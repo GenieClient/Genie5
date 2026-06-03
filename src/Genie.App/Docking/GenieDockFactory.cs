@@ -174,6 +174,8 @@ public class GenieDockFactory : Factory
         var whispers = new StreamTool      (_vm.StreamTabs.Whispers, ws.Get("whispers"));
         var thoughts = new StreamTool      (_vm.StreamTabs.Thoughts, ws.Get("thoughts"));
         var combat   = new StreamTool      (_vm.StreamTabs.Combat,   ws.Get("combat"));
+        var log      = new StreamTool      (_vm.StreamTabs.Log,      ws.Get("log"));
+        var itemlog  = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
         var experience = new ExperienceTool(_vm.Experience,          ws.Get("experience"));
 
         // ── Default ship layout — three vertical columns ─────────────────
@@ -231,7 +233,7 @@ public class GenieDockFactory : Factory
             Id               = "streams",
             Alignment        = Alignment.Bottom,
             Proportion       = 0.65,
-            VisibleDockables = CreateList<IDockable>(logons, talk, whispers, thoughts, combat),
+            VisibleDockables = CreateList<IDockable>(logons, talk, whispers, thoughts, combat, log, itemlog),
             ActiveDockable   = combat   // matches screenshot default — Combat tab active
         };
 
@@ -302,6 +304,8 @@ public class GenieDockFactory : Factory
         _tools[whispers.Id] = (whispers, streamDock.Id);
         _tools[thoughts.Id] = (thoughts, streamDock.Id);
         _tools[combat.Id]   = (combat,   streamDock.Id);
+        _tools[log.Id]      = (log,      streamDock.Id);
+        _tools[itemlog.Id]  = (itemlog,  streamDock.Id);
         // Experience: registered but hidden by default (like Vitals) — re-opens
         // beside the Backpack via Window → Experience. The plugin fills it.
         _tools[experience.Id] = (experience, backpackDock.Id);
@@ -360,6 +364,8 @@ public class GenieDockFactory : Factory
         var whispers   = new StreamTool      (_vm.StreamTabs.Whispers, ws.Get("whispers"));
         var thoughts   = new StreamTool      (_vm.StreamTabs.Thoughts, ws.Get("thoughts"));
         var combat     = new StreamTool      (_vm.StreamTabs.Combat,   ws.Get("combat"));
+        var log        = new StreamTool      (_vm.StreamTabs.Log,      ws.Get("log"));
+        var itemlog    = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
         var experience = new ExperienceTool  (_vm.Experience,          ws.Get("experience"));
 
         // Default-visible set mirrors the tabbed layout (Vitals + Experience
@@ -373,7 +379,7 @@ public class GenieDockFactory : Factory
             LayoutMode        = DocumentLayoutMode.Mdi,
             VisibleDockables  = CreateList<IDockable>(
                 gameText, room, mapper, backpack,
-                logons, talk, whispers, thoughts, combat),
+                logons, talk, whispers, thoughts, combat, log, itemlog),
             ActiveDockable    = gameText,
         };
 
@@ -398,7 +404,7 @@ public class GenieDockFactory : Factory
         _tools.Clear();
         foreach (var d in new IDockable[]
                  { gameText, room, mapper, backpack,
-                   logons, talk, whispers, thoughts, combat,
+                   logons, talk, whispers, thoughts, combat, log, itemlog,
                    vitals, experience })
             _tools[d.Id!] = (d, mdiDock.Id);
         _dockHomes.Clear();

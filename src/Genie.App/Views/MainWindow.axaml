@@ -219,6 +219,16 @@
                   ToggleType="CheckBox"
                   IsChecked="{Binding CombatVisible, Mode=OneWay}"
                   Command="{Binding ToggleCombatCommand}"/>
+        <MenuItem Header="Lo_g"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding LogVisible, Mode=OneWay}"
+                  Command="{Binding ToggleLogCommand}"
+                  ToolTip.Tip="Consolidated conversation log — mirrors the Talk and Whispers speech streams. Also the target for script `#echo &gt;log`."/>
+        <MenuItem Header="_Item Log"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding ItemLogVisible, Mode=OneWay}"
+                  Command="{Binding ToggleItemLogCommand}"
+                  ToolTip.Tip="Item / loot log — fed by the server itemLog stream and by script `#echo &gt;itemlog`."/>
 
         <Separator/>
 
