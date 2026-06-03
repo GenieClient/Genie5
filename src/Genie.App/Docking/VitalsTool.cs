@@ -1,5 +1,5 @@
 using Genie.Core.Layout;
-using Dock.Model.ReactiveUI.Controls;
+using Dock.Model.Mvvm.Controls;
 using Genie.App.ViewModels;
 
 namespace Genie.App.Docking;

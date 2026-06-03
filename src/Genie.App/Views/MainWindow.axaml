@@ -130,6 +130,11 @@
                   IsChecked="{Binding Display.ShowStatusBar}"
                   Command="{Binding ToggleStatusBarCommand}"
                   ToolTip.Tip="Show/hide the Wrayth-style vitals strip at the bottom of the window"/>
+        <MenuItem Header="_Windowed Mode (MDI)"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.WindowedMode, Mode=OneWay}"
+                  Command="{Binding ToggleWindowedModeCommand}"
+                  ToolTip.Tip="Genie 4-style windowed mode: every panel becomes a free-floating child window inside the main window, instead of the tabbed/docked layout. The choice and each window's position/size are remembered."/>
         <MenuItem Header="G_uild in Title Bar"
                   ToggleType="CheckBox"
                   IsChecked="{Binding Display.ShowGuildInTitle}"

@@ -209,6 +209,9 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
+        // Capture windowed-mode geometry on every close attempt (idempotent;
+        // harmless if the close is later cancelled by the connection prompt).
+        ViewModel?.PersistMdiGeometryIfWindowed();
         if (e.Cancel)            return;   // something upstream already vetoed
         if (_closeConfirmed)     return;   // second pass after user said Yes
         if (ViewModel?.IsConnected != true) return;

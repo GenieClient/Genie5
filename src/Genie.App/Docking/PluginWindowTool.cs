@@ -1,6 +1,6 @@
 using System;
 using Avalonia.Media;
-using Dock.Model.ReactiveUI.Controls;
+using Dock.Model.Mvvm.Controls;
 using Genie.App.ViewModels;
 using ReactiveUI;
 
@@ -12,7 +12,7 @@ namespace Genie.App.Docking;
 /// title. Monospaced so plugins that render column-aligned text (inventory
 /// trees, tables) line up — same treatment as the Experience panel.
 ///
-/// <para>The dock <see cref="Dock.Model.ReactiveUI.Controls.Tool.Id"/> is the
+/// <para>The dock <see cref="Dock.Model.Mvvm.Controls.Tool.Id"/> is the
 /// canonical <c>pluginwin:&lt;name&gt;</c> key (see
 /// <see cref="GenieDockFactory.PluginWindowId"/>), so the panel round-trips
 /// through saved layouts and the Window menu's visibility toggles just like a
