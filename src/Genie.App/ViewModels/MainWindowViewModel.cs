@@ -262,6 +262,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     [Reactive] public bool WhispersVisible { get; private set; } = true;
     [Reactive] public bool ThoughtsVisible { get; private set; } = true;
     [Reactive] public bool CombatVisible   { get; private set; } = true;
+    [Reactive] public bool LogVisible      { get; private set; } = true;
+    [Reactive] public bool ItemLogVisible  { get; private set; } = true;
 
     // ── Toggle commands (one per dockable) ───────────────────────────────────
     public ReactiveCommand<Unit, Unit> ToggleGameCommand     { get; }
@@ -275,6 +277,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ToggleWhispersCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleThoughtsCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleCombatCommand   { get; }
+    public ReactiveCommand<Unit, Unit> ToggleLogCommand      { get; }
+    public ReactiveCommand<Unit, Unit> ToggleItemLogCommand  { get; }
 
     // ── Core ──────────────────────────────────────────────────────────────────
 
@@ -952,15 +956,18 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleWhispersCommand = MakeToggleCommand("whispers",  v => WhispersVisible = v);
         ToggleThoughtsCommand = MakeToggleCommand("thoughts",  v => ThoughtsVisible = v);
         ToggleCombatCommand   = MakeToggleCommand("combat",    v => CombatVisible   = v);
+        ToggleLogCommand      = MakeToggleCommand("log",       v => LogVisible      = v);
+        ToggleItemLogCommand  = MakeToggleCommand("itemlog",   v => ItemLogVisible  = v);
 
         ResetLayoutCommand = ReactiveCommand.Create(() =>
         {
             if (DockFactory is not GenieDockFactory factory) return;
-            foreach (var id in new[] { "game-text", "vitals", "room", "backpack", "mapper", "logons", "talk", "whispers", "thoughts", "combat" })
+            foreach (var id in new[] { "game-text", "vitals", "room", "backpack", "mapper", "logons", "talk", "whispers", "thoughts", "combat", "log", "itemlog" })
                 factory.SetToolVisibility(id, true);
 
             GameVisible   = VitalsVisible   = RoomVisible    = BackpackVisible = MapperVisible = true;
             LogonsVisible = TalkVisible     = WhispersVisible = ThoughtsVisible = CombatVisible = true;
+            LogVisible    = ItemLogVisible  = true;
         });
 
         DisconnectCommand = ReactiveCommand.CreateFromTask(
@@ -1534,6 +1541,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         SetVisibilityBool("whispers",  factory.IsToolVisible("whispers"));
         SetVisibilityBool("thoughts",  factory.IsToolVisible("thoughts"));
         SetVisibilityBool("combat",    factory.IsToolVisible("combat"));
+        SetVisibilityBool("log",       factory.IsToolVisible("log"));
+        SetVisibilityBool("itemlog",   factory.IsToolVisible("itemlog"));
     }
 
     // ── Plugin-created windows ───────────────────────────────────────────────
@@ -1556,6 +1565,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             "experience", "main", "game", "game-text", "room", "vitals",
             "backpack", "mapper", "scripts",
             "logons", "talk", "whispers", "thoughts", "combat",
+            "log", "itemlog",
         };
 
     private static bool IsReservedWindow(string? name)
@@ -1584,6 +1594,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // not re-open it on every line if the user closed it.
         core.EchoToWindow += (text, window, _) =>
         {
+            // First-class log windows: route #echo >log / >itemlog to the
+            // built-in stream panels instead of auto-creating a plugin window.
+            var w = window?.Trim().ToLowerInvariant();
+            if (w is "log" or "itemlog")
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    (w == "log" ? StreamTabs.Log : StreamTabs.ItemLog).Add(text));
+                return;
+            }
             if (IsReservedWindow(window)) return;
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
@@ -1814,6 +1833,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "whispers":  ForceSet(visible, v => WhispersVisible = v, () => WhispersVisible); break;
             case "thoughts":  ForceSet(visible, v => ThoughtsVisible = v, () => ThoughtsVisible); break;
             case "combat":    ForceSet(visible, v => CombatVisible   = v, () => CombatVisible);   break;
+            case "log":       ForceSet(visible, v => LogVisible      = v, () => LogVisible);      break;
+            case "itemlog":   ForceSet(visible, v => ItemLogVisible  = v, () => ItemLogVisible);  break;
         }
 
         static void ForceSet(bool target, Action<bool> set, Func<bool> get)

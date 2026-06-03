@@ -14,7 +14,16 @@ public class StreamTabsViewModel : ReactiveObject
     public StreamBuffer Thoughts { get; } = new("Thoughts");
     public StreamBuffer Combat   { get; } = new("Combat");
 
-    public IReadOnlyList<StreamBuffer> All => [Logons, Talk, Whispers, Thoughts, Combat];
+    /// <summary>Consolidated conversation log — mirrors the speech streams
+    /// (talk / whispers), Genie 4 "Log" window parity. Also an <c>#echo &gt;log</c>
+    /// target (wired in MainWindowViewModel).</summary>
+    public StreamBuffer Log      { get; } = new("Log");
+
+    /// <summary>Item / loot log. Fed by the <c>itemLog</c> server stream and by
+    /// <c>#echo &gt;itemlog</c> from scripts.</summary>
+    public StreamBuffer ItemLog  { get; } = new("ItemLog");
+
+    public IReadOnlyList<StreamBuffer> All => [Logons, Talk, Whispers, Thoughts, Combat, Log, ItemLog];
 
     public void Attach(GenieCore core)
     {
@@ -25,14 +34,21 @@ public class StreamTabsViewModel : ReactiveObject
             {
                 var buf = e.Stream switch
                 {
-                    "logons"   => Logons,
-                    "talk"     => Talk,
-                    "whispers" => Whispers,
-                    "thoughts" => Thoughts,
-                    "combat"   => Combat,
-                    _          => null
+                    "logons"               => Logons,
+                    "talk"                 => Talk,
+                    "whispers"             => Whispers,
+                    "thoughts"             => Thoughts,
+                    "combat"               => Combat,
+                    "itemlog" or "itemLog" => ItemLog,
+                    _                      => null
                 };
                 buf?.Add(e.Text);
+
+                // The Log window is a consolidated conversation feed: mirror
+                // the speech streams into it (matches the Genie 4 / dylb0t
+                // prototype "Log" window).
+                if (e.Stream is "talk" or "whispers")
+                    Log.Add(e.Text);
             });
     }
 }
