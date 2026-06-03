@@ -1,5 +1,5 @@
 using Avalonia.Media;
-using Dock.Model.ReactiveUI.Controls;
+using Dock.Model.Mvvm.Controls;
 using Genie.App.ViewModels;
 using Genie.Core.Layout;
 

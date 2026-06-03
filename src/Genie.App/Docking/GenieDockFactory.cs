@@ -3,8 +3,8 @@ using Avalonia.Media;
 using Dock.Avalonia.Controls;
 using Dock.Model.Controls;
 using Dock.Model.Core;
-using Dock.Model.ReactiveUI;
-using Dock.Model.ReactiveUI.Controls;
+using Dock.Model.Mvvm;
+using Dock.Model.Mvvm.Controls;
 using Genie.App.ViewModels;
 
 namespace Genie.App.Docking;
@@ -325,6 +325,142 @@ public class GenieDockFactory : Factory
             _tools[id] = (tool, backpackDock.Id);
 
         return root;
+    }
+
+    /// <summary>
+    /// Windowed (MDI) layout — every panel is a free-floating child window
+    /// inside a single MDI <see cref="DocumentDock"/> (Genie 4 "windowed
+    /// mode"). Requires Dock 11.3.9+ (<see cref="DocumentLayoutMode.Mdi"/>).
+    /// Panel instances and their DataTemplates are identical to
+    /// <see cref="CreateLayout"/>; only the container differs, so the Window
+    /// menu, per-window settings, and float/visibility plumbing all carry over.
+    /// </summary>
+    public IRootDock CreateMdiLayout()
+    {
+        // Host-window locator is harmless in MDI mode (children are in-window,
+        // not OS windows) but a panel can still be floated out to a real
+        // window, so keep it wired exactly as the tabbed path does.
+        HostWindowLocator = new Dictionary<string, Func<IHostWindow?>>
+        {
+            [nameof(IDockWindow)] = () => new HostWindow
+            {
+                Background            = new SolidColorBrush(Color.FromRgb(0x1f, 0x1f, 0x1f)),
+                TransparencyLevelHint = new[] { WindowTransparencyLevel.None },
+            }
+        };
+
+        var ws         = _vm.WindowSettings;
+        var gameText   = new GameTextDocument(_vm.GameText,           ws.Get("game-text"));
+        var vitals     = new VitalsTool      (_vm.Vitals,             ws.Get("vitals"));
+        var room       = new RoomTool        (_vm.Room,               ws.Get("room"));
+        var backpack   = new BackpackTool    (_vm.Inventory,          ws.Get("backpack"));
+        var mapper     = new MapperTool      (_vm.Mapper,             ws.Get("mapper"));
+        var logons     = new StreamTool      (_vm.StreamTabs.Logons,   ws.Get("logons"));
+        var talk       = new StreamTool      (_vm.StreamTabs.Talk,     ws.Get("talk"));
+        var whispers   = new StreamTool      (_vm.StreamTabs.Whispers, ws.Get("whispers"));
+        var thoughts   = new StreamTool      (_vm.StreamTabs.Thoughts, ws.Get("thoughts"));
+        var combat     = new StreamTool      (_vm.StreamTabs.Combat,   ws.Get("combat"));
+        var experience = new ExperienceTool  (_vm.Experience,          ws.Get("experience"));
+
+        // Default-visible set mirrors the tabbed layout (Vitals + Experience
+        // stay registered-but-hidden — the Status Bar / plugin cover them).
+        var mdiDock = new DocumentDock
+        {
+            Id                = "mdi",
+            Title             = "Windows",
+            IsCollapsable     = false,
+            CanCreateDocument = false,
+            LayoutMode        = DocumentLayoutMode.Mdi,
+            VisibleDockables  = CreateList<IDockable>(
+                gameText, room, mapper, backpack,
+                logons, talk, whispers, thoughts, combat),
+            ActiveDockable    = gameText,
+        };
+
+        var rootLayout = new ProportionalDock
+        {
+            Id               = "root-layout",
+            Orientation      = Orientation.Horizontal,
+            IsCollapsable    = false,
+            VisibleDockables = CreateList<IDockable>(mdiDock),
+        };
+
+        var root = CreateRootDock();
+        root.Id               = "root";
+        root.IsCollapsable    = false;
+        root.VisibleDockables = CreateList<IDockable>(rootLayout);
+        root.ActiveDockable   = rootLayout;
+        root.DefaultDockable  = rootLayout;
+        _root                 = root;
+
+        // Registry for Window-menu visibility toggles — every panel re-opens
+        // into the single MDI dock. No nested home docks in MDI mode.
+        _tools.Clear();
+        foreach (var d in new IDockable[]
+                 { gameText, room, mapper, backpack,
+                   logons, talk, whispers, thoughts, combat,
+                   vitals, experience })
+            _tools[d.Id!] = (d, mdiDock.Id);
+        _dockHomes.Clear();
+
+        foreach (var (id, tool) in _pluginWindowTools)
+            _tools[id] = (tool, mdiDock.Id);
+
+        return root;
+    }
+
+    /// <summary>Build + initialise the MDI layout, ready to assign to the
+    /// DockControl. MDI counterpart of <see cref="BuildDefaultLayout"/>.
+    /// <paramref name="savedBounds"/> (if any) restores each child window's
+    /// last position/size/state.</summary>
+    public IRootDock BuildMdiLayout(
+        IReadOnlyDictionary<string, Settings.MdiWindowBounds>? savedBounds = null)
+    {
+        var root = CreateMdiLayout();
+        InitLayout(root);
+        if (savedBounds is { Count: > 0 }) ApplyMdiBounds(savedBounds);
+        CaptureAllPositions();
+        return root;
+    }
+
+    // ── Windowed-mode (MDI) per-window geometry ────────────────────────────
+    // Every dockable in Dock.Model.Mvvm (Tool AND Document) implements
+    // IMdiDocument, so each floating panel carries its own MdiBounds/MdiState.
+
+    /// <summary>Read the current MDI geometry of every panel that has a
+    /// non-empty rect. Called before leaving windowed mode and on app close
+    /// so positions survive restarts.</summary>
+    public Dictionary<string, Settings.MdiWindowBounds> CaptureMdiBounds()
+    {
+        var result = new Dictionary<string, Settings.MdiWindowBounds>();
+        foreach (var (_, (dockable, _)) in _tools)
+        {
+            if (dockable is Dock.Model.Controls.IMdiDocument mdi &&
+                dockable.Id is { Length: > 0 } id)
+            {
+                var r = mdi.MdiBounds;
+                if (r.Width > 0 && r.Height > 0)
+                    result[id] = new Settings.MdiWindowBounds(
+                        r.X, r.Y, r.Width, r.Height, mdi.MdiState.ToString());
+            }
+        }
+        return result;
+    }
+
+    /// <summary>Restore saved MDI geometry onto the freshly built panels.</summary>
+    public void ApplyMdiBounds(IReadOnlyDictionary<string, Settings.MdiWindowBounds> bounds)
+    {
+        foreach (var (_, (dockable, _)) in _tools)
+        {
+            if (dockable is Dock.Model.Controls.IMdiDocument mdi &&
+                dockable.Id is { Length: > 0 } id &&
+                bounds.TryGetValue(id, out var b))
+            {
+                mdi.MdiBounds = new Dock.Model.Core.DockRect(b.X, b.Y, b.Width, b.Height);
+                if (Enum.TryParse<Dock.Model.Core.MdiWindowState>(b.State, out var st))
+                    mdi.MdiState = st;
+            }
+        }
     }
 
     // ── Layout snapshot (full-tree round-trip) ─────────────────────────────

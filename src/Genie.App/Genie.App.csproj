@@ -41,15 +41,27 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.3.6" />
-    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="11.3.6" />
-    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.6" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.6" />
-    <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.6" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.6" />
-    <PackageReference Include="Dock.Avalonia" Version="11.3.6.4" />
-    <PackageReference Include="Dock.Avalonia.Themes.Fluent" Version="11.3.6.4" />
-    <PackageReference Include="Dock.Model.ReactiveUI" Version="11.3.6.4" />
+    <!-- Avalonia core pinned to 11.3.11 (Dock 11.3.11.x requires >= 11.3.11).
+         Avalonia.ReactiveUI stays at 11.3.9 — its highest published version —
+         which still resolves against core 11.3.11 (>= 11.3.9, an upgrade of
+         the transitive, not a downgrade). -->
+    <PackageReference Include="Avalonia" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.11" />
+    <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.9" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.11" />
+    <!-- Docking framework. The MVVM model variant (CommunityToolkit.Mvvm-based)
+         is used instead of Dock.Model.ReactiveUI so the MDI document layout +
+         skinned MDI window chrome are available WITHOUT forcing a ReactiveUI
+         20→22 upgrade (Dock.Model.ReactiveUI requires ReactiveUI >= 22.2.1,
+         which would break ReactiveUI.Fody). The app's own view-models keep
+         ReactiveUI + Fody; only the dock Tool/Document/Factory classes use the
+         MVVM base (ObservableObject). Pinned to 11.3.11.22 to match the
+         windowed-mode skin (MdiDocumentWindowSkin) authored against that API. -->
+    <PackageReference Include="Dock.Avalonia" Version="11.3.11.22" />
+    <PackageReference Include="Dock.Avalonia.Themes.Fluent" Version="11.3.11.22" />
+    <PackageReference Include="Dock.Model.Mvvm" Version="11.3.11.22" />
     <PackageReference Include="ReactiveUI" Version="20.4.1" />
     <PackageReference Include="ReactiveUI.Fody" Version="19.5.41" />
     <!-- Cross-platform install + auto-update framework. Used by
@@ -82,6 +94,10 @@
     <AvaloniaResource Include="Assets/app.icns" />
     <AvaloniaResource Include="Assets/app.png" />
     <AvaloniaResource Include="Assets/Icons/*.png" />
+    <!-- 9-slice border bitmaps for the Genie 4-style windowed (MDI) window
+         chrome — consumed by Themes/MdiDocumentWindowSkin.axaml. -->
+    <AvaloniaResource Include="Assets/skin_*.bmp" />
+    <AvaloniaResource Include="Assets/skin_*.png" />
   </ItemGroup>
 
   <ItemGroup>

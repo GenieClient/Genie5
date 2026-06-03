@@ -1,10 +1,9 @@
 using Avalonia;
 using Avalonia.Media;
-using Dock.Model.ReactiveUI.Controls;
+using Dock.Model.Mvvm.Controls;
 using Genie.App.Controls;
 using Genie.App.ViewModels;
 using Genie.Core.Layout;
-using ReactiveUI.Fody.Helpers;
 
 namespace Genie.App.Docking;
 
@@ -12,10 +11,20 @@ public class BackpackTool : Tool
 {
     public InventoryViewModel ViewModel { get; }
 
-    [Reactive] public IBrush?    ToolForeground { get; private set; }
-    [Reactive] public IBrush?    ToolBackground { get; private set; }
-    [Reactive] public FontFamily ToolFontFamily { get; private set; } = new("Cascadia Mono,Consolas,Courier New,monospace");
-    [Reactive] public double     ToolFontSize   { get; private set; } = 11;
+    // Per-window appearance overrides. Backed by SetProperty (the Dock.Model.Mvvm
+    // base derives from CommunityToolkit's ObservableObject) rather than Fody
+    // [Reactive], since this Tool no longer derives from a ReactiveObject.
+    private IBrush?    _toolForeground;
+    public  IBrush?    ToolForeground { get => _toolForeground; private set => SetProperty(ref _toolForeground, value); }
+
+    private IBrush?    _toolBackground;
+    public  IBrush?    ToolBackground { get => _toolBackground; private set => SetProperty(ref _toolBackground, value); }
+
+    private FontFamily _toolFontFamily = new("Cascadia Mono,Consolas,Courier New,monospace");
+    public  FontFamily ToolFontFamily { get => _toolFontFamily; private set => SetProperty(ref _toolFontFamily, value); }
+
+    private double     _toolFontSize = 11;
+    public  double     ToolFontSize { get => _toolFontSize; private set => SetProperty(ref _toolFontSize, value); }
 
     public BackpackTool(InventoryViewModel vm, WindowSettings? settings = null)
     {

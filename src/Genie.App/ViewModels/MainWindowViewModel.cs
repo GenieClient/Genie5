@@ -176,6 +176,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     public Interaction<LayoutSavePrompt, LayoutSaveResult?> ShowLayoutSavePrompt   { get; } = new();
     public ReactiveCommand<Unit, Unit>                    ToggleStatusBarCommand   { get; }
+    public ReactiveCommand<Unit, Unit>                    ToggleWindowedModeCommand{ get; }
     public ReactiveCommand<Unit, Unit>                    ToggleGuildInTitleCommand{ get; }
     public ReactiveCommand<Unit, Unit>                    ToggleHandsBarCommand    { get; }
     /// <summary>Window → Hands Strip Position → Top. Snaps the strip to the top of the window.</summary>
@@ -313,6 +314,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private readonly string _profilesPath;
     private readonly string _displayPath;
     private readonly string _pathsPath;
+    private readonly string _mdiLayoutPath;
     private readonly string _configDir;
     private readonly string _defaultMapsDir;
 
@@ -366,6 +368,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _profilesPath = Path.Combine(_configDir, "profiles.json");
         _displayPath  = Path.Combine(_configDir, "display.json");
         _pathsPath    = Path.Combine(_configDir, "paths.json");
+        _mdiLayoutPath = Path.Combine(_configDir, "mdi-layout.json");
         // Recordings live as a sibling to Config (not under it) — same parent
         // dir, so {AppData}/Genie5/{Config, Logs, Maps, Profiles}/ is the layout.
         _logsDir      = Path.Combine(Path.GetDirectoryName(_configDir)!, "Logs");
@@ -531,7 +534,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         };
 
         DockFactory = factory;
-        DockLayout  = factory.BuildDefaultLayout();
+        // Honor the persisted windowed-mode choice on startup, restoring each
+        // child window's saved geometry when windowed.
+        DockLayout  = Display.WindowedMode
+            ? factory.BuildMdiLayout(Settings.MdiLayoutStore.Load(_mdiLayoutPath))
+            : factory.BuildDefaultLayout();
 
         // Wire the Mapper's "pop out" button. Done here (after factory exists)
         // because the VM doesn't carry a factory reference itself.
@@ -788,6 +795,26 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Display.Save(_displayPath);
         });
 
+        // Switch between tabbed/docked and windowed (MDI) document modes.
+        // Rebuilds the dock layout from scratch — the panel view-models are
+        // reused, only the container tree changes — then re-syncs the
+        // Window-menu check marks against the freshly built tree.
+        ToggleWindowedModeCommand = ReactiveCommand.Create(() =>
+        {
+            if (DockFactory is not GenieDockFactory factory) return;
+            // Leaving windowed mode — capture the current window geometry first
+            // so it's restored next time MDI is enabled.
+            if (Display.WindowedMode)
+                Settings.MdiLayoutStore.Save(_mdiLayoutPath, factory.CaptureMdiBounds());
+            Display.WindowedMode = !Display.WindowedMode;
+            Display.Save(_displayPath);
+            DockLayout = Display.WindowedMode
+                ? factory.BuildMdiLayout(Settings.MdiLayoutStore.Load(_mdiLayoutPath))
+                : factory.BuildDefaultLayout();
+            RefreshVisibilityBools();
+            GameText.AddSystemLine($"[layout] {(Display.WindowedMode ? "windowed (MDI)" : "tabbed")} mode");
+        });
+
         ToggleGuildInTitleCommand = ReactiveCommand.Create(() =>
         {
             Display.ShowGuildInTitle = !Display.ShowGuildInTitle;
@@ -967,6 +994,19 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// connect dialog after a Save / Delete action.
     /// </summary>
     public void SaveProfiles() => Profiles.Save(_profilesPath);
+
+    /// <summary>
+    /// If windowed (MDI) mode is active, capture each child window's current
+    /// position/size/state to <c>mdi-layout.json</c>. Called from the main
+    /// window's close handler so the windowed layout survives a restart.
+    /// No-op in tabbed mode.
+    /// </summary>
+    public void PersistMdiGeometryIfWindowed()
+    {
+        if (!Display.WindowedMode) return;
+        if (DockFactory is GenieDockFactory factory)
+            Settings.MdiLayoutStore.Save(_mdiLayoutPath, factory.CaptureMdiBounds());
+    }
 
     /// <summary>
     /// File → Maps Directory... Opens a native folder picker, persists the
