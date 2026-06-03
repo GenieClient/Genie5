@@ -958,14 +958,14 @@
                           Background="Transparent" BorderThickness="0"
                           Foreground="#80a8c0"
                           ToolTip.Tip="Edit this script in the configured editor"
-                          Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).ScriptBar.EditScriptCommand}"
+                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.EditScriptCommand}"
                           CommandParameter="{Binding}"/>
                   <Button Content="✕"
                           FontSize="10" Padding="3,0" MinWidth="0" MinHeight="0"
                           Background="Transparent" BorderThickness="0"
                           Foreground="#d08080"
                           ToolTip.Tip="Stop this script (#stop)"
-                          Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).ScriptBar.StopScriptCommand}"
+                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.StopScriptCommand}"
                           CommandParameter="{Binding}"/>
                 </StackPanel>
               </Border>

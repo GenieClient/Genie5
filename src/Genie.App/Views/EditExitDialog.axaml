@@ -64,7 +64,7 @@
                   <Button Grid.Column="3" Content="✕" Margin="4,0,0,0"
                           FontSize="11" Padding="6,2"
                           Background="#3a2828" Foreground="#d09090"
-                          Command="{Binding $parent[ItemsControl].((vm:EditExitViewModel)DataContext).RemoveSkillCommand}"
+                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveSkillCommand}"
                           CommandParameter="{Binding}"
                           ToolTip.Tip="Remove this skill requirement"/>
                 </Grid>
