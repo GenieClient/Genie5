@@ -82,6 +82,13 @@ public sealed class SavedLayout
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+        // Dock leaves a ProportionalDock's Proportion at double.NaN to mean
+        // "auto / equal share". The DockTree snapshot captures that verbatim,
+        // and System.Text.Json rejects NaN/Infinity unless told otherwise —
+        // which crashed "Save Layout" (the snapshot legitimately contains NaN).
+        // Allow the named literals so NaN round-trips and auto-sized docks stay
+        // auto-sized; used for both serialize and deserialize (shared options).
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     };
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOpts);
