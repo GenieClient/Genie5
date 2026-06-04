@@ -445,7 +445,12 @@ public class GenieDockFactory : Factory
                 dockable.Id is { Length: > 0 } id)
             {
                 var r = mdi.MdiBounds;
-                if (r.Width > 0 && r.Height > 0)
+                // Only persist real, finite rects — a window that was never
+                // realised (or is minimised) can report NaN/Infinity bounds,
+                // which would crash MdiLayoutStore's JSON write.
+                if (double.IsFinite(r.X) && double.IsFinite(r.Y) &&
+                    double.IsFinite(r.Width) && double.IsFinite(r.Height) &&
+                    r.Width > 0 && r.Height > 0)
                     result[id] = new Settings.MdiWindowBounds(
                         r.X, r.Y, r.Width, r.Height, mdi.MdiState.ToString());
             }
