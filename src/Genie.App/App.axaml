@@ -83,6 +83,7 @@
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
                       Width="{Binding $parent[Grid].Bounds.Width}"
+                      Height="{Binding $parent[Grid].Bounds.Height}"
                       controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}">
           <ItemsControl ItemsSource="{Binding ViewModel.Lines}"
                         FontFamily="{Binding ToolFontFamily}"
@@ -512,7 +513,8 @@
         <ScrollViewer x:Name="backpackScroll"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
-                      Width="{Binding $parent[Grid].Bounds.Width}">
+                      Width="{Binding $parent[Grid].Bounds.Width}"
+                      Height="{Binding $parent[Grid].Bounds.Height}">
           <ItemsControl ItemsSource="{Binding ViewModel.Items}"
                         FontFamily="{Binding ToolFontFamily}"
                         FontSize="{Binding ToolFontSize}"
@@ -537,6 +539,7 @@
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
                       Width="{Binding $parent[Grid].Bounds.Width}"
+                      Height="{Binding $parent[Grid].Bounds.Height}"
                       controls:AutoScrollBehavior.ItemsSource="{Binding Buffer.Lines}">
           <ItemsControl ItemsSource="{Binding Buffer.Lines}"
                         FontFamily="{Binding ToolFontFamily}"

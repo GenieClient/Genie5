@@ -487,6 +487,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         WindowSettings.Register("whispers",  "Whispers");
         WindowSettings.Register("thoughts",  "Thoughts");
         WindowSettings.Register("combat",    "Combat");
+        WindowSettings.Register("log",       "Log");
+        WindowSettings.Register("itemlog",   "ItemLog");
         WindowSettings.Register("mapper",    "Mapper");
         WindowSettings.Register("experience", "Experience");
 
@@ -2185,6 +2187,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             ShowEchoText          = Display.ShowEchoText,
             ShowScriptText        = Display.ShowScriptText,
             MapBackgroundHex      = Display.MapBackgroundHex,
+            WindowedMode          = Display.WindowedMode,
         };
 
         // Visible-tool list — walk the dock factory's known tools and
@@ -2204,6 +2207,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             // alignments, active tabs, container structure), so loading the
             // layout restores the visual arrangement, not just visibility.
             layout.DockTree = factory.CaptureLayout();
+
+            // In windowed mode the tree snapshot isn't the arrangement — the
+            // per-window MDI geometry is. Capture it so the layout reopens with
+            // each floating window where it was.
+            if (Display.WindowedMode)
+                layout.MdiBounds = factory.CaptureMdiBounds();
         }
         return layout;
     }
@@ -2228,11 +2237,25 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.ShowScriptText         = layout.ShowScriptText;
         if (!string.IsNullOrWhiteSpace(layout.MapBackgroundHex))
             Display.MapBackgroundHex   = layout.MapBackgroundHex;
+        // Switch document mode to match the saved layout BEFORE rebuilding the
+        // dock, so a layout saved in windowed mode reopens windowed (not tabbed).
+        Display.WindowedMode           = layout.WindowedMode;
         Display.Save(_displayPath);
 
         if (DockFactory is Docking.GenieDockFactory factory)
         {
-            if (layout.DockTree is not null)
+            if (layout.WindowedMode)
+            {
+                // Windowed (MDI): the dock-tree snapshot doesn't capture MDI
+                // arrangement — the per-window geometry does. Prefer the
+                // layout's own saved geometry, falling back to the global
+                // mdi-layout.json.
+                var bounds = layout.MdiBounds is { Count: > 0 }
+                    ? layout.MdiBounds
+                    : Settings.MdiLayoutStore.Load(_mdiLayoutPath);
+                DockLayout = factory.BuildMdiLayout(bounds);
+            }
+            else if (layout.DockTree is not null)
             {
                 // Authoritative path: rebuild the whole tree from the snapshot
                 // and swap it into the bound DockControl. Restores proportions,
@@ -2252,6 +2275,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 foreach (var id in factory.ToolIds)
                     factory.SetToolVisibility(id, wanted.Contains(id));
             }
+            RefreshVisibilityBools();
         }
     }
 

@@ -59,6 +59,16 @@ public sealed class SavedLayout
     /// feature; those fall back to <see cref="VisibleTools"/>.</summary>
     public Docking.DockNodeSnapshot? DockTree { get; set; }
 
+    /// <summary>Whether this layout was saved in windowed (MDI) document mode.
+    /// On load, the app switches to that mode before rebuilding — so a layout
+    /// saved in windowed mode reopens windowed, not tabbed.</summary>
+    public bool WindowedMode { get; set; }
+
+    /// <summary>Per-window MDI geometry (position/size/state), keyed by panel
+    /// id. Only populated for <see cref="WindowedMode"/> layouts; restores each
+    /// floating window where it was when the layout was saved.</summary>
+    public Dictionary<string, MdiWindowBounds>? MdiBounds { get; set; }
+
     // ── Cross-cutting display flags ────────────────────────────────────
 
     public bool   HandsStripVisible    { get; set; } = true;
