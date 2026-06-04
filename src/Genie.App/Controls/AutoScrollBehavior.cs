@@ -101,8 +101,11 @@ public sealed class AutoScrollState : ReactiveObject
 
     public void ScrollToBottom()
     {
-        var max = Math.Max(0, _sv.Extent.Height - _sv.Viewport.Height);
-        _sv.Offset = _sv.Offset.WithY(max);
+        // ScrollToEnd() uses the ScrollViewer's own up-to-date extent, so it
+        // lands on the last line even when extent/viewport are mid-update
+        // (right after a line is added, or after an MDI relayout) — more
+        // robust than computing Offset from Extent - Viewport.
+        _sv.ScrollToEnd();
     }
 
     private void JumpToBottom()
