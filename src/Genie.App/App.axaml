@@ -82,6 +82,7 @@
         <ScrollViewer x:Name="gameScroll"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
+                      Width="{Binding $parent[Grid].Bounds.Width}"
                       controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}">
           <ItemsControl ItemsSource="{Binding ViewModel.Lines}"
                         FontFamily="{Binding ToolFontFamily}"
@@ -510,7 +511,8 @@
       <Grid RowDefinitions="*" Background="{Binding ToolBackground}">
         <ScrollViewer x:Name="backpackScroll"
                       HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto">
+                      VerticalScrollBarVisibility="Auto"
+                      Width="{Binding $parent[Grid].Bounds.Width}">
           <ItemsControl ItemsSource="{Binding ViewModel.Items}"
                         FontFamily="{Binding ToolFontFamily}"
                         FontSize="{Binding ToolFontSize}"
@@ -534,6 +536,7 @@
         <ScrollViewer x:Name="streamScroll"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
+                      Width="{Binding $parent[Grid].Bounds.Width}"
                       controls:AutoScrollBehavior.ItemsSource="{Binding Buffer.Lines}">
           <ItemsControl ItemsSource="{Binding Buffer.Lines}"
                         FontFamily="{Binding ToolFontFamily}"
