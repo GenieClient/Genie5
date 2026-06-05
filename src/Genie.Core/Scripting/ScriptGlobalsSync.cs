@@ -42,20 +42,32 @@ public sealed class ScriptGlobalsSync : IDisposable
     private readonly IDisposable                 _subscription;
     private readonly string                      _gameCode;
     private readonly string                      _characterName;
+    private readonly string                      _accountName;
+    private readonly string                      _clientName;
+    private readonly string                      _clientVersion;
 
     /// <param name="gameCode">e.g. "DR" for DragonRealms. Surfaced as <c>$game</c> and <c>$gamename</c>.</param>
     /// <param name="characterName">Seeds <c>$charactername</c> until the server's component event arrives.</param>
+    /// <param name="accountName">SGE account, surfaced as <c>$account</c>.</param>
+    /// <param name="clientName">Product name, surfaced as <c>$client</c> (Genie 4 used "Genie Client 4").</param>
+    /// <param name="clientVersion">App version string, surfaced as <c>$version</c>.</param>
     public ScriptGlobalsSync(
         Models.GameState            state,
         IDictionary<string, string> globals,
         IObservable<GameEvent>      events,
         string                      gameCode      = "DR",
-        string                      characterName = "")
+        string                      characterName = "",
+        string                      accountName   = "",
+        string                      clientName    = "Genie Client 5",
+        string                      clientVersion = "")
     {
         _state         = state;
         _globals       = globals;
         _gameCode      = gameCode;
         _characterName = characterName;
+        _accountName   = accountName;
+        _clientName    = clientName;
+        _clientVersion = clientVersion;
 
         SeedInitial();
         _subscription  = events.Subscribe(OnEvent);
@@ -76,6 +88,11 @@ public sealed class ScriptGlobalsSync : IDisposable
         Set("gamename",      _gameCode);
         Set("game",          _gameCode);    // common alias used by some scripts
         Set("connected",     "1");
+
+        // Session statics — known at construction, never change for this session.
+        Set("account",       _accountName);
+        Set("client",        _clientName);
+        Set("version",       _clientVersion);
 
         // Vitals — match GameState defaults (100%).
         Set("health",        _state.Vitals.Health.ToString(CultureInfo.InvariantCulture));

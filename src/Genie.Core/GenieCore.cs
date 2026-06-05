@@ -302,7 +302,9 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _globalsSync = new ScriptGlobalsSync(
             state, Scripts.Globals, _parser.GameEvents,
             gameCode:      cfg.GameCode,
-            characterName: cfg.CharacterName);
+            characterName: cfg.CharacterName,
+            accountName:   cfg.AccountName,
+            clientVersion: HostVersionString);
 
         // ── Game event routing ─────────────────────────────────────────────────
         // Note: Scripts.OnGameLine already calls Extensions.DispatchGameLine internally —
@@ -417,6 +419,9 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // directions ("n", "go bridge", etc.) so it can correlate the
         // subsequent room change with the direction we just moved.
         AutoMapper.OnCommandSent(text);
+
+        // Genie 4 reserved $lastcommand — the last line sent to the game.
+        Scripts.Globals["lastcommand"] = text;
 
         _ = _connection.SendCommandAsync(text);
     }

@@ -1837,6 +1837,15 @@ public sealed class ScriptEngine
             { value = sv; return true; }
             if (Globals.TryGetValue(name, out var gv))
             { value = gv ?? string.Empty; return true; }
+            // $scriptlist — '|'-separated names of running scripts, or "none"
+            // (Genie 4 parity). Computed on read so it's always current.
+            if (name.Equals("scriptlist", StringComparison.OrdinalIgnoreCase))
+            { value = BuildScriptList(); return true; }
+            // Genie 4 reserved clock variables ($date/$time/$unixtime/...).
+            // Computed on read so they're always current, and resolved as a
+            // final fallback so a user var of the same name can still shadow.
+            if (TryClockVar(name, out var clock))
+            { value = clock; return true; }
             return false;
         }
 
@@ -1844,6 +1853,47 @@ public sealed class ScriptEngine
         if (inst.Vars.TryGetValue(name, out var lv))
         { value = lv ?? string.Empty; return true; }
         return false;
+    }
+
+    /// <summary>
+    /// Builds the <c>$scriptlist</c> value: the names of all currently running
+    /// script instances joined with <c>'|'</c>, or the literal <c>"none"</c>
+    /// when nothing is running (Genie 4 parity).
+    /// </summary>
+    private string BuildScriptList()
+    {
+        // Snapshot to a local array first: the same unlocked access pattern the
+        // engine uses for Instances/AnyRunning, but the copy avoids enumerating
+        // the live list if a start/stop mutates it mid-read.
+        var names = _instances.ToArray().Where(i => i.Running).Select(i => i.Name);
+        var joined = string.Join("|", names);
+        return joined.Length == 0 ? "none" : joined;
+    }
+
+    /// <summary>
+    /// Resolves the Genie 4 "reserved" date/time variables, computed fresh on
+    /// each read. Formats are copied verbatim from Genie 4
+    /// (<c>Lists/Globals.cs</c>) for script parity — including the quirk that
+    /// <c>$time24</c> still appends the AM/PM designator. Returns false for any
+    /// name that isn't one of these so normal resolution can continue.
+    /// </summary>
+    private static bool TryClockVar(string name, out string value)
+    {
+        var now = DateTime.Now;
+        value = name.ToLowerInvariant() switch
+        {
+            "time"         => now.ToString("hh:mm:ss tt", CultureInfo.InvariantCulture).Trim(),
+            "time24"       => now.ToString("HH:mm:ss tt", CultureInfo.InvariantCulture).Trim(),
+            "date"         => now.ToString("M/d/yyyy",     CultureInfo.InvariantCulture).Trim(),
+            "datetime"     => now.ToString("M/d/yyyy hh:mm:ss tt", CultureInfo.InvariantCulture).Trim(),
+            "datetime24"   => now.ToString("M/d/yyyy HH:mm:ss tt", CultureInfo.InvariantCulture).Trim(),
+            "militarytime" => now.ToString("HHmm",         CultureInfo.InvariantCulture).Trim(),
+            "dayofmonth"   => now.ToString("dd",           CultureInfo.InvariantCulture).Trim(),
+            "dayofyear"    => now.DayOfYear.ToString(CultureInfo.InvariantCulture),
+            "unixtime"     => DateTimeOffset.Now.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture),
+            _              => string.Empty,
+        };
+        return value.Length > 0;
     }
 
     // Bounded LRU cache of compiled regexes, shared across all TryMatch
