@@ -53,21 +53,24 @@ public class GameTextViewModel : ReactiveObject
                 AddLine(text, StreamColor.Main, links, bolds);
             });
 
-        // ── Local echoes: typed commands + #echo + script echoes ──────────
-        // EchoLine fires for two semantically-distinct kinds of line:
+        // ── Local echoes: typed commands + system diagnostics ─────────────
+        // EchoLine carries non-script lines of two kinds:
         //   (a) typed-command echoes ("> look", "> n", …) — what we call "Echo"
-        //   (b) script + system diagnostics ([script] X done, [recorder] …) — "Script"
+        //   (b) system diagnostics ([plugin] …, [layout] …, [recorder] …) — a
+        //       bracketed tag, grouped with "Script" for filtering purposes.
         // The split is detected by prefix: a line starting with [xxx] is a
-        // bracketed system tag. Both render with StreamColor.System styling
-        // (italic-gray); the filter just decides whether to render at all.
+        // bracketed system tag. Script-originated lines no longer arrive here —
+        // they come via ScriptOutputLine (below) — so there's no double render.
+        // Both render with StreamColor.System styling (italic-gray); the filter
+        // just decides whether to render at all.
         Observable.FromEvent<Action<string>, string>(
                 h => core.EchoLine += h,
                 h => core.EchoLine -= h)
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(msg =>
             {
-                var isScriptTag = msg.StartsWith("[", StringComparison.Ordinal);
-                if (isScriptTag)
+                var isSystemTag = msg.StartsWith("[", StringComparison.Ordinal);
+                if (isSystemTag)
                 {
                     if (DisplaySettings?.ShowScriptText == false) return;
                 }
@@ -75,6 +78,21 @@ public class GameTextViewModel : ReactiveObject
                 {
                     if (DisplaySettings?.ShowEchoText == false) return;
                 }
+                AddLine(msg, StreamColor.System);
+            });
+
+        // ── Script-originated lines ───────────────────────────────────────
+        // Everything a script produces arrives on ScriptOutputLine: its
+        // echo output, [script]/[dbg] diagnostics, AND the game commands it
+        // issues (`put north`, …). All classified as Script lines so the
+        // "Script Lines" toggle governs the whole of a script's activity.
+        Observable.FromEvent<Action<string>, string>(
+                h => core.ScriptOutputLine += h,
+                h => core.ScriptOutputLine -= h)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(msg =>
+            {
+                if (DisplaySettings?.ShowScriptText == false) return;
                 AddLine(msg, StreamColor.System);
             });
 

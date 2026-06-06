@@ -145,13 +145,14 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     public event Action<string>?                   EchoLine;
 
     /// <summary>
-    /// Raised specifically for script-originated echoes — anything the
-    /// <see cref="ScriptEngine"/> emits via its echo channel: <c>[script]</c>
-    /// status lines, <c>[dbg:N]</c> traces, <c>#echo</c> output from inside
-    /// a running script, abort messages. Fired in addition to
-    /// <see cref="EchoLine"/> (which still gets the same text) so the
-    /// Scripts panel can build its own scrollback without blocking the
-    /// main game window from showing the same messages.
+    /// Raised for every script-originated line — the single "this came from a
+    /// script" signal. Covers anything the <see cref="ScriptEngine"/> emits via
+    /// its echo channel (<c>[script]</c> status lines, <c>[dbg:N]</c> traces,
+    /// <c>echo</c>/<c>#echo</c> output, abort messages) AND the game commands a
+    /// script issues. The main game window classifies these as Script lines
+    /// (governed by the "Script Lines" filter); the Scripts panel uses the same
+    /// stream for its scrollback. Distinct from <see cref="EchoLine"/>, which
+    /// carries user-typed command echoes and system diagnostics.
     /// </summary>
     public event Action<string>?                   ScriptOutputLine;
 
@@ -271,21 +272,27 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
         // ── Scripting ──────────────────────────────────────────────────────────
         _typeAhead = new TypeAheadSession();
-        // The script engine's echo callback fires for ALL script-originated
-        // text: "[script] X started/done", "[dbg:N]" traces, `#echo` output
-        // from running scripts, abort messages. Fork the dispatch so the
-        // main game window (via EchoLine) AND the Scripts panel (via
-        // ScriptOutputLine) both receive it. The main window already knows
-        // not to highlight echoes; the Scripts panel keeps its own scrollback.
+        // All script-originated output flows through ScriptOutputLine — the
+        // single "this came from a script" signal the UI uses to classify a
+        // line as a Script line (governed by the "Script Lines" filter):
+        //   • echo callback — "[script] X started/done", "[dbg:N]" traces,
+        //     `echo`/`#echo` output, abort messages;
+        //   • sendCommand   — the actual game commands a script issues
+        //     (`put north`, …), so they're visible/toggleable as script
+        //     activity (Genie 4 surfaces script-sent commands too).
+        // Routed to ScriptOutputLine ONLY (not EchoLine) so the game window
+        // shows each script line once; EchoLine is reserved for user-typed
+        // command echoes and system diagnostics. The Scripts panel also reads
+        // ScriptOutputLine for its own scrollback.
         Scripts    = new ScriptEngine(
             scriptsDir:    Config.ScriptDir,
             typeAhead:     _typeAhead,
-            sendCommand:   cmd => _ = _connection.SendCommandAsync(cmd),
-            echo:          msg =>
+            sendCommand:   cmd =>
                            {
-                               EchoLine?.Invoke(msg);
-                               ScriptOutputLine?.Invoke(msg);
+                               ScriptOutputLine?.Invoke(cmd);
+                               _ = _connection.SendCommandAsync(cmd);
                            },
+            echo:          msg => ScriptOutputLine?.Invoke(msg),
             handleHashCmd: cmd => Commands.ProcessInput(cmd));
 
         // Wire game-state callbacks for RT-gated script pausing
