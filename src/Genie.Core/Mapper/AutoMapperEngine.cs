@@ -57,6 +57,18 @@ public sealed class AutoMapperEngine
     public MapZone   ActiveZone   => _zone;
     public bool      IsEnabled    { get; set; } = false;
 
+    /// <summary>
+    /// Genie 4 "Allow Duplicate" parity. When true AND <see cref="IsEnabled"/>
+    /// (record mode), the fuzzy fingerprint/title match tiers (c)/(e)/(f) are
+    /// skipped so a freshly-entered room that merely shares a title+exit
+    /// fingerprint with an existing node gets its OWN node instead of being
+    /// folded into the existing one. Definitive tiers — server room id (a) and
+    /// graph-arc walk (b)/(d) — still match, so genuinely revisiting a known
+    /// room via a linked exit does not spawn a duplicate. Off by default
+    /// (de-duplication is the right behaviour for almost every zone).
+    /// </summary>
+    public bool      AllowDuplicateRooms { get; set; } = false;
+
     public event Action? MapChanged;
     public event Action? CurrentNodeChanged;
     /// <summary>
@@ -158,6 +170,78 @@ public sealed class AutoMapperEngine
         return zone;
     }
 
+    // ── Manual editor operations (Genie 4 AutoMapper toolbar parity) ──────────
+    // These mutate the active zone directly from the UI editor rather than from
+    // the live game stream. Each keeps the fingerprint / server-id indexes
+    // consistent (via RebuildIndex) and fires MapChanged so the canvas repaints.
+
+    /// <summary>
+    /// Delete a node and scrub every arc that pointed at it (Genie 4
+    /// "Remove Selected Nodes/Labels"). If the deleted node was the current
+    /// room, CurrentNode is cleared. No-op when the id isn't present.
+    /// </summary>
+    public bool RemoveNode(int id)
+    {
+        if (!_zone.Nodes.Remove(id)) return false;
+
+        // Drop any dangling arcs that referenced the removed node so the
+        // exported XML stays self-consistent (Genie 4 leaves dead arcs; we
+        // prefer a clean graph for the weighted pathfinder).
+        foreach (var n in _zone.Nodes.Values)
+            n.Exits.RemoveAll(e => e.DestinationId == id);
+
+        if (CurrentNode?.Id == id)
+        {
+            CurrentNode = null;
+            CurrentNodeChanged?.Invoke();
+        }
+
+        RebuildIndex();
+        MapChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>
+    /// Renumber every node to a dense 1..N sequence in ascending current-id
+    /// order, remapping all arc destinations to match (Genie 4 "Reset Map IDs").
+    /// Preserves the current-room selection across the renumber. Useful after a
+    /// lot of add/remove churn leaves the id space sparse.
+    /// </summary>
+    public void ResetMapIds()
+    {
+        var ordered = _zone.Nodes.Values.OrderBy(n => n.Id).ToList();
+        var remap   = new Dictionary<int, int>(ordered.Count);
+        for (int i = 0; i < ordered.Count; i++)
+            remap[ordered[i].Id] = i + 1;
+
+        var rebuilt = new Dictionary<int, MapNode>(ordered.Count);
+        foreach (var node in ordered)
+        {
+            node.Id = remap[node.Id];
+            foreach (var exit in node.Exits)
+                if (exit.DestinationId is { } dest && remap.TryGetValue(dest, out var newDest))
+                    exit.DestinationId = newDest;
+            rebuilt[node.Id] = node;
+        }
+
+        _zone.Nodes = rebuilt;
+        RebuildIndex();
+        MapChanged?.Invoke();
+        CurrentNodeChanged?.Invoke();   // CurrentNode object is unchanged; its Id moved
+    }
+
+    /// <summary>
+    /// Signal that node fields affecting the lookup indexes (Title, Exits,
+    /// ServerRoomId) were edited in the UI, so the fingerprint / server-id
+    /// indexes must be rebuilt and the canvas repainted. Position/Notes/Color
+    /// edits don't need this — callers can just bump the render tick.
+    /// </summary>
+    public void NotifyStructureChanged()
+    {
+        RebuildIndex();
+        MapChanged?.Invoke();
+    }
+
     // ── Internal ────────────────────────────────────────────────────────────
 
     private void OnStateChanged()
@@ -204,6 +288,12 @@ public sealed class AutoMapperEngine
         _pendingMoveCommand = string.Empty;
 
         bool zoneChanged = false;
+
+        // "Allow Duplicate" gate: when the user has opted into duplicates while
+        // recording, skip the fuzzy fingerprint/title tiers (c)/(e)/(f) so a
+        // new room sharing a fingerprint creates its own node. Definitive tiers
+        // (server-id, graph-arc) below are unaffected.
+        bool allowFuzzy = !(IsEnabled && AllowDuplicateRooms);
 
         // ── 1. Find the node ─────────────────────────────────────────────────
         // Priority:
@@ -271,7 +361,7 @@ public sealed class AutoMapperEngine
         //          would lock in a wrong match that then cascades — once
         //          CurrentNode is wrong, every subsequent move's tier (b)
         //          graph walk runs from the wrong room and stays wrong.
-        if (node is null && _fingerprintIndex.TryGetValue(fingerprint, out var candidateIds))
+        if (node is null && allowFuzzy && _fingerprintIndex.TryGetValue(fingerprint, out var candidateIds))
         {
             if (candidateIds.Count == 1)
             {
@@ -334,7 +424,7 @@ public sealed class AutoMapperEngine
 
         // (e) Description tiebreaker: scan all nodes with matching title and
         //     pick the one whose description matches (handles duplicate titles).
-        if (node is null && !string.IsNullOrEmpty(description))
+        if (node is null && allowFuzzy && !string.IsNullOrEmpty(description))
         {
             foreach (var candidate in _zone.Nodes.Values)
             {
@@ -358,7 +448,7 @@ public sealed class AutoMapperEngine
         //     currently closed in-game so the visible exit set is a subset
         //     of the persisted node's exits). Without this fallback the
         //     fingerprint check (c) would miss every such room.
-        if (node is null && !string.IsNullOrEmpty(title))
+        if (node is null && allowFuzzy && !string.IsNullOrEmpty(title))
         {
             var liveDirs = exits
                 .Select(DirectionHelper.Parse)

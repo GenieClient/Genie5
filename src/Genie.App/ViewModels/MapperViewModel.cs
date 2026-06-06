@@ -138,6 +138,59 @@ public class MapperViewModel : ReactiveObject
     /// </summary>
     [Reactive] public bool   AutoCreateEnabled { get; set; }
 
+    // ── Editor state (Genie 4 AutoMapper edit toolbar parity) ─────────────
+    /// <summary>Master toggle: when on, the canvas selects/drags nodes and the
+    /// edit toolbar + node-properties panel appear.</summary>
+    [Reactive] public bool   EditMode      { get; set; }
+
+    /// <summary>Snap dragged nodes to the grid (always effectively on — the
+    /// Genie 4 format stores 20px multiples; see MapCanvas).</summary>
+    [Reactive] public bool   SnapToGrid    { get; set; } = true;
+
+    /// <summary>Lock node positions so a drag can't nudge a clean map.</summary>
+    [Reactive] public bool   LockPositions { get; set; }
+
+    /// <summary>Genie 4 "Allow Duplicate" — mirror to
+    /// <see cref="AutoMapperEngine.AllowDuplicateRooms"/>.</summary>
+    [Reactive] public bool   AllowDuplicate { get; set; }
+
+    /// <summary>Show full <c>|</c>-separated room labels vs. only the primary
+    /// name (default). Bound to <see cref="Controls.MapCanvas.FullLabels"/>.</summary>
+    [Reactive] public bool   FullLabels    { get; set; }
+
+    /// <summary>The node selected in the canvas (edit mode). Two-way bound.</summary>
+    [Reactive] public MapNode? SelectedNode { get; set; }
+
+    /// <summary>True when the active zone has unsaved edits. Drives the Save
+    /// button's enabled state + a "● unsaved" hint.</summary>
+    [Reactive] public bool   IsZoneDirty   { get; private set; }
+
+    // Editable mirrors of the selected node's fields (Edit Panel). The user
+    // types here, then Apply pushes them back into the live node.
+    [Reactive] public string SelNodeTitle    { get; set; } = "";
+    [Reactive] public string SelNodeNotes    { get; set; } = "";
+    [Reactive] public string SelNodeColor    { get; set; } = "";
+    [Reactive] public string SelNodeServerId { get; set; } = "";
+
+    // ── Editor commands ───────────────────────────────────────────────────
+    /// <summary>Create a fresh empty zone in the engine (Genie 4 "New").</summary>
+    public ReactiveCommand<Unit, Unit> NewZoneCommand        { get; }
+    /// <summary>Save the active zone XML (Genie 4 "Save"). Derives a filename
+    /// from the zone name for brand-new zones.</summary>
+    public ReactiveCommand<Unit, Unit> SaveMapCommand        { get; }
+    /// <summary>Delete the selected node (Genie 4 "Remove Selected").</summary>
+    public ReactiveCommand<Unit, Unit> RemoveSelectedCommand { get; }
+    /// <summary>Renumber node ids to a dense 1..N (Genie 4 "Reset Map IDs").</summary>
+    public ReactiveCommand<Unit, Unit> ResetMapIdsCommand    { get; }
+    /// <summary>Push the Edit-Panel fields back into the selected node.</summary>
+    public ReactiveCommand<Unit, Unit> ApplyNodePropsCommand { get; }
+    /// <summary>Invoked by the canvas after a node drag completes — mark dirty
+    /// and repaint.</summary>
+    public ReactiveCommand<MapNode, Unit> NodeMovedCommand   { get; }
+    /// <summary>Delete a specific node — invoked by the canvas (Remove Room
+    /// context item / Delete key) with the target node.</summary>
+    public ReactiveCommand<MapNode, Unit> RemoveNodeCommand  { get; }
+
     // ── Zone selection ────────────────────────────────────────────────────
     /// <summary>Zone filenames (no extension) found in <see cref="MapsDirectory"/>.</summary>
     public ObservableCollection<string> AvailableZones { get; } = new();
@@ -427,6 +480,25 @@ public class MapperViewModel : ReactiveObject
         ZoomOutCommand   = ReactiveCommand.Create(() => { ZoomLevel /= 1.2; });
         ZoomResetCommand = ReactiveCommand.Create(() => { ZoomLevel  = 1.0; });
 
+        // ── Editor commands ───────────────────────────────────────────────
+        NewZoneCommand        = ReactiveCommand.Create(NewZone);
+        SaveMapCommand        = ReactiveCommand.Create(SaveMap);
+        RemoveSelectedCommand = ReactiveCommand.Create(RemoveSelected);
+        ResetMapIdsCommand    = ReactiveCommand.Create(ResetMapIds);
+        ApplyNodePropsCommand = ReactiveCommand.Create(ApplyNodeProps);
+        NodeMovedCommand      = ReactiveCommand.Create<MapNode>(_ => { IsZoneDirty = true; RenderTick++; });
+        RemoveNodeCommand     = ReactiveCommand.Create<MapNode>(RemoveNodeById);
+
+        foreach (var c in new IReactiveCommand[]
+                 { NewZoneCommand, SaveMapCommand, RemoveSelectedCommand,
+                   ResetMapIdsCommand, ApplyNodePropsCommand, NodeMovedCommand, RemoveNodeCommand })
+            c.ThrownExceptions.Subscribe(ex => LoadStatus = $"Editor error: {ex.Message}");
+
+        // Mirror the selected node's fields into the editable Edit-Panel
+        // properties whenever the selection changes (canvas sets SelectedNode
+        // via its two-way binding).
+        this.WhenAnyValue(x => x.SelectedNode).Subscribe(_ => MirrorSelectedNode());
+
         RefreshZonesCommand = ReactiveCommand.Create(RefreshAvailableZones);
         RefreshZonesCommand.ThrownExceptions.Subscribe(ex =>
             LoadStatus = $"Refresh failed: {ex.Message}");
@@ -593,6 +665,12 @@ public class MapperViewModel : ReactiveObject
         this.WhenAnyValue(x => x.AutoCreateEnabled)
             .Skip(1)   // ignore the initial emission; engine already matches
             .Subscribe(v => { if (_engine is not null) _engine.IsEnabled = v; });
+
+        // Allow-duplicate mirror (Genie 4 parity) — same pattern.
+        AllowDuplicate = _engine.AllowDuplicateRooms;
+        this.WhenAnyValue(x => x.AllowDuplicate)
+            .Skip(1)
+            .Subscribe(v => { if (_engine is not null) _engine.AllowDuplicateRooms = v; });
 
         RefreshAvailableZones();
 
@@ -873,6 +951,122 @@ public class MapperViewModel : ReactiveObject
         {
             LoadStatus = $"Save failed: {ex.Message}";
         }
+    }
+
+    // ── Editor operations (Genie 4 AutoMapper toolbar) ────────────────────
+    private void NewZone()
+    {
+        if (_engine is null) { LoadStatus = "Mapper not ready."; return; }
+        _engine.NewZone("New Zone");
+        // Don't trigger LoadSelectedZone — there's no file yet.
+        _suppressAutoLoad = true;
+        try { SelectedZoneFile = null; } finally { _suppressAutoLoad = false; }
+        SelectedNode      = null;
+        ZoneLastWriteTime = null;
+        ZoneAgeDisplay    = "";
+        IsZoneStale       = false;
+        IsZoneDirty       = true;     // unsaved
+        EditMode          = true;     // drop straight into editing a blank map
+        Refresh();
+        LoadStatus = "New zone created — turn on Record (or add rooms), then Save.";
+    }
+
+    private void SaveMap()
+    {
+        if (_engine is null || _zoneRepo is null) { LoadStatus = "Mapper not ready."; return; }
+        if (string.IsNullOrWhiteSpace(MapsDirectory)) { LoadStatus = "No Maps directory set."; return; }
+
+        var file = SelectedZoneFile;
+        if (string.IsNullOrEmpty(file))
+        {
+            // Brand-new zone with no backing file — derive a filename from the
+            // zone name (sanitised) so New → Save works without a Save-As dialog.
+            var zname = _engine.ActiveZone.Name;
+            file = SanitizeFileName(string.IsNullOrWhiteSpace(zname) ? "new_zone" : zname);
+        }
+
+        var path = Path.Combine(MapsDirectory, file + ".xml");
+        try
+        {
+            _zoneRepo.Save(path, _engine.ActiveZone);
+            ZoneLastWriteTime = File.GetLastWriteTime(path);
+            RefreshZoneAge();
+            IsZoneDirty = false;
+            RenderTick++;
+
+            // Make sure the dropdown reflects a newly-created file and keep it
+            // selected WITHOUT re-loading (which would reset CurrentNode).
+            if (!AvailableZones.Contains(file))
+            {
+                _suppressAutoLoad = true;
+                try { AvailableZones.Add(file); SelectedZoneFile = file; }
+                finally { _suppressAutoLoad = false; }
+            }
+            LoadStatus = $"Saved {file}.xml ({_engine.ActiveZone.Nodes.Count} rooms).";
+        }
+        catch (Exception ex)
+        {
+            LoadStatus = $"Save failed: {ex.Message}";
+        }
+    }
+
+    private void RemoveSelected()
+    {
+        if (SelectedNode is null) { LoadStatus = "No room selected."; return; }
+        RemoveNodeById(SelectedNode);
+    }
+
+    private void RemoveNodeById(MapNode node)
+    {
+        if (_engine is null || node is null) return;
+        var id = node.Id;
+        if (_engine.RemoveNode(id))
+        {
+            if (SelectedNode?.Id == id) SelectedNode = null;
+            IsZoneDirty = true;
+            Refresh();
+            LoadStatus = $"Removed room {id}. Save to persist.";
+        }
+    }
+
+    private void ResetMapIds()
+    {
+        if (_engine is null) { LoadStatus = "Mapper not ready."; return; }
+        _engine.ResetMapIds();
+        SelectedNode = null;   // ids changed; clear selection to avoid a stale ref
+        IsZoneDirty  = true;
+        Refresh();
+        LoadStatus = "Renumbered room IDs to 1..N. Save to persist.";
+    }
+
+    private void ApplyNodeProps()
+    {
+        if (_engine is null || SelectedNode is null) { LoadStatus = "No room selected."; return; }
+        SelectedNode.Title        = SelNodeTitle    ?? "";
+        SelectedNode.Notes        = SelNodeNotes    ?? "";
+        SelectedNode.Color        = SelNodeColor    ?? "";
+        SelectedNode.ServerRoomId = SelNodeServerId ?? "";
+        // Title + ServerRoomId feed the lookup indexes — rebuild them.
+        _engine.NotifyStructureChanged();
+        IsZoneDirty = true;
+        RenderTick++;
+        LoadStatus = $"Updated room {SelectedNode.Id}. Save to persist.";
+    }
+
+    private void MirrorSelectedNode()
+    {
+        var n = SelectedNode;
+        SelNodeTitle    = n?.Title        ?? "";
+        SelNodeNotes    = n?.Notes        ?? "";
+        SelNodeColor    = n?.Color        ?? "";
+        SelNodeServerId = n?.ServerRoomId ?? "";
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var clean   = new string(name.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray()).Trim();
+        return string.IsNullOrEmpty(clean) ? "new_zone" : clean;
     }
 
     // ── Zone selector ─────────────────────────────────────────────────────

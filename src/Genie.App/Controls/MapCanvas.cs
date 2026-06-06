@@ -48,6 +48,10 @@ public class MapCanvas : Control
     private static readonly IBrush  CurrentStroke   = new SolidColorBrush(Color.FromRgb(0xff, 0x40, 0x40));
     private static readonly Pen     NodePen         = new(NodeStroke, 1.0);
     private static readonly Pen     CurrentPen      = new(CurrentStroke, 2.5);
+    // Selection outline (edit mode) — bright yellow dashed so it's distinct
+    // from the red "you are here" current-room outline.
+    private static readonly Pen     SelectedPen     = new(new SolidColorBrush(Color.FromRgb(0xff, 0xe0, 0x40)), 2.0)
+                                                      { DashStyle = new DashStyle(new double[] { 2, 2 }, 0) };
     private static readonly IBrush  EmptyMessageBrush = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66));
 
     // Edge pens — colour-coded by exit type so the player can see at a glance
@@ -65,6 +69,9 @@ public class MapCanvas : Control
     // (e.g. "Spell Library", "Pawnshop"). The Genie 4 AutoMapper uses these
     // labels as the primary way to orient the player in dense city zones.
     private static readonly IBrush  RoomLabelBrush  = new SolidColorBrush(Color.FromRgb(0xc8, 0xc8, 0xc8));
+    // Dotted leader line tying a displaced label back to its node.
+    private static readonly Pen     LabelLeaderPen  = new(new SolidColorBrush(Color.FromRgb(0x77, 0x77, 0x77)), 1.0)
+                                                      { DashStyle = new DashStyle(new double[] { 1, 2 }, 0) };
 
     // Hover badge — translucent panel + bright text drawn near the cursor.
     private static readonly IBrush  HoverBackgroundBrush = new SolidColorBrush(Color.FromArgb(0xee, 0x22, 0x22, 0x22));
@@ -135,6 +142,61 @@ public class MapCanvas : Control
     public static readonly StyledProperty<IBrush?> MapBackgroundBrushProperty =
         AvaloniaProperty.Register<MapCanvas, IBrush?>(nameof(MapBackgroundBrush));
 
+    // ── Editor styled properties (Genie 4 AutoMapper edit toolbar) ─────────
+
+    /// <summary>When true, left-click selects a node and drag moves it
+    /// (edit mode). When false the canvas is a read-only navigator and
+    /// left-click does nothing (Go Here lives on the right-click menu).</summary>
+    public static readonly StyledProperty<bool> EditModeProperty =
+        AvaloniaProperty.Register<MapCanvas, bool>(nameof(EditMode));
+
+    /// <summary>Snap dragged nodes to the integer grid (always on in practice —
+    /// the Genie 4 map format stores positions as 20px multiples, so off-grid
+    /// placement can't round-trip; the toggle biases rounding vs floor).</summary>
+    public static readonly StyledProperty<bool> SnapToGridProperty =
+        AvaloniaProperty.Register<MapCanvas, bool>(nameof(SnapToGrid), defaultValue: true);
+
+    /// <summary>When true, nodes can be selected but not dragged (Genie 4
+    /// "Lock Positions") — guards against accidentally nudging a clean map.</summary>
+    public static readonly StyledProperty<bool> LockPositionsProperty =
+        AvaloniaProperty.Register<MapCanvas, bool>(nameof(LockPositions));
+
+    /// <summary>When true, room labels show the full <c>|</c>-separated Notes
+    /// string (all #goto labels). When false (default) only the primary label
+    /// (first segment) is drawn — much cleaner in dense zones. The full set is
+    /// always available in the hover badge.</summary>
+    public static readonly StyledProperty<bool> FullLabelsProperty =
+        AvaloniaProperty.Register<MapCanvas, bool>(nameof(FullLabels));
+
+    /// <summary>The currently selected node (edit mode). Outlined in yellow.</summary>
+    public static readonly StyledProperty<MapNode?> SelectedNodeProperty =
+        AvaloniaProperty.Register<MapCanvas, MapNode?>(nameof(SelectedNode),
+            defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
+
+    /// <summary>Invoked with the moved <see cref="MapNode"/> after a drag
+    /// completes, so the VM can mark the zone dirty + repaint.</summary>
+    public static readonly StyledProperty<ICommand?> NodeMovedCommandProperty =
+        AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(NodeMovedCommand));
+
+    /// <summary>Invoked with the selected <see cref="MapNode"/> (or null) when
+    /// the selection changes in edit mode.</summary>
+    public static readonly StyledProperty<ICommand?> SelectNodeCommandProperty =
+        AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(SelectNodeCommand));
+
+    /// <summary>Invoked with a <see cref="MapNode"/> to delete it (Remove Room
+    /// context-menu item / Delete key in edit mode).</summary>
+    public static readonly StyledProperty<ICommand?> RemoveNodeCommandProperty =
+        AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(RemoveNodeCommand));
+
+    public bool      EditMode          { get => GetValue(EditModeProperty);          set => SetValue(EditModeProperty, value); }
+    public bool      SnapToGrid        { get => GetValue(SnapToGridProperty);        set => SetValue(SnapToGridProperty, value); }
+    public bool      LockPositions     { get => GetValue(LockPositionsProperty);     set => SetValue(LockPositionsProperty, value); }
+    public bool      FullLabels        { get => GetValue(FullLabelsProperty);        set => SetValue(FullLabelsProperty, value); }
+    public MapNode?  SelectedNode      { get => GetValue(SelectedNodeProperty);      set => SetValue(SelectedNodeProperty, value); }
+    public ICommand? NodeMovedCommand  { get => GetValue(NodeMovedCommandProperty);  set => SetValue(NodeMovedCommandProperty, value); }
+    public ICommand? SelectNodeCommand { get => GetValue(SelectNodeCommandProperty); set => SetValue(SelectNodeCommandProperty, value); }
+    public ICommand? RemoveNodeCommand { get => GetValue(RemoveNodeCommandProperty); set => SetValue(RemoveNodeCommandProperty, value); }
+
     public MapZone?  Zone               { get => GetValue(ZoneProperty);               set => SetValue(ZoneProperty, value); }
     public MapNode?  CurrentNode        { get => GetValue(CurrentNodeProperty);        set => SetValue(CurrentNodeProperty, value); }
     public int       Level              { get => GetValue(LevelProperty);              set => SetValue(LevelProperty, value); }
@@ -149,11 +211,31 @@ public class MapCanvas : Control
     private MapNode? _hoveredNode;
     private Point    _cursor;
 
+    // ── Drag state (edit mode) ────────────────────────────────────────────
+    private bool _dragging;
+    private int  _dragMinX;   // bounds origin cached at drag start (stable while dragging)
+    private int  _dragMinY;
+    private int  _dragOrigX;  // selected node's grid position at drag start —
+    private int  _dragOrigY;  // used to skip the move/dirty when it didn't change
+
+    // ── Pan state (grab-scroll the view) ──────────────────────────────────
+    private bool          _panning;
+    private Point         _panLast;    // last pointer pos in ScrollViewer coords
+    private ScrollViewer? _scroller;   // cached parent scroll viewer
+
+    public MapCanvas()
+    {
+        // Focusable so the Delete key reaches OnKeyDown when the canvas has
+        // focus (we Focus() on pointer-press in edit mode).
+        Focusable = true;
+    }
+
     static MapCanvas()
     {
         // Any of these changing means we need to repaint AND recompute size.
         AffectsRender<MapCanvas>(ZoneProperty, CurrentNodeProperty, LevelProperty, RenderTickProperty,
-                                 ZoomProperty, CurrentRoomBrushProperty, MapBackgroundBrushProperty);
+                                 ZoomProperty, CurrentRoomBrushProperty, MapBackgroundBrushProperty,
+                                 EditModeProperty, SelectedNodeProperty, FullLabelsProperty);
         AffectsMeasure<MapCanvas>(ZoneProperty, LevelProperty, RenderTickProperty, ZoomProperty);
 
         // Auto-center on the active room whenever it changes. Walking into a
@@ -314,7 +396,14 @@ public class MapCanvas : Control
         {
             if (node.Z != Level) continue;
 
-            var rect = NodeRect(node, minX, minY);
+            var isSelected = SelectedNode is not null && node.Id == SelectedNode.Id;
+
+            // While dragging the selected node, draw it under the cursor (a
+            // visual-only offset) — its stored X/Y don't change until release,
+            // so the bounds origin stays stable and nothing else jumps.
+            var rect = (_dragging && isSelected)
+                ? new Rect(_cursor.X - NodeSize / 2, _cursor.Y - NodeSize / 2, NodeSize, NodeSize)
+                : NodeRect(node, minX, minY);
             var fill = ParseColor(node.Color) ?? DefaultNodeFill;
 
             context.FillRectangle(fill, rect);
@@ -330,34 +419,83 @@ public class MapCanvas : Control
                     : new Pen(CurrentRoomBrush, 2.5);
                 context.DrawRectangle(pen, hi);
             }
+
+            // Edit-mode selection outline (drawn outset further than the
+            // current-room ring so both are visible on the active room).
+            if (isSelected)
+                context.DrawRectangle(SelectedPen, rect.Inflate(4.0));
         }
 
-        // ── Pass 3: room labels (Notes attribute) ────────────────────────
-        // Genie 4's AutoMapper draws the "note" attribute as text next to the
-        // node rectangle — that's how Spell Library / Bank / Pawnshop etc.
-        // are tagged on the canvas. We render the same thing here. Multi-line
-        // notes (rare; usually a single short phrase) wrap naturally via
-        // FormattedText. Overlap with adjacent labels is accepted for MVP —
-        // a smarter placement pass can come later.
+        // ── Pass 3: room labels (Notes) with collision-aware placement ──────
+        // Genie 4 draws the "note" attribute next to each node (Spell Library /
+        // Bank / Pawnshop). We do the same, but place each label in the first
+        // free slot around the node (right → left → above → below) so labels
+        // don't pile up in dense zones. When a label can't sit directly to the
+        // right, a dotted leader line ties it back to its node. Important rooms
+        // (current / selected / hovered) always get drawn even when crowded;
+        // other labels are skipped rather than overlap.
         var labelTypeface = Typeface.Default;
         var labelSize     = Math.Max(9.0, 10.0 * Zoom);   // grows slightly with zoom
-        foreach (var node in Zone.Nodes.Values)
+
+        // Occupied rects seed with every visible node (labels avoid covering
+        // rooms) and grow as labels are placed.
+        var occupied = new List<Rect>();
+        foreach (var n in Zone.Nodes.Values)
+            if (n.Z == Level) occupied.Add(NodeRect(n, minX, minY));
+
+        int LabelPriority(MapNode n) =>
+            (CurrentNode  is not null && n.Id == CurrentNode.Id)  ? 0 :
+            (SelectedNode is not null && n.Id == SelectedNode.Id) ? 1 :
+            (_hoveredNode is not null && n.Id == _hoveredNode.Id) ? 2 : 3;
+
+        // Important labels first (best slots), then by id for stable placement.
+        var labelled = Zone.Nodes.Values
+            .Where(n => n.Z == Level && !string.IsNullOrEmpty(n.Notes))
+            .OrderBy(LabelPriority).ThenBy(n => n.Id);
+
+        const double gap = 4.0;
+        foreach (var node in labelled)
         {
-            if (node.Z != Level) continue;
-            if (string.IsNullOrEmpty(node.Notes)) continue;
+            var text = FullLabels ? node.Notes : node.Notes.Split('|')[0].Trim();
+            if (string.IsNullOrEmpty(text)) continue;
 
             var ft = new FormattedText(
-                node.Notes,
-                System.Globalization.CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight,
-                labelTypeface,
-                labelSize,
-                RoomLabelBrush);
+                text, System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight, labelTypeface, labelSize, RoomLabelBrush);
 
             var rect = NodeRect(node, minX, minY);
-            // Position to the right of the node, vertically centered.
-            var pos  = new Point(rect.Right + 4, rect.Top + (NodeSize - ft.Height) / 2);
-            context.DrawText(ft, pos);
+            double cx = rect.Center.X, cy = rect.Center.Y, w = ft.Width, h = ft.Height;
+
+            // Candidate slots in preference order; the first (right) is the
+            // historical default and needs no leader line.
+            var cands = new (Rect r, bool leader)[]
+            {
+                (new Rect(rect.Right + gap,     cy - h / 2,         w, h), false), // right
+                (new Rect(rect.Left  - gap - w, cy - h / 2,         w, h), true),  // left
+                (new Rect(cx - w / 2,           rect.Top - gap - h, w, h), true),  // above
+                (new Rect(cx - w / 2,           rect.Bottom + gap,  w, h), true),  // below
+            };
+
+            Rect chosen = cands[0].r; bool leader = false; bool placed = false;
+            foreach (var (r, needsLeader) in cands)
+            {
+                bool clash = false;
+                foreach (var o in occupied) if (r.Intersects(o)) { clash = true; break; }
+                if (!clash) { chosen = r; leader = needsLeader; placed = true; break; }
+            }
+
+            if (!placed)
+            {
+                // Crowded. Only force-draw the important rooms; skip the rest.
+                if (LabelPriority(node) == 3) continue;
+                chosen = cands[0].r; leader = false;
+            }
+
+            if (leader)
+                context.DrawLine(LabelLeaderPen, new Point(cx, cy), chosen.Center);
+
+            context.DrawText(ft, chosen.Position);
+            occupied.Add(chosen);
         }
 
         // ── Pass 4: hover badge ───────────────────────────────────────────
@@ -370,6 +508,8 @@ public class MapCanvas : Control
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+        var props = e.GetCurrentPoint(this).Properties;
+
         // Right-click on a node = open a context menu with Go Here / Copy
         // Room ID / Show Details. We previously walked-immediately on right
         // click which made it too easy to start a long auto-walk by mis-
@@ -379,7 +519,7 @@ public class MapCanvas : Control
         // Building the menu per-click rather than via a static ContextMenu
         // property because the items depend on which node was hit — the
         // menu needs the MapNode reference captured at click time.
-        if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
+        if (props.IsRightButtonPressed)
         {
             var pt   = e.GetPosition(this);
             var node = HitTest(pt);
@@ -387,7 +527,148 @@ public class MapCanvas : Control
 
             ShowNodeContextMenu(node);
             e.Handled = true;
+            return;
         }
+
+        // Middle-button drag pans the view in any mode (universal grab-scroll).
+        if (props.IsMiddleButtonPressed)
+        {
+            BeginPan(e);
+            e.Handled = true;
+            return;
+        }
+
+        if (props.IsLeftButtonPressed && EditMode)
+        {
+            // Edit mode: left-click selects the hit node (or clears selection on
+            // empty space) and, unless locked, begins a drag-to-move. Pressing
+            // on empty space instead pans the view.
+            Focus();   // so the Delete key reaches OnKeyDown
+            _cursor   = e.GetPosition(this);
+            var node  = HitTest(_cursor);
+
+            SelectedNode = node;
+            if (SelectNodeCommand?.CanExecute(node) == true)
+                SelectNodeCommand.Execute(node);
+
+            if (node is not null && !LockPositions)
+            {
+                // Cache the bounds origin now so the grid math stays stable
+                // for the whole drag even as the visual node tracks the cursor.
+                ComputeOrigin(out _dragMinX, out _dragMinY);
+                _dragOrigX = node.X;
+                _dragOrigY = node.Y;
+                _dragging = true;
+                e.Pointer.Capture(this);
+            }
+            else
+            {
+                // Empty space (or positions locked) → pan instead of move.
+                BeginPan(e);
+            }
+
+            InvalidateVisual();
+            e.Handled = true;
+        }
+        else if (props.IsLeftButtonPressed)
+        {
+            // Navigate mode: left-drag grab-scrolls the map. (Go Here stays on
+            // the right-click menu, so a plain left-drag is free to pan.)
+            BeginPan(e);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Start a grab-scroll pan: cache the parent ScrollViewer and the
+    /// pointer's position within it, capture the pointer, show the move cursor.</summary>
+    private void BeginPan(PointerPressedEventArgs e)
+    {
+        _scroller = this.FindAncestorOfType<ScrollViewer>();
+        if (_scroller is null) return;   // nothing to scroll (e.g. designer)
+        _panLast  = e.GetPosition(_scroller);
+        _panning  = true;
+        e.Pointer.Capture(this);
+        Cursor = new Cursor(StandardCursorType.SizeAll);
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+
+        if (_panning)
+        {
+            _panning = false;
+            e.Pointer.Capture(null);
+            Cursor = Cursor.Default;
+            e.Handled = true;
+            return;
+        }
+
+        if (!_dragging) return;
+
+        _dragging = false;
+        e.Pointer.Capture(null);
+
+        if (SelectedNode is { } node)
+        {
+            // Convert the release point to a grid cell using the origin cached
+            // at drag start. SnapToGrid rounds to the nearest cell; with it off
+            // we floor — both produce integer coords (the only values the
+            // Genie 4 XML format can round-trip, since export writes X*20).
+            var rawX = (_cursor.X - Padding - GridSize / 2) / GridSize + _dragMinX;
+            var rawY = (_cursor.Y - Padding - GridSize / 2) / GridSize + _dragMinY;
+            var newX = SnapToGrid ? (int)Math.Round(rawX) : (int)Math.Floor(rawX);
+            var newY = SnapToGrid ? (int)Math.Round(rawY) : (int)Math.Floor(rawY);
+
+            // Only commit + mark dirty when the room actually moved to a new
+            // grid cell. A plain click (press+release with no drag) lands back
+            // on the same cell and must not dirty the zone.
+            if (newX != _dragOrigX || newY != _dragOrigY)
+            {
+                node.X = newX;
+                node.Y = newY;
+                if (NodeMovedCommand?.CanExecute(node) == true)
+                    NodeMovedCommand.Execute(node);
+            }
+        }
+
+        InvalidateVisual();
+        e.Handled = true;
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        // Delete removes the selected room in edit mode (Genie 4 "Remove
+        // Selected Nodes/Labels"). Gated on EditMode so the key is inert in
+        // the read-only navigator.
+        if (EditMode && e.Key == Key.Delete && SelectedNode is { } node)
+        {
+            if (RemoveNodeCommand?.CanExecute(node) == true)
+            {
+                RemoveNodeCommand.Execute(node);
+                SelectedNode = null;
+                e.Handled = true;
+            }
+        }
+    }
+
+    /// <summary>Compute the current-level bounds origin (min X/Y across visible
+    /// nodes) — the same calculation Render/HitTest use to map grid → pixels.</summary>
+    private void ComputeOrigin(out int minX, out int minY)
+    {
+        minX = 0; minY = 0;
+        if (Zone is null) return;
+        int mx = int.MaxValue, my = int.MaxValue;
+        bool any = false;
+        foreach (var n in Zone.Nodes.Values)
+        {
+            if (n.Z != Level) continue;
+            if (n.X < mx) mx = n.X;
+            if (n.Y < my) my = n.Y;
+            any = true;
+        }
+        if (any) { minX = mx; minY = my; }
     }
 
     /// <summary>
@@ -452,6 +733,23 @@ public class MapCanvas : Control
         };
         if (editExitMenu is not null) items.Add(editExitMenu);
 
+        // Edit-mode-only: Remove Room. Mirrors the Delete key + the toolbar
+        // Remove button; the menu item makes it discoverable on right-click.
+        if (EditMode && RemoveNodeCommand is not null)
+        {
+            items.Add(new Separator());
+            var remove = new MenuItem { Header = "Remove Room", Foreground = new SolidColorBrush(Color.FromRgb(0xff, 0x99, 0x99)) };
+            remove.Click += (_, _) =>
+            {
+                if (RemoveNodeCommand?.CanExecute(node) == true)
+                {
+                    RemoveNodeCommand.Execute(node);
+                    if (SelectedNode?.Id == node.Id) SelectedNode = null;
+                }
+            };
+            items.Add(remove);
+        }
+
         var menu = new ContextMenu { ItemsSource = items };
 
         // Show the menu programmatically. Avalonia's ContextMenu.Open()
@@ -509,6 +807,28 @@ public class MapCanvas : Control
     {
         base.OnPointerMoved(e);
         _cursor = e.GetPosition(this);
+
+        // Grab-scroll panning: shift the ScrollViewer offset by the pointer
+        // delta (measured in the viewer's own coords so changing the offset
+        // doesn't feed back into the next reading).
+        if (_panning && _scroller is not null)
+        {
+            var p     = e.GetPosition(_scroller);
+            var delta = p - _panLast;
+            _scroller.Offset -= delta;
+            _panLast = p;
+            return;
+        }
+
+        // While dragging a node, just track the cursor and repaint — the node
+        // is drawn under the cursor and committed to a grid cell on release.
+        if (_dragging)
+        {
+            _hoveredNode = null;   // suppress the hover badge mid-drag
+            InvalidateVisual();
+            return;
+        }
+
         var hit = HitTest(_cursor);
         if (!ReferenceEquals(hit, _hoveredNode))
         {

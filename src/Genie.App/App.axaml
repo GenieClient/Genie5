@@ -166,6 +166,7 @@
         <!-- cluster put it next to "zoom in" which made it easy to click  -->
         <!-- by accident while intending a zoom action.                    -->
         <Border Grid.Row="0" Background="#252525" BorderBrush="#333" BorderThickness="0,0,0,1" Padding="4,3">
+          <StackPanel Spacing="3">
           <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4">
             <!-- Pop out (window-level action, separated from data-level cluster) -->
             <Button Grid.Column="0" Content="⬈" Padding="6,1" FontSize="11"
@@ -196,6 +197,55 @@
                     Command="{Binding ViewModel.ZoomInCommand}"
                     ToolTip.Tip="Zoom in (or mouse-wheel up over the map)"/>
           </Grid>
+
+          <!-- Editor toolbar (Genie 4 AutoMapper edit tools). Edit + Record + -->
+          <!-- New + Save are always available; the node-edit cluster (Remove / -->
+          <!-- Reset IDs / Snap / Lock / Dup) only shows in Edit mode.          -->
+          <WrapPanel Orientation="Horizontal">
+            <ToggleButton Content="✎ Edit" IsChecked="{Binding ViewModel.EditMode}"
+                          Margin="0,0,4,0" Padding="6,1" FontSize="11"
+                          ToolTip.Tip="Edit mode: click a room to select it, drag to move it. Turn off to navigate (click = nothing, right-click = Go Here)."/>
+            <ToggleButton Content="⏺ Record" IsChecked="{Binding ViewModel.AutoCreateEnabled}"
+                          Margin="0,0,4,0" Padding="6,1" FontSize="11"
+                          ToolTip.Tip="Record mode: add new rooms to the active zone as you walk into them (Genie 4 Record Mode)."/>
+            <Button Content="New" Command="{Binding ViewModel.NewZoneCommand}"
+                    Margin="0,0,4,0" Padding="6,1" FontSize="11"
+                    ToolTip.Tip="Start a new, empty zone. Save writes it to the Maps directory."/>
+            <Button Command="{Binding ViewModel.SaveMapCommand}"
+                    Margin="0,0,8,0" Padding="6,1" FontSize="11"
+                    ToolTip.Tip="Save the active zone to its XML file (Genie 4 compatible).">
+              <StackPanel Orientation="Horizontal" Spacing="3">
+                <TextBlock Text="Save"/>
+                <TextBlock Text="●" Foreground="#e0a060"
+                           IsVisible="{Binding ViewModel.IsZoneDirty}"
+                           ToolTip.Tip="Unsaved edits"/>
+              </StackPanel>
+            </Button>
+            <ToggleButton Content="Labels" IsChecked="{Binding ViewModel.FullLabels}"
+                          Margin="8,0,0,0" Padding="6,1" FontSize="11"
+                          ToolTip.Tip="OFF: show only each room's primary name. ON: show the full |-separated label list. Labels auto-place around rooms and skip when crowded; the full set is always in the hover tooltip."/>
+
+            <!-- Edit-only cluster -->
+            <StackPanel Orientation="Horizontal" Spacing="4"
+                        IsVisible="{Binding ViewModel.EditMode}">
+              <Button Content="Remove" Command="{Binding ViewModel.RemoveSelectedCommand}"
+                      Padding="6,1" FontSize="11" Background="#3a2424" Foreground="#ffcccc"
+                      ToolTip.Tip="Delete the selected room (or press Delete on the map)."/>
+              <Button Content="Reset IDs" Command="{Binding ViewModel.ResetMapIdsCommand}"
+                      Padding="6,1" FontSize="11"
+                      ToolTip.Tip="Renumber all room IDs to a dense 1..N sequence (fixes sparse ids after lots of add/remove)."/>
+              <ToggleButton Content="Snap" IsChecked="{Binding ViewModel.SnapToGrid}"
+                            Padding="6,1" FontSize="11"
+                            ToolTip.Tip="Snap dragged rooms to the grid. Genie 5 maps are grid-based, so positions always align."/>
+              <ToggleButton Content="Lock" IsChecked="{Binding ViewModel.LockPositions}"
+                            Padding="6,1" FontSize="11"
+                            ToolTip.Tip="Lock positions: rooms can be selected but not dragged."/>
+              <ToggleButton Content="Dup" IsChecked="{Binding ViewModel.AllowDuplicate}"
+                            Padding="6,1" FontSize="11"
+                            ToolTip.Tip="Allow duplicate rooms while recording — don't merge a new room into an existing one that merely looks the same."/>
+            </StackPanel>
+          </WrapPanel>
+          </StackPanel>
         </Border>
 
         <!-- ── ROW 1: map (left) + Details panel (right) ─────────────── -->
@@ -312,7 +362,14 @@
                                     Zoom="{Binding ViewModel.ZoomLevel}"
                                     MapBackgroundBrush="{Binding ViewModel.MapBackgroundBrush}"
                                     NodeClickedCommand="{Binding ViewModel.GotoNodeCommand}"
-                                    EditExitCommand="{Binding ViewModel.EditExitCommand}"/>
+                                    EditExitCommand="{Binding ViewModel.EditExitCommand}"
+                                    EditMode="{Binding ViewModel.EditMode}"
+                                    SnapToGrid="{Binding ViewModel.SnapToGrid}"
+                                    LockPositions="{Binding ViewModel.LockPositions}"
+                                    FullLabels="{Binding ViewModel.FullLabels}"
+                                    SelectedNode="{Binding ViewModel.SelectedNode, Mode=TwoWay}"
+                                    NodeMovedCommand="{Binding ViewModel.NodeMovedCommand}"
+                                    RemoveNodeCommand="{Binding ViewModel.RemoveNodeCommand}"/>
               </ScrollViewer>
             </Border>
           </Grid>
@@ -358,6 +415,36 @@
                           HorizontalAlignment="Right"
                           Command="{Binding ViewModel.SaveNotesCommand}"
                           ToolTip.Tip="Save the edited Notes back to the zone XML file. Updates immediately on disk and on the map."/>
+                </StackPanel>
+
+                <!-- ── Edit Room (edit mode only) ───────────────────── -->
+                <!-- Genie 4 AutoMapper "Edit Panel": properties of the      -->
+                <!-- selected node. Title/server-id feed the lookup index,   -->
+                <!-- so Apply rebuilds it; Color is a hex like #FFAA00.      -->
+                <StackPanel Spacing="3" IsVisible="{Binding ViewModel.EditMode}">
+                  <TextBlock Text="EDIT ROOM" Foreground="#7a92a8" FontSize="9"
+                             FontWeight="SemiBold" Margin="0,0,0,2"/>
+                  <TextBlock Text="Click a room on the map to select it."
+                             Foreground="#888" FontSize="11" TextWrapping="Wrap"
+                             IsVisible="{Binding ViewModel.SelectedNode, Converter={x:Static ObjectConverters.IsNull}}"/>
+                  <StackPanel Spacing="3"
+                              IsVisible="{Binding ViewModel.SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <TextBlock Text="Title" Foreground="#888" FontSize="11"/>
+                    <TextBox Text="{Binding ViewModel.SelNodeTitle}" FontSize="11"/>
+                    <TextBlock Text="Notes / label" Foreground="#888" FontSize="11"/>
+                    <TextBox Text="{Binding ViewModel.SelNodeNotes}" FontSize="11"
+                             Watermark="e.g. Bank|Teller (| separates #goto labels)"/>
+                    <TextBlock Text="Color (hex)" Foreground="#888" FontSize="11"/>
+                    <TextBox Text="{Binding ViewModel.SelNodeColor}" FontSize="11"
+                             FontFamily="Consolas,monospace" Watermark="#FFAA00"/>
+                    <TextBlock Text="Server id" Foreground="#888" FontSize="11"/>
+                    <TextBox Text="{Binding ViewModel.SelNodeServerId}" FontSize="11"
+                             FontFamily="Consolas,monospace"/>
+                    <Button Content="Apply" Padding="8,2" FontSize="11"
+                            HorizontalAlignment="Right"
+                            Command="{Binding ViewModel.ApplyNodePropsCommand}"
+                            ToolTip.Tip="Write these fields back into the room. Save the zone to persist to disk."/>
+                  </StackPanel>
                 </StackPanel>
 
                 <!-- ── Zone ─────────────────────────────────────────── -->
