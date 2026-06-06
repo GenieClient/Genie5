@@ -41,6 +41,21 @@ public sealed class SavedLayout
     public double WindowWidth  { get; set; } = 1280;
     public double WindowHeight { get; set; } = 800;
 
+    /// <summary>Main-window position (DIPs). Only meaningful when
+    /// <see cref="HasWindowGeometry"/> is true.</summary>
+    public int  WindowX { get; set; }
+    public int  WindowY { get; set; }
+
+    /// <summary>Whether the main window was maximized when the layout was saved.
+    /// Wins over size on restore (we just re-maximize).</summary>
+    public bool WindowMaximized { get; set; }
+
+    /// <summary>True once a layout has actually captured the main-window
+    /// geometry. Layouts saved before window geometry rode on the profile leave
+    /// this false, so applying them leaves the current window size untouched
+    /// instead of snapping to the 1280×800 defaults at (0,0).</summary>
+    public bool HasWindowGeometry { get; set; }
+
     // ── Dock-tool visibility ───────────────────────────────────────────
 
     /// <summary>String IDs of every tool that should be visible in the

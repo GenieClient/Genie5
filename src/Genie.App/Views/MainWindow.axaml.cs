@@ -5,53 +5,21 @@ using Avalonia.Interactivity;
 using Avalonia.ReactiveUI;
 using Avalonia.VisualTree;
 using Genie.App.Controls;
-using Genie.App.Settings;
 using Genie.App.ViewModels;
-using Genie.Core.Runtime;
 using ReactiveUI;
 
 namespace Genie.App.Views;
 
 public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 {
-    /// <summary>Path to the persisted main-window geometry (window.json under
-    /// the app's Config dir). Null only if the dir couldn't be resolved.</summary>
-    private readonly string? _windowBoundsPath;
-
     public MainWindow()
     {
         InitializeComponent();
 
-        // ── Restore the saved window size/position (before first show, so
-        //    there's no resize flash). Self-contained here rather than via the
-        //    VM because the VM's DataContext isn't set until after construction.
-        try
-        {
-            var cfgDir = new LocalDirectoryService("Genie5", AppContext.BaseDirectory)
-                .Current.ValidateDirectory("Config");
-            _windowBoundsPath = System.IO.Path.Combine(cfgDir, "window.json");
-
-            if (WindowBoundsStore.Load(_windowBoundsPath) is { } b)
-            {
-                if (b.Maximized)
-                {
-                    WindowState = WindowState.Maximized;
-                }
-                else
-                {
-                    if (b.Width  >= 400) Width  = b.Width;
-                    if (b.Height >= 300) Height = b.Height;
-                    // Only restore position if it looks sane (guards against a
-                    // window stranded off-screen after a monitor change).
-                    if (b.X > -50 && b.Y > -50 && b.X < 20000 && b.Y < 20000)
-                    {
-                        WindowStartupLocation = WindowStartupLocation.Manual;
-                        Position = new PixelPoint(b.X, b.Y);
-                    }
-                }
-            }
-        }
-        catch { /* fall back to the XAML default size */ }
+        // Main-window size/position is no longer auto-restored on startup — the
+        // app always opens at the XAML default size. Geometry now rides on a
+        // saved layout profile (captured/applied via the VM's
+        // CaptureWindowGeometry / ApplyWindowGeometry bridge, wired below).
 
         // Ctrl+Right-Click on selected game text → append selection to the
         // command bar. Window-level handler so the gesture works regardless of
@@ -86,6 +54,33 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
         this.WhenActivated(d =>
         {
+            // Bridge the main-window geometry to the VM so a saved layout can
+            // capture/restore it (size, position, maximized). The VM owns no
+            // Window reference, so it calls back through these hooks.
+            ViewModel!.CaptureWindowGeometry = () =>
+            {
+                var maximized = WindowState == WindowState.Maximized;
+                return (Bounds.Width, Bounds.Height, Position.X, Position.Y, maximized);
+            };
+            ViewModel!.ApplyWindowGeometry = (w, h, x, y, maximized) =>
+            {
+                if (maximized)
+                {
+                    WindowState = WindowState.Maximized;
+                    return;
+                }
+                WindowState = WindowState.Normal;
+                if (w >= 400) Width  = w;
+                if (h >= 300) Height = h;
+                // Only restore position if it looks sane (guards against a
+                // window stranded off-screen after a monitor change).
+                if (x > -50 && y > -50 && x < 20000 && y < 20000)
+                {
+                    WindowStartupLocation = WindowStartupLocation.Manual;
+                    Position = new PixelPoint(x, y);
+                }
+            };
+
             d(ViewModel!.ShowConnectDialog.RegisterHandler(async ctx =>
             {
                 // Pass the previous session's actual config so the dialog
@@ -246,11 +241,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
-        // Capture windowed-mode geometry + the main-window size on every close
-        // attempt (idempotent; harmless if the close is later cancelled by the
-        // connection prompt).
-        ViewModel?.PersistMdiGeometryIfWindowed();
-        SaveWindowBounds();
+        // Window geometry + windowed-mode layout are no longer auto-saved on
+        // close — they persist only when the user saves a layout profile.
         if (e.Cancel)            return;   // something upstream already vetoed
         if (_closeConfirmed)     return;   // second pass after user said Yes
         if (ViewModel?.IsConnected != true) return;
@@ -286,22 +278,6 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
         _closeConfirmed = true;
         Close();
-    }
-
-    /// <summary>Persist the current window size/position for next launch. Uses
-    /// Bounds (the live size) rather than Width/Height, which go stale after an
-    /// OS-driven resize. When maximized we record the flag and re-maximize on
-    /// restore, so the captured size is unused in that case.</summary>
-    private void SaveWindowBounds()
-    {
-        if (_windowBoundsPath is null) return;
-        try
-        {
-            var maximized = WindowState == WindowState.Maximized;
-            WindowBoundsStore.Save(_windowBoundsPath, new WindowBounds(
-                Bounds.Width, Bounds.Height, Position.X, Position.Y, maximized));
-        }
-        catch { /* best-effort */ }
     }
 
     private void CommandInput_KeyDown(object? sender, KeyEventArgs e)
