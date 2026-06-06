@@ -247,7 +247,7 @@ public static class ScriptParser
                     bodyEnd   = inst.Lines.Count;
                     for (int j = bodyStart; j < inst.Lines.Count; j++)
                     {
-                        if (inst.Lines[j].Trimmed.Length == 0) continue;
+                        if (IsSkippable(inst.Lines[j].Trimmed)) continue;
                         if (inst.Lines[j].Indent <= line.Indent) { bodyEnd = j; break; }
                     }
                 }
@@ -356,7 +356,7 @@ public static class ScriptParser
                         bodyEnd = inst.Lines.Count;
                         for (int j = cursor + 1; j < inst.Lines.Count; j++)
                         {
-                            if (inst.Lines[j].Trimmed.Length == 0) continue;
+                            if (IsSkippable(inst.Lines[j].Trimmed)) continue;
                             if (inst.Lines[j].Indent <= inst.Lines[cursor].Indent) { bodyEnd = j; break; }
                         }
                     }
@@ -384,7 +384,7 @@ public static class ScriptParser
                     elseEnd = inst.Lines.Count;
                     for (int j = cursor + 1; j < inst.Lines.Count; j++)
                     {
-                        if (inst.Lines[j].Trimmed.Length == 0) continue;
+                        if (IsSkippable(inst.Lines[j].Trimmed)) continue;
                         if (inst.Lines[j].Indent <= inst.Lines[cursor].Indent) { elseEnd = j; break; }
                     }
                     return elseEnd;
@@ -413,10 +413,17 @@ public static class ScriptParser
         return t[6] == ' ' || t[6] == '\t';
     }
 
+    /// <summary>True for lines the block/jump mapper must look past: blank
+    /// lines and `#` comments. A `#` comment is semantically "not there" (Genie
+    /// 4), so it must not separate an `if … then` from its `{`, or an if-block
+    /// from its `else`/`elseif`, when building jump maps.</summary>
+    private static bool IsSkippable(string trimmed)
+        => trimmed.Length == 0 || trimmed[0] == '#';
+
     private static int NextNonEmpty(ScriptInstance inst, int from)
     {
         for (int j = from; j < inst.Lines.Count; j++)
-            if (inst.Lines[j].Trimmed.Length > 0) return j;
+            if (!IsSkippable(inst.Lines[j].Trimmed)) return j;
         return -1;
     }
 

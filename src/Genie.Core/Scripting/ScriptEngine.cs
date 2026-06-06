@@ -650,42 +650,18 @@ public sealed class ScriptEngine
         inst.Pc++;
 
         var t = line.Trimmed;
-        // Skip blank lines and pure comments. A comment is `#` alone, `#`
-        // followed by whitespace, or `#` followed by a non-letter (e.g.
-        // `############` divider lines). Meta-commands (`#echo`, `#var`,
-        // `#tvar`, `#class`, `#mapper`, `#parse`, ...) start with `#`
-        // immediately followed by a letter and fall through to the
-        // meta-command route a few lines down — Genie 4 parity for the
-        // bare `#xxx` invocation pattern community scripts use.
+        // Skip blank lines and comments. In Genie 4 a script line whose first
+        // non-whitespace character is `#` is ALWAYS a comment — including
+        // `#debug 10`, `#include foo`, commented-out code like `#goto LABEL`,
+        // and prose (`#todo ...`). Meta-commands are never invoked as a bare
+        // `#xxx` script line; a script runs one only by sending it to the
+        // command line via put/send (`put #echo foo`, `put #goto 400`), which
+        // the `put`/`send` case handles separately. So `#` here means "ignore
+        // the rest of the line" — nothing is substituted or dispatched.
         if (t.Length == 0) return true;
-        if (t[0] == '#' && (t.Length == 1 || !char.IsLetter(t[1]))) return true;
+        if (t[0] == '#') return true;
         if ((t[0] == ':' || t[^1] == ':') && !t.Contains(' ')) return true;
 
-        // Bare meta-command (`#echo foo`, `#var x 1`, ...). Substitute
-        // $/% vars then route through HandleMetaCommand — the same target
-        // the `put #...` and PendingSends paths use. AbortReason from the
-        // substitute step is honoured exactly like the regular dispatch
-        // path below: undefined-$var stops the script with a clear reason
-        // rather than running a half-substituted meta-command.
-        if (t[0] == '#')
-        {
-            inst.AbortReason = null;
-            var metaText = SubstituteVars(t, inst);
-            if (inst.AbortReason is not null)
-            {
-                _echo($"[script] {inst.Name} stopped at line {line.LineNumber}: {inst.AbortReason}");
-                inst.Running = false;
-                ScriptFinished?.Invoke(inst.Name);
-                return false;
-            }
-            if (inst.LastDebugLine != line.LineNumber)
-            {
-                DbgEcho(inst, 10, $"{inst.Name}:{line.LineNumber} {metaText}");
-                inst.LastDebugLine = line.LineNumber;
-            }
-            HandleMetaCommand(metaText, inst);
-            return true;
-        }
         // Brace block delimiters are structural — the parser already mapped
         // jumps over them; at runtime they're no-ops.
         if (t == "{") return true;
