@@ -134,6 +134,7 @@ public sealed class ScriptGlobalsSync : IDisposable
 
         // Misc
         Set("prompt",        "");
+        Set("gametime",      "0");
         Set("monstercount",  "0");
         Set("monsterlist",   "");
     }
@@ -152,8 +153,20 @@ public sealed class ScriptGlobalsSync : IDisposable
             case RoundTimeEvent rt:    Set("roundtime", SecondsRemaining(rt.ExpiresAt)); break;
             case CastTimeEvent ct:     Set("casttime",  SecondsRemaining(ct.ExpiresAt)); break;
             case SpellEvent sp:        Set("preparedspell", sp.SpellName ?? string.Empty); break;
-            case PromptEvent p:        Set("prompt", p.Indicator);                            break;
+            case PromptEvent p:        OnPrompt(p);                                           break;
         }
+    }
+
+    private void OnPrompt(PromptEvent p)
+    {
+        Set("prompt", p.Indicator);
+
+        // Genie 4 reserved $gametime — the server's clock (Unix seconds) carried
+        // on each <prompt time='...'> tag. The parser leaves ServerTime at its
+        // default when a prompt arrives without a time attribute; guard against
+        // that so we never publish a bogus negative epoch.
+        if (p.ServerTime > DateTimeOffset.UnixEpoch)
+            Set("gametime", p.ServerTime.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
     }
 
     private void OnProgressBar(ProgressBarEvent bar)
