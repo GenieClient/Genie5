@@ -318,9 +318,26 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private readonly string _profilesPath;
     private readonly string _displayPath;
     private readonly string _pathsPath;
-    private readonly string _mdiLayoutPath;
     private readonly string _configDir;
     private readonly string _defaultMapsDir;
+
+    /// <summary>
+    /// In-memory MDI geometry held across a Window-menu mode toggle within a
+    /// single session. Captured when leaving windowed mode so toggling back
+    /// restores the floating windows where they were. Deliberately NOT
+    /// persisted to disk — windowed geometry only survives a restart via a
+    /// saved layout (<see cref="SavedLayout.MdiBounds"/>).
+    /// </summary>
+    private Dictionary<string, Settings.MdiWindowBounds>? _mdiBoundsCache;
+
+    // ── Main-window geometry bridge (set by the View) ───────────────────────
+    /// <summary>Set by <c>MainWindow</c>: returns the live window geometry so a
+    /// layout save can capture it. Null until the view wires it up.</summary>
+    public Func<(double Width, double Height, int X, int Y, bool Maximized)>? CaptureWindowGeometry { get; set; }
+
+    /// <summary>Set by <c>MainWindow</c>: applies geometry from a loaded layout
+    /// to the main window. Null until the view wires it up.</summary>
+    public Action<double, double, int, int, bool>? ApplyWindowGeometry { get; set; }
 
     /// <summary>
     /// Directory the <see cref="SessionRecorder"/> writes raw-XML captures to
@@ -372,7 +389,6 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _profilesPath = Path.Combine(_configDir, "profiles.json");
         _displayPath  = Path.Combine(_configDir, "display.json");
         _pathsPath    = Path.Combine(_configDir, "paths.json");
-        _mdiLayoutPath = Path.Combine(_configDir, "mdi-layout.json");
         // Recordings live as a sibling to Config (not under it) — same parent
         // dir, so {AppData}/Genie5/{Config, Logs, Maps, Profiles}/ is the layout.
         _logsDir      = Path.Combine(Path.GetDirectoryName(_configDir)!, "Logs");
@@ -540,11 +556,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         };
 
         DockFactory = factory;
-        // Honor the persisted windowed-mode choice on startup, restoring each
-        // child window's saved geometry when windowed.
-        DockLayout  = Display.WindowedMode
-            ? factory.BuildMdiLayout(Settings.MdiLayoutStore.Load(_mdiLayoutPath))
-            : factory.BuildDefaultLayout();
+        // Always start in the built-in tabbed layout. The document mode,
+        // window geometry, and MDI window positions are NOT auto-restored from
+        // the last session — they only load when a layout profile is applied
+        // (the Layout menu, or the per-profile / global default layout on
+        // connect via ApplyDefaultLayoutForConnect).
+        DockLayout  = factory.BuildDefaultLayout();
 
         // Wire the Mapper's "pop out" button. Done here (after factory exists)
         // because the VM doesn't carry a factory reference itself.
@@ -808,14 +825,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleWindowedModeCommand = ReactiveCommand.Create(() =>
         {
             if (DockFactory is not GenieDockFactory factory) return;
-            // Leaving windowed mode — capture the current window geometry first
-            // so it's restored next time MDI is enabled.
+            // Leaving windowed mode — capture the current window geometry into
+            // the in-memory cache so toggling back restores positions within
+            // this session. (Not written to disk; restart-persistence is via a
+            // saved layout only.)
             if (Display.WindowedMode)
-                Settings.MdiLayoutStore.Save(_mdiLayoutPath, factory.CaptureMdiBounds());
+                _mdiBoundsCache = factory.CaptureMdiBounds();
             Display.WindowedMode = !Display.WindowedMode;
-            Display.Save(_displayPath);
             DockLayout = Display.WindowedMode
-                ? factory.BuildMdiLayout(Settings.MdiLayoutStore.Load(_mdiLayoutPath))
+                ? factory.BuildMdiLayout(_mdiBoundsCache)
                 : factory.BuildDefaultLayout();
             RefreshVisibilityBools();
             GameText.AddSystemLine($"[layout] {(Display.WindowedMode ? "windowed (MDI)" : "tabbed")} mode");
@@ -1003,19 +1021,6 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// connect dialog after a Save / Delete action.
     /// </summary>
     public void SaveProfiles() => Profiles.Save(_profilesPath);
-
-    /// <summary>
-    /// If windowed (MDI) mode is active, capture each child window's current
-    /// position/size/state to <c>mdi-layout.json</c>. Called from the main
-    /// window's close handler so the windowed layout survives a restart.
-    /// No-op in tabbed mode.
-    /// </summary>
-    public void PersistMdiGeometryIfWindowed()
-    {
-        if (!Display.WindowedMode) return;
-        if (DockFactory is GenieDockFactory factory)
-            Settings.MdiLayoutStore.Save(_mdiLayoutPath, factory.CaptureMdiBounds());
-    }
 
     /// <summary>
     /// File → Maps Directory... Opens a native folder picker, persists the
@@ -2190,6 +2195,19 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             WindowedMode          = Display.WindowedMode,
         };
 
+        // Main-window geometry — captured from the View (if it has wired the
+        // bridge) so window size/position/maximized ride on the layout profile.
+        if (CaptureWindowGeometry is { } capture)
+        {
+            var g = capture();
+            layout.WindowWidth     = g.Width;
+            layout.WindowHeight    = g.Height;
+            layout.WindowX         = g.X;
+            layout.WindowY         = g.Y;
+            layout.WindowMaximized = g.Maximized;
+            layout.HasWindowGeometry = true;
+        }
+
         // Visible-tool list — walk the dock factory's known tools and
         // record which ones are currently in the dock tree. The factory
         // knows the canonical set; checking IsToolVisible per id gives
@@ -2242,17 +2260,24 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.WindowedMode           = layout.WindowedMode;
         Display.Save(_displayPath);
 
+        // Restore the main-window geometry from the layout (only when the
+        // layout actually captured it — older layouts leave the window as-is).
+        if (layout.HasWindowGeometry)
+            ApplyWindowGeometry?.Invoke(
+                layout.WindowWidth, layout.WindowHeight,
+                layout.WindowX, layout.WindowY, layout.WindowMaximized);
+
         if (DockFactory is Docking.GenieDockFactory factory)
         {
             if (layout.WindowedMode)
             {
                 // Windowed (MDI): the dock-tree snapshot doesn't capture MDI
                 // arrangement — the per-window geometry does. Prefer the
-                // layout's own saved geometry, falling back to the global
-                // mdi-layout.json.
+                // layout's own saved geometry, falling back to the in-session
+                // cache (null is fine — BuildMdiLayout cascades from defaults).
                 var bounds = layout.MdiBounds is { Count: > 0 }
                     ? layout.MdiBounds
-                    : Settings.MdiLayoutStore.Load(_mdiLayoutPath);
+                    : _mdiBoundsCache;
                 DockLayout = factory.BuildMdiLayout(bounds);
             }
             else if (layout.DockTree is not null)

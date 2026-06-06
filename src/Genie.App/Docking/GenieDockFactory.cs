@@ -485,9 +485,9 @@ public class GenieDockFactory : Factory
                 dockable.Id is { Length: > 0 } id)
             {
                 var r = mdi.MdiBounds;
-                // Only persist real, finite rects — a window that was never
+                // Only capture real, finite rects — a window that was never
                 // realised (or is minimised) can report NaN/Infinity bounds,
-                // which would crash MdiLayoutStore's JSON write.
+                // which would crash the layout's JSON write.
                 if (double.IsFinite(r.X) && double.IsFinite(r.Y) &&
                     double.IsFinite(r.Width) && double.IsFinite(r.Height) &&
                     r.Width > 0 && r.Height > 0)
