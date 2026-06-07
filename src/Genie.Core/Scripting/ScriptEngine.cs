@@ -1715,22 +1715,19 @@ public sealed class ScriptEngine
             }
             if (!resolved)
             {
-                // No prefix matched anywhere. For local %vars we keep the
-                // historical "empty if undefined" behavior — scripts often
-                // lazy-init %vars and rely on `if "%foo" = ""` checks.
-                //
-                // For global $vars we record an AbortReason so the runner
-                // can stop the script at the next safe point. Without this,
-                // an unset $sheath/$pack/etc. silently truncates the line
-                // ("put open my $sheath" → "put open my") and the server
-                // rejects a malformed command. Scripts that legitimately
-                // want to check for an unset global should use the def()
-                // expression helper.
+                // Undefined variable → empty string, for BOTH local %vars and
+                // global $vars. This matches Genie 4 (Lists/Globals.cs returns
+                // the line with the token resolved to nothing) and the
+                // Genie5.Kzin engine, which both treat an unset variable as
+                // empty rather than aborting. Scripts routinely compare against
+                // optional globals — e.g. travel.cmd's
+                // `if "$charactername" = "$char1"` where $char1 may never have
+                // been created — and rely on the empty result so the branch
+                // simply doesn't match. Scripts that need to distinguish
+                // "set to empty" from "never set" use the def() helper.
                 name = text[nameStart..j];
                 value = string.Empty;
                 nameEnd = j;
-                if (c == '$' && inst.AbortReason is null)
-                    inst.AbortReason = "undefined variable $" + name;
             }
             j = nameEnd;
             if (doubleEval && !string.IsNullOrEmpty(value))
