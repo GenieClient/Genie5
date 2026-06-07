@@ -143,20 +143,23 @@
     </DataTemplate>
 
     <!-- ── Room ───────────────────────────────────────────────────────────── -->
+    <!-- Every field wraps (Genie5.Kzin parity). The Exits/Players/Objects
+         section labels are intentionally omitted — the content is colour-coded
+         (blue=exits, green=players, grey=objects) and the game text is already
+         self-describing. Each field collapses when empty so the panel doesn't
+         show blank rows for sections the current room lacks. -->
     <DataTemplate DataType="docking:RoomTool">
       <ScrollViewer>
         <StackPanel Spacing="4" Margin="8">
           <SelectableTextBlock Text="{Binding ViewModel.Title}"       FontWeight="Bold" Foreground="#ccc" TextWrapping="Wrap"/>
-          <SelectableTextBlock Text="{Binding ViewModel.Description}" Foreground="#aaa" FontSize="11"     TextWrapping="Wrap" Margin="0,4,0,0"/>
-          <SelectableTextBlock Foreground="#6af" FontSize="11" Margin="0,4,0,0">
-            <Run Text="Exits: "/><Run Text="{Binding ViewModel.Exits}"/>
-          </SelectableTextBlock>
-          <SelectableTextBlock Foreground="#8d8" FontSize="11">
-            <Run Text="Also here: "/><Run Text="{Binding ViewModel.Players}"/>
-          </SelectableTextBlock>
-          <SelectableTextBlock Foreground="#aaa" FontSize="11">
-            <Run Text="Objects: "/><Run Text="{Binding ViewModel.Objects}"/>
-          </SelectableTextBlock>
+          <SelectableTextBlock Text="{Binding ViewModel.Description}" Foreground="#aaa" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                               IsVisible="{Binding ViewModel.Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+          <SelectableTextBlock Text="{Binding ViewModel.Exits}"   Foreground="#6af" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                               IsVisible="{Binding ViewModel.Exits,   Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+          <SelectableTextBlock Text="{Binding ViewModel.Players}" Foreground="#8d8" FontSize="11" TextWrapping="Wrap"
+                               IsVisible="{Binding ViewModel.Players, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+          <SelectableTextBlock Text="{Binding ViewModel.Objects}" Foreground="#aaa" FontSize="11" TextWrapping="Wrap"
+                               IsVisible="{Binding ViewModel.Objects, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         </StackPanel>
       </ScrollViewer>
     </DataTemplate>
