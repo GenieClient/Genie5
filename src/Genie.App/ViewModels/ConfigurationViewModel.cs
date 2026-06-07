@@ -211,6 +211,24 @@ public class ConfigurationViewModel : ReactiveObject
         return Path.Combine(dir, fileName);
     }
 
+    /// <summary>
+    /// Read path with profile-over-global precedence: the selected profile's
+    /// own copy when present, otherwise the shared global Config file (so a
+    /// profile that hasn't customised a rule type still shows the global set,
+    /// including legacy / earlier-prototype configs). Saves always go to the
+    /// profile dir via <see cref="PathFor"/>, so the first edit promotes a
+    /// global config into a per-profile override. Returns the profile path
+    /// (which may not exist) when neither location has the file, so callers'
+    /// existing <c>File.Exists</c> guards still work.
+    /// </summary>
+    private string ReadPathFor(string fileName)
+    {
+        var profilePath = PathFor(fileName);
+        if (File.Exists(profilePath)) return profilePath;
+        var globalPath = Path.Combine(_configRoot, fileName);
+        return File.Exists(globalPath) ? globalPath : profilePath;
+    }
+
     // ── Draft engines (cleared whenever SelectedProfile changes) ─────────────
 
     private HighlightEngine?     _draftHighlights;
@@ -253,7 +271,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftHighlights is not null) return _draftHighlights;
         _draftHighlights = new HighlightEngine();
-        var path = PathFor("highlights.json");
+        var path = ReadPathFor("highlights.json");
         if (!File.Exists(path)) return _draftHighlights;
         try
         {
@@ -274,7 +292,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftTriggers is not null) return _draftTriggers;
         _draftTriggers = new TriggerEngineFinal();
-        var path = PathFor("triggers.json");
+        var path = ReadPathFor("triggers.json");
         if (!File.Exists(path)) return _draftTriggers;
         try
         {
@@ -289,7 +307,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftSubstitutes is not null) return _draftSubstitutes;
         _draftSubstitutes = new SubstituteEngine();
-        var path = PathFor("substitutes.json");
+        var path = ReadPathFor("substitutes.json");
         if (!File.Exists(path)) return _draftSubstitutes;
         try
         {
@@ -304,7 +322,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftGags is not null) return _draftGags;
         _draftGags = new GagEngine();
-        var path = PathFor("gags.json");
+        var path = ReadPathFor("gags.json");
         if (!File.Exists(path)) return _draftGags;
         try
         {
@@ -319,7 +337,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftAliases is not null) return _draftAliases;
         _draftAliases = new AliasEngine();
-        var path = PathFor("aliases.json");
+        var path = ReadPathFor("aliases.json");
         if (!File.Exists(path)) return _draftAliases;
         try
         {
@@ -334,7 +352,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftMacros is not null) return _draftMacros;
         _draftMacros = new MacroEngine();
-        var path = PathFor("macros.json");
+        var path = ReadPathFor("macros.json");
         if (!File.Exists(path)) return _draftMacros;
         try
         {
@@ -345,13 +363,26 @@ public class ConfigurationViewModel : ReactiveObject
         return _draftMacros;
     }
 
-    private ClassEngine GetDraftClasses() => _draftClasses ??= new ClassEngine();
+    private ClassEngine GetDraftClasses()
+    {
+        if (_draftClasses is not null) return _draftClasses;
+        _draftClasses = new ClassEngine();
+        var path = ReadPathFor("classes.json");
+        if (!File.Exists(path)) return _draftClasses;
+        try
+        {
+            foreach (var m in _persistence.LoadClasses(path))
+                _draftClasses.Set(m.Name, m.IsActive);
+        }
+        catch { }
+        return _draftClasses;
+    }
 
     private VariableStore GetDraftVariables()
     {
         if (_draftVariables is not null) return _draftVariables;
         _draftVariables = new VariableStore();
-        var path = PathFor("variables.json");
+        var path = ReadPathFor("variables.json");
         if (!File.Exists(path)) return _draftVariables;
         try
         {

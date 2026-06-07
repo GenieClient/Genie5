@@ -1680,10 +1680,35 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// </summary>
     private void LoadSavedConfiguration(GenieCore core)
     {
-        var p   = new PersistenceService();
-        var dir = GetProfileConfigDir(ConnectedProfile);
+        var p          = new PersistenceService();
+        var profileDir = GetProfileConfigDir(ConnectedProfile);
+        var globalDir  = _configDir;
 
-        SafeLoad(dir, "highlights.json", path =>
+        // Resolve a rule file with profile-over-global precedence: the connected
+        // profile's own copy wins when present, otherwise fall back to the shared
+        // global Config dir. This lets per-profile configs override the shared
+        // set while legacy / pre-per-profile configs (e.g. imported Genie 4 or
+        // earlier-prototype files that live in the global Config dir) still load
+        // for a profile that hasn't customised that rule type yet. Returns null
+        // when neither location has the file. For a profile-less (ad-hoc)
+        // connection profileDir == globalDir, so this is a plain "load if present".
+        string? Pick(string fileName)
+        {
+            var profilePath = Path.Combine(profileDir, fileName);
+            if (File.Exists(profilePath)) return profilePath;
+            var globalPath = Path.Combine(globalDir, fileName);
+            return File.Exists(globalPath) ? globalPath : null;
+        }
+
+        // Classes first so Ensure() calls from the rule loaders below don't
+        // clobber persisted active/inactive state (matches Genie5.Kzin ordering).
+        SafeLoad(Pick("classes.json"), path =>
+        {
+            foreach (var m in p.LoadClasses(path))
+                core.Classes.Set(m.Name, m.IsActive);
+        });
+
+        SafeLoad(Pick("highlights.json"), path =>
         {
             foreach (var m in p.LoadHighlights(path))
             {
@@ -1695,7 +1720,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
         });
 
-        SafeLoad(dir, "triggers.json", path =>
+        SafeLoad(Pick("triggers.json"), path =>
         {
             foreach (var m in p.LoadTriggers(path))
             {
@@ -1704,7 +1729,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
         });
 
-        SafeLoad(dir, "substitutes.json", path =>
+        SafeLoad(Pick("substitutes.json"), path =>
         {
             foreach (var m in p.LoadSubstitutes(path))
             {
@@ -1713,7 +1738,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
         });
 
-        SafeLoad(dir, "gags.json", path =>
+        SafeLoad(Pick("gags.json"), path =>
         {
             foreach (var m in p.LoadGags(path))
             {
@@ -1722,7 +1747,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
         });
 
-        SafeLoad(dir, "aliases.json", path =>
+        SafeLoad(Pick("aliases.json"), path =>
         {
             foreach (var m in p.LoadAliases(path))
             {
@@ -1731,10 +1756,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
         });
 
-        var macrosPath = Path.Combine(dir, "macros.json");
-        if (File.Exists(macrosPath))
+        var macrosPath = Pick("macros.json");
+        if (macrosPath is not null)
         {
-            SafeLoad(dir, "macros.json", path =>
+            SafeLoad(macrosPath, path =>
             {
                 foreach (var m in p.LoadMacros(path))
                     core.Macros.Add(m.Key, m.Action);
@@ -1742,32 +1767,33 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         }
         else
         {
-            // First run for this profile: seed Genie 4's classic numpad
-            // movement pad so 10-key travel works out of the box. Persisted
-            // so it appears in the Macros panel and the user can edit/remove
-            // any of it freely.
+            // First run for this profile (and no global macros either): seed
+            // Genie 4's classic numpad movement pad so 10-key travel works out
+            // of the box. Persisted to the profile dir so it appears in the
+            // Macros panel and the user can edit/remove any of it freely.
             SeedDefaultMovementMacros(core.Macros);
-            try { p.SaveMacros(macrosPath, core.Macros.Rules); } catch { /* best-effort seed */ }
+            try { p.SaveMacros(Path.Combine(profileDir, "macros.json"), core.Macros.Rules); } catch { /* best-effort seed */ }
         }
 
-        SafeLoad(dir, "variables.json", path =>
+        SafeLoad(Pick("variables.json"), path =>
         {
             foreach (var m in p.LoadVariables(path))
                 core.Variables.Store.Set(m.Name, m.Value);
         });
 
-        SafeLoad(dir, "windows.json", path =>
+        SafeLoad(Pick("windows.json"), path =>
         {
             foreach (var m in p.LoadWindowSettings(path))
                 WindowSettings.Apply(m);
         });
     }
 
-    /// <summary>Run a load callback against <c>{dir}/{name}</c> if it exists, swallowing exceptions.</summary>
-    private static void SafeLoad(string dir, string fileName, Action<string> load)
+    /// <summary>Run a load callback against <paramref name="path"/> when it's
+    /// non-null and present, swallowing exceptions (corrupt JSON shouldn't block
+    /// connect). Pair with the profile-over-global path resolver in the caller.</summary>
+    private static void SafeLoad(string? path, Action<string> load)
     {
-        var path = Path.Combine(dir, fileName);
-        if (!File.Exists(path)) return;
+        if (path is null || !File.Exists(path)) return;
         try { load(path); } catch { /* corrupt JSON shouldn't block connect */ }
     }
 
