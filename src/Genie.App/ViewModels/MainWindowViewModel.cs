@@ -1966,6 +1966,21 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // toggles (Window → Game Window) — supply Display so it can read
         // ShowGameText / ShowEchoText / ShowScriptText at subscription time.
         GameText.DisplaySettings = Display;
+
+        // Timer-driven script tick so `pause`/`delay` (and the RT gate) unblock
+        // on their own schedule instead of waiting for the next server event.
+        // Without this, a paused script only resumes when game text/a prompt
+        // arrives — so a `pause 0.5` between idle commands stalls until DR's
+        // periodic keepalive prompt (~10s), crawling any pause-heavy script.
+        // One-shot DispatcherTimer per scheduled wake (UI thread, where Tick
+        // already marshals its echo/send callbacks).
+        _core.Scripts.ScheduleTick = delay =>
+        {
+            var timer = new Avalonia.Threading.DispatcherTimer { Interval = delay };
+            timer.Tick += (_, _) => { timer.Stop(); _core.Scripts.Tick(); };
+            timer.Start();
+        };
+
         GameText.Attach(_core);
         Vitals.Attach(_core);
         Room.Attach(_core);
