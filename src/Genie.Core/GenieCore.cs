@@ -313,6 +313,17 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             accountName:   cfg.AccountName,
             clientVersion: HostVersionString);
 
+        // Mirror the AutoMapper's current location into the script globals so
+        // scripts can read $roomid / $zoneid / $zonename (Genie 4 parity — the
+        // mapper-sourced reserved vars deferred from #45). $roomid is the MAPPER
+        // node id (the numbers #goto and scripts compare against, e.g.
+        // `if $roomid != 156`), distinct from the server's $gameroomid. Seeded
+        // now for scripts that start before any move; refreshed on every
+        // CurrentNodeChanged. Scripts.Globals is concurrent, so the mapper-thread
+        // write is safe against script-thread reads.
+        SyncMapperGlobals();
+        AutoMapper.CurrentNodeChanged += SyncMapperGlobals;
+
         // ── Game event routing ─────────────────────────────────────────────────
         // Note: Scripts.OnGameLine already calls Extensions.DispatchGameLine internally —
         // no need to route TextEvents to the extension manager separately.
@@ -688,8 +699,25 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         set => _connection.AiPipeEnabled = value;
     }
 
+    /// <summary>
+    /// Push the AutoMapper's current room/zone into the script globals
+    /// (<c>$roomid</c> / <c>$zoneid</c> / <c>$zonename</c>). <c>$roomid</c> is the
+    /// mapper node id (what <c>#goto</c> and scripts compare against), not the
+    /// server's <c>$gameroomid</c>. Defaults to <c>"0"</c> / empty when there's
+    /// no current node (off-map), matching Genie 4 / Genie5.Kzin.
+    /// </summary>
+    private void SyncMapperGlobals()
+    {
+        var node = AutoMapper.CurrentNode;
+        var zone = AutoMapper.ActiveZone;
+        Scripts.Globals["roomid"]   = node?.Id.ToString() ?? "0";
+        Scripts.Globals["zoneid"]   = zone?.Genie4Id ?? string.Empty;
+        Scripts.Globals["zonename"] = zone?.Name ?? string.Empty;
+    }
+
     public async ValueTask DisposeAsync()
     {
+        AutoMapper.CurrentNodeChanged -= SyncMapperGlobals;
         _gameEventSub.Dispose();
         _pluginXmlSub.Dispose();
         Plugins.Shutdown();
