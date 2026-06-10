@@ -1013,7 +1013,8 @@
     <!-- InitializeLayout="False": the VM/factory init the layout explicitly
          (BuildDefaultLayout / BuildLayout call InitLayout) so runtime layout
          swaps are deterministic and don't double-initialise. -->
-    <dockc:DockControl Layout="{Binding DockLayout}"
+    <dockc:DockControl x:Name="MainDock"
+                       Layout="{Binding DockLayout}"
                        Factory="{Binding DockFactory}"
                        InitializeLayout="False"/>
 
