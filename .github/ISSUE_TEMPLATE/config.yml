@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🔒 Security vulnerability
+    url: https://github.com/GenieClient/Genie5/blob/main/SECURITY.md
+    about: Credential leaks, code execution, or anything that could harm another user — please report privately, not as a public issue.
+  - name: 💬 Discord community
+    url: https://discord.gg/MtmzE2w
+    about: Scripting help, mapper questions, alpha-tester chat, or sanity-checking an idea before opening an issue.
+  - name: 💡 Discussions
+    url: https://github.com/GenieClient/Genie5/discussions
+    about: Open-ended Q&A, ideas, and show-and-tell that aren't bug reports or feature requests.
