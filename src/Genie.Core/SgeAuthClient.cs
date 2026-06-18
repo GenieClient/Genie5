@@ -42,7 +42,7 @@ public sealed class SgeAuthClient(ILogger<SgeAuthClient> logger)
     /// hitting a connection stall can capture a full trace on demand without
     /// every normal login spamming the game window.</summary>
     public bool VerboseDiag { get; set; }
-    public sealed record SgeResult(string GameHost, int GamePort, string GameKey, bool UsedTls = false);
+    public sealed record SgeResult(string GameHost, int GamePort, string GameKey, bool UsedTls = false, bool IsPremium = false);
     public sealed record SgeCharacter(string Code, string Name);
 
     /// <summary>
@@ -195,6 +195,13 @@ public sealed class SgeAuthClient(ILogger<SgeAuthClient> logger)
         await StreamWriteAsync(stream, $"G\t{cfg.GameCode}\n", ct);
         var gameResponse = await ReadLineAsync(stream, useTls, ct);
         logger.LogDebug("Game select: {GameResponse}", gameResponse);
+        // The game-select response carries the account's subscription type as one
+        // of its tab fields (PREMIUM / NORMAL / FREE_TO_PLAY / TRIAL / …). We keep
+        // only whether it's PREMIUM — used to seed the DR type-ahead limit (premium
+        // accounts get an extra type-ahead line; see TypeAheadSession). Scan ALL
+        // fields rather than a fixed index, same defensive approach as PROBLEM codes.
+        bool isPremium = gameResponse.Split('\t')
+            .Any(f => f.Equals("PREMIUM", StringComparison.OrdinalIgnoreCase));
         mark("→M/G  ←game selected");
 
         // ── Step 6: Character list ───────────────────────────────────────────
@@ -224,7 +231,7 @@ public sealed class SgeAuthClient(ILogger<SgeAuthClient> logger)
         logger.LogWarning("SGE login response: {LoginResponse}", loginResponse);
         mark("→L  ←login token");
 
-        return ParseLoginResponse(loginResponse) with { UsedTls = useTls };
+        return ParseLoginResponse(loginResponse) with { UsedTls = useTls, IsPremium = isPremium };
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

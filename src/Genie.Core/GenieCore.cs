@@ -161,6 +161,21 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// <summary>Connection lifecycle events.</summary>
     public IObservable<ConnectionEvent> ConnectionState => _connection.StateStream;
 
+    // ── Type-ahead (UI counter) ─────────────────────────────────────────────
+    /// <summary>Commands sent to the game awaiting a prompt — the live
+    /// type-ahead buffer occupancy shown by the command-bar counter.</summary>
+    public int TypeAheadInFlight => _typeAhead.InFlight;
+    /// <summary>The current type-ahead cap (1 free / 2 premium / 3 +LTB, or the
+    /// server-calibrated value).</summary>
+    public int TypeAheadLimit    => _typeAhead.Limit;
+    /// <summary>Raised when <see cref="TypeAheadInFlight"/> or
+    /// <see cref="TypeAheadLimit"/> changes. May fire off the UI thread.</summary>
+    public event Action? TypeAheadChanged
+    {
+        add    => _typeAhead.Changed += value;
+        remove => _typeAhead.Changed -= value;
+    }
+
     /// <summary>Timed connect-progress sink (TLS attempt, per-step SGE timings,
     /// fallback, game-server connect) surfaced to the game window so a stall can
     /// be isolated to an exact step. Set by the host before connecting.</summary>
@@ -352,6 +367,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             sendCommand:   cmd =>
                            {
                                ScriptOutputLine?.Invoke(cmd);
+                               _typeAhead.NotifySent();
                                _ = _connection.SendCommandAsync(cmd);
                            },
             echo:          msg => ScriptOutputLine?.Invoke(msg),
@@ -411,6 +427,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             switch (evt)
             {
                 case TextEvent te:
+                    // Self-calibrate the type-ahead limit from the server's own cap
+                    // report ("(Sorry,) you may only type ahead N line(s).") so a
+                    // wrong seed (e.g. a Lich/DevReplay default, or premium+LTB) is
+                    // corrected by the authority. Cheap guard before any parsing.
+                    if (te.Text.IndexOf("type ahead", StringComparison.OrdinalIgnoreCase) >= 0)
+                        CalibrateTypeAhead(te.Text);
                     // Each per-line consumer is timed into its own stage so the
                     // overlay shows which feature is eating the frame. The Time
                     // wrapper is a zero-overhead passthrough while disabled.
@@ -430,6 +452,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                     break;
 
                 case PromptEvent:
+                    _typeAhead.NotifyConsumed();   // server caught up → free a type-ahead slot
                     Scripts.OnPrompt();            // advance RT-gated script execution
                     Plugins.DispatchPrompt();
                     break;
@@ -476,6 +499,19 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                 Scripts.Globals["gameport"] = _connection.ResolvedGamePort > 0
                     ? _connection.ResolvedGamePort.ToString(System.Globalization.CultureInfo.InvariantCulture)
                     : "0";
+
+                // Seed the DR type-ahead limit from the account tier reported by
+                // the SGE login: free/basic = 1 line, premium = 2 (premium grants
+                // an extra type-ahead line). A premium+LTB account (3 lines) self-
+                // calibrates up via the server cap message if it ever overruns.
+                // Only DirectSGE knows the tier; Lich/DevReplay keep the default
+                // and rely on cap-message calibration. Refreshes each (re)connect.
+                if (cfg.Mode == ConnectionMode.DirectSGE)
+                    _typeAhead.Limit = _connection.AccountPremium ? 2 : 1;
+
+                // Fresh session → clear any stale type-ahead count so the UI
+                // counter starts empty.
+                _typeAhead.ResetInFlight();
             });
 
         // ── Per-character profile directory ────────────────────────────────────
@@ -546,6 +582,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // Genie 4 reserved $lastcommand — the last line sent to the game.
         Scripts.Globals["lastcommand"] = text;
 
+        _typeAhead.NotifySent();
         _ = _connection.SendCommandAsync(text);
     }
 
@@ -563,6 +600,35 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// if one is configured (Genie 4 parity). A bad/missing connect-script name
     /// must never break the connect, so failures are swallowed.
     /// </summary>
+    /// <summary>
+    /// Parse the server's type-ahead cap report — "(Sorry,) you may only type
+    /// ahead N line(s)." — and set the shared <see cref="TypeAheadSession.Limit"/>
+    /// to N. DR phrases the single-line case as the word "one"; multi-line as a
+    /// digit. This is the authoritative correction for a mis-seeded limit.
+    /// </summary>
+    private void CalibrateTypeAhead(string line)
+    {
+        const string marker = "type ahead ";
+        int i = line.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (i < 0) return;
+        var rest = line[(i + marker.Length)..].TrimStart();
+        // Grab the token after the marker (a digit run or a number word).
+        int end = 0;
+        while (end < rest.Length && !char.IsWhiteSpace(rest[end]) && rest[end] != '.') end++;
+        var token = rest[..end];
+
+        int cap = token.ToLowerInvariant() switch
+        {
+            "one"   => 1,
+            "two"   => 2,
+            "three" => 3,
+            "four"  => 4,
+            _ => int.TryParse(token, out var n) ? n : 0,
+        };
+        if (cap >= 1 && cap != _typeAhead.Limit)
+            _typeAhead.Limit = cap;
+    }
+
     private void OnConnectReady()
     {
         var __ = _connection.SendCommandAsync("look");

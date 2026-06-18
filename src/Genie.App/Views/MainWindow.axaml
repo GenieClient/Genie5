@@ -1108,10 +1108,11 @@
     </Border>
 
     <!-- ── Command bar (above status bar) ────────────────────────────────── -->
-    <!-- Three columns: RT badge | input box | Send. The RT badge is only
-         visible while a roundtime is active; it ticks down live courtesy of
-         the VitalsViewModel timer. -->
-    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto" Margin="4,2">
+    <!-- Four columns: RT badge | type-ahead counter | input box | Send. The RT
+         badge is only visible while a roundtime is active; it ticks down live
+         courtesy of the VitalsViewModel timer. The type-ahead counter sits
+         between RT and the input and is always visible (dim when idle). -->
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,Auto,*,Auto" Margin="4,2">
 
       <Border Grid.Column="0"
               IsVisible="{Binding ShowRtInCommandBar}"
@@ -1127,7 +1128,35 @@
         </TextBlock>
       </Border>
 
-      <TextBox Grid.Column="1"
+      <!-- ── Type-ahead counter ──────────────────────────────────────────
+           Pips show the type-ahead buffer: filled = commands queued ahead of
+           the game, hollow = free slots, up to the per-account cap (1 free /
+           2 premium / 3 +LTB, auto-calibrated from the server). Dim when idle,
+           amber at the cap. -->
+      <Border Grid.Column="1"
+              Background="#2a2a2a" BorderBrush="#444" BorderThickness="1"
+              CornerRadius="3" Padding="6,2" Margin="0,0,4,0"
+              VerticalAlignment="Stretch"
+              ToolTip.Tip="Type-ahead buffer — commands queued ahead of the game (filled = used, hollow = free). DR caps this per account: free 1, premium 2, +1 with the LTB line. Amber means the buffer is full.">
+        <TextBlock FontWeight="SemiBold"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   FontFamily="Consolas,Courier New,monospace" FontSize="12">
+          <TextBlock.Text>
+            <MultiBinding Converter="{x:Static controls:TypeAheadPipsConverter.Instance}">
+              <Binding Path="Vitals.TypeAheadInFlight"/>
+              <Binding Path="Vitals.TypeAheadLimit"/>
+            </MultiBinding>
+          </TextBlock.Text>
+          <TextBlock.Foreground>
+            <MultiBinding Converter="{x:Static controls:TypeAheadBrushConverter.Instance}">
+              <Binding Path="Vitals.TypeAheadInFlight"/>
+              <Binding Path="Vitals.TypeAheadLimit"/>
+            </MultiBinding>
+          </TextBlock.Foreground>
+        </TextBlock>
+      </Border>
+
+      <TextBox Grid.Column="2"
                Text="{Binding Command.CommandText}"
                Watermark="Enter command..."
                FontFamily="Consolas,Courier New,monospace"
@@ -1136,7 +1165,7 @@
           <KeyBinding Gesture="Return" Command="{Binding Command.SubmitCommand}"/>
         </TextBox.KeyBindings>
       </TextBox>
-      <Button Grid.Column="2" Content="Send" Margin="4,0,0,0"
+      <Button Grid.Column="3" Content="Send" Margin="4,0,0,0"
               Command="{Binding Command.SubmitCommand}"/>
     </Grid>
 

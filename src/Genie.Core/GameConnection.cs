@@ -96,6 +96,14 @@ public sealed class GameConnection : IAsyncDisposable
     /// </summary>
     public string ResolvedGameHost { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// True when the last DirectSGE login reported a PREMIUM account. Used to
+    /// seed the DR type-ahead limit (premium accounts get an extra type-ahead
+    /// line). Stays false for Lich / DevReplay (no SGE handshake), where the
+    /// limit instead self-calibrates from the server's cap message.
+    /// </summary>
+    public bool AccountPremium { get; private set; }
+
     /// <summary>The port paired with <see cref="ResolvedGameHost"/>; surfaced as
     /// <c>$gameport</c>. 0 until first connect.</summary>
     public int ResolvedGamePort { get; private set; }
@@ -268,6 +276,7 @@ public sealed class GameConnection : IAsyncDisposable
         // Remember which transport the login actually used so the UI can show a
         // TLS / plaintext indicator (the TLS attempt auto-falls-back to plain).
         _authTransport = sgeResult.UsedTls ? "TLS" : "plaintext";
+        AccountPremium = sgeResult.IsPremium;
 
         _log.LogInformation("SGE OK → connecting to game {Host}:{Port}",
             sgeResult.GameHost, sgeResult.GamePort);

@@ -18,6 +18,14 @@ public class VitalsViewModel : ReactiveObject
     [Reactive] public double RoundTimeSeconds { get; private set; }
     [Reactive] public bool   InRoundTime      { get; private set; }
 
+    /// <summary>Commands currently typed ahead of the game (sent, awaiting a
+    /// prompt). Drives the filled pips in the command-bar type-ahead counter.</summary>
+    [Reactive] public int    TypeAheadInFlight { get; private set; }
+
+    /// <summary>The type-ahead cap (1 free / 2 premium / 3 +LTB, or the
+    /// server-calibrated value). Number of pips drawn by the counter.</summary>
+    [Reactive] public int    TypeAheadLimit    { get; private set; } = 2;
+
     /// <summary>Bare prepared-spell name from <c>&lt;spell&gt;X&lt;/spell&gt;</c>.
     /// Empty or "None" means no spell held. This is what scripts see as
     /// <c>$preparedspell</c>; the UI binds to <see cref="PreparedSpellLabel"/>.</summary>
@@ -130,6 +138,23 @@ public class VitalsViewModel : ReactiveObject
     {
         // ShowSpellTimer (Genie 4): gate the prepared-spell timer display.
         IsSpellTimerVisible = core.Config?.ShowSpellTimer ?? true;
+
+        // ── Type-ahead counter ──────────────────────────────────────────────
+        // Mirror the Core type-ahead state into reactive props. The Changed
+        // event can fire off the UI thread (send happens on the script/UI
+        // thread, the prompt decrement on the parser thread), so marshal.
+        void SyncTypeAhead()
+        {
+            void apply()
+            {
+                TypeAheadInFlight = core.TypeAheadInFlight;
+                TypeAheadLimit    = core.TypeAheadLimit;
+            }
+            if (Dispatcher.UIThread.CheckAccess()) apply();
+            else Dispatcher.UIThread.Post(apply);
+        }
+        core.TypeAheadChanged += SyncTypeAhead;
+        SyncTypeAhead(); // seed initial values
 
         core.GameEvents.OfType<ProgressBarEvent>()
             .ObserveOn(RxApp.MainThreadScheduler)
