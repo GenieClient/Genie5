@@ -147,6 +147,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     private readonly ScriptGlobalsSync _globalsSync;
     private readonly Diagnostics.LiveAudit _liveAudit;
 
+    /// <summary>Set when a room-defining event arrives (NavEvent or the
+    /// room-title component); consumed on the next prompt to unblock the
+    /// script <c>move</c> command. Coalescing to the prompt lets uid-less
+    /// "(**)" rooms — which emit no NavEvent — still wake a paused move.</summary>
+    private bool _roomChangedSincePrompt;
+
     /// <summary>.cmd script runner. Includes built-in EXP and info trackers.</summary>
     public ScriptEngine Scripts { get; }
 
@@ -454,11 +460,29 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                 case PromptEvent:
                     _typeAhead.NotifyConsumed();   // server caught up → free a type-ahead slot
                     Scripts.OnPrompt();            // advance RT-gated script execution
+                    // Unblock `move` once the room has settled. We key off the
+                    // prompt (turn boundary) rather than NavEvent directly because
+                    // DR emits NO NavEvent for "(**)" rooms (no server uid) — yet
+                    // the player IS in a new room. Without this, `move go guild`
+                    // into such a room reaches it but never unblocks. The flag is
+                    // set by NavEvent OR the room-title component below, so both
+                    // uid and uid-less rooms wake the script.
+                    if (_roomChangedSincePrompt)
+                    {
+                        _roomChangedSincePrompt = false;
+                        Scripts.OnRoomChanged();
+                    }
                     Plugins.DispatchPrompt();
                     break;
 
                 case NavEvent:
-                    Scripts.OnRoomChanged();       // unblock `move` in running scripts
+                    _roomChangedSincePrompt = true;
+                    break;
+
+                case ComponentEvent ce
+                    when ce.ComponentId.Equals("room title", StringComparison.OrdinalIgnoreCase):
+                    // Room arrival without a NavEvent (e.g. "(**)" no-uid rooms).
+                    _roomChangedSincePrompt = true;
                     break;
             }
         });

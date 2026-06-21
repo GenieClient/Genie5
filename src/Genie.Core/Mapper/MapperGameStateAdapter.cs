@@ -62,25 +62,46 @@ public sealed class MapperGameStateAdapter : IMapperGameState, IDisposable
 
     public event Action? StateChanged;
 
+    /// <summary>
+    /// Set when a room-defining event (nav / compass / room title / room desc)
+    /// arrives; cleared when we flush on the next prompt. See the constructor
+    /// for why we coalesce rather than fire per-event.
+    /// </summary>
+    private bool _roomDirty;
+
     public MapperGameStateAdapter(Models.GameState state, IObservable<GameEvent> events)
     {
         _state = state;
 
-        // Fire StateChanged on every event that could have updated Room.*.
-        // GameStateEngine writes the fields BEFORE the next event reaches our
-        // subscriber, so by the time we read _state.Room here, the new value
-        // is already present.
+        // COALESCE room updates to the prompt that ends the server turn, rather
+        // than firing per room-component event. DR streams a room as a sequence
+        // — title → desc → objs → exits/<compass> — and the TITLE arrives before
+        // THIS room's compass. Firing on each event made the engine fingerprint
+        // the new title against the PREVIOUS room's exits (and against the
+        // transient empty-compass mid-parse), producing wrong fingerprints that
+        // miss every zone — then the one coherent (title + own compass) snapshot
+        // arrives too late, after the misses have already poisoned the auto-load
+        // dedup. DR sends a <prompt> at the end of every turn, AFTER the full
+        // room block, so by then Title / Exits / RoomId are all the new room's:
+        // a single flush there gives the engine one coherent snapshot.
+        //
+        // Idle/keepalive prompts (no preceding room change) leave _roomDirty
+        // false and are ignored, so this doesn't add spurious placements.
         _subscription = events.Subscribe(e =>
         {
             switch (e)
             {
                 case NavEvent:
                 case CompassEvent:
-                    StateChanged?.Invoke();
+                    _roomDirty = true;
                     break;
                 case ComponentEvent ce
                     when ce.ComponentId.Equals("room title", StringComparison.OrdinalIgnoreCase)
                       || ce.ComponentId.Equals("room desc",  StringComparison.OrdinalIgnoreCase):
+                    _roomDirty = true;
+                    break;
+                case PromptEvent when _roomDirty:
+                    _roomDirty = false;
                     StateChanged?.Invoke();
                     break;
             }
