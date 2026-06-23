@@ -5,6 +5,7 @@ using System.Text;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Documents;
+using Avalonia.Media;
 using Genie.App.Highlighting;
 using Genie.App.Settings;
 using Genie.Core;
@@ -202,6 +203,22 @@ public class GameTextViewModel : ReactiveObject
                 AddLine(msg, StreamColor.System);
             });
 
+        // ── Styled #echo (colour / mono, no >window) ──────────────────────
+        // `#echo Yellow foo` / `#echo mono foo` from the command bar or a
+        // script: a main-window line carrying an explicit colour and/or a
+        // monospaced font. Governed by the same Echo-text filter as a plain
+        // #echo; rendered via the explicit-style path on TextLine.
+        Observable.FromEvent<Action<string, string?, bool>, (string Msg, string? Color, bool Mono)>(
+                rx => (t, c, m) => rx((t, c, m)),
+                h => core.EchoStyledLine += h,
+                h => core.EchoStyledLine -= h)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(t =>
+            {
+                if (DisplaySettings?.ShowEchoText == false) return;
+                AddEcho(t.Msg, t.Color, t.Mono);
+            });
+
         // ── Script-originated lines ───────────────────────────────────────
         // Everything a script produces arrives on ScriptOutputLine: its
         // echo output, [script]/[dbg] diagnostics, AND the game commands it
@@ -295,6 +312,20 @@ public class GameTextViewModel : ReactiveObject
     /// </summary>
     public void AddSystemLine(string text)
         => AddLine(text, StreamColor.System);
+
+    /// <summary>
+    /// Add a styled <c>#echo</c> line to the main window — an explicit colour
+    /// (named or <c>#rrggbb</c>) and/or a monospaced font (Genie 4 <c>#echo</c>
+    /// colour / <c>mono</c> options). Renders as a single plain run carrying the
+    /// requested style; unparseable colours fall back to the default echo colour.
+    /// </summary>
+    public void AddEcho(string text, string? color, bool mono)
+    {
+        Lines.Add(new TextLine(text, StreamColor.System, EchoColor: color, Mono: mono));
+        while (Lines.Count > _maxLines)
+            Lines.RemoveAt(0);
+        _lastLineWasPrompt = false;
+    }
 }
 
 /// <summary>
@@ -306,19 +337,50 @@ public class GameTextViewModel : ReactiveObject
 public record TextLine(string Text, StreamColor Color,
                        IReadOnlyList<LinkSpan>? Links = null,
                        IReadOnlyList<BoldSpan>? BoldSpans = null,
-                       IReadOnlyList<PresetSpan>? PresetSpans = null)
+                       IReadOnlyList<PresetSpan>? PresetSpans = null,
+                       string? EchoColor = null,
+                       bool Mono = false)
 {
     public bool IsEcho => Color == StreamColor.System;
+
+    /// <summary>Monospaced font for <c>#echo mono</c> lines — falls back through
+    /// the chain if the first family is unavailable.</summary>
+    private static readonly FontFamily MonoFont = new("Consolas,Courier New,monospace");
 
     /// <summary>
     /// The line broken into styled <see cref="Inline"/> segments by
     /// <see cref="DefaultHighlights"/>. Echo lines bypass highlighting and
     /// render as a single plain run (the AXAML class selector handles their
-    /// italic + colour). Each access produces a fresh list — Avalonia
+    /// italic + colour). A styled <c>#echo</c> (<see cref="EchoColor"/> /
+    /// <see cref="Mono"/>) sets the run's foreground/font directly so it
+    /// overrides the class styling. Each access produces a fresh list — Avalonia
     /// <see cref="Inline"/>s can only belong to one parent, so we don't cache.
     /// </summary>
-    public IReadOnlyList<Inline> Inlines =>
-        IsEcho ? [new Run(Text)] : DefaultHighlights.Tokenize(Text, Links, BoldSpans, PresetSpans);
+    public IReadOnlyList<Inline> Inlines
+    {
+        get
+        {
+            if (EchoColor is not null || Mono)
+            {
+                var run = new Run(Text);
+                if (Mono) run.FontFamily = MonoFont;
+                if (EchoColor is not null && TryParseColor(EchoColor, out var c))
+                    run.Foreground = new SolidColorBrush(c);
+                return [run];
+            }
+            return IsEcho ? [new Run(Text)]
+                          : DefaultHighlights.Tokenize(Text, Links, BoldSpans, PresetSpans);
+        }
+    }
+
+    /// <summary>Parse a Genie 4 echo colour — a named colour (Yellow, DodgerBlue)
+    /// or <c>#rrggbb</c> hex. Returns false (caller keeps the default colour) on
+    /// anything Avalonia can't parse.</summary>
+    private static bool TryParseColor(string token, out Avalonia.Media.Color color)
+    {
+        try { color = Avalonia.Media.Color.Parse(token); return true; }
+        catch { color = default; return false; }
+    }
 }
 
 public enum StreamColor { Main, Logons, Talk, Whisper, Thought, Combat, Familiar, System }

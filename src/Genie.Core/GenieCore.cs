@@ -282,6 +282,14 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// </summary>
     public event Action<string, string?, string?>? EchoToWindow;
 
+    /// <summary>
+    /// Raised by <c>#echo</c> with a colour and/or <c>mono</c> flag but no
+    /// <c>&gt;window</c> redirect — a styled line for the <em>main</em> game
+    /// window. Args: (text, colour?, mono). Colour is a named colour or
+    /// <c>#rrggbb</c> (null = default echo colour); mono = monospaced font.
+    /// </summary>
+    public event Action<string, string?, bool>? EchoStyledLine;
+
     // ── Constructor ────────────────────────────────────────────────────────────
 
     public GenieCore(
@@ -422,6 +430,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // $spelltime — seconds since the current spell was prepared (Genie 4).
         Scripts.SpellTimeSeconds          = () => (int)_state.Combat.SpellTimeSeconds;
         Scripts.EchoTo                   = (msg, win, color) => EchoToWindow?.Invoke(msg, win, color);
+        Scripts.EchoStyled               = (msg, color, mono) => EchoStyledLine?.Invoke(msg, color, mono);
         // Named-window seam for the built-in trackers (Spell Timer / Experience /
         // Time Tracker), which re-render a whole dock panel each prompt. Same event
         // the App's ExperienceViewModel + generic PluginWindowViewModel consume.
@@ -736,6 +745,9 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     void ICommandHost.EchoTo(string text, string? window, string? color)
         => EchoToWindow?.Invoke(text, window, color);
+
+    void ICommandHost.EchoMain(string text, string? color, bool mono)
+        => EchoStyledLine?.Invoke(text, color, mono);
 
     void ICommandHost.SendToGame(string text, bool userInput, string origin, string? echoOverride)
     {

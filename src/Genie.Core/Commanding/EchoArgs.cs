@@ -5,13 +5,26 @@ public static class EchoArgs
     public static void Parse(
         IReadOnlyList<string> tokens, int startIndex,
         out string? window, out string? color, out string message)
+        => Parse(tokens, startIndex, out window, out color, out _, out message);
+
+    /// <summary>
+    /// Parse the leading <c>#echo</c> option tokens (Genie 4 parity): an optional
+    /// <c>&gt;window</c> redirect, an optional colour (named or <c>#rrggbb</c>),
+    /// and an optional <c>mono</c> flag (render the line in a monospaced font).
+    /// Options may appear in any order before the message; the first token that
+    /// isn't an option begins the message.
+    /// </summary>
+    public static void Parse(
+        IReadOnlyList<string> tokens, int startIndex,
+        out string? window, out string? color, out bool mono, out string message)
     {
-        window = null; color = null;
+        window = null; color = null; mono = false;
         int idx = startIndex;
         while (idx < tokens.Count)
         {
             var tok = tokens[idx];
             if (tok.Length > 0 && tok[0] == '>') { window = tok[1..]; idx++; continue; }
+            if (string.Equals(tok, "mono", StringComparison.OrdinalIgnoreCase)) { mono = true; idx++; continue; }
             if (IsEchoColor(tok)) { color = tok; idx++; continue; }
             break;
         }

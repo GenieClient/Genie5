@@ -42,6 +42,14 @@ public sealed class ScriptEngine
     public Action<string, string?, string?>? EchoTo { get; set; }
 
     /// <summary>
+    /// Styled main-window echo: (message, color, mono). For <c>#echo</c> with a
+    /// colour and/or the <c>mono</c> flag but no <c>&gt;window</c> redirect —
+    /// routes to the main game window (not a side window). Falls back to a plain
+    /// <see cref="_echo"/> when unset (headless tests).
+    /// </summary>
+    public Action<string, string?, bool>? EchoStyled { get; set; }
+
+    /// <summary>
     /// Echoes a command sent by a script to the game window. Args: (scriptName, command).
     /// Set by the UI layer to render with the "scriptecho" preset colour.
     /// </summary>
@@ -1546,18 +1554,23 @@ public sealed class ScriptEngine
                 // (e.g. Crimson, DodgerBlue) — the downstream Brush.Parse handles both.
                 string? window = null;
                 string? color  = null;
+                bool    mono   = false;
                 var msg = rest;
                 while (msg.Length > 0)
                 {
                     var (tok, after) = SplitCmd(msg);
                     if (tok.Length > 0 && tok[0] == '>')
                     { window = tok[1..]; msg = after; continue; }
+                    if (string.Equals(tok, "mono", StringComparison.OrdinalIgnoreCase))
+                    { mono = true; msg = after; continue; }
                     if (IsEchoColor(tok))
                     { color = tok; msg = after; continue; }
                     break;
                 }
-                if ((window != null || color != null) && EchoTo != null)
+                if (window != null && EchoTo != null)
                     EchoTo(msg, window, color);
+                else if ((color != null || mono) && EchoStyled != null)
+                    EchoStyled(msg, color, mono);
                 else
                     _echo(msg);
                 return;

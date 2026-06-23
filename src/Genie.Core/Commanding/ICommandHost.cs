@@ -4,6 +4,16 @@ public interface ICommandHost
 {
     void Echo(string text);
     void EchoTo(string text, string? window, string? color);
+
+    /// <summary>
+    /// Echo a styled line into the <em>main</em> game window (Genie 4
+    /// <c>#echo</c> with a colour and/or the <c>mono</c> flag but no
+    /// <c>&gt;window</c> redirect). <paramref name="color"/> is a named colour
+    /// or <c>#rrggbb</c> hex (null = default echo colour); <paramref name="mono"/>
+    /// renders the line in a monospaced font. Distinct from
+    /// <see cref="EchoTo"/>, which targets a named side/plugin window.
+    /// </summary>
+    void EchoMain(string text, string? color, bool mono);
     /// <summary>
     /// Send a command line to the game socket.
     /// </summary>

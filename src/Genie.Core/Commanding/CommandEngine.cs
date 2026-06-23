@@ -177,9 +177,10 @@ public sealed class CommandEngine
             case "echo":
                 if (parts.Count > 1)
                 {
-                    EchoArgs.Parse(parts, 1, out var window, out var color, out var msg);
-                    if (window != null || color != null) _host.EchoTo(msg, window, color);
-                    else _host.Echo(msg);
+                    EchoArgs.Parse(parts, 1, out var window, out var color, out var mono, out var msg);
+                    if (window != null)         _host.EchoTo(msg, window, color);
+                    else if (color != null || mono) _host.EchoMain(msg, color, mono);
+                    else                        _host.Echo(msg);
                 }
                 break;
             case "send":
