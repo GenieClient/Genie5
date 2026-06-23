@@ -227,8 +227,11 @@ public sealed class SgeAuthClient(ILogger<SgeAuthClient> logger)
         // after the game server connection, which GameConnection handles via ClientMode.
         await StreamWriteAsync(stream, $"L\t{charCode}\tSTORM\n", ct);
         var loginResponse = await ReadLineAsync(stream, useTls, ct);
-        // Log at Warning so this is always visible — needed to diagnose WIZ vs STORM differences.
-        logger.LogWarning("SGE login response: {LoginResponse}", loginResponse);
+        // Log at Warning so this is always visible — needed to diagnose WIZ vs STORM
+        // differences — but mask the one-time game-entry KEY token first (#45): it's a
+        // reusable secret and these logs get shared/synced for troubleshooting. The
+        // tab structure (and GAMEHOST/GAMEPORT/PROBLEM fields) stays intact.
+        logger.LogWarning("SGE login response: {LoginResponse}", RedactSecrets(loginResponse));
         mark("→L  ←login token");
 
         return ParseLoginResponse(loginResponse) with { UsedTls = useTls, IsPremium = isPremium };
@@ -491,6 +494,20 @@ public sealed class SgeAuthClient(ILogger<SgeAuthClient> logger)
         if (r.StartsWith("UNKNOWN", StringComparison.OrdinalIgnoreCase))
             return "the account name was not recognized. Use your play.net ACCOUNT name (not your character name).";
         return $"the server rejected the credentials (replied '{r}'). Check your account name and password.";
+    }
+
+    /// <summary>
+    /// Mask the one-time game-entry <c>KEY=</c> token in an SGE login response
+    /// before it reaches a log sink (#45). Keeps the tab-separated structure and
+    /// every non-secret field (GAMEHOST/GAMEPORT/PROBLEM/…) so the line stays
+    /// useful for diagnosing WIZ vs STORM and PROBLEM responses.
+    /// </summary>
+    internal static string RedactSecrets(string response)
+    {
+        if (string.IsNullOrEmpty(response)) return response;
+        return System.Text.RegularExpressions.Regex.Replace(
+            response, "(KEY=)[^\t]*", "$1<redacted>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
     private static SgeResult ParseLoginResponse(string response)
