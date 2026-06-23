@@ -557,6 +557,25 @@ public sealed class CommandEngine
             return;
         }
 
+        // Explicit subcommands (#97): a bare `list` / `set` used to be treated as
+        // a class-name filter / class name — `#class list` filtered by "list" and
+        // `#class set foo on` was silently ignored. Recognise them explicitly.
+        var firstLower = first.ToLowerInvariant();
+        if (firstLower == "list")
+        {
+            ListClasses(parts.Count > 2 ? parts[2] : null);
+            return;
+        }
+        if (firstLower == "set")
+        {
+            if (parts.Count < 3) { _host.Echo("Usage: #class set <name> [on|off]"); return; }
+            var setName = parts[2].ToLowerInvariant();
+            var setVal  = parts.Count > 3 ? parts[3].ToLowerInvariant() : "on";
+            if (setVal is "off" or "false" or "0") Classes.Set(setName, false);
+            else                                   Classes.Set(setName, true);
+            return;
+        }
+
         // 2-arg subcommands or single-name filter
         if (parts.Count == 2)
         {
@@ -776,6 +795,27 @@ public sealed class CommandEngine
         if (parts.Count == 1) { ListVars(null); return; }
 
         var sub = parts[1].ToLowerInvariant();
+
+        // Explicit subcommands (#97): a bare `list` / `set` used to be treated as
+        // a name filter / variable name — `#var list` filtered by the text "list"
+        // and `#var set x 1` created a variable literally named "set". Recognise
+        // them so they behave as users expect. (A variable genuinely named
+        // "list"/"set"/"save"/… must be set via `#var set <name> <value>`.)
+        if (sub == "list")
+        {
+            ListVars(parts.Count > 2 ? string.Join(" ", parts.Skip(2)) : null);
+            return;
+        }
+        if (sub == "set")
+        {
+            if (parts.Count < 4) { _host.Echo("Usage: #var set <name> <value>"); return; }
+            var setName  = parts[2];
+            var setValue = string.Join(" ", parts.Skip(3));
+            Variables.Store.Set(setName, setValue);
+            if (_processInputDepth == 1 && _interactive)
+                _host.Echo($"Variable set: {setName}={setValue}");
+            return;
+        }
 
         if (parts.Count == 2)
         {

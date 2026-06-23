@@ -15,12 +15,18 @@
                 Grid.Row="0"
                 Margin="0,0,0,4"
                 IsReadOnly="True"
-                SelectionMode="Single"
+                SelectionMode="Extended"
                 CanUserSortColumns="True"
                 GridLinesVisibility="Horizontal"
                 HeadersVisibility="Column"
                 x:CompileBindings="False"
                 SelectionChanged="OnSelectionChanged">
+        <DataGrid.ContextMenu>
+          <ContextMenu>
+            <MenuItem Header="Copy"       Click="OnCopy"/>
+            <MenuItem Header="Select All" Click="OnSelectAll"/>
+          </ContextMenu>
+        </DataGrid.ContextMenu>
         <DataGrid.Columns>
           <DataGridTextColumn Header="Name"  Binding="{Binding Name}"  Width="Auto"/>
           <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/>

@@ -80,6 +80,27 @@ public partial class VariablesPanel : UserControl
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();
     private void OnClear(object? sender, RoutedEventArgs e) => ClearForm();
 
+    private void OnSelectAll(object? sender, RoutedEventArgs e) => ItemsList.SelectAll();
+
+    /// <summary>
+    /// Copy every selected row (not just the focused one — #97) to the clipboard
+    /// as tab-separated <c>Name\tValue</c> lines, in display order.
+    /// </summary>
+    private async void OnCopy(object? sender, RoutedEventArgs e)
+    {
+        var rows = ItemsList.SelectedItems?.Cast<VariableRow>().ToList() ?? new List<VariableRow>();
+        if (rows.Count == 0 && ItemsList.SelectedItem is VariableRow one) rows.Add(one);
+        if (rows.Count == 0) return;
+
+        var text = string.Join(
+            Environment.NewLine,
+            rows.OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(r => $"{r.Name}\t{r.Value}"));
+
+        if (TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+            await clipboard.SetTextAsync(text);
+    }
+
     private void ClearForm()
     {
         ItemsList.SelectedItem = null;
