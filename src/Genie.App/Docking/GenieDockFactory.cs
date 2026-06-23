@@ -182,6 +182,7 @@ public class GenieDockFactory : Factory
         var familiar = new StreamTool      (_vm.StreamTabs.Familiar, ws.Get("familiar"));
         var death    = new StreamTool      (_vm.StreamTabs.Death,    ws.Get("death"));
         var assess   = new StreamTool      (_vm.StreamTabs.Assess,   ws.Get("assess"));
+        var atmospherics = new StreamTool  (_vm.StreamTabs.Atmospherics, ws.Get("atmospherics"));
         var log      = new StreamTool      (_vm.StreamTabs.Log,      ws.Get("log"));
         var itemlog  = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
         var experience = new ExperienceTool(_vm.Experience,          ws.Get("experience"));
@@ -329,6 +330,9 @@ public class GenieDockFactory : Factory
         _tools[familiar.Id] = (familiar, streamDock.Id);
         _tools[death.Id]    = (death,    streamDock.Id);
         _tools[assess.Id]   = (assess,   streamDock.Id);
+        // Atmospherics: ambient/weather feed — hidden by default (opt-in, #85);
+        // re-open via Window → Atmospherics. Homes in the stream dock.
+        _tools[atmospherics.Id] = (atmospherics, streamDock.Id);
         _tools[log.Id]      = (log,      streamDock.Id);
         _tools[itemlog.Id]  = (itemlog,  streamDock.Id);
         // Experience: registered but hidden by default (like Vitals) — re-opens
@@ -405,6 +409,7 @@ public class GenieDockFactory : Factory
         var familiar   = new StreamTool      (_vm.StreamTabs.Familiar, ws.Get("familiar"));
         var death      = new StreamTool      (_vm.StreamTabs.Death,    ws.Get("death"));
         var assess     = new StreamTool      (_vm.StreamTabs.Assess,   ws.Get("assess"));
+        var atmospherics = new StreamTool    (_vm.StreamTabs.Atmospherics, ws.Get("atmospherics"));
         var log        = new StreamTool      (_vm.StreamTabs.Log,      ws.Get("log"));
         var itemlog    = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
         var experience = new ExperienceTool  (_vm.Experience,          ws.Get("experience"));
@@ -418,7 +423,7 @@ public class GenieDockFactory : Factory
             ("game-text", gameText), ("room", room), ("mapper", mapper), ("backpack", backpack),
             ("logons", logons), ("talk", talk), ("whispers", whispers), ("thoughts", thoughts),
             ("combat", combat), ("familiar", familiar), ("death", death), ("assess", assess),
-            ("log", log), ("itemlog", itemlog),
+            ("atmospherics", atmospherics), ("log", log), ("itemlog", itemlog),
             ("vitals", vitals), ("experience", experience), ("scene", scene),
             ("mobs", mobs), ("players", players),
         };

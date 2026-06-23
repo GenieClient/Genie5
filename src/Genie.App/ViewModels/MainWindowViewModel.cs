@@ -337,6 +337,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     [Reactive] public bool FamiliarVisible { get; private set; } = true;
     [Reactive] public bool DeathVisible    { get; private set; } = true;
     [Reactive] public bool AssessVisible   { get; private set; } = true;
+    [Reactive] public bool AtmosphericsVisible { get; private set; }   // hidden by default (opt-in, #85)
     [Reactive] public bool LogVisible      { get; private set; } = true;
     [Reactive] public bool ItemLogVisible  { get; private set; } = true;
     [Reactive] public bool ScriptsVisible  { get; private set; }   // hidden by default (opt-in)
@@ -359,6 +360,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ToggleFamiliarCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleDeathCommand    { get; }
     public ReactiveCommand<Unit, Unit> ToggleAssessCommand   { get; }
+    public ReactiveCommand<Unit, Unit> ToggleAtmosphericsCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleLogCommand      { get; }
     public ReactiveCommand<Unit, Unit> ToggleItemLogCommand  { get; }
     public ReactiveCommand<Unit, Unit> ToggleScriptsCommand  { get; }
@@ -701,6 +703,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         WindowSettings.Register("familiar",  "Familiar");
         WindowSettings.Register("death",     "Deaths");
         WindowSettings.Register("assess",    "Assess");
+        WindowSettings.Register("atmospherics", "Atmospherics");
         WindowSettings.Register("log",       "Log");
         WindowSettings.Register("itemlog",   "ItemLog");
         WindowSettings.Register("mapper",    "Mapper");
@@ -1230,6 +1233,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleFamiliarCommand = MakeToggleCommand("familiar",  v => FamiliarVisible = v);
         ToggleDeathCommand    = MakeToggleCommand("death",     v => DeathVisible    = v);
         ToggleAssessCommand   = MakeToggleCommand("assess",    v => AssessVisible   = v);
+        ToggleAtmosphericsCommand = MakeToggleCommand("atmospherics", v => AtmosphericsVisible = v);
         ToggleLogCommand      = MakeToggleCommand("log",       v => LogVisible      = v);
         ToggleItemLogCommand  = MakeToggleCommand("itemlog",   v => ItemLogVisible  = v);
         ToggleScriptsCommand  = MakeToggleCommand("scripts",   v => ScriptsVisible  = v);
@@ -2071,6 +2075,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         SetVisibilityBool("familiar",  factory.IsToolVisible("familiar"));
         SetVisibilityBool("death",     factory.IsToolVisible("death"));
         SetVisibilityBool("assess",    factory.IsToolVisible("assess"));
+        SetVisibilityBool("atmospherics", factory.IsToolVisible("atmospherics"));
         SetVisibilityBool("log",       factory.IsToolVisible("log"));
         SetVisibilityBool("itemlog",   factory.IsToolVisible("itemlog"));
         SetVisibilityBool("scripts",   factory.IsToolVisible("scripts"));
@@ -2396,6 +2401,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "familiar":  ForceSet(visible, v => FamiliarVisible = v, () => FamiliarVisible); break;
             case "death":     ForceSet(visible, v => DeathVisible    = v, () => DeathVisible);    break;
             case "assess":    ForceSet(visible, v => AssessVisible   = v, () => AssessVisible);   break;
+            case "atmospherics": ForceSet(visible, v => AtmosphericsVisible = v, () => AtmosphericsVisible); break;
             case "log":       ForceSet(visible, v => LogVisible      = v, () => LogVisible);      break;
             case "itemlog":   ForceSet(visible, v => ItemLogVisible  = v, () => ItemLogVisible);  break;
             case "scripts":   ForceSet(visible, v => ScriptsVisible  = v, () => ScriptsVisible);  break;

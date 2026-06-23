@@ -28,6 +28,11 @@ public class StreamTabsViewModel : ReactiveObject
     /// (declared <c>ifClosed="main"</c>).</summary>
     public StreamBuffer Assess   { get; } = new("Assess");
 
+    /// <summary>Atmospherics / ambient feed — the server's <c>atmospherics</c>
+    /// stream (weather + ambient room flavour). Genie 4 "Atmo window" parity
+    /// (#85); hidden by default, re-open via Window → Atmospherics.</summary>
+    public StreamBuffer Atmospherics { get; } = new("Atmospherics");
+
     /// <summary>Consolidated conversation log — mirrors the speech streams
     /// (talk / whispers), Genie 4 "Log" window parity. Also an <c>#echo &gt;log</c>
     /// target (wired in MainWindowViewModel).</summary>
@@ -38,7 +43,7 @@ public class StreamTabsViewModel : ReactiveObject
     public StreamBuffer ItemLog  { get; } = new("ItemLog");
 
     public IReadOnlyList<StreamBuffer> All =>
-        [Logons, Talk, Whispers, Thoughts, Combat, Familiar, Death, Assess, Log, ItemLog];
+        [Logons, Talk, Whispers, Thoughts, Combat, Familiar, Death, Assess, Atmospherics, Log, ItemLog];
 
     public void Attach(GenieCore core)
     {
@@ -57,6 +62,7 @@ public class StreamTabsViewModel : ReactiveObject
                     "familiar"             => Familiar,
                     "death"                => Death,
                     "assess"               => Assess,
+                    "atmospherics"         => Atmospherics,
                     "itemlog" or "itemLog" => ItemLog,
                     _                      => null
                 };

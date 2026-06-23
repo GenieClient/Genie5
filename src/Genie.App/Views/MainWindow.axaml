@@ -239,6 +239,11 @@
                   IsChecked="{Binding AssessVisible, Mode=OneWay}"
                   Command="{Binding ToggleAssessCommand}"
                   ToolTip.Tip="Assess feed — the server `assess` stream."/>
+        <MenuItem Header="At_mospherics"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding AtmosphericsVisible, Mode=OneWay}"
+                  Command="{Binding ToggleAtmosphericsCommand}"
+                  ToolTip.Tip="Atmospherics / ambient feed — the server `atmospherics` stream (weather + room flavour)."/>
         <MenuItem Header="Lo_g"
                   ToggleType="CheckBox"
                   IsChecked="{Binding LogVisible, Mode=OneWay}"
