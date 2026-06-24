@@ -8,6 +8,16 @@
 
 > ⚠️ **Alpha** — Genie 5 is in active development, several alphas in. It targets feature parity with the most-used 80% of Genie 4 while running natively on Windows, macOS, and Linux. Expect rough edges. File issues; PRs welcome.
 
+## Screenshots
+
+A live DragonRealms session — game stream, Room panel, inventory, and stream tabs:
+
+![Genie 5 in a live DragonRealms session](docs/screenshots/game-session.png)
+
+| Mapper | Connect dialog |
+|---|---|
+| ![Mapper panel](docs/screenshots/mapper.png) | ![Connect to DragonRealms dialog](docs/screenshots/connect-dialog.png) |
+
 ## Why Genie 5
 
 The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern .NET, cross-platform tooling, or the broader scripting ecosystem. Genie 5 is a clean rewrite that:

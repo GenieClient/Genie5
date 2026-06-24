@@ -244,7 +244,7 @@ contributions are welcomed.
 
 ## Code of Conduct
 
-Be decent. The MUD community is small and we all want it to be welcoming. Anyone behaving badly in issues / PRs / Discord will be banned from the repo at maintainer discretion.
+Be decent. The MUD community is small and we all want it to be welcoming. This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md) — please read it. Anyone behaving badly in issues / PRs / Discord will be banned from the repo at maintainer discretion.
 
 ## License
 
