@@ -202,6 +202,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     public Interaction<LayoutSavePrompt, LayoutSaveResult?> ShowLayoutSavePrompt   { get; } = new();
     public ReactiveCommand<Unit, Unit>                    ToggleStatusBarCommand   { get; }
+    public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomIdCommand  { get; }
+    public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomNumberCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleWindowedModeCommand{ get; }
     public ReactiveCommand<Unit, Unit>                    ToggleGuildInTitleCommand{ get; }
     public ReactiveCommand<Unit, Unit>                    ToggleHandsBarCommand    { get; }
@@ -1047,6 +1049,18 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleStatusBarCommand = ReactiveCommand.Create(() =>
         {
             Display.ShowStatusBar = !Display.ShowStatusBar;
+            Display.Save(_displayPath);
+        });
+
+        ToggleZoneRoomIdCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ShowZoneRoomId = !Display.ShowZoneRoomId;
+            Display.Save(_displayPath);
+        });
+
+        ToggleZoneRoomNumberCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ZoneRoomShowNumber = !Display.ZoneRoomShowNumber;
             Display.Save(_displayPath);
         });
 

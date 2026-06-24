@@ -34,6 +34,22 @@ public class MapperViewModel : ReactiveObject
     [Reactive] public string CurrentServerId { get; private set; } = "";
     [Reactive] public int    RoomCount       { get; private set; }
 
+    /// <summary>The mapper <c>$roomid</c> — the current map node's id, matching the
+    /// script variable scripts/<c>#goto</c> compare against (NOT the server's
+    /// <c>$gameroomid</c>, e.g. 1010002). Defaults to "0" off-map, like
+    /// <c>$roomid</c> itself. Used by the status-bar location line (#66).</summary>
+    [Reactive] public string CurrentRoomId { get; private set; } = "0";
+
+    /// <summary>The mapper <c>$zoneid</c> — the active zone's Genie 4 numeric id
+    /// (e.g. "33"). Defaults to "0" off-map, like <c>$zoneid</c>. Shown on the
+    /// status-bar location line when the user picks "Zone Number" mode (#66).</summary>
+    [Reactive] public string CurrentZoneId { get; private set; } = "0";
+
+    private ObservableAsPropertyHelper<string>? _locationDisplay;
+    /// <summary>Compact "Zone: … · Room: …" readout for the optional status-bar
+    /// location line (#66). Zone name + DR's live server room id, live-updating.</summary>
+    public string LocationDisplay => _locationDisplay?.Value ?? "";
+
     /// <summary>
     /// Compass exits from the current room — "north", "northeast", "down",
     /// "up", etc. Rendered as clickable buttons in the Mapper status strip
@@ -557,6 +573,10 @@ public class MapperViewModel : ReactiveObject
             .Skip(1)
             .Subscribe(LoadSelectedZone);
 
+        // The status-bar location line OAPH (#66) is wired in AttachDisplay,
+        // where the DisplaySettings are available — its Zone-name-vs-number mode
+        // is a user setting (Display.ZoneRoomShowNumber).
+
         // Whenever the Maps directory changes, recompute the "git-managed"
         // hint. This is purely informational — Genie never runs git itself,
         // but showing the user that they're pointed at a working copy is a
@@ -598,6 +618,23 @@ public class MapperViewModel : ReactiveObject
         _displayPath = displayPath;
         if (Color.TryParse(display.MapBackgroundHex, out var c))
             MapBackground = c;
+
+        // Status-bar location line (#66). Zone field follows the user's
+        // Zone-name-vs-number setting; Room is always $roomid (the mapper node
+        // id), never the server $gameroomid. Wired here (not the constructor) so
+        // it can react to the DisplaySettings toggle. Idempotent: the OAPH is
+        // built once even if AttachDisplay is somehow called again.
+        _locationDisplay ??= this
+            .WhenAnyValue(x => x.ZoneName, x => x.CurrentZoneId, x => x.CurrentRoomId)
+            .CombineLatest(
+                display.WhenAnyValue(d => d.ZoneRoomShowNumber),
+                (parts, showNumber) =>
+                {
+                    var (name, zoneId, roomId) = parts;
+                    var zone = showNumber ? zoneId : name;
+                    return $"Zone: {zone}   Room: {roomId}";
+                })
+            .ToProperty(this, x => x.LocationDisplay);
     }
 
     private void RecomputeIsGitManaged()
@@ -946,6 +983,13 @@ public class MapperViewModel : ReactiveObject
         ZoneName  = string.IsNullOrEmpty(_engine.ActiveZone.Name)
             ? "(unsaved)" : _engine.ActiveZone.Name;
         RoomCount = _engine.ActiveZone.Nodes.Count;
+
+        // Mapper $roomid (#66) — the current node's id (what scripts/#goto use),
+        // "0" off-map. Matches the $roomid script variable exactly, NOT the
+        // server's $gameroomid.
+        CurrentRoomId = _engine.CurrentNode?.Id.ToString() ?? "0";
+        // $zoneid (#66) — the active zone's Genie 4 numeric id, "0" off-map.
+        CurrentZoneId = string.IsNullOrEmpty(_engine.ActiveZone.Genie4Id) ? "0" : _engine.ActiveZone.Genie4Id;
 
         // Surface the live references for the canvas. Reference may not have
         // changed since last call (the engine mutates Nodes in place), so we

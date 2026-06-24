@@ -51,6 +51,23 @@ public sealed class DisplaySettings : ReactiveObject
     [Reactive] public bool   ShowStatusBar { get; set; } = true;
 
     /// <summary>
+    /// Whether the optional zone/room location line (the mapper's current zone
+    /// + <c>$roomid</c>) is shown at the bottom of the window (#66). Opt-in (off
+    /// by default) — handy for travel/scripting so you can always see where you
+    /// are without opening the Mapper.
+    /// </summary>
+    [Reactive] public bool   ShowZoneRoomId { get; set; }
+
+    /// <summary>
+    /// For the zone/room location line (#66): when <c>true</c> the Zone field
+    /// shows the numeric <c>$zoneid</c> (e.g. "33"); when <c>false</c> (default)
+    /// it shows the zone name (e.g. "Riverhaven West Gate"). The Room field is
+    /// always <c>$roomid</c>. Only meaningful when <see cref="ShowZoneRoomId"/>
+    /// is on.
+    /// </summary>
+    [Reactive] public bool   ZoneRoomShowNumber { get; set; }
+
+    /// <summary>
     /// Windowed (MDI) document mode — every panel becomes a free-floating
     /// child window inside the main window, à la Genie 4, instead of the
     /// tabbed/docked layout.

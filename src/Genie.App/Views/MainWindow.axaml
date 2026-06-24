@@ -132,6 +132,17 @@
                   IsChecked="{Binding Display.ShowStatusBar}"
                   Command="{Binding ToggleStatusBarCommand}"
                   ToolTip.Tip="Show/hide the Wrayth-style vitals strip at the bottom of the window"/>
+        <MenuItem Header="_Zone / Room ID"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.ShowZoneRoomId}"
+                  Command="{Binding ToggleZoneRoomIdCommand}"
+                  ToolTip.Tip="Show the current mapper zone and $roomid on a line at the bottom of the window (#66)"/>
+        <MenuItem Header="Zone as _Number"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.ZoneRoomShowNumber}"
+                  Command="{Binding ToggleZoneRoomNumberCommand}"
+                  IsEnabled="{Binding Display.ShowZoneRoomId}"
+                  ToolTip.Tip="On the Zone / Room ID line, show the numeric $zoneid (e.g. 33) instead of the zone name. Room is always $roomid."/>
         <MenuItem Header="_Windowed Mode (MDI)"
                   ToggleType="CheckBox"
                   IsChecked="{Binding Display.WindowedMode, Mode=OneWay}"
@@ -840,6 +851,18 @@
                    FontSize="11" Foreground="#fff" FontWeight="SemiBold"/>
       </Grid>
     </Grid>
+
+    <!-- ── Zone / Room location line (#66, opt-in via View → Zone / Room ID) ── -->
+    <!-- Declared AFTER the vitals strip so DockPanel stacks it just ABOVE it.   -->
+    <Border DockPanel.Dock="Bottom"
+            IsVisible="{Binding Display.ShowZoneRoomId}"
+            Background="#1b2024" BorderBrush="#3a4148" BorderThickness="0,1,0,0"
+            Padding="6,2">
+      <TextBlock Text="{Binding Mapper.LocationDisplay}"
+                 FontFamily="Consolas,Courier New,monospace" FontSize="11"
+                 Foreground="#8aa3b5" VerticalAlignment="Center"
+                 ToolTip.Tip="Current mapper zone and DR server room id (#66)"/>
+    </Border>
 
     <!-- ── Hands strip (bottom position — Genie 4 style) ────────────────── -->
     <!-- Declared AFTER the StatusBar and BEFORE the CommandBar so the         -->
