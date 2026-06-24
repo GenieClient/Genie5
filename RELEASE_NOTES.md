@@ -1,3 +1,46 @@
+# Genie 5 — v5.0.0-alpha.7.1
+
+A **maps & polish** point release on top of the Persistent Core. The headline is
+a maps-updater fix; the rest is quality-of-life plus a security fix.
+
+> **Alpha software.** Builds are **unsigned** for most platforms — Windows
+> SmartScreen will warn on first launch (More info → Run anyway). Signing is
+> tracked in #33.
+
+## 🗺️ Update Maps now pulls *every* map
+
+The updater was silently dropping **13 of the 90 official maps** — including
+**Riverhaven** (`Map30`), **Crossing West Gate**, **Shard West Gate**, the
+**Southern Trade Routes**, **M'Riss**, **Hibarnhvidar**, and **Fang Cove**. Those
+files are saved with a UTF-8 BOM that the XML importer rejected, so every Update
+Maps run reported success but left them missing — which is why the mapper showed
+**"No zone loaded"** in those areas. The BOM is now stripped on import. **If your
+mapper couldn't place you somewhere, re-run File → Update Maps** and the missing
+zones fill in.
+
+## ✨ New & quality-of-life
+
+- **Zone / Room ID on the status bar (#66)** — an optional bottom line showing
+  your current zone and `$roomid`; a View-menu toggle switches the zone field
+  between **name** and the numeric `$zoneid`.
+- **Per-script pause/resume + debug level (#94)** — each running-script chip now
+  has a **⏸ / ▶** pause button and a **dbg:N** button that cycles the script's
+  trace level 0 → 1 → 5 → 10.
+- **Atmospherics window (#85)** — a dockable Atmo stream tab (Window →
+  Atmospherics).
+- **`#echo` colour + mono (#84)** — `#echo Yellow …` renders coloured and
+  `#echo mono …` renders monospaced, from the command bar and scripts.
+- **`#var` / `#class` `list` & `set` subcommands (#97)** — `#var list` lists
+  (instead of filtering by the text "list"), `#var set x 1` sets `x` (instead of
+  creating a variable named "set"); plus full multi-row copy in the Variables grid.
+
+## 🔒 Security
+
+- **SGE game-entry key no longer logged (#45)** — the one-time `KEY=` token is
+  masked in connection logs.
+
+---
+
 # Genie 5 — v5.0.0-alpha.7
 
 The **Persistent Core** release. Genie now keeps one live session "brain" for the

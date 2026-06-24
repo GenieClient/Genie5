@@ -9,10 +9,10 @@
     <AssemblyName>Genie</AssemblyName>
 
     <!-- ── Versioning (shown in File Properties → Details + About box) ── -->
-    <Version>5.0.0-alpha.7</Version>
+    <Version>5.0.0-alpha.7.1</Version>
     <AssemblyVersion>5.0.0.0</AssemblyVersion>
     <FileVersion>5.0.0.0</FileVersion>
-    <InformationalVersion>5.0.0-alpha.7</InformationalVersion>
+    <InformationalVersion>5.0.0-alpha.7.1</InformationalVersion>
     <Product>Genie 5</Product>
     <Company>Genie 5 Project</Company>
     <Copyright>Copyright © 2026 — GPL-3.0</Copyright>
