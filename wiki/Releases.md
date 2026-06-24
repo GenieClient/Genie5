@@ -4,7 +4,51 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.6.2 — type-ahead & script editing
+## Latest: v5.0.0-alpha.7.1 — Maps & polish
+
+A maps-and-polish point release on top of the Persistent Core.
+
+**The big one:** **Update Maps now pulls every map.** The updater was silently dropping **13 of the 90 official maps** — Riverhaven (`Map30`), Crossing West Gate, Shard West Gate, the Southern Trade Routes, M'Riss, Hibarnhvidar, Fang Cove and more — because they're saved with a UTF-8 BOM the XML importer rejected. Every Update Maps run looked successful but left them missing, which is why the mapper showed **"No zone loaded"** in those areas. The BOM is now stripped on import. **If the mapper couldn't place you somewhere, re-run File → Update Maps** and the missing zones fill in.
+
+**New & quality-of-life**
+
+- **Zone / Room ID on the status bar** — an optional bottom line showing your current zone and `$roomid`; a View-menu toggle switches the zone field between the **name** and the numeric `$zoneid` ([#66](https://github.com/GenieClient/Genie5/issues/66)).
+- **Per-script pause/resume + debug level** — each running-script chip now has a **⏸ / ▶** pause button and a **dbg:N** button that cycles the script's trace level 0 → 1 → 5 → 10 ([#94](https://github.com/GenieClient/Genie5/issues/94)).
+- **Atmospherics window** — a dockable Atmo stream tab (Window → Atmospherics) ([#85](https://github.com/GenieClient/Genie5/issues/85)).
+- **`#echo` colour + mono** — `#echo Yellow …` renders coloured and `#echo mono …` monospaced, from the command bar and scripts ([#84](https://github.com/GenieClient/Genie5/issues/84)).
+- **`#var` / `#class` `list` & `set` subcommands** — `#var list` lists instead of filtering by "list", `#var set x 1` sets `x` instead of creating a variable named "set"; plus full multi-row copy in the Variables grid ([#97](https://github.com/GenieClient/Genie5/issues/97)).
+
+**Security**
+
+- **SGE game-entry key no longer logged** — the one-time `KEY=` token is masked in connection logs ([#45](https://github.com/GenieClient/Genie5/issues/45)).
+
+## v5.0.0-alpha.7 — Persistent Core
+
+The session core now persists for the whole time Genie is open, instead of being rebuilt on every connect. That one change unlocks a lot: you can **run scripts while disconnected**, write a **logon script that connects and keeps running after login**, and **switch characters without restarting** — all without losing your engines, mapper, or trackers. The auto-walker also got smarter about pacing itself to the game.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.7** as a delta.
+
+> ⚠️ **Big release — please regression-test.** This rebuilds the session core and changes auto-walk significantly. Run your normal workflows — connect, scripts, triggers, mapper/travel, multi-character — and report anything that regressed in the [regression tracker (#98)](https://github.com/GenieClient/Genie5/issues/98).
+
+**Persistent core & scripting**
+
+- **Run scripts offline** — set `#var` / `#class` / aliases / triggers, run `.cmd` / `.js`, `#edit`, and save your config while disconnected — handy for setting up before login or testing a script offline ([#88](https://github.com/GenieClient/Genie5/issues/88)).
+- **Logon scripts survive connecting** — a `.cmd` that sets things up, then `put #connect <profile>`, then does more after login runs straight through; the same script keeps running across the connect. (In a `.cmd`, a bare `#` line is a comment — run client commands with `put #…`, as in Genie 4.)
+- **Switch characters without restarting** — `#connect <other-profile>` clears the previous character's rules / variables / classes / skills and loads the new one's, while your scripts, mapper, and panels stay alive.
+
+**Connection & travel**
+
+- **Bounded auto-reconnect** — an unexpected drop retries on a short ladder and **stops after ~1.5–2 minutes** with a clear *Disconnected*, instead of retrying forever. A deliberate `quit` / `exit` never auto-reconnects.
+- **Smarter auto-walk** — holds each step until the game is ready: it waits out **roundtime** and movement blocks (stunned / webbed), and **stands you up automatically** when you're sitting, kneeling, or prone. It also no longer reports a false **"No path"** before your skills are read.
+
+**Trackers & windows**
+
+- **Built-in Spell Timer, Experience, and Time Tracker** — no external plugin DLLs needed — plus new **Mobs** and **Players** panels listing what's in the room ([#86](https://github.com/GenieClient/Genie5/issues/86)).
+- **Dock fixes** — a floated panel (e.g. the Mapper) reopens **fully on-screen** instead of off a monitor edge, and its title bar **double-click maximizes / restores**.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.7)
+
+## v5.0.0-alpha.6.2 — type-ahead & script editing
 
 Genie now shows a live **type-ahead counter** in the command bar, and that limit finally matches your **account tier** (free 1 / premium 2 / +LTB 3) and self-corrects from the server. Script editing also gets friendlier: `#edit` opens your chosen editor — including the Genie 4 `#config editor` setting that used to be ignored — and **creates a new script** when one doesn't exist yet.
 
