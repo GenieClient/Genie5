@@ -530,6 +530,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>This drop already printed a reason ("Connection lost: …"), so the paired Disconnected
     /// event should not also print "Connection closed.".</summary>
     private bool _dropAnnounced;
+    /// <summary>This drop was an UNEXPECTED dead link — the transport raised an <see cref="ConnectionEventKind.Error"/>
+    /// (read exception / keepalive failure / activity watchdog) before the paired Disconnected. Only such a drop
+    /// auto-reconnects. A clean server-initiated close (DR idle-kick, boot, "Connection closed.") arrives as a bare
+    /// Disconnected with no Error and must NOT auto-reconnect — the server deliberately ended the session and the
+    /// user is idle/away (no resume-while-away). Reset on each fresh connect.</summary>
+    private bool _dropWasError;
 
     /// <summary>Base name of the recipe script whose completion should auto-stop
     /// the current capture (null for a manual capture, which the user stops).</summary>
@@ -2617,6 +2623,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     else
                         ReportConnectionFailure(e.Message);
                     _dropAnnounced = true;
+                    _dropWasError  = true;   // unexpected dead link → eligible to auto-reconnect
                 }
 
                 // On connect, announce the login transport (TLS vs plaintext),
@@ -2642,8 +2649,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     _dropAnnounced = true;
                 }
 
-                // A dropped/failed established session may auto-reconnect.
-                if (e.Kind is ConnectionEventKind.Disconnected or ConnectionEventKind.Error)
+                // Only an UNEXPECTED dead link auto-reconnects. The transport raises
+                // Error (read failure / keepalive trip / activity watchdog) before
+                // the paired Disconnected; a clean server-initiated close — DR
+                // idle-kick, boot, or "Connection closed." — arrives as a bare
+                // Disconnected with no Error. A deliberate server close must NOT
+                // auto-reconnect (the user is idle/away; no resume-while-away).
+                // Network drops still recover via the bounded ladder.
+                if (_dropWasError && e.Kind is ConnectionEventKind.Disconnected or ConnectionEventKind.Error)
                     MaybeArmAutoReconnect();
 
                 // Close any in-flight analyst capture when the session ends, so
@@ -3055,6 +3068,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _reconnectAttempts     = 0;
         _reconnectAt           = null;
         _dropAnnounced         = false;
+        _dropWasError          = false;
         EnsureReconnectTimer();
     }
 
