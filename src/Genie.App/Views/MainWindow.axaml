@@ -1115,6 +1115,23 @@
                     <TextBlock Text="js" FontSize="9" Foreground="#e8c97a"
                                VerticalAlignment="Center"/>
                   </Border>
+                  <!-- Pause / resume this script (#94). Glyph flips ⏸/▶. -->
+                  <Button Content="{Binding PauseGlyph}"
+                          FontSize="10" Padding="3,0" MinWidth="0" MinHeight="0"
+                          Background="Transparent" BorderThickness="0"
+                          Foreground="#9ec59a"
+                          ToolTip.Tip="Pause / resume this script"
+                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.PauseResumeCommand}"
+                          CommandParameter="{Binding}"/>
+                  <!-- Per-script debug level (#94): cycles 0→1→5→10. .cmd only. -->
+                  <Button Content="{Binding DebugLabel}"
+                          FontSize="9" Padding="3,0" MinWidth="0" MinHeight="0"
+                          Background="Transparent" BorderThickness="0"
+                          Foreground="#c0a060"
+                          IsVisible="{Binding !IsJavaScript}"
+                          ToolTip.Tip="Cycle this script's debug/trace level (0→1→5→10)"
+                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.CycleDebugCommand}"
+                          CommandParameter="{Binding}"/>
                   <Button Content="✏"
                           FontSize="10" Padding="3,0" MinWidth="0" MinHeight="0"
                           Background="Transparent" BorderThickness="0"

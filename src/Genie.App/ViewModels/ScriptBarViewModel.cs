@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Reactive;
+using System.Reactive.Linq;
 using Avalonia.Threading;
 using Genie.Core;
 using ReactiveUI;
@@ -54,6 +55,14 @@ public sealed class ScriptBarViewModel : ReactiveObject
     /// </summary>
     public ReactiveCommand<string, Unit> EditScriptCommand { get; }
 
+    /// <summary>Toggle pause/resume for one script chip (#94). Mirrors the engine's
+    /// per-script <see cref="ScriptEngine.PauseScript"/>/<c>ResumeScript</c>.</summary>
+    public ReactiveCommand<ScriptBarItem, Unit> PauseResumeCommand { get; }
+
+    /// <summary>Cycle one script chip's debug/trace level 0→1→5→10→0 (#94),
+    /// pushing it to the engine via <see cref="ScriptEngine.SetTrace"/>.</summary>
+    public ReactiveCommand<ScriptBarItem, Unit> CycleDebugCommand { get; }
+
     public ScriptBarViewModel()
     {
         StopScriptCommand = ReactiveCommand.Create<string, Unit>(name =>
@@ -67,6 +76,22 @@ public sealed class ScriptBarViewModel : ReactiveObject
         {
             if (string.IsNullOrWhiteSpace(name) || _core is null) return Unit.Default;
             EditScript?.Invoke(name);
+            return Unit.Default;
+        });
+
+        PauseResumeCommand = ReactiveCommand.Create<ScriptBarItem, Unit>(item =>
+        {
+            if (item is null || _core is null) return Unit.Default;
+            if (item.IsPaused) { _core.Scripts.ResumeScript(item.Name); item.IsPaused = false; }
+            else               { _core.Scripts.PauseScript(item.Name);  item.IsPaused = true;  }
+            return Unit.Default;
+        });
+
+        CycleDebugCommand = ReactiveCommand.Create<ScriptBarItem, Unit>(item =>
+        {
+            if (item is null || _core is null) return Unit.Default;
+            item.DebugLevel = item.DebugLevel switch { 0 => 1, 1 => 5, 5 => 10, _ => 0 };
+            _core.Scripts.SetTrace(item.Name, item.DebugLevel);
             return Unit.Default;
         });
     }
@@ -111,5 +136,41 @@ public sealed class ScriptBarViewModel : ReactiveObject
 }
 
 /// <summary>One running-script chip in the script bar. Carries the language so
-/// the bar can show a "js" tag; the Stop/Edit commands key off <see cref="Name"/>.</summary>
-public sealed record ScriptBarItem(string Name, bool IsJavaScript);
+/// the bar can show a "js" tag; the Stop/Edit/Pause/Debug commands key off
+/// <see cref="Name"/>. Reactive so per-chip Pause/Resume (#94) and the debug-level
+/// readout update live.</summary>
+public sealed class ScriptBarItem : ReactiveObject
+{
+    private readonly ObservableAsPropertyHelper<string> _debugLabel;
+    private readonly ObservableAsPropertyHelper<string> _pauseGlyph;
+
+    public ScriptBarItem(string name, bool isJavaScript)
+    {
+        Name = name;
+        IsJavaScript = isJavaScript;
+        _debugLabel = this.WhenAnyValue(x => x.DebugLevel)
+            .Select(n => $"dbg:{n}")
+            .ToProperty(this, x => x.DebugLabel);
+        _pauseGlyph = this.WhenAnyValue(x => x.IsPaused)
+            .Select(p => p ? "▶" : "⏸")
+            .ToProperty(this, x => x.PauseGlyph);
+    }
+
+    public string Name { get; }
+    public bool   IsJavaScript { get; }
+
+    /// <summary>User-paused via the chip's ⏸/▶ button (mirrors the engine's
+    /// per-script pause). Drives the button glyph.</summary>
+    [Reactive] public bool IsPaused { get; set; }
+
+    /// <summary>Per-script debug/trace level set via the chip (0 = off, cycles
+    /// 0→1→5→10). <c>.js</c> scripts have no trace level, so the control is
+    /// hidden for them.</summary>
+    [Reactive] public int DebugLevel { get; set; }
+
+    /// <summary>Debug button caption ("dbg:N"), live-tracking <see cref="DebugLevel"/>.</summary>
+    public string DebugLabel => _debugLabel.Value;
+
+    /// <summary>Pause button glyph — ⏸ while running, ▶ while paused.</summary>
+    public string PauseGlyph => _pauseGlyph.Value;
+}

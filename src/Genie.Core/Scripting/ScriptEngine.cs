@@ -405,6 +405,20 @@ public sealed class ScriptEngine
             { inst.UserPaused = false; _echo($"[script] {name} resumed"); }
     }
 
+    /// <summary>Set the debug/trace level for a SINGLE running <c>.cmd</c> script
+    /// by name (the per-chip control on the Script Bar, #94). Level is clamped to
+    /// 0–10 (0 = off; higher surfaces more <c>[dbg:N]</c> traces). The global
+    /// equivalent is <c>#traceall</c> (<see cref="GenieCore"/> ICommandHost).
+    /// <c>.js</c> scripts have no per-line trace level, so they're unaffected.</summary>
+    public void SetTrace(string name, int level)
+    {
+        if (level < 0) level = 0;
+        if (level > 10) level = 10;
+        foreach (var inst in _instances)
+            if (inst.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            { inst.DebugLevel = level; _echo($"[script] {name} debug level set to {level}"); }
+    }
+
     public void PauseAll()
     {
         _js.PauseAll();
