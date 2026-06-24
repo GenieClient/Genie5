@@ -31,6 +31,18 @@ public static class Genie4MapImporter
     /// </summary>
     public static MapZone ImportFromContent(string xmlContent, string fallbackName)
     {
+        // Strip a leading UTF-8 BOM (U+FEFF). When the source is a byte[] decoded
+        // via Encoding.UTF8.GetString — e.g. the Maps updater's download path — the
+        // BOM survives as a leading character and XmlDocument.LoadXml rejects it
+        // ("data at the root level is invalid"). File.ReadAllText already strips it,
+        // so file-load callers never hit this; the byte-array path did. This silently
+        // dropped every BOM-prefixed upstream map (Map30_Riverhaven, Map4_Crossing_
+        // West_Gate, Map69_Shard_West_Gate, … — 13 of the 90 GenieClient/Maps files),
+        // since the importer threw and MapsUpdater swallowed it as a per-file error.
+        const char Bom = (char)0xFEFF;   // U+FEFF — UTF-8 BOM, decoded as one leading char
+        if (xmlContent.Length > 0 && xmlContent[0] == Bom)
+            xmlContent = xmlContent[1..];
+
         var doc = new XmlDocument();
         doc.LoadXml(xmlContent);
 
