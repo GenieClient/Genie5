@@ -14,6 +14,18 @@ public interface ICommandHost
     /// <see cref="EchoTo"/>, which targets a named side/plugin window.
     /// </summary>
     void EchoMain(string text, string? color, bool mono);
+
+    /// <summary>
+    /// Set the script status-bar text (Genie 4 <c>#statusbar</c> / <c>#status</c>).
+    /// <paramref name="index"/> selects one of Genie 4's ten status slots
+    /// (1-10; the command-bar layer defaults a missing/invalid index to 1); the
+    /// App composes the non-empty slots into the strip shown to the right of the
+    /// Script Bar (#111). An empty <paramref name="text"/> clears that slot.
+    /// Console / headless builds with no UI strip drop it silently — Genie 4
+    /// parity (a status write to nowhere is a no-op, not an error).
+    /// </summary>
+    void SetStatusBar(string text, int index);
+
     /// <summary>
     /// Send a command line to the game socket.
     /// </summary>

@@ -42,6 +42,52 @@ public sealed class ScriptBarViewModel : ReactiveObject
     [Reactive] public bool HasScripts { get; private set; }
 
     /// <summary>
+    /// Genie 4's ten <c>#statusbar</c> slots (1-10, stored 0-indexed). Scripts
+    /// write progress here via <c>#statusbar [N] {text}</c>; we compose the
+    /// non-empty slots into <see cref="StatusText"/>. Cleared when the last
+    /// script finishes so the strip returns to zero height during ordinary play.
+    /// </summary>
+    private readonly string[] _statusSlots = new string[10];
+
+    /// <summary>
+    /// The composed <c>#statusbar</c> text shown to the right of the Script Bar
+    /// (#111) — the non-empty slots joined left-to-right. Empty when no script
+    /// has set a status, which keeps <see cref="HasStatus"/> false and the
+    /// status block collapsed.
+    /// </summary>
+    [Reactive] public string StatusText { get; private set; } = "";
+
+    /// <summary>True when any status slot is non-empty. Bound to the status
+    /// block's <c>IsVisible</c> so it shows only once a script writes one.</summary>
+    [Reactive] public bool HasStatus { get; private set; }
+
+    /// <summary>
+    /// Apply a <c>#statusbar</c> write (Genie 4 <c>#statusbar [N] {text}</c>),
+    /// routed from <see cref="GenieCore.StatusBarRequested"/>. <paramref name="index"/>
+    /// is the 1-10 slot; out-of-range indices clamp to 1. Must be called on the
+    /// UI thread (the caller marshals) since it mutates reactive state.
+    /// </summary>
+    public void SetStatus(int index, string text)
+    {
+        var slot = index is >= 1 and <= 10 ? index - 1 : 0;
+        _statusSlots[slot] = text ?? "";
+        RecomposeStatus();
+    }
+
+    private void RecomposeStatus()
+    {
+        StatusText = string.Join("   ", _statusSlots.Where(s => !string.IsNullOrEmpty(s)));
+        HasStatus  = StatusText.Length > 0;
+    }
+
+    private void ClearStatus()
+    {
+        Array.Clear(_statusSlots, 0, _statusSlots.Length);
+        StatusText = "";
+        HasStatus  = false;
+    }
+
+    /// <summary>
     /// Sends <c>#stop &lt;name&gt;</c> to the script engine. Parameterised
     /// so the XAML <c>Button.Command</c> can pass the per-item name via
     /// <c>CommandParameter</c>.
@@ -131,6 +177,9 @@ public sealed class ScriptBarViewModel : ReactiveObject
                     if (RunningScripts[i].Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                         RunningScripts.RemoveAt(i);
                 HasScripts = RunningScripts.Count > 0;
+                // Once nothing is running, drop any leftover #statusbar text so
+                // the strip collapses to zero height during ordinary play (#111).
+                if (!HasScripts) ClearStatus();
             });
     }
 }

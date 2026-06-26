@@ -2809,6 +2809,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _core.EditScriptRequested     += name =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => OpenScriptInEditor(name));
 
+        // #statusbar / #status [N] {text} — scripts write progress to the strip
+        // shown to the right of the Script Bar (#111). Raised on the engine
+        // thread; marshal to the UI thread before touching reactive state.
+        _core.StatusBarRequested      += (text, index) =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ScriptBar.SetStatus(index, text));
+
         // (The script tick pump — #61 — is wired at the end of WireCore so it runs
         // for the core's whole life, including while disconnected, for offline
         // scripts; #88.)

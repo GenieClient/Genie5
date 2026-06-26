@@ -183,6 +183,24 @@ public sealed class CommandEngine
                     else                        _host.Echo(msg);
                 }
                 break;
+            case "status":
+            case "statusbar":
+                // Genie 4 #statusbar [N] {text} — write text to one of ten status
+                // slots (N = 1-10, default 1). The App renders the slots to the
+                // right of the Script Bar (#111). With no args it's a no-op; a
+                // bare `#statusbar N` (no text) clears slot N.
+                if (parts.Count > 1)
+                {
+                    var slot = 1;
+                    var textFrom = 1;
+                    if (int.TryParse(parts[1], out var n) && n is >= 1 and <= 10)
+                    {
+                        slot = n;
+                        textFrom = 2;
+                    }
+                    _host.SetStatusBar(string.Join(" ", parts.Skip(textFrom)), slot);
+                }
+                break;
             case "send":
             case "put":
                 // Genie 4: #put is the canonical "send to game" command in

@@ -1113,11 +1113,19 @@
             IsVisible="{Binding ScriptBar.HasScripts}"
             Background="#1f2429" BorderBrush="#3a4148" BorderThickness="0,1,0,0"
             Padding="6,3">
-      <StackPanel Orientation="Horizontal" Spacing="6">
-        <TextBlock Text="Scripts:" Foreground="#8aa3b5" FontSize="11"
+      <DockPanel LastChildFill="False">
+        <!-- #statusbar / #status text (Genie 4 parity, #111) — docked right so
+             it stays put as running-script chips come and go on the left. -->
+        <TextBlock DockPanel.Dock="Right"
+                   IsVisible="{Binding ScriptBar.HasStatus}"
+                   Text="{Binding ScriptBar.StatusText}"
+                   Foreground="#cfe0ee" FontSize="11"
+                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                   Margin="12,0,2,0"/>
+        <TextBlock DockPanel.Dock="Left" Text="Scripts:" Foreground="#8aa3b5" FontSize="11"
                    FontWeight="SemiBold" VerticalAlignment="Center"
                    Margin="0,0,2,0"/>
-        <ItemsControl ItemsSource="{Binding ScriptBar.RunningScripts}">
+        <ItemsControl DockPanel.Dock="Left" ItemsSource="{Binding ScriptBar.RunningScripts}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
               <StackPanel Orientation="Horizontal" Spacing="4"/>
@@ -1174,7 +1182,7 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-      </StackPanel>
+      </DockPanel>
     </Border>
 
     <!-- ── Command bar (above status bar) ────────────────────────────────── -->

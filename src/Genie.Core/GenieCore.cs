@@ -750,6 +750,17 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     void ICommandHost.EchoMain(string text, string? color, bool mono)
         => EchoStyledLine?.Invoke(text, color, mono);
 
+    void ICommandHost.SetStatusBar(string text, int index)
+        => StatusBarRequested?.Invoke(text, index);
+
+    /// <summary>
+    /// Raised by <c>#statusbar</c> / <c>#status</c>. Carries the text and the
+    /// 1-10 slot index. The App routes it to the Script Bar's status strip
+    /// (#111); Console / headless builds with no subscriber drop it (Genie 4
+    /// parity — a status write with no bar is a silent no-op).
+    /// </summary>
+    public event Action<string, int>? StatusBarRequested;
+
     void ICommandHost.SendToGame(string text, bool userInput, string origin, string? echoOverride)
     {
         // Local echo of user-typed commands so the player can see what they sent.

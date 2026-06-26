@@ -93,6 +93,7 @@ Regex captures from `matchre` / `waitforre` / actions land in the current `$0..$
 | Statement | Notes |
 | --- | --- |
 | `echo text` | Print to the echo channel (main window + Scripts panel). |
+| `#statusbar [N] text` | Show `text` in the strip to the right of the Script Bar (`#status` is a synonym). `N` (1–10, default 1) picks one of Genie 4's status slots; the non-empty slots are shown together and clear when the last script ends. An empty `text` clears slot `N`. |
 | `debug N` | Per-script trace verbosity (1 = goto/gosub/return … 10 = every line). |
 | `include <file>.js` | Load a JavaScript function library for this script run — see [JavaScript Scripting](JavaScript-Scripting). |
 | `js <expr>` / `jscall <var> <expr>` | Call a JS library function; `jscall` stores the result in `%var`. |
