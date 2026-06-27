@@ -1427,7 +1427,19 @@ public class MapperViewModel : ReactiveObject
         GotoNode(target);
     }
 
-    /// <summary>Resolve a #goto token to a node: id → label → title.</summary>
+    /// <summary>
+    /// Resolve a #goto token to a node, in Genie 4 priority order: numeric id,
+    /// then note label (exact, then prefix), then title (exact, then prefix),
+    /// then a single unambiguous title substring.
+    /// <para>
+    /// The prefix steps are Genie 4's shorthand handling (#115): typing
+    /// <c>#goto gem</c> reaches a room labelled <c>gems</c>, and <c>#goto
+    /// brickwell</c> reaches one labelled/titled <c>brickwell tower</c>. Prefix
+    /// matches take the first hit (Genie 4 + the Kzin prototype's resolver
+    /// behaviour); the unambiguous-substring fallback only fires when exactly
+    /// one title contains the token.
+    /// </para>
+    /// </summary>
     private MapNode? ResolveNode(string arg)
     {
         var zone = _engine!.ActiveZone;
@@ -1436,20 +1448,21 @@ public class MapperViewModel : ReactiveObject
         if (int.TryParse(arg, out var id) && zone.Nodes.TryGetValue(id, out var byId))
             return byId;
 
-        // 2) Note label — notes hold '|'-separated labels.
-        foreach (var n in zone.Nodes.Values)
-        {
-            if (string.IsNullOrEmpty(n.Notes)) continue;
-            foreach (var label in n.Notes.Split('|'))
-                if (label.Trim().Equals(arg, StringComparison.OrdinalIgnoreCase))
-                    return n;
-        }
+        // Notes hold '|'-separated labels; match the predicate against any one.
+        bool Label(MapNode n, Func<string, bool> pred)
+            => !string.IsNullOrEmpty(n.Notes) &&
+               n.Notes.Split('|').Any(label => pred(label.Trim()));
 
-        // 3) Title — exact match first, then a single unambiguous contains.
-        var exact = zone.Nodes.Values.FirstOrDefault(
-            n => n.Title.Equals(arg, StringComparison.OrdinalIgnoreCase));
-        if (exact is not null) return exact;
+        // 2) Note label exact → 3) note label prefix (shorthand, #115) →
+        //    4) title exact → 5) title prefix (shorthand).
+        var hit =
+               zone.Nodes.Values.FirstOrDefault(n => Label(n, l => l.Equals(arg, StringComparison.OrdinalIgnoreCase)))
+            ?? zone.Nodes.Values.FirstOrDefault(n => Label(n, l => l.StartsWith(arg, StringComparison.OrdinalIgnoreCase)))
+            ?? zone.Nodes.Values.FirstOrDefault(n => n.Title.Equals(arg, StringComparison.OrdinalIgnoreCase))
+            ?? zone.Nodes.Values.FirstOrDefault(n => n.Title.StartsWith(arg, StringComparison.OrdinalIgnoreCase));
+        if (hit is not null) return hit;
 
+        // 6) Final fallback: a single unambiguous title substring.
         var partial = zone.Nodes.Values
             .Where(n => n.Title.IndexOf(arg, StringComparison.OrdinalIgnoreCase) >= 0)
             .ToList();
