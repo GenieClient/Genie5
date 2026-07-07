@@ -319,6 +319,28 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     public ReactiveCommand<Unit, Unit> DismissUpdateNoticeCommand { get; private set; } = null!;
 
+    // ── Report-XML-gap notice (crowdsourced parser-gap reporting) ────────────
+
+    /// <summary>One-line prompt shown when the parser meets an XML element it
+    /// doesn't consume (<see cref="UnknownTagEvent"/>). Empty = the strip is
+    /// collapsed. Click drafts a REDACTED GitHub issue and opens the prefill URL
+    /// in the browser (nothing is posted automatically); the × dismisses it.
+    /// One prompt per tag type per session — the parser rarely meets an unknown
+    /// element, so this does not nag.</summary>
+    [Reactive] public string XmlGapNotice { get; private set; } = "";
+
+    /// <summary>Prefill new-issue URL for the pending XML-gap draft, opened by
+    /// <see cref="ReportXmlGapCommand"/>. Empty when no gap is pending.</summary>
+    private string _pendingXmlGapUrl = "";
+
+    /// <summary>Tag types already surfaced this session — dedup so the same
+    /// unknown element never re-prompts.</summary>
+    private readonly System.Collections.Generic.HashSet<string> _reportedGapTags =
+        new(System.StringComparer.OrdinalIgnoreCase);
+
+    public ReactiveCommand<Unit, Unit> ReportXmlGapCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> DismissXmlGapNoticeCommand { get; private set; } = null!;
+
     // ── Plugins menu ────────────────────────────────────────────────────────
     /// <summary>Loaded plugins shown in the Plugins menu (enable/disable).
     /// Rebuilt when the menu opens.</summary>
@@ -1505,6 +1527,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // auto-applies where the matching Auto-Apply toggle is on.
         LoadUpdatePolicies();
         DismissUpdateNoticeCommand = ReactiveCommand.Create(() => { UpdateNotice = ""; });
+
+        DismissXmlGapNoticeCommand = ReactiveCommand.Create(() => { XmlGapNotice = ""; });
+        ReportXmlGapCommand = ReactiveCommand.Create(() =>
+        {
+            if (!string.IsNullOrEmpty(_pendingXmlGapUrl))
+                OpenUrl(_pendingXmlGapUrl, "the XML gap report");
+            XmlGapNotice = "";
+        });
         _ = CheckForUpdatesInBackgroundAsync();
 
         this.WhenAnyValue(x => x.UpdatesAvailable)
@@ -2311,6 +2341,25 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         {
             GameText.AddSystemLine($"[help] could not open {label} ({ex.Message}). Visit {url} manually.");
         }
+    }
+
+    /// <summary>Environment/context for an XML-gap issue draft. Version comes
+    /// from the assembly InformationalVersion (single source of truth); the git
+    /// hash after '+' becomes the parser-commit line when present.</summary>
+    private static Genie.Core.Diagnostics.XmlGapReport.ReportContext BuildXmlGapContext(string trigger)
+    {
+        var asm  = System.Reflection.Assembly.GetEntryAssembly();
+        var info = (asm is null ? null : System.Reflection.CustomAttributeExtensions
+                       .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(asm)?.InformationalVersion)
+                   ?? "5.0.0";
+        var plus    = info.IndexOf('+');
+        var version = plus >= 0 ? info[..plus] : info;
+        var commit  = plus >= 0 ? info[(plus + 1)..] : "local";
+        return new Genie.Core.Diagnostics.XmlGapReport.ReportContext(
+            AppVersion: version,
+            Os:         System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+            Commit:     commit,
+            Trigger:    trigger);
     }
 
     private void OpenMapsFolder()
@@ -3628,6 +3677,28 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     LastConnectionConfig = LastConnectionConfig with { CharacterName = e.Name };
                 if (IsConnected)
                     ConnectionStatus = $"Connected — {Genie.Core.Profiles.CharacterIdentity.Format(e.Name, LastConnectionConfig?.AccountName ?? "")}";
+            });
+
+        // Report XML Gap: when the parser meets an element it doesn't consume
+        // (UnknownTagEvent), offer a one-click, human-in-the-loop report. The
+        // draft is redacted (policy gate G2) and only a browser prefill URL is
+        // produced — nothing is posted automatically. One prompt per tag type
+        // per session so a routine gap doesn't nag.
+        _core.GameEvents.OfType<UnknownTagEvent>()
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(e =>
+            {
+                if (string.IsNullOrWhiteSpace(e.TagName)) return;
+                if (!_reportedGapTags.Add(e.TagName)) return;
+                try
+                {
+                    var fate  = Genie.Core.Parser.DrXmlParser.ClassifyTag(e.TagName);
+                    var draft = Genie.Core.Diagnostics.XmlGapReport.Build(
+                        e.TagName, fate, e.RawXml ?? "", BuildXmlGapContext($"live element <{e.TagName}>"));
+                    _pendingXmlGapUrl = draft.Url;
+                    XmlGapNotice = $"Genie received an unrecognized game element: <{e.TagName}>. Help improve the parser — report it?";
+                }
+                catch (Exception ex) { ErrorLog.Log("XmlGapReport", ex); }
             });
 
         _core.ConnectionState.ObserveOn(RxApp.MainThreadScheduler)

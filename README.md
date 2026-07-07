@@ -49,6 +49,7 @@ The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern
 | JavaScript (`.js`) array scripts via Jint — `genie.*` API (put/waitFor/matchWait/pause/timers/vars), coexists with `.cmd`, memory + runaway-loop guards | ✅ Working |
 | `#connect` / `#reconnect` / `#lichconnect` — typed/scripted login (Genie 4 parity; saved-profile, explicit, and reconnect forms; password-masked) | ✅ Working |
 | Analyst Capture — redacted, recipe-driven session capture for parser/analysis (other-player speech stripped by default) | ✅ Working |
+| Report parser gap — when the game sends an element Genie doesn't recognize, a one-click prompt opens a **pre-filled, pre-redacted** GitHub issue in your browser (nothing sent until you submit) | ✅ Working |
 | Performance overlay — live per-stage pipeline timing + running-`.js` list, behind the Performance menu | ✅ Working |
 | Game prompt in the window — `prompt` string + `promptbreak` (own-line) / `promptforce` (reconstructed status letters) | ✅ Working |
 | Portrait panel — DR room/scene artwork (`#config showimages`), fetched from the play.net art CDN | ✅ Working |

@@ -1149,6 +1149,29 @@
       </DockPanel>
     </Border>
 
+    <!-- ── Report-XML-gap notice strip (parser met an element it doesn't      -->
+    <!-- consume). One-click, human-in-the-loop: drafts a REDACTED GitHub issue -->
+    <!-- and opens the prefill URL in the browser — nothing is posted           -->
+    <!-- automatically. Auto-shows only while a gap is pending; × dismisses.    -->
+    <!-- Independent of the vitals Status Bar toggle, like the update strip.    -->
+    <Border DockPanel.Dock="Bottom"
+            IsVisible="{Binding XmlGapNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+            Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
+            Padding="6,1">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="✕"
+                Command="{Binding DismissXmlGapNoticeCommand}"
+                Background="Transparent" BorderThickness="0" Padding="4,0"
+                FontSize="10" Foreground="{DynamicResource Theme.SectionHeader}"
+                ToolTip.Tip="Dismiss (this element won't prompt again this session)"/>
+        <Button Content="{Binding XmlGapNotice}"
+                Command="{Binding ReportXmlGapCommand}"
+                Background="Transparent" BorderThickness="0" Padding="2,0"
+                HorizontalAlignment="Left" FontSize="11" Foreground="{DynamicResource Theme.SectionHeader}"
+                ToolTip.Tip="Opens a pre-filled, pre-redacted GitHub issue in your browser — you review and submit it"/>
+      </DockPanel>
+    </Border>
+
     <!-- ── Hands strip (bottom position — Genie 4 style) ────────────────── -->
     <!-- Declared AFTER the StatusBar and BEFORE the CommandBar so the         -->
     <!-- DockPanel stacks (bottom → top): StatusBar, HandsBottom, CommandBar.  -->

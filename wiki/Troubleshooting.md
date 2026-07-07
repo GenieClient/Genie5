@@ -101,6 +101,9 @@ Details: [Application Folders](Application-Folders#resetting-to-defaults).
 
 Recordings stay on your machine until you choose to share a snippet.
 
+**What's the "Genie received an unrecognized game element" prompt?**
+That's Genie offering to help itself. When DragonRealms sends a tag the parser doesn't handle yet, a slim strip appears above the vitals bar. Click it and Genie opens a **pre-filled GitHub issue** in your browser — the sample is **already redacted** (other players' speech removed) and your Genie version is attached. **Nothing is sent until you review it and press Submit.** It's the fastest way to help the parser keep up as the game changes; each unknown element only asks once per session, and **✕** dismisses it. See [The Interface → Notices](The-Interface#notices).
+
 ## Related
 
 - [Connecting & Profiles](Connecting) · [Application Folders](Application-Folders) · [The Mapper](Mapper) · [Scripting](Scripting) · [Policy Compliance](Policy-Compliance)

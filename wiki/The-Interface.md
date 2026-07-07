@@ -41,6 +41,13 @@ Scripts can create their **own named windows** too — the Genie 4 menu-script c
 - **Hands strip** — what's in your **left** and **right** hands, your **prepared spell** (with a cast-time bar), and your **stance**. Its position (top or bottom) is configurable from the **Window** menu.
 - **Command bar** — where you type. A **roundtime** indicator shows here (or on the hands strip — your choice) so you can see when you can act again.
 
+## Notices
+
+Two slim, dismissible strips appear just above the vitals bar — but only when there's something to tell you. Each has an **✕** to hide it.
+
+- **Updates available** — shows after the startup check finds a newer Core, map, script, or plugin. Click it to open the **Updates** dialog. See [Keeping Up to Date](Updates).
+- **Help improve the parser** — if the game ever sends Genie an element it doesn't recognize, this strip asks whether you'd like to report it. Click it and Genie opens a **pre-filled GitHub issue** in your browser, with the sample **already redacted** (other players' speech removed) and your Genie version attached. **Nothing is sent until you review it and press Submit** — no account data, no automatic posting. It's a one-click way to help Genie's parser keep pace as DragonRealms evolves. Each unknown element only asks once per session.
+
 ## The command bar
 
 Type a game command and press **Enter**. Beyond plain commands:
