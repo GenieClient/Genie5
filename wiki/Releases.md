@@ -4,7 +4,17 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.3 — Experience & Highlights
+## Latest: v5.0.0-alpha.8.4 — Parser Gap Reporting
+
+When DragonRealms sends an element Genie's parser doesn't recognize yet, a one-click prompt drafts a pre-redacted GitHub issue for you to review and submit.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.4** as a delta.
+
+- **Report parser gaps ([#152](https://github.com/GenieClient/Genie5/issues/152))** — if the game sends an element the parser doesn't handle yet, a slim notice offers to report it. One click opens a **pre-filled, pre-redacted** GitHub issue in your browser (other players' speech removed, your version attached); nothing is posted until you review and submit. Each unknown element asks once per session.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.4)
+
+## v5.0.0-alpha.8.3 — Experience & Highlights
 
 The Experience window catches up to Genie 3/4, a Display Settings Theme manager arrives, dock windows gain Save As / Find / Word Wrap, and a batch of highlight fixes land.
 

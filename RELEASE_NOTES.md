@@ -1,3 +1,23 @@
+# Genie 5 — v5.0.0-alpha.8.4
+
+Genie can now help improve its own parser: when the game sends an element it
+doesn't recognize yet, a one-click prompt drafts a pre-redacted GitHub issue
+for you to review and submit.
+
+> **Alpha software.** Windows SmartScreen may warn on first launch
+> (More info → Run anyway) while code signing is being rolled out — tracked
+> in #33.
+
+## ✨ New
+
+- **Report parser gaps (#152)** — if DragonRealms ever sends an element Genie's
+  parser doesn't handle yet, a slim notice appears above the vitals bar offering
+  to report it. One click opens a **pre-filled GitHub issue** in your browser,
+  with the sample **already redacted** (other players' speech removed) and your
+  Genie version attached — nothing is posted until you review it and press
+  Submit. A one-click way to help the parser keep pace as the game evolves; each
+  unknown element only asks once per session.
+
 # Genie 5 — v5.0.0-alpha.8.3
 
 The Experience window catches up to Genie 3/4 — session rank-gain, numeric
