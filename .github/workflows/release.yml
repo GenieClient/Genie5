@@ -382,12 +382,18 @@ jobs:
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Download previous Velopack releases (for delta packages)
+        # --channel is required here: `vpk download` defaults to the runner
+        # OS's default channel, which on a macOS runner is `osx` (Apple
+        # Silicon). Without it this job pulls the arm64 packages, so Intel
+        # deltas are diffed against the wrong base or skipped entirely. Must
+        # match the `--channel osx-x64` used by the pack step below.
         continue-on-error: true
         run: |
           vpk download github \
             --repoUrl https://github.com/GenieClient/Genie5 \
             --outputDir velopack-releases \
-            --pre
+            --pre \
+            --channel osx-x64
 
       - name: Velopack pack
         run: |
