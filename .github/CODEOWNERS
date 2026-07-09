@@ -1,0 +1,7 @@
+# Code owners for Genie 5
+# Auto-requests review from the listed owner(s) when a PR touches matching paths.
+# Docs: https://docs.github.com/articles/about-code-owners
+#
+# Global fallback owner. Refine with per-area entries (Genie.Core, Genie.App,
+# .github, wiki) as the maintainer roster stabilises.
+* @monil2233
