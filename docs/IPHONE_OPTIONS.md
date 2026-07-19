@@ -193,11 +193,72 @@ and point an existing iOS MUD/telnet client at it.
      acceptable under [POLICY.md §4](POLICY.md). Until that's answered, treat
      4 and 5 as off the table and don't prototype them.
 
+## Distribution decision (Option 2/3 prerequisite)
+
+If a native Apple target is pursued, **how it reaches users** must be settled
+before port code is written — it's a licensing/values call, not engineering.
+The three candidates are not competing choices; they sit at different points
+on a *beta → permanent → App-Store-legitimate* spectrum, and Genie 5's
+**GPL-3.0** license bites each one differently.
+
+| Path | What it actually is | GPL-3 fit | Reach | Cost / friction | The catch |
+|---|---|---|---|---|---|
+| **TestFlight** | Apple's *beta* channel | ⚠️ gray — still App-Store-Connect terms | Worldwide, ≤10k external testers | $99/yr dev account; first build per version hits Apple beta review (~24h) | **Builds expire every 90 days** — a testing channel, not a permanent home |
+| **AltStore / sideload** | Self-hosted distribution outside Apple | ✅ cleanest — no App Store DRM/usage terms | **Geo-split (see below)** | Notarization (malware scan only, no content review) | AltStore **PAL** is EU/Japan/Brazil-only; the worldwide variant re-signs every **7 days** and needs a desktop running AltServer |
+| **GPL exception / relicense** | Legally unblock the real App Store | ✅ makes App Store legitimate | Worldwide, everyone | Must obtain **every copyright holder's** consent (GPLv3 §7) | Highest effort; conflicts with the deliberate "same license as Lich 5" choice in the README |
+
+**Project-specific nuances:**
+
+- **TestFlight — the 90-day expiry is the story.** Perfect for an *alpha*
+  (which Genie 5 is), useless as a permanent channel: every build dies at 90
+  days, so you re-upload forever and testers re-download. Nobody gets pulled
+  from *TestFlight* over GPL the way VLC was pulled from the App Store, so for
+  a small tester pool the license tension is a tolerable gray area.
+- **AltStore — geography is the catch, and it matters here.** The DR
+  playerbase is largely **US-based**, where the DMA doesn't apply — so the
+  clean, malware-scan-only **AltStore PAL** marketplace (EU/Japan/Brazil, with
+  Australia/UK following) is *not available*. For the actual audience,
+  "AltStore" means the **worldwide classic-sideload path**: 7-day re-sign,
+  3-app-per-device limit, a desktop AltServer to refresh. A heavy ask for
+  casual users — but this community already runs Lich and writes `.cmd`
+  scripts, so it's within reach. GPL-wise it's the cleanest fit.
+- **GPL exception — tractable *now*, harder every merge.** GPLv3 §7 lets you
+  add an "App Store distribution" permission, but only copyright holders can
+  grant it — meaning **every contributor** must agree (or sign a CLA). Genie 5
+  is effectively solo-maintained today (@monil2233 holds the signing roles),
+  so there are few/no external copyright holders to chase — **the easiest this
+  will ever be.** VLC solved the equivalent problem by relicensing its engine
+  to LGPL, but that works because VLC is library-shaped; for a whole GPL app
+  the normal move is the added exception. Note the README chose GPL-3
+  deliberately to align with Lich 5, so this is a values decision too.
+
+**Recommended phasing** (you likely never need all three):
+
+1. **Alpha:** **TestFlight** — matches the project's stage, worldwide reach,
+   lowest friction; accept the 90-day churn as the cost of a beta.
+2. **Permanent GPL-clean release:** **sideload / AltStore**, documented for the
+   technical DR crowd who can tolerate the 7-day resign. The honest "GPL app,
+   no App Store" answer.
+3. **Real App Store presence (the GPL exception):** only if frictionless,
+   one-tap install for *non-technical* users ever becomes a goal.
+
+**The question that decides it:** *is a frictionless App Store install ever a
+goal, or is "technical DR players who already run Lich" the whole audience?*
+If the latter, TestFlight-for-alpha + sideload-for-release covers everything
+and the GPL headache is avoidable entirely. If the former, begin collecting
+contributor consent / adopt a **CLA now** — while the contributor list is tiny
+— because every merged external-contributor PR raises the cost of ever
+relicensing.
+
 ## Sources
 
 - [Avalonia — Supported Platforms](https://docs.avaloniaui.net/docs/overview/supported-platforms)
 - [Avalonia UI for Mobile (iOS & Android)](https://avaloniaui.net/avalonia/mobile)
 - [Avalonia.iOS on NuGet](https://www.nuget.org/packages/Avalonia.iOS)
 - [FSF — VLC and App Store GPL enforcement](https://www.fsf.org/blogs/licensing/vlc-enforcement)
+- [Apple — TestFlight overview](https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview/)
+- [AltStore PAL — FAQ](https://faq.altstore.io/altstore-pal/what-is-altstore-pal)
+- [TechCrunch — alternative EU app stores](https://techcrunch.com/2026/02/22/move-over-apple-meet-the-alternative-app-stores-available-in-the-eu-and-elsewhere/)
+- [App Fair — The GPL and Commercial App Stores](https://appfair.org/blog/gpl-and-the-app-stores/)
 - Genie 5 internals: [README architecture](../README.md), [POLICY.md](POLICY.md),
   `src/Genie.Core/Genie.Core.csproj`, `src/Genie.App/Genie.App.csproj`
