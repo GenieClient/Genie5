@@ -1534,28 +1534,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             var scriptsDir = _core is not null
                                  ? _core.Config.ScriptDir
                                  : Path.Combine(Path.GetDirectoryName(_configDir)!, "Scripts");
-            try
-            {
-                if (!Directory.Exists(scriptsDir)) Directory.CreateDirectory(scriptsDir);
-                // explorer.exe/open/xdg-open with the resolved absolute path —
-                // the SAME pattern as every other folder-open (Maps, Recordings,
-                // Plugins, Open Directory). The previous ShellExecute-on-the-dir
-                // route is exactly what OpenMapsFolder documents as failing with
-                // "Location is not available" on some Windows setups.
-                var nativePath = Path.GetFullPath(scriptsDir);
-                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                        System.Runtime.InteropServices.OSPlatform.Windows))
-                    System.Diagnostics.Process.Start("explorer.exe", nativePath);
-                else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                             System.Runtime.InteropServices.OSPlatform.OSX))
-                    System.Diagnostics.Process.Start("open", nativePath);
-                else
-                    System.Diagnostics.Process.Start("xdg-open", nativePath);
-            }
-            catch (Exception ex)
-            {
-                GameText.AddSystemLine($"[scripts] could not open {scriptsDir} ({ex.Message})");
-            }
+            OpenFolder(scriptsDir, "OpenScriptsFolder");
         });
 
         // Seed the Help ▸ Update Settings checkboxes from update-feeds.json,
@@ -2342,22 +2321,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     }
 
     /// <summary>Open a folder in the OS file browser, creating it if missing.
-    /// Cross-platform (explorer / open / xdg-open).</summary>
+    /// See <see cref="Genie.Core.Runtime.FileBrowser"/> for why this must use
+    /// <c>ArgumentList</c> rather than string arguments (paths with spaces,
+    /// e.g. macOS <c>~/Library/Application Support/Genie5</c>).</summary>
     private static void OpenFolder(string dir, string logTag)
     {
-        if (string.IsNullOrWhiteSpace(dir)) return;
         try
         {
-            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-            var nativePath = Path.GetFullPath(dir);
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                    System.Runtime.InteropServices.OSPlatform.Windows))
-                System.Diagnostics.Process.Start("explorer.exe", nativePath);
-            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                         System.Runtime.InteropServices.OSPlatform.OSX))
-                System.Diagnostics.Process.Start("open", nativePath);
-            else
-                System.Diagnostics.Process.Start("xdg-open", nativePath);
+            Genie.Core.Runtime.FileBrowser.OpenDirectory(dir, createIfMissing: true);
         }
         catch (Exception ex) { ErrorLog.Log(logTag, ex); }
     }
@@ -2413,34 +2384,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             return;
         }
 
-        try
-        {
-            // First-run users typically haven't pulled the Maps repo yet, so
-            // the configured directory may not exist on disk. Create it so
-            // the menu item actually opens a folder instead of silently
-            // failing — matches OpenRecordingsFolder's behavior.
-            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-            // Canonical Windows pattern: Process.Start(filename, argument).
-            // Quoting / escaping handled internally. The ProcessStartInfo
-            // route with explicit Arguments was failing here with
-            // "Location is not available" — likely because the quoted arg
-            // was being passed to explorer.exe in a form it interpreted
-            // as a literal filename to OPEN (not navigate to). The simpler
-            // overload works reliably.
-            var nativePath = Path.GetFullPath(dir);
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                    System.Runtime.InteropServices.OSPlatform.Windows))
-                System.Diagnostics.Process.Start("explorer.exe", nativePath);
-            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                         System.Runtime.InteropServices.OSPlatform.OSX))
-                System.Diagnostics.Process.Start("open", nativePath);
-            else
-                System.Diagnostics.Process.Start("xdg-open", nativePath);
-        }
-        catch (Exception ex)
-        {
-            ErrorLog.Log("OpenMapsFolder", ex);
-        }
+        // First-run users typically haven't pulled the Maps repo yet, so
+        // OpenFolder creates the configured directory when missing.
+        OpenFolder(dir, "OpenMapsFolder");
     }
 
     /// <summary>
@@ -2448,28 +2394,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <see cref="OpenMapsFolder"/>. Creates the directory if it doesn't
     /// exist yet (user may have installed but never recorded).
     /// </summary>
-    private void OpenRecordingsFolder()
-    {
-        var dir = _logsDir;
-        try
-        {
-            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+    private void OpenRecordingsFolder() => OpenFolder(_logsDir, "OpenRecordingsFolder");
 
-            var nativePath = Path.GetFullPath(dir);
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                    System.Runtime.InteropServices.OSPlatform.Windows))
-                System.Diagnostics.Process.Start("explorer.exe", nativePath);
-            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                         System.Runtime.InteropServices.OSPlatform.OSX))
-                System.Diagnostics.Process.Start("open", nativePath);
-            else
-                System.Diagnostics.Process.Start("xdg-open", nativePath);
-        }
-        catch (Exception ex)
-        {
-            ErrorLog.Log("OpenRecordingsFolder", ex);
-        }
-    }
 
     private async Task SetMapsDirectoryAsync()
     {
@@ -2748,20 +2674,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             GameText.AddSystemLine("[analyst] no capture folder set — use Analyst → Set Capture Folder first.");
             return;
         }
-        try
-        {
-            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-            var nativePath = Path.GetFullPath(dir);
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                    System.Runtime.InteropServices.OSPlatform.Windows))
-                System.Diagnostics.Process.Start("explorer.exe", nativePath);
-            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                         System.Runtime.InteropServices.OSPlatform.OSX))
-                System.Diagnostics.Process.Start("open", nativePath);
-            else
-                System.Diagnostics.Process.Start("xdg-open", nativePath);
-        }
-        catch (Exception ex) { ErrorLog.Log("OpenCaptureFolder", ex); }
+        OpenFolder(dir, "OpenCaptureFolder");
     }
 
     /// <summary>
@@ -5668,6 +5581,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// </summary>
     private string LaunchExternalEditor(string file)
     {
+        // Normalize once so every rung — custom/config candidates and the OS
+        // default — passes the editor the same absolute path.
+        var fullPath = System.IO.Path.GetFullPath(file);
+
         // 1) explicit GUI override, then 2) the #config editor value.
         foreach (var candidate in new[] { Display.EditorPath, _core?.Config?.Editor })
         {
@@ -5675,8 +5592,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             try
             {
                 System.Diagnostics.Process.Start(
-                    new System.Diagnostics.ProcessStartInfo(candidate, $"\"{file}\"")
-                    { UseShellExecute = false });
+                    new System.Diagnostics.ProcessStartInfo(candidate)
+                    { UseShellExecute = false, ArgumentList = { fullPath } });
                 return candidate;
             }
             catch (Exception ex)
@@ -5686,16 +5603,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
         }
 
-        // 3) OS default plain-text editor.
-        if (OperatingSystem.IsWindows())
-            System.Diagnostics.Process.Start("notepad.exe", $"\"{file}\"");
-        else if (OperatingSystem.IsMacOS())
-            // -t opens in the default TEXT editor regardless of extension.
-            System.Diagnostics.Process.Start("open", $"-t \"{file}\"");
-        else
-            // Linux doesn't treat `.cmd` as executable, so xdg-open routes it to
-            // the text/plain handler (a text editor).
-            System.Diagnostics.Process.Start("xdg-open", $"\"{file}\"");
+        // 3) OS default plain-text editor (see Genie.Core.Runtime.FileBrowser
+        // for the platform ladder and the ArgumentList spaces rationale).
+        System.Diagnostics.Process.Start(Genie.Core.Runtime.FileBrowser.BuildOpenInDefaultTextEditorInfo(fullPath));
         return "OS default";
     }
 
