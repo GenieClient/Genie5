@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Genie.Core.Connection;
@@ -51,13 +52,16 @@ public class LichStopTests
     }
 
     [Fact]
-    public void Launched_result_can_carry_process_id()
+    public void Launched_result_can_carry_process_id_and_start_time()
     {
-        var result = new LichLaunchResult(LichLaunchOutcome.Launched, "[lich] up", 42_424);
+        var start = DateTime.UtcNow;
+        var result = new LichLaunchResult(LichLaunchOutcome.Launched, "[lich] up", 42_424, start);
         Assert.Equal(42_424, result.ProcessId);
+        Assert.Equal(start, result.ProcessStartTimeUtc);
 
         var attach = new LichLaunchResult(LichLaunchOutcome.AlreadyRunning, "[lich] attaching");
         Assert.Null(attach.ProcessId);
+        Assert.Null(attach.ProcessStartTimeUtc);
     }
 
     private static Process? StartShortLivedProcess()

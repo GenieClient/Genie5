@@ -31,7 +31,7 @@ That character is still in game in another session. Quit it there, then reconnec
 The account's subscription needs attention on [play.net](https://www.play.net/dr).
 
 **Connect hangs, then fails.**
-A firewall/proxy is blocking `play.net`, or the game is down for maintenance. Genie retries the **initial** connect a few times, then stops (it never auto-reconnects after a session was established — see [Policy Compliance](Policy-Compliance)). To see *where* it stalls, turn on the connect trace: `#config conndebug true`, then reconnect — each protocol step prints into the game window with timings (off again with `#config conndebug false`).
+A firewall/proxy is blocking `play.net`, or the game is down for maintenance. Genie retries the **initial** connect a few times, then stops (it never auto-reconnects after a session was established — see [Policy Compliance](Policy-Compliance)). To see *where* it stalls, turn on the connect trace: `#config conndebug true`, then reconnect — each protocol step prints into the game window with timings. If Genie auto-launched Lich, also try `#config lichdebug true` to mirror that session's Lich `temp/debug-*.log` as `[lich-debug]` lines (independent of `conndebug`; off again with `#config lichdebug false`).
 
 **The title bar shows 🔓 instead of 🔒.**
 🔒 means your login was encrypted (TLS); 🔓 means Genie couldn't reach the secure login port and fell back to the legacy plaintext path — it still connects, but the password is only obfuscated, not encrypted. If it happens every time, something on your network (firewall/filter) is blocking the secure port. Confirm with `#config conndebug true` and reconnect — the trace shows the TLS attempt and why it fell back. See [Connecting](Connecting#secure-tls-login--the-padlock).

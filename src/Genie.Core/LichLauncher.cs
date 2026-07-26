@@ -22,10 +22,16 @@ public enum LichLaunchOutcome
 }
 
 /// <summary>Outcome + a human-readable message for the game window.
-/// <see cref="ProcessId"/> is set only when <see cref="Outcome"/> is
-/// <see cref="LichLaunchOutcome.Launched"/> — the caller owns that process and
-/// should stop it on disconnect / character change via <see cref="LichLauncher.TryStop"/>.</summary>
-public sealed record LichLaunchResult(LichLaunchOutcome Outcome, string Message, int? ProcessId = null);
+/// <see cref="ProcessId"/> and <see cref="ProcessStartTimeUtc"/> are set only when
+/// <see cref="Outcome"/> is <see cref="LichLaunchOutcome.Launched"/> — the caller
+/// owns that process and should stop it on disconnect / character change via
+/// <see cref="LichLauncher.TryStop"/>. Start time is used to ignore leftover
+/// <c>temp/debug-*.log</c> files from earlier Lich runs when mirroring logs.</summary>
+public sealed record LichLaunchResult(
+    LichLaunchOutcome Outcome,
+    string Message,
+    int? ProcessId = null,
+    DateTime? ProcessStartTimeUtc = null);
 
 /// <summary>
 /// Cross-platform "start Lich for me" helper backing the Genie 4 <c>#lc</c> /
@@ -136,12 +142,36 @@ public static class LichLauncher
             return new(LichLaunchOutcome.Failed,
                 $"[lich] Ruby not found at '{rubyPath}'. Fix #config lichruby, or clear it to use Ruby from PATH.");
 
-        // 3. Launch ruby <lichPath> <arguments> and keep the PID for ownership.
-        //    Progress is best-effort and must NEVER abort the launch — callers often
-        //    push lines into a UI ObservableCollection, and this method uses
-        //    ConfigureAwait(false), so progress may run off the UI thread and race
-        //    CollectionChanged (character change: "disconnected" + relaunch).
+        // 2b. Tokenize the argument string before anything is started. A malformed
+        //     value (unterminated quote) aborts loudly here rather than launching
+        //     Lich with mangled argv — a Lich that came up with the wrong --temp or
+        //     a split --login value fails later, in ways that don't point back at a
+        //     stray quote in #config lichargs.
+        IReadOnlyList<string> argv;
+        try
+        {
+            argv = SplitArguments(arguments);
+        }
+        catch (FormatException ex)
+        {
+            return new(LichLaunchOutcome.Failed, $"[lich] {ex.Message} Fix #config lichargs.");
+        }
+
+        // 2c. Reject path flags Lich accepts but silently discards. It never warns
+        //     about these, so the symptom is a Lich quietly using default paths —
+        //     and, for --temp, a debug-log tailer watching a directory nothing writes.
+        if (LichArgs.TryFindIgnoredDirFlag(argv, out var ignored, out var fix))
+            return new(LichLaunchOutcome.Failed,
+                $"[lich] Lich ignores '{ignored}' — use {fix} instead (the '=' is required, " +
+                $"and Lich's --help lists some path flags it doesn't implement). Fix #config lichargs.");
+
+        // 3. Launch ruby <lichPath> <arguments> and keep the PID + start time for
+        //    ownership / debug-log tailing. Progress is best-effort and must NEVER
+        //    abort the launch — callers often push lines into a UI ObservableCollection,
+        //    and this method uses ConfigureAwait(false), so progress may run off the
+        //    UI thread and race CollectionChanged (character change: "disconnected" + relaunch).
         int pid;
+        DateTime startUtc;
         try
         {
             var psi = new ProcessStartInfo
@@ -152,20 +182,23 @@ public static class LichLauncher
                 WorkingDirectory = Path.GetDirectoryName(lichPath) ?? string.Empty,
             };
             psi.ArgumentList.Add(lichPath);
-            foreach (var a in SplitArguments(arguments))
+            foreach (var a in argv)
                 psi.ArgumentList.Add(a);
 
+            var launchedAt = DateTime.UtcNow;
             using var proc = Process.Start(psi);
             if (proc is null)
                 return new(LichLaunchOutcome.Failed, "[lich] failed to start the Lich process.");
             pid = proc.Id;
+            try { startUtc = proc.StartTime.ToUniversalTime(); }
+            catch { startUtc = launchedAt; }
         }
         catch (Exception ex)
         {
             return new(LichLaunchOutcome.Failed, $"[lich] failed to start Lich: {ex.Message}");
         }
 
-        ReportProgress(progress, $"[lich] starting: {ruby} {lichPath} {arguments}".TrimEnd());
+        ReportProgress(progress, $"[lich] starting pid {pid}: {ruby} {lichPath} {arguments}".TrimEnd());
 
         // 4. Poll the proxy port until it opens or the start-pause elapses.
         //    If we never see the port, kill the orphan we just started.
@@ -178,7 +211,7 @@ public static class LichLauncher
                 return new(LichLaunchOutcome.Failed, "[lich] launch cancelled.");
             }
             if (IsProxyPortInUse(host, port))
-                return new(LichLaunchOutcome.Launched, $"[lich] up on {host}:{port}.", pid);
+                return new(LichLaunchOutcome.Launched, $"[lich] up on {host}:{port} (pid {pid}).", pid, startUtc);
             ReportProgress(progress, $"[lich] waiting for Lich… ({i + 1}/{pause}s)");
             try { await Task.Delay(1000, ct).ConfigureAwait(false); }
             catch (OperationCanceledException)
@@ -279,15 +312,14 @@ public static class LichLauncher
     /// <c>.exe</c> automatically under CreateProcess).</summary>
     private static string DefaultRubyExecutable => "ruby";
 
-    /// <summary>Split a Lich argument string into individual tokens on whitespace.
-    /// Lich arguments are simple flags (<c>--login X --without-frontend
-    /// --detachable-client=8000</c>), so a whitespace split is sufficient;
-    /// quoting is intentionally not supported (a single config value rarely needs
-    /// it, and it keeps behaviour predictable).</summary>
-    private static IEnumerable<string> SplitArguments(string arguments) =>
-        string.IsNullOrWhiteSpace(arguments)
-            ? Array.Empty<string>()
-            : arguments.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+    /// <summary>Split a Lich argument string into argv entries. Lich arguments are
+    /// mostly simple flags (<c>--login X --without-frontend --detachable-client=8000</c>),
+    /// but quoting is honoured so a path with spaces stays one entry — see
+    /// <see cref="LichArgs.Tokenize"/>, which <see cref="LichDebugLogTailer"/> shares
+    /// so both resolve <c>--temp</c> identically. Throws <see cref="FormatException"/>
+    /// on an unterminated quote; callers abort the launch.</summary>
+    private static IReadOnlyList<string> SplitArguments(string arguments) =>
+        LichArgs.Tokenize(arguments);
 
     /// <summary>
     /// True when something is already bound to <paramref name="host"/>:<paramref name="port"/>.

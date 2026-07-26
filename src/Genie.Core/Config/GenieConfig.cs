@@ -149,7 +149,8 @@ public sealed class GenieConfig
     /// <c>→auth</c>, TCP/TLS handshake timings…) into the game window. The
     /// high-level connect status lines show regardless. Default OFF — a normal
     /// login stays quiet; flip on to capture a full trace when diagnosing a
-    /// connection stall (<c>#config conndebug true</c>).</summary>
+    /// connection stall (<c>#config conndebug true</c>). Complementary to
+    /// <see cref="LichDebug"/> for Lich-proxy diagnosis.</summary>
     public bool ConnDebug { get; set; }
 
     /// <summary>
@@ -258,6 +259,13 @@ public sealed class GenieConfig
     /// <c>LichStartPause</c> (a fixed sleep); Genie 5 polls the port and returns
     /// as soon as it's up, so this is an upper bound. <c>#config lichstartpause N</c>.</summary>
     public int LichStartPause { get; set; } = 8;
+
+    /// <summary>When <c>true</c> and Genie auto-launched (owns) Lich, new lines
+    /// from that session's <c>temp/debug-*.log</c> are mirrored into the game
+    /// window with a <c>[lich-debug]</c> prefix for the whole owned session.
+    /// Default OFF. Independent of <see cref="ConnDebug"/> — enable both for a
+    /// full Lich-proxy connection diagnosis. <c>#config lichdebug true</c>.</summary>
+    public bool LichDebug { get; set; }
 
     public string ScriptDirRaw { get; set; } = "Scripts";
     public string SoundDirRaw { get; set; } = "Sounds";
@@ -622,6 +630,7 @@ public sealed class GenieConfig
         ("lichpath", LichPath),
         ("lichargs", LichArguments),
         ("lichstartpause", LichStartPause.ToString()),
+        ("lichdebug", LichDebug.ToString()),
         ("autoupdate", AutoUpdate.ToString()),
         ("checkforupdates", CheckForUpdates.ToString()),
         ("scriptextension", ScriptExtension),
@@ -668,7 +677,7 @@ public sealed class GenieConfig
     public static readonly IReadOnlyList<(string Category, string[] Keys)> ConfigCategories = new (string, string[])[]
     {
         ("Connection",       new[] { "classicconnect", "conndebug", "connectscript", "frontend", "reconnect" }),
-        ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause" }),
+        ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
@@ -802,6 +811,7 @@ public sealed class GenieConfig
                 case "lichpath": LichPath = value.Trim(); break;
                 case "lichargs": LichArguments = value.Trim(); break;
                 case "lichstartpause": LichStartPause = Math.Clamp((int)UtilityCore.StringToDouble(value), 1, 120); break;
+                case "lichdebug": LichDebug = ToBool(value); Notify(ConfigFieldUpdated.LichDebug); break;
                 case "autoupdate": AutoUpdate = ToBool(value); Notify(ConfigFieldUpdated.AutoUpdate); break;
                 case "checkforupdates": CheckForUpdates = ToBool(value); Notify(ConfigFieldUpdated.CheckForUpdates); break;
                 case "scriptextension": ScriptExtension = string.IsNullOrWhiteSpace(value) ? "cmd" : value; break;

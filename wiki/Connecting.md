@@ -88,6 +88,16 @@ character list, game select) with timings straight into the game window, so a
 stall can be pinned to an exact step — ideal to paste into a bug report. It's
 **off by default**; turn it back off with `#config conndebug false`.
 
+When Genie auto-launches Lich (owns the process), you can also mirror that
+session's Lich `temp/debug-*.log` into the game window as `[lich-debug]` lines:
+
+```
+#config lichdebug true
+```
+
+`conndebug` and `lichdebug` are independent — enable both for a full Lich-proxy
+connection diagnosis. See [Lich 5 Integration](Lich-5-Integration).
+
 ## Related
 
 - [Quick Start](Quick-Start) — the condensed first-login walkthrough.
