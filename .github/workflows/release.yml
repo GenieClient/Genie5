@@ -181,10 +181,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Download previous Velopack releases (for delta packages)
-        # Skipped for v0.0.0-* throwaway test tags: Velopack refuses to pack a
+        # Skipped for v0.0.x throwaway test tags: Velopack refuses to pack a
         # version lower than the latest downloaded release, so plumbing tests
         # build a standalone full package with no delta instead.
-        if: ${{ !startsWith(github.ref_name, 'v0.0.0') }}
+        if: ${{ !startsWith(github.ref_name, 'v0.0.') }}
         # First release will fail this step (no prior assets) — that's OK,
         # the resulting full.nupkg is still valid. Subsequent releases get
         # binary-diff deltas pulled from the most recent assets.
@@ -286,10 +286,10 @@ jobs:
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Download previous Velopack releases (for delta packages)
-        # Skipped for v0.0.0-* throwaway test tags: Velopack refuses to pack a
+        # Skipped for v0.0.x throwaway test tags: Velopack refuses to pack a
         # version lower than the latest downloaded release, so plumbing tests
         # build a standalone full package with no delta instead.
-        if: ${{ !startsWith(github.ref_name, 'v0.0.0') }}
+        if: ${{ !startsWith(github.ref_name, 'v0.0.') }}
         continue-on-error: true
         run: |
           vpk download github \
@@ -364,10 +364,10 @@ jobs:
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Download previous Velopack releases (for delta packages)
-        # Skipped for v0.0.0-* throwaway test tags: Velopack refuses to pack a
+        # Skipped for v0.0.x throwaway test tags: Velopack refuses to pack a
         # version lower than the latest downloaded release, so plumbing tests
         # build a standalone full package with no delta instead.
-        if: ${{ !startsWith(github.ref_name, 'v0.0.0') }}
+        if: ${{ !startsWith(github.ref_name, 'v0.0.') }}
         continue-on-error: true
         run: |
           vpk download github \
@@ -467,10 +467,10 @@ jobs:
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Download previous Velopack releases (for delta packages)
-        # Skipped for v0.0.0-* throwaway test tags: Velopack refuses to pack a
+        # Skipped for v0.0.x throwaway test tags: Velopack refuses to pack a
         # version lower than the latest downloaded release, so plumbing tests
         # build a standalone full package with no delta instead.
-        if: ${{ !startsWith(github.ref_name, 'v0.0.0') }}
+        if: ${{ !startsWith(github.ref_name, 'v0.0.') }}
         # --channel is required here: `vpk download` defaults to the runner
         # OS's default channel, which on a macOS runner is `osx` (Apple
         # Silicon). Without it this job pulls the arm64 packages, so Intel
