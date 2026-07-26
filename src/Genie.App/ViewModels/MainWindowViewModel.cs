@@ -929,7 +929,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private int? _ownedLichProcessId;
 
     /// <summary>UTC start time of the owned auto-launched Lich — used to ignore leftover
-    /// <c>temp/debug-*.log</c> files from earlier runs when <c>conndebug</c> mirrors logs.</summary>
+    /// <c>temp/debug-*.log</c> files from earlier runs when <c>lichdebug</c> mirrors logs.</summary>
     private DateTime? _ownedLichProcessStartUtc;
 
     /// <summary>Character + port key for the owned auto-launched Lich — used to detect a
@@ -937,7 +937,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private string? _ownedLichLaunchKey;
 
     /// <summary>Live-tails the owned Lich's <c>temp/debug-*.log</c> into the game window
-    /// when <c>#config conndebug</c> is on. Null when not tailing.</summary>
+    /// when <c>#config lichdebug</c> is on. Null when not tailing.</summary>
     private Genie.Core.Connection.LichDebugLogTailer? _lichDebugTailer;
 
     /// <summary>Base name of the recipe script whose completion should auto-stop
@@ -3606,11 +3606,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     /// <summary>
     /// Start or stop mirroring the owned Lich's <c>temp/debug-*.log</c> based on
-    /// <c>#config conndebug</c> and whether we currently own a Lich process.
+    /// <c>#config lichdebug</c> and whether we currently own a Lich process.
     /// </summary>
     private void SyncOwnedLichDebugTail()
     {
-        if (_core is null || !_core.Config.ConnDebug || _ownedLichProcessId is null)
+        if (_core is null || !_core.Config.LichDebug || _ownedLichProcessId is null)
         {
             StopOwnedLichDebugTail();
             return;
@@ -4027,10 +4027,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 Avalonia.Threading.Dispatcher.UIThread.Post(SyncAlignInputFromConfig);
         };
 
-        // Owned-Lich debug-log mirror ⇄ `#config conndebug` (start/stop mid-session).
+        // Owned-Lich debug-log mirror ⇄ `#config lichdebug` (start/stop mid-session).
         _core.Config.ConfigChanged += field =>
         {
-            if (field == Genie.Core.Config.ConfigFieldUpdated.ConnDebug)
+            if (field == Genie.Core.Config.ConfigFieldUpdated.LichDebug)
                 Avalonia.Threading.Dispatcher.UIThread.Post(SyncOwnedLichDebugTail);
         };
 

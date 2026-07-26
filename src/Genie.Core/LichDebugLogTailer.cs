@@ -5,7 +5,7 @@ namespace Genie.Core.Connection;
 /// <summary>
 /// Live-tails Lich's session debug log (<c>temp/debug-*.log</c>) for a Genie-owned
 /// auto-launched process. Pure Core (no UI); the App prefixes lines and posts them
-/// to the game window when <c>#config conndebug</c> is on.
+/// to the game window when <c>#config lichdebug</c> is on.
 /// </summary>
 public sealed class LichDebugLogTailer : IDisposable
 {

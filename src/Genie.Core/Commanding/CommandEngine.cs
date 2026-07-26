@@ -725,6 +725,7 @@ public sealed class CommandEngine
                 _host.Echo($"Lich Path:\t {(_config.LichPath.Length == 0 ? "(not set)" : _config.LichPath)}");
                 _host.Echo($"Lich Args:\t {(_config.LichArguments.Length == 0 ? "(none)" : _config.LichArguments)}");
                 _host.Echo($"Start Pause:\t {_config.LichStartPause}s");
+                _host.Echo($"Lich Debug:\t {(_config.LichDebug ? "on" : "off")} (mirror owned temp/debug-*.log)");
                 if (_config.LichArguments.Contains("{character}", StringComparison.OrdinalIgnoreCase)
                     || _config.LichArguments.Contains("{port}", StringComparison.OrdinalIgnoreCase))
                     _host.Echo("Placeholders:\t {character} and {port} expand from the Lich-proxy Character / port at connect.");

@@ -85,19 +85,22 @@ public class LichConnectTests : IDisposable
         _config.SetSetting("lichpath", @"C:\lich\lich.rbw", showException: false);
         _config.SetSetting("lichargs", "--login Char --without-frontend", showException: false);
         _config.SetSetting("lichstartpause", "12", showException: false);
+        _config.SetSetting("lichdebug", "on", showException: false);
 
         Assert.True(_config.LichAutoLaunch);
         Assert.Equal(@"C:\Ruby\bin\ruby.exe", _config.LichRubyPath);
         Assert.Equal(@"C:\lich\lich.rbw", _config.LichPath);
         Assert.Equal("--login Char --without-frontend", _config.LichArguments);
         Assert.Equal(12, _config.LichStartPause);
+        Assert.True(_config.LichDebug);
 
         // Present in the persisted pair list so settings.cfg saves them.
         var keys = _config.ToConfigPairs().Select(p => p.Key).ToList();
-        foreach (var k in new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause" })
+        foreach (var k in new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" })
             Assert.Contains(k, keys);
 
         Assert.Equal("12", _config.GetSetting("lichstartpause"));
+        Assert.Equal("True", _config.GetSetting("lichdebug"));
     }
 
     [Theory]
@@ -124,6 +127,7 @@ public class LichConnectTests : IDisposable
         var dump = string.Join("\n", host.Echoes);
         Assert.Contains("Lich Settings", dump);
         Assert.Contains(@"C:\lich\lich.rbw", dump);
+        Assert.Contains("Lich Debug:", dump);
         Assert.Null(host.LastRequest);     // it's a report, not a connect
         Assert.Empty(host.GameCommands);   // never reaches the game
     }
