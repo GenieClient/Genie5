@@ -378,9 +378,20 @@ public class GameTextViewModel : ReactiveObject
     /// this adds no bracket prefix, so the line reads inline as ordinary main
     /// text — matching Genie 4's per-stream "show in main". The stream's own
     /// panel still receives the line separately.
+    /// <para>
+    /// #187: the parser's span metadata (bold / link / preset) rides along so
+    /// the echoed line renders identically to a native main-stream line — most
+    /// visibly, the combat stream's <c>&lt;pushBold&gt;</c> hit result shows in
+    /// the gold monster-bold colour instead of plain white. <see cref="AddLine"/>
+    /// shifts the (absolute) span offsets for the timestamp prefix when the
+    /// game-window Timestamp toggle is on.
+    /// </para>
     /// </summary>
-    public void EchoStreamToMain(string text)
-        => AddLine(text, StreamColor.Main);
+    public void EchoStreamToMain(string text,
+                                 IReadOnlyList<BoldSpan>? bolds = null,
+                                 IReadOnlyList<LinkSpan>? links = null,
+                                 IReadOnlyList<PresetSpan>? presets = null)
+        => AddLine(text, StreamColor.Main, links, bolds, presets);
 
     /// <summary>
     /// Add a client-side system / diagnostic line — recorder status, internal
