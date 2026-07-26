@@ -87,4 +87,39 @@ public class LichArgsTests
     {
         Assert.Equal(new[] { "--temp", "" }, LichArgs.Tokenize("--temp \"\"").ToArray());
     }
+
+    [Theory]
+    // Space form — lich.rbw's regexes all require '='.
+    [InlineData("--login Char --temp /a/b", "--temp", "--temp=PATH")]
+    [InlineData("--home /a/b", "--home", "--home=PATH")]
+    // Documented by `lich --help`, implemented nowhere.
+    [InlineData("--temp-dir=/a/b", "--temp-dir=/a/b", "--temp=PATH")]
+    [InlineData("--script-dir=/a/b", "--script-dir=/a/b", "--scripts=PATH")]
+    [InlineData("--data-dir=/a/b", "--data-dir=/a/b", "--data=PATH")]
+    public void TryFindIgnoredDirFlag_catches_what_lich_silently_drops(
+        string args, string expectedProblem, string expectedFix)
+    {
+        Assert.True(LichArgs.TryFindIgnoredDirFlag(LichArgs.Tokenize(args), out var problem, out var fix));
+        Assert.Equal(expectedProblem, problem);
+        Assert.Equal(expectedFix, fix);
+    }
+
+    [Theory]
+    [InlineData("--temp=/a/b --login Char --without-frontend")]
+    [InlineData("--home=/a/b --scripts=/c/d --maps=/e/f")]
+    [InlineData("--login Char --dragonrealms --genie --headless 8000")]
+    // --hosts-dir takes a space-separated value and IS handled (argv_options.rb).
+    [InlineData("--hosts-dir /a/b")]
+    public void TryFindIgnoredDirFlag_passes_arguments_lich_honours(string args) =>
+        Assert.False(LichArgs.TryFindIgnoredDirFlag(LichArgs.Tokenize(args), out _, out _));
+
+    [Fact]
+    public void TryParseDirFlag_reads_only_the_equals_form()
+    {
+        Assert.True(LichArgs.TryParseDirFlag(LichArgs.Tokenize("--temp=/a/b"), "--temp", out var value));
+        Assert.Equal("/a/b", value);
+
+        Assert.False(LichArgs.TryParseDirFlag(LichArgs.Tokenize("--temp /a/b"), "--temp", out _));
+        Assert.False(LichArgs.TryParseDirFlag(LichArgs.Tokenize("--temp="), "--temp", out _));
+    }
 }

@@ -29,12 +29,19 @@ public class LichDebugLogTailerTests
     }
 
     [Fact]
-    public void ResolveTempDirectory_accepts_temp_space_form_and_temp_dir()
+    public void ResolveTempDirectory_ignores_forms_lich_itself_discards()
     {
-        var a = Path.Combine(Path.GetTempPath(), "temp-a");
-        var b = Path.Combine(Path.GetTempPath(), "temp-b");
-        Assert.Equal(a, LichDebugLogTailer.ResolveTempDirectory("x", $"--temp {a}"));
-        Assert.Equal(b, LichDebugLogTailer.ResolveTempDirectory("x", $"--temp-dir={b}"));
+        // Verified against lich.rbw: only /^--temp=(.+)/ sets TEMP_DIR. The space
+        // form and --temp-dir= (which Lich's own --help advertises) are dropped, so
+        // Genie must fall back to {dirname(lich.rbw)}/temp — the directory Lich
+        // really uses — rather than tailing a path nothing writes to.
+        var requested = Path.Combine(Path.GetTempPath(), "requested-temp");
+        var fallback = Path.Combine(Path.GetTempPath(), "lich-home", "temp");
+        var lich = Path.Combine(Path.GetTempPath(), "lich-home", "lich.rbw");
+
+        Assert.Equal(fallback, LichDebugLogTailer.ResolveTempDirectory(lich, $"--temp {requested}"));
+        Assert.Equal(fallback, LichDebugLogTailer.ResolveTempDirectory(lich, $"--temp-dir={requested}"));
+        Assert.Equal(fallback, LichDebugLogTailer.ResolveTempDirectory(lich, $"--temp-dir {requested}"));
     }
 
     [Fact]
@@ -43,11 +50,25 @@ public class LichDebugLogTailerTests
         var spaced = Path.Combine(Path.GetTempPath(), "Application Support", "lich", "temp");
 
         Assert.Equal(spaced, LichDebugLogTailer.ResolveTempDirectory(
-            "/unused/lich.rbw", $"--login Char --temp \"{spaced}\""));
-        Assert.Equal(spaced, LichDebugLogTailer.ResolveTempDirectory(
             "/unused/lich.rbw", $"--temp=\"{spaced}\" --without-frontend"));
         Assert.Equal(spaced, LichDebugLogTailer.ResolveTempDirectory(
-            "/unused/lich.rbw", $"--temp-dir '{spaced}'"));
+            "/unused/lich.rbw", $"--login Char --temp='{spaced}'"));
+    }
+
+    [Fact]
+    public void ResolveTempDirectory_follows_home_when_no_temp_is_given()
+    {
+        // lich.rbw: LICH_DIR = --home=…; constants.rb: TEMP_DIR ||= LICH_DIR/temp.
+        var home = Path.Combine(Path.GetTempPath(), "custom lich home");
+
+        Assert.Equal(
+            Path.Combine(home, "temp"),
+            LichDebugLogTailer.ResolveTempDirectory("/elsewhere/lich.rbw", $"--home=\"{home}\""));
+
+        // An explicit --temp= still wins over --home=.
+        var temp = Path.Combine(Path.GetTempPath(), "explicit-temp");
+        Assert.Equal(temp, LichDebugLogTailer.ResolveTempDirectory(
+            "/elsewhere/lich.rbw", $"--home={home} --temp={temp}"));
     }
 
     [Fact]

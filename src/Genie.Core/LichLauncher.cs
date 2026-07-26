@@ -157,6 +157,14 @@ public static class LichLauncher
             return new(LichLaunchOutcome.Failed, $"[lich] {ex.Message} Fix #config lichargs.");
         }
 
+        // 2c. Reject path flags Lich accepts but silently discards. It never warns
+        //     about these, so the symptom is a Lich quietly using default paths —
+        //     and, for --temp, a debug-log tailer watching a directory nothing writes.
+        if (LichArgs.TryFindIgnoredDirFlag(argv, out var ignored, out var fix))
+            return new(LichLaunchOutcome.Failed,
+                $"[lich] Lich ignores '{ignored}' — use {fix} instead (the '=' is required, " +
+                $"and Lich's --help lists some path flags it doesn't implement). Fix #config lichargs.");
+
         // 3. Launch ruby <lichPath> <arguments> and keep the PID + start time for
         //    ownership / debug-log tailing. Progress is best-effort and must NEVER
         //    abort the launch — callers often push lines into a UI ObservableCollection,

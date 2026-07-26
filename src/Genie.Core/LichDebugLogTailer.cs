@@ -11,24 +11,49 @@ public sealed class LichDebugLogTailer : IDisposable
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(250);
 
+    /// <summary>How long an empty temp directory is tolerated before the host is
+    /// told. Generous — Lich has to start Ruby, create the directory and open the
+    /// log — but short enough to answer "why is nothing showing up?" while the user
+    /// is still looking at the screen.</summary>
+    internal static readonly TimeSpan IdleWarningAfter = TimeSpan.FromSeconds(15);
+
+    private static readonly int IdleWarningPolls =
+        (int)(IdleWarningAfter.TotalMilliseconds / PollInterval.TotalMilliseconds);
+
     private CancellationTokenSource? _cts;
     private Task? _loop;
     private readonly object _gate = new();
 
     /// <summary>
-    /// Resolve Lich's temp directory: <c>--temp=PATH</c> / <c>--temp PATH</c> /
-    /// <c>--temp-dir=PATH</c> from <paramref name="lichArgs"/>, else
-    /// <c>{dirname(lichPath)}/temp</c>.
+    /// Resolve Lich's temp directory the way <c>lich.rbw</c> itself does:
+    /// <c>--temp=PATH</c> if present, else <c>{LICH_DIR}/temp</c> where
+    /// <c>LICH_DIR</c> is <c>--home=PATH</c> or the directory holding
+    /// <paramref name="lichPath"/>.
     /// </summary>
+    /// <remarks>
+    /// Mirrors <c>lich.rbw</c>'s argument loop (<c>/^--temp=(.+)/</c>,
+    /// <c>/^--home=(.+)/</c>) and <c>lib/constants.rb</c>
+    /// (<c>TEMP_DIR ||= File.join(LICH_DIR, "temp")</c>). Only the <c>=</c> form is
+    /// recognised because that is the only form Lich accepts — see
+    /// <see cref="LichArgs.TryFindIgnoredDirFlag"/>, which rejects the others at
+    /// launch rather than letting Genie tail a directory Lich silently ignored.
+    /// </remarks>
     /// <exception cref="FormatException">
     /// <paramref name="lichArgs"/> has an unterminated quote. Propagated rather than
-    /// swallowed into the <c>{dirname(lichPath)}/temp</c> fallback, which would tail
-    /// the wrong directory (or nothing) and read as "Lich just isn't logging".
+    /// swallowed into the <c>{LICH_DIR}/temp</c> fallback, which would tail the wrong
+    /// directory (or nothing) and read as "Lich just isn't logging".
     /// </exception>
     public static string? ResolveTempDirectory(string? lichPath, string? lichArgs)
     {
-        if (TryParseTempFromArgs(lichArgs, out var fromArgs))
-            return fromArgs;
+        var tokens = LichArgs.Tokenize(lichArgs);
+
+        if (LichArgs.TryParseDirFlag(tokens, "--temp", out var temp))
+            return temp;
+
+        // No --temp: TEMP_DIR is {LICH_DIR}/temp, and LICH_DIR is --home= when given,
+        // otherwise the directory lich.rbw lives in.
+        if (LichArgs.TryParseDirFlag(tokens, "--home", out var home))
+            return Path.Combine(home, "temp");
 
         if (string.IsNullOrWhiteSpace(lichPath))
             return null;
@@ -78,11 +103,22 @@ public sealed class LichDebugLogTailer : IDisposable
     /// <param name="notBeforeUtc">Ignore files last written before this (process start).</param>
     /// <param name="onLine">Raw log line (no prefix). Must not throw.</param>
     /// <param name="onFileBound">Fired once when a new file is opened for tailing.</param>
+    /// <param name="onIdle">Fired once if no eligible log shows up within
+    /// <see cref="IdleWarningAfter"/> — see the remarks.</param>
+    /// <remarks>
+    /// Lich creates its temp directory during startup, so "nothing there yet" is
+    /// normal for the first moment and cannot be treated as an error. But if it stays
+    /// empty, the tailer would otherwise poll a wrong or nonexistent path forever and
+    /// present as "lichdebug does nothing" — the exact failure that made a discarded
+    /// <c>--temp</c> argument so hard to trace. <paramref name="onIdle"/> gives the
+    /// host something to say instead.
+    /// </remarks>
     public void Start(
         string tempDir,
         DateTime notBeforeUtc,
         Action<string> onLine,
-        Action<string>? onFileBound = null)
+        Action<string>? onFileBound = null,
+        Action<string>? onIdle = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tempDir);
         ArgumentNullException.ThrowIfNull(onLine);
@@ -93,7 +129,8 @@ public sealed class LichDebugLogTailer : IDisposable
         lock (_gate)
         {
             _cts = cts;
-            _loop = Task.Run(() => RunLoop(tempDir, notBeforeUtc.ToUniversalTime(), onLine, onFileBound, cts.Token));
+            _loop = Task.Run(() => RunLoop(
+                tempDir, notBeforeUtc.ToUniversalTime(), onLine, onFileBound, onIdle, cts.Token));
         }
     }
 
@@ -131,17 +168,26 @@ public sealed class LichDebugLogTailer : IDisposable
         DateTime notBeforeUtc,
         Action<string> onLine,
         Action<string>? onFileBound,
+        Action<string>? onIdle,
         CancellationToken ct)
     {
         string? currentPath = null;
         FileStream? stream = null;
         StreamReader? reader = null;
         var pending = new StringBuilder();
+        var polls = 0;
+        var warned = false;
 
         try
         {
             while (!ct.IsCancellationRequested)
             {
+                if (!warned && currentPath is null && ++polls > IdleWarningPolls)
+                {
+                    warned = true;
+                    SafeInvoke(onIdle, tempDir);
+                }
+
                 try
                 {
                     var latest = TryFindLatestDebugLog(tempDir, notBeforeUtc);
@@ -229,42 +275,4 @@ public sealed class LichDebugLogTailer : IDisposable
         try { action(arg); }
         catch { /* best-effort */ }
     }
-
-    /// <summary>Parse <c>--temp=</c>, <c>--temp-dir=</c>, or <c>--temp PATH</c> from a
-    /// lichargs string. Tokenized through <see cref="LichArgs.Tokenize"/> — the same
-    /// splitter <see cref="LichLauncher"/> uses to build argv — so a quoted path with
-    /// spaces resolves to the directory Lich was actually handed.</summary>
-    internal static bool TryParseTempFromArgs(string? lichArgs, out string path)
-    {
-        path = string.Empty;
-        if (string.IsNullOrWhiteSpace(lichArgs)) return false;
-
-        var tokens = LichArgs.Tokenize(lichArgs);
-        for (var i = 0; i < tokens.Count; i++)
-        {
-            var t = tokens[i];
-            if (t.StartsWith("--temp=", StringComparison.OrdinalIgnoreCase))
-            {
-                path = TrimTrailingSeparators(t["--temp=".Length..]);
-                return path.Length > 0;
-            }
-            if (t.StartsWith("--temp-dir=", StringComparison.OrdinalIgnoreCase))
-            {
-                path = TrimTrailingSeparators(t["--temp-dir=".Length..]);
-                return path.Length > 0;
-            }
-            if (t.Equals("--temp", StringComparison.OrdinalIgnoreCase) ||
-                t.Equals("--temp-dir", StringComparison.OrdinalIgnoreCase))
-            {
-                if (i + 1 >= tokens.Count) return false;
-                path = TrimTrailingSeparators(tokens[i + 1]);
-                return path.Length > 0;
-            }
-        }
-
-        return false;
-    }
-
-    private static string TrimTrailingSeparators(string p) =>
-        p.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 }

@@ -48,12 +48,19 @@ You can mix them: a Lich script can be doing one thing while a Genie `.cmd` scri
   Arguments split on whitespace, so **quote any value containing a space** — single or double quotes both work, and the quotes are stripped before Lich sees the argument:
 
   ```text
-  #config lichargs {--temp "/Users/me/Library/Application Support/lich/temp" --genie}
+  #config lichargs {--temp="/Users/me/Library/Application Support/lich/temp" --genie}
   ```
 
   Backslashes are literal (so Windows paths like `--temp=C:\lich\temp` work as-is); there is no escape character. A quote you never close aborts the connect with `[lich] unterminated " quote in the Lich arguments…` rather than starting Lich with a mangled argument list.
+
+  **Lich's path flags require the `=` form.** `lich.rbw` matches `--temp=PATH`, `--home=PATH`, `--scripts=PATH`, `--data=PATH` and friends; it does *not* read a space-separated value, and it silently ignores anything it doesn't match. Note that `lich --help` currently advertises `--temp-dir=`, `--script-dir=` and `--data-dir=`, none of which are implemented — use `--temp=`, `--scripts=` and `--data=` instead. Genie refuses to launch on a form Lich would discard:
+
+  ```text
+  [lich] Lich ignores '--temp-dir=/tmp/lich' — use --temp=PATH instead (the '=' is
+  required, and Lich's --help lists some path flags it doesn't implement).
+  ```
 - **Auto-launched Lich lifecycle.** When Genie starts Lich (outcome `Launched`), it owns that process and stops it on manual disconnect, final session end (no auto-reconnect), or character/port change. If Lich was already running and Genie only attached, Genie never kills it. Transient drops that arm auto-reconnect leave the owned Lich up so Genie can reattach.
-- **`#config lichdebug` + owned Lich.** With auto-launch ownership and `lichdebug` on, Genie tails that session's Lich `temp/debug-*.log` into the game window as `[lich-debug]` lines (ignores older leftover debug files from prior runs). Independent of `#config conndebug` (Genie-side connection trace) — enable both for a full Lich-proxy connection diagnosis.
+- **`#config lichdebug` + owned Lich.** With auto-launch ownership and `lichdebug` on, Genie tails that session's Lich `temp/debug-*.log` into the game window as `[lich-debug]` lines (ignores older leftover debug files from prior runs). Genie resolves the directory the same way Lich does — `--temp=PATH`, else `{--home=PATH}/temp`, else the `temp` folder beside `lich.rbw` — and reports `[lich-debug] no debug-*.log in …` if nothing appears there within 15s, rather than watching an empty path in silence. Independent of `#config conndebug` (Genie-side connection trace) — enable both for a full Lich-proxy connection diagnosis.
 - **Policy still applies.** Running behind Lich doesn't change DragonRealms' [Scripting Policy](https://elanthipedia.play.net/Policy:Scripting_policy). The responsiveness expectation in [Policy Compliance](Policy-Compliance) applies to whatever automation you run, in either tool.
 
 ## Related

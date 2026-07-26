@@ -3652,7 +3652,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             onLine: line => Avalonia.Threading.Dispatcher.UIThread.Post(
                 () => GameText.AddSystemLine($"[lich-debug] {line}")),
             onFileBound: path => Avalonia.Threading.Dispatcher.UIThread.Post(
-                () => GameText.AddSystemLine($"[lich-debug] tailing {path}")));
+                () => GameText.AddSystemLine($"[lich-debug] tailing {path}")),
+            onIdle: dir => Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => GameText.AddSystemLine(
+                    $"[lich-debug] no debug-*.log in {dir} — still watching. If you set a temp " +
+                    "directory in #config lichargs, Lich only honours the --temp=PATH form.")));
     }
 
     private void StopOwnedLichDebugTail()
