@@ -521,12 +521,12 @@ public sealed class DrXmlParser : IDisposable
         // inventory items, etc.). Stripping it (the old behavior) made
         // `info`/`exp` output flush-left and broke column alignment.
         //
-        // IMPORTANT: link span offsets were computed against _textLineBuffer
-        // BEFORE this transform, so HtmlDecode/StripBasicXml must not be
-        // collapsing characters within the link spans (the parser strips
-        // tags but the link inner text is already plain by the time we get
-        // here). HTML entities inside link text are rare in DR; if they
-        // appear we accept minor span drift rather than complicate the math.
+        // NOTE: bold / preset / link span offsets were recorded against the RAW
+        // _textLineBuffer. This transform collapses HTML entities (&lt; → <,
+        // 4 chars → 1) and strips inline tags, so any entity or tag BEFORE a
+        // span shifts every later offset. The spans are rebased into
+        // decoded-text space just below (public #199) — combat lines are the
+        // reliable trigger, since DR prefixes them with a literal `&lt;`.
         var stripped = System.Net.WebUtility.HtmlDecode(StripBasicXml(rawLine)).TrimEnd();
 
         // Snapshot and clear link + bold state regardless of whether we
@@ -560,6 +560,31 @@ public sealed class DrXmlParser : IDisposable
                 _events.OnNext(new TextEvent(_activeStream, string.Empty));
             }
             return;
+        }
+
+        // Rebase every span offset from raw-buffer space into decoded-text
+        // space (public #199). The offsets were taken against _textLineBuffer,
+        // whose entities/tags `stripped` has since collapsed — so replay the
+        // identical transform over the raw prefix to find where each offset
+        // lands in `stripped`. Runs before any consumer of the spans below
+        // (room-seed capture, the emitted TextEvent). The synthesized news
+        // link added later is already in decoded space and is not rebased.
+        if (boldSpans is not null || presetSpans is not null || links is not null)
+        {
+            int Rebase(int rawOffset)
+            {
+                if (rawOffset <= 0) return 0;
+                if (rawOffset >= rawLine.Length) return stripped.Length;
+                var dec = System.Net.WebUtility.HtmlDecode(StripBasicXml(rawLine[..rawOffset])).Length;
+                return dec < stripped.Length ? dec : stripped.Length;
+            }
+
+            boldSpans = RebaseSpans(boldSpans, b => b.Start, b => b.Length,
+                (_, s, l) => new BoldSpan(s, l), Rebase);
+            presetSpans = RebaseSpans(presetSpans, p => p.Start, p => p.Length,
+                (p, s, l) => new PresetSpan(s, l, p.PresetId), Rebase);
+            links = RebaseSpans(links, x => x.Start, x => x.Length,
+                (x, s, l) => new LinkSpan(s, l, x.Command, x.IsUrl), Rebase);
         }
 
         // Bare-text prompt line (">", "H>", "HR>"). Trim leading whitespace
@@ -648,6 +673,32 @@ public sealed class DrXmlParser : IDisposable
 
         _events.OnNext(new TextEvent(_activeStream, stripped, links, boldSpans, presetSpans, Mono: _inMono));
         _emittedTextLine = true;   // a real blank line may now follow (#176)
+    }
+
+    // Map a span list from raw-buffer offsets into decoded-text offsets using
+    // <paramref name="rebase"/> (public #199). A span that collapses to zero
+    // length after rebasing (e.g. it covered only entity/tag characters) is
+    // dropped; a null/empty result returns null so the TextEvent carries no
+    // empty list. <paramref name="rebuild"/> reconstructs each record from its
+    // new (start, length) so per-type fields (PresetId, link Command) survive.
+    private static IReadOnlyList<T>? RebaseSpans<T>(
+        IReadOnlyList<T>? spans,
+        Func<T, int> getStart,
+        Func<T, int> getLength,
+        Func<T, int, int, T> rebuild,
+        Func<int, int> rebase)
+    {
+        if (spans is null || spans.Count == 0) return null;
+
+        List<T>? result = null;
+        foreach (var span in spans)
+        {
+            var start = rebase(getStart(span));
+            var end = rebase(getStart(span) + getLength(span));
+            if (end > start)
+                (result ??= new List<T>()).Add(rebuild(span, start, end - start));
+        }
+        return result;
     }
 
     // One armed `look` response → synthetic room ComponentEvents (issue #126).
