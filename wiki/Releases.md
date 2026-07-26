@@ -4,7 +4,20 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the organization that maintains Genie 5; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-alpha.8.17 — Community Fixes
+## Latest: v5.0.0-alpha.10 — Signed, Sealed, Delivered
+
+**The first code-signed release** — plus a batch of community fixes.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.10** as a delta.
+
+- **🔏 Signed Windows builds** — the Windows binary is code-signed with an **EV certificate** issued by GlobalSign to **Shadow Realms LLC**. `Genie5.exe` now verifies as Shadow Realms LLC under Properties → Digital Signatures; the "unknown publisher" era is over (SmartScreen reputation still accrues per file on brand-new builds). macOS/Linux remain unsigned for now. The version jumps to **alpha.10** to mark the milestone.
+- **Lich improvements** — dynamic `lichargs` + owned auto-launch lifecycle (#182), nil-safe `GENIE5-IDENT` probe (#185), FE-port probe binding + PID preserved on reconnect (#186). Thanks @simtel12!
+- **Script Manager opens cleanly before the first connect/command** (#193) and a normal disconnect no longer fires `Disconnected` twice (#195). Thanks @simtel12!
+- **Folder/editor launches handle paths with spaces** (#192); **Layout → Windows keeps Apply/Reset reachable** (#184); new wiki exploration of **iPhone options** (#189).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.10)
+
+## v5.0.0-alpha.8.17 — Community Fixes
 
 A community bug-fix round — display polish and a Genie 4 command.
 
