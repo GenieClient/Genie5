@@ -172,7 +172,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports, feature requests, and PRs a
 
 ## Code signing policy
 
-Windows release binaries are code-signed through [SignPath.io](https://signpath.io/), using an Extended Validation (EV) code signing certificate issued by GlobalSign to **Shadow Realms LLC**, the project's sponsoring legal entity. The private key is generated and held in SignPath's hardware security module and never leaves it.
+Windows release binaries are code-signed through [SignPath.io](https://signpath.io/), using an Extended Validation (EV) code signing certificate issued by GlobalSign to **Shadow Realms LLC**, the project's support partner (certificates can only be issued to a registered legal entity, which the community project itself is not). The private key is generated and held in SignPath's hardware security module and never leaves it.
 
 Each release is built from this repository's source by GitHub Actions and submitted to SignPath automatically; the maintainer reviews and manually approves every signing request before the signature is applied. Releases published before EV signing went live are unsigned, as are macOS and Linux builds for now — those show a first-launch "unknown publisher" / Gatekeeper warning ([Installation guide](https://github.com/GenieClient/Genie5/wiki/Installation) has the per-platform steps). SmartScreen reputation accrues per file over time, so early signed builds may still show a reduced warning while download counts build up.
 

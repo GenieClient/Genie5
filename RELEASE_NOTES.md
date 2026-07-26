@@ -6,7 +6,7 @@
 
 Starting with this release, the Windows binary is **code-signed with an
 Extended Validation (EV) certificate** issued by GlobalSign to
-**Shadow Realms LLC**, the organization behind Genie 5. Every release is
+**Shadow Realms LLC**, the project's support partner. Every release is
 built from this repository's source by GitHub Actions, submitted to
 [SignPath.io](https://signpath.io/) automatically, and manually approved
 by the maintainer before the HSM-held key applies the signature (with an

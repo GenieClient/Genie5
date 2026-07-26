@@ -9,13 +9,14 @@ For source-code contributions, see the project's git history
 
 ---
 
-## Maintainer & publisher
+## Support partner
 
-Genie 5 is maintained and published by **Shadow Realms LLC**, together with
-the Genie community and open-source contributors. Shadow Realms LLC is the
-organization that publishes the project's official releases; Windows release
-binaries are EV code-signed under its name (GlobalSign Extended Validation
-certificate via [SignPath.io](https://signpath.io/)).
+Genie 5 is maintained by the Genie community and open-source contributors.
+**Shadow Realms LLC** is the project's support partner: it sponsors the
+project's code-signing infrastructure, and Windows release binaries are EV
+code-signed under its name (GlobalSign Extended Validation certificate via
+[SignPath.io](https://signpath.io/)) — certificates can only be issued to a
+registered legal entity, which the community project itself is not.
 
 ---
 
