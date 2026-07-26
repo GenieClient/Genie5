@@ -1847,7 +1847,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleAtmosphericsCommand = MakeToggleCommand("atmospherics", v => AtmosphericsVisible = v);
         ToggleLogCommand      = MakeToggleCommand("log",       v => LogVisible      = v);
         ToggleItemLogCommand  = MakeToggleCommand("itemlog",   v => ItemLogVisible  = v);
-        ToggleScriptsCommand  = MakeToggleCommand("scripts",   v => ScriptsVisible  = v);
+        // The panel reads live off Core (script library scan, running-scripts
+        // list, folder open) but Core itself is built lazily on first
+        // connect/command (EnsureCoreBuilt). Opening the panel before either
+        // of those has happened must not leave it stuck showing an empty
+        // library — build Core first via beforeShow, the same on-demand
+        // pattern Genie4ImportCommand uses. See also EnsureScriptsPanelReady.
+        ToggleScriptsCommand  = MakeToggleCommand("scripts",   v => ScriptsVisible  = v, beforeShow: EnsureScriptsPanelReady);
         ToggleSceneCommand    = MakeToggleCommand("scene",     v => SceneVisible    = v);
         ToggleMobsCommand     = MakeToggleCommand("mobs",      v => MobsVisible     = v);
         TogglePlayersCommand  = MakeToggleCommand("players",   v => PlayersVisible  = v);
@@ -3288,17 +3294,31 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// menu's check mark and the dock's true state aligned even if the user
     /// closed a tool by some other means (e.g. the X on its tab).
     /// </summary>
-    private ReactiveCommand<Unit, Unit> MakeToggleCommand(string toolId, Action<bool> updateBool)
+    private ReactiveCommand<Unit, Unit> MakeToggleCommand(string toolId, Action<bool> updateBool, Action? beforeShow = null)
         => ReactiveCommand.Create(() =>
         {
             if (DockFactory is not GenieDockFactory factory) return;
             var newVisible = !factory.IsToolVisible(toolId);
+            // Only run beforeShow on the transition TO visible — a hide should
+            // never have a side effect meant for "the panel is about to be seen".
+            if (newVisible) beforeShow?.Invoke();
             factory.SetToolVisibility(toolId, newVisible);
             // The Opened/Closed events also push this; explicitly setting it
             // here covers cases where the event already fired with the same
             // value (no PropertyChanged would otherwise refresh the binding).
             updateBool(newVisible);
         });
+
+    /// <summary>Build Core on demand (see <see cref="EnsureCoreBuilt"/>) before
+    /// the Script Manager panel is shown. The panel is fully Core-driven —
+    /// script library scan, running-scripts list, folder open — but Core is
+    /// otherwise built lazily on first connect/command, so showing the panel
+    /// without this would leave it stuck with an empty library and a dead
+    /// folder-open button. Called from both places the panel can become
+    /// visible: <see cref="ToggleScriptsCommand"/> and the dock-driven
+    /// "scripts" case in <see cref="SetVisibilityBool"/> (tab dragged back
+    /// into view, layout restore, etc.).</summary>
+    private void EnsureScriptsPanelReady() => EnsureCoreBuilt(null, eagerLoadOfflineRules: true);
 
     /// <summary>
     /// Sync the matching <c>XxxVisible</c> bool to <paramref name="visible"/>
@@ -3333,7 +3353,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "atmospherics": ForceSet(visible, v => AtmosphericsVisible = v, () => AtmosphericsVisible); break;
             case "log":       ForceSet(visible, v => LogVisible      = v, () => LogVisible);      break;
             case "itemlog":   ForceSet(visible, v => ItemLogVisible  = v, () => ItemLogVisible);  break;
-            case "scripts":   ForceSet(visible, v => ScriptsVisible  = v, () => ScriptsVisible);  break;
+            case "scripts":
+                // Dock-driven show (drag the tab back into view, restore a
+                // layout, etc.) bypasses ToggleScriptsCommand — this Core
+                // side effect on a checkmark-sync path is intentional; see
+                // EnsureScriptsPanelReady.
+                if (visible) EnsureScriptsPanelReady();
+                ForceSet(visible, v => ScriptsVisible = v, () => ScriptsVisible);
+                break;
             case "scene":     ForceSet(visible, v => SceneVisible    = v, () => SceneVisible);    break;
             case "mobs":      ForceSet(visible, v => MobsVisible     = v, () => MobsVisible);     break;
             case "players":   ForceSet(visible, v => PlayersVisible  = v, () => PlayersVisible);  break;
