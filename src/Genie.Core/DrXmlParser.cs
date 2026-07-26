@@ -902,6 +902,9 @@ public sealed class DrXmlParser : IDisposable
         // are handled explicitly; non-injuries dialog content is still
         // discarded there.
         "opendialog", "detach", "skin", "radio",
+        // <switchQuickBar id='quick-simu'/> — Wrayth/StormFront quick-bar
+        // selection, pure client UI chrome with no game data (public #188).
+        "switchquickbar",
         // ── Text styling ────────────────────────────────────────────────────
         // "preset" is NOT here — its </preset> must reach HandleEndElement to
         // flush the room description before exits appear on the next line.
