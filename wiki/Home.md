@@ -73,5 +73,6 @@ See **[Connecting & Profiles](Connecting)** for the walkthrough.
 - **Releases** — [download builds](https://github.com/GenieClient/Genie5/releases) as they ship.
 - **Contributing** — [CONTRIBUTING.md](https://github.com/GenieClient/Genie5/blob/main/CONTRIBUTING.md). PRs welcome.
 - **Developer docs** — the [`docs/` folder](https://github.com/GenieClient/Genie5/tree/main/docs) covers the parser, scripting engine, and mapper internals.
+- **Maintainer** — Genie 5 is maintained and published by **Shadow Realms LLC**, together with the Genie community and open-source contributors. See [CREDITS.md](https://github.com/GenieClient/Genie5/blob/main/CREDITS.md).
 
 > Genie 5 is third-party software for DragonRealms. DR's [Scripting Policy](https://elanthipedia.play.net/Policy:Scripting_policy) asks players to stay responsive to the game — it's the player's call, not the client's. See **[Policy Compliance](Policy-Compliance)** for what that means in practice.

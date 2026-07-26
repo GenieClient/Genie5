@@ -2,7 +2,7 @@
 
 Where to get Genie 5 and what changed in each build. Downloads live on the [Releases page](https://github.com/GenieClient/Genie5/releases); the [latest release](https://github.com/GenieClient/Genie5/releases/latest) is always the one to grab. For how to install each download, see [Installation](Installation); for staying current after that, [Keeping Up to Date](Updates).
 
-> Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
+> Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the organization that maintains Genie 5; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
 ## Latest: v5.0.0-alpha.8.17 — Community Fixes
 

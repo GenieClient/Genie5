@@ -9,6 +9,16 @@ For source-code contributions, see the project's git history
 
 ---
 
+## Maintainer & publisher
+
+Genie 5 is maintained and published by **Shadow Realms LLC**, together with
+the Genie community and open-source contributors. Shadow Realms LLC is the
+organization that publishes the project's official releases; Windows release
+binaries are EV code-signed under its name (GlobalSign Extended Validation
+certificate via [SignPath.io](https://signpath.io/)).
+
+---
+
 ## Art & icon set
 
 **App icon, status indicators, compass-direction glyphs** — [@dylb0t](https://github.com/dylb0t).
