@@ -29,6 +29,13 @@ public sealed class ScriptEngine
     private readonly Action<string>?      _injectGameLine;
     private readonly string               _scriptsDir;
 
+    // Re-entrancy guard for extension Echo → trigger/action feed (G4 parity):
+    // while an extension's own game-window output is being fed back through the
+    // pipeline, OnGameLine must NOT re-dispatch it to extensions (they'd re-parse
+    // each other's rendered output and could loop), and a nested extension Echo
+    // must display without re-feeding.
+    private bool _inExtensionEcho;
+
     /// <summary>Threaded runtime for <c>.js</c> scripts. The .cmd tick loop is
     /// untouched; JS launches are delegated here from <see cref="TryStart"/>, and
     /// game lines/prompts/stop/pause are forwarded so both languages behave
@@ -222,7 +229,7 @@ public sealed class ScriptEngine
         private readonly ScriptEngine _engine;
         public EngineExtensionHost(ScriptEngine engine) { _engine = engine; }
         public IDictionary<string, string> Globals  => _engine.Globals;
-        public void Echo(string text)               => _engine._echo(text);
+        public void Echo(string text)               => _engine.EchoFromExtension(text);
         public void SendCommand(string command)     => _engine._sendCommand(command);
         public void SetWindow(string window, string content)
             => _engine.SetWindow?.Invoke(window, content);
@@ -787,14 +794,34 @@ public sealed class ScriptEngine
         Tick();
     }
 
+    /// <summary>An extension wrote a line to the game window (<see cref="IExtensionHost.Echo"/>).
+    /// Display it, then — Genie 4 parity — feed it back through the parse pipeline so
+    /// script <c>action</c>/<c>match</c>/<c>waitfor</c> and user <c>#trigger</c>s can match
+    /// against it (in G4, plugin/script window text was trigger-matchable; a builtin like
+    /// CircleCalc's <c>/sort</c> emits results a script's <c>action … when</c> is meant to
+    /// capture). Guarded so an extension can't re-consume its own echo (OnGameLine skips
+    /// extension dispatch while the flag is set) and a nested echo displays without looping.</summary>
+    private void EchoFromExtension(string text)
+    {
+        _echo(text);                                     // display — unchanged behaviour
+        if (_inExtensionEcho || _injectGameLine is null) return;
+        _inExtensionEcho = true;
+        try { _injectGameLine(text); }
+        finally { _inExtensionEcho = false; }
+    }
+
     public void OnGameLine(string line)
     {
         if (string.IsNullOrEmpty(line)) return;
 
         // Always dispatch to extensions — trackers must populate their
         // globals even when no scripts are running, so the next script that
-        // starts sees up-to-date values.
-        Extensions.DispatchGameLine(line);
+        // starts sees up-to-date values. Skip when this line is an extension's
+        // own echo being fed back for trigger/action matching (G4 parity): re-
+        // dispatching would let extensions re-parse each other's rendered output
+        // and could loop.
+        if (!_inExtensionEcho)
+            Extensions.DispatchGameLine(line);
 
         // Feed JS waiters (genie.waitFor / waitForRe) on their own threads. Done
         // before the .cmd early-return so JS scripts get lines even when no .cmd
