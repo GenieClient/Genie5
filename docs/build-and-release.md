@@ -102,7 +102,7 @@ Ad-hoc signing is not notarisation. Users still need the right-click → **Open*
 
 ### Windows — SmartScreen
 
-The published `.exe` is unsigned, so SmartScreen shows a "Windows protected your PC" prompt on first run (**More info → Run anyway**). An Authenticode certificate removes this — which is what the SignPath Foundation pipeline provides: the tag-triggered `release.yml` workflow will sign Windows builds from an upcoming release onward. (An MSI installer via [WiX](https://wixtoolset.org/) remains a possible later addition if a richer installer is wanted.)
+Release `Genie5.exe` binaries are EV code-signed (GlobalSign certificate issued to Shadow Realms LLC, the project's support partner) via the tag-triggered `release.yml` workflow: the sign job uploads the unsigned binary to SignPath.io's REST API and the maintainer approves each signing request before the HSM-held key signs it. A **locally built** exe is unsigned and shows the SmartScreen "Windows protected your PC" prompt (**More info → Run anyway**) — expected for dev builds. The Velopack `Setup.exe` installer does not yet go through signing; reworking the pipeline so installers inherit the signature is a planned follow-up. (An MSI installer via [WiX](https://wixtoolset.org/) remains a possible later addition if a richer installer is wanted.)
 
 ### Linux
 

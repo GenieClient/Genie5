@@ -31,7 +31,7 @@ Auto-update requires that you installed via an updater-aware package:
 
 The plain **Portable `.zip`** builds don't register for updates — re-download from [Releases](https://github.com/GenieClient/Genie5/releases/latest) to upgrade those. Once you're on an updater-aware install, new releases arrive as small **delta** downloads (only the bytes that changed). See [Installation](Installation) for which download to pick.
 
-> **Signing:** alpha builds are currently unsigned, so first launch shows a SmartScreen / Gatekeeper warning ([details](Installation#platform-first-launch-notes)). A SignPath-backed signing pipeline is in progress (see the [README's code-signing section](https://github.com/GenieClient/Genie5/blob/main/README.md#code-signing-policy)); signed Windows builds are expected from an upcoming release.
+> **Signing:** **Windows** release binaries are EV code-signed (since v5.0.0-alpha.10) under **Shadow Realms LLC**, the project's support partner — see the [README's code-signing section](https://github.com/GenieClient/Genie5/blob/main/README.md#code-signing-policy). **macOS and Linux** builds are unsigned for now, so those platforms show a first-launch warning ([details](Installation#platform-first-launch-notes)).
 
 > **Release channel (while we're in alpha):** the Core updater has a **stable** / **beta** channel selector in the Updates dialog. Every current build ships as a GitHub **pre-release**, so during the alpha/beta period Genie defaults to the **beta** channel — that's what lets the in-app updater see new alpha builds. If you ever switch to **stable** you'll see "up to date" until the first non-prerelease (5.0.0) ships. Leave it on **beta** to ride the test releases.
 

@@ -11,7 +11,7 @@ Pre-built builds ship for all three platforms — see the [Installation](Install
 Alpha builds aren't notarized. Right-click the app → **Open** → **Open** (macOS remembers it). If it reports "damaged," clear the download quarantine: `xattr -d com.apple.quarantine /Applications/Genie5.app` (or `xattr -cr <path>`). Running from source with `dotnet run` avoids this entirely.
 
 **Windows SmartScreen blocks the exe.**
-Unsigned alpha builds trigger the blue panel: **More info → Run anyway**. Signed builds (expected in an upcoming release) won't. See [Installation](Installation).
+Builds from before v5.0.0-alpha.10 are unsigned and always trigger the blue panel: **More info → Run anyway**. Since alpha.10, `Genie5.exe` is EV-signed by Shadow Realms LLC (the project's support partner); a brand-new signed build may still show the panel briefly while SmartScreen reputation accrues per file. See [Installation](Installation).
 
 **Linux: AppImage won't run / "FUSE not installed."**
 Make it executable first (`chmod +x Genie5.AppImage`), then `./Genie5.AppImage`. For the FUSE error, install it — Debian/Ubuntu: `sudo apt install libfuse2` (Fedora usually works out of the box). If text renders oddly on a minimal distro, install `fontconfig`. For a desktop-menu entry, use [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher).

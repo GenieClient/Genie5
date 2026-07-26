@@ -63,10 +63,11 @@ These work today, in the v5.0.0-alpha.5 build.
   Contents + Releases); `MapsUpdater` (pulls from the community Maps
   repo) and `PluginUpdater` (pulls plugin DLLs from configured release
   feeds)
-- **Code-signing pipeline (wired)** — the SignPath Foundation
-  tag-triggered release workflow is in place, but signing isn't live
-  yet: Foundation approval and the first signed Windows build are still
-  pending (tracked in #33)
+- **Code-signing pipeline (live)** — every tagged release submits the
+  Windows binary to SignPath.io and, after per-release maintainer
+  approval, ships it EV-signed under Shadow Realms LLC, the project's
+  support partner (first signed release: v5.0.0-alpha.10; was #33).
+  Installer (`Setup.exe`) signing is a planned follow-up
 - **Multi-platform release artifacts** — every tagged release attaches
   Windows / macOS (Apple Silicon + Intel) / Linux builds plus the
   Velopack update feeds, built by `release.yml`
