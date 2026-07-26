@@ -14,10 +14,12 @@ namespace Genie.App.Docking;
 
 /// <summary>
 /// Dock floating-panel window (used when a Tool/Document is floated out to its own
-/// OS window) with <b>double-click-to-maximize</b> on its title bar — the gesture
-/// Dock's stock <see cref="HostWindow"/> chrome doesn't wire. A floated panel (e.g.
-/// the Mapper) now maximizes / restores on a title-bar double-click, matching normal
-/// window behavior, in addition to the chrome's maximize button.
+/// OS window). Adds the window affordances Dock's stock <see cref="HostWindow"/>
+/// chrome doesn't wire: <b>double-click-to-maximize/restore</b> on the title bar
+/// (from any state, incl. restoring a minimized float — #196), an injected
+/// <b>minimize button</b> (#170), and a title-bar <b>right-click menu</b> with
+/// Restore / Maximize / Minimize / Close (#196). Floats have no taskbar button
+/// (#170), so these plus the Window menu are how one is controlled.
 /// </summary>
 public sealed class GenieHostWindow : HostWindow
 {
@@ -199,7 +201,10 @@ public sealed class GenieHostWindow : HostWindow
         // double-tap there precisely so a double-tap in the content area is ignored.
         _titleBar = e.NameScope.Find<Control>("PART_TitleBar");
         if (_titleBar is not null)
+        {
             _titleBar.DoubleTapped += OnTitleBarDoubleTapped;
+            _titleBar.ContextMenu = BuildTitleBarMenu(this);   // #196: right-click state menu
+        }
     }
 
     private void OnTitleBarDoubleTapped(object? sender, TappedEventArgs e) => ToggleMaximize(e);
@@ -213,9 +218,37 @@ public sealed class GenieHostWindow : HostWindow
 
     private void ToggleMaximize(TappedEventArgs e)
     {
-        WindowState = WindowState == WindowState.Maximized
-            ? WindowState.Normal
-            : WindowState.Maximized;
+        // Normal → Maximized; Maximized OR Minimized → Normal (#196). The
+        // Minimized case is the fix: double-clicking a minimized float's
+        // title-bar stub to bring it back used to fall into the else branch
+        // and MAXIMIZE it (restore-goes-fullscreen) instead of returning to
+        // its prior floated bounds.
+        WindowState = WindowState == WindowState.Normal
+            ? WindowState.Maximized
+            : WindowState.Normal;
         e.Handled = true;
+    }
+
+    /// <summary>Right-click menu on the float's title bar with explicit
+    /// window-state control (#196). Floats have no taskbar button, so this is
+    /// the direct way to Restore / Maximize / Minimize / Close one without
+    /// hunting for the Window menu. Attached to PART_TitleBar so a right-click
+    /// in the panel content (which has its own menus) is unaffected.</summary>
+    private static ContextMenu BuildTitleBarMenu(GenieHostWindow win)
+    {
+        MenuItem Item(string header, Action act)
+        {
+            var mi = new MenuItem { Header = header };
+            mi.Click += (_, _) => act();
+            return mi;
+        }
+
+        var menu = new ContextMenu();
+        menu.Items.Add(Item("Restore",  () => win.WindowState = WindowState.Normal));
+        menu.Items.Add(Item("Maximize", () => win.WindowState = WindowState.Maximized));
+        menu.Items.Add(Item("Minimize", () => win.WindowState = WindowState.Minimized));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(Item("Close",    win.Close));
+        return menu;
     }
 }
