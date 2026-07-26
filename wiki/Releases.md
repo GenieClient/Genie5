@@ -2,9 +2,23 @@
 
 Where to get Genie 5 and what changed in each build. Downloads live on the [Releases page](https://github.com/GenieClient/Genie5/releases); the [latest release](https://github.com/GenieClient/Genie5/releases/latest) is always the one to grab. For how to install each download, see [Installation](Installation); for staying current after that, [Keeping Up to Date](Updates).
 
-> Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
+> Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-alpha.10 — Signed, Sealed, Delivered
+## Latest: v5.0.0-beta.1 — Coming of Age
+
+**Genie 5 graduates to beta** — plus a round of display-polish fixes.
+
+> **📡 Still on the beta channel — now literally.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel keeps delivering them; **Help → Check for Updates** offers **beta.1** as a delta from alpha.10. A stable `5.0.0` channel follows once the beta soak and the remaining roadmap items (cross-platform auto-update, server-driven dialog windows) land.
+
+- **🎓 Alpha → Beta** — the version line graduates from `alpha` to **beta**. Nothing about install or updates changes; it's a maturity milestone on top of a proven core (SGE/Lich login, the `.cmd` script engine, mapper, plugins, themes, docking, and EV-signed Windows builds).
+- **Monospace game text** — `<output class="mono">` blocks (stat tables, ASCII maps, some menus) render in the monospace font while normal prose keeps your game font; highlights still paint. (#178)
+- **Combat text keeps its color** — side-stream lines (combat, thoughts, whispers) echoed to the main window no longer lose their bold/link/preset colors; combat hits paint yellow again. (#187)
+- **Floating windows restore correctly** — a minimized float returns to its floated bounds instead of full screen, plus a **right-click title-bar menu** (Restore/Maximize/Minimize/Close). (#196)
+- **Script Manager keeps its name** (#197) and the server's `<switchQuickBar>` element is discarded cleanly instead of leaking as stray output (#188).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.1)
+
+## v5.0.0-alpha.10 — Signed, Sealed, Delivered
 
 **The first code-signed release** — plus a batch of community fixes.
 
