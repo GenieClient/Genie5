@@ -44,6 +44,14 @@ You can mix them: a Lich script can be doing one thing while a Genie `.cmd` scri
   ```
 
   Switch characters by changing the profile Character — Genie stops the Lich it auto-launched before starting the new one. If `{character}` is present but Character is empty, Genie aborts the connect with a clear error.
+
+  Arguments split on whitespace, so **quote any value containing a space** — single or double quotes both work, and the quotes are stripped before Lich sees the argument:
+
+  ```text
+  #config lichargs {--temp "/Users/me/Library/Application Support/lich/temp" --genie}
+  ```
+
+  Backslashes are literal (so Windows paths like `--temp=C:\lich\temp` work as-is); there is no escape character. A quote you never close aborts the connect with `[lich] unterminated " quote in the Lich arguments…` rather than starting Lich with a mangled argument list.
 - **Auto-launched Lich lifecycle.** When Genie starts Lich (outcome `Launched`), it owns that process and stops it on manual disconnect, final session end (no auto-reconnect), or character/port change. If Lich was already running and Genie only attached, Genie never kills it. Transient drops that arm auto-reconnect leave the owned Lich up so Genie can reattach.
 - **`#config lichdebug` + owned Lich.** With auto-launch ownership and `lichdebug` on, Genie tails that session's Lich `temp/debug-*.log` into the game window as `[lich-debug]` lines (ignores older leftover debug files from prior runs). Independent of `#config conndebug` (Genie-side connection trace) — enable both for a full Lich-proxy connection diagnosis.
 - **Policy still applies.** Running behind Lich doesn't change DragonRealms' [Scripting Policy](https://elanthipedia.play.net/Policy:Scripting_policy). The responsiveness expectation in [Policy Compliance](Policy-Compliance) applies to whatever automation you run, in either tool.

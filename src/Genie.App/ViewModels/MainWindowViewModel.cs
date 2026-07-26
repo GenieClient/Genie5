@@ -3621,8 +3621,20 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                         ?? DateTime.UtcNow;
         _ownedLichProcessStartUtc ??= notBefore;
 
-        var tempDir = Genie.Core.Connection.LichDebugLogTailer.ResolveTempDirectory(
-            _core.Config.LichPath, _core.Config.LichArguments);
+        // lichargs can be edited after the owned Lich was launched, so a malformed
+        // value can reach us even though the launcher validated it at start.
+        string? tempDir;
+        try
+        {
+            tempDir = Genie.Core.Connection.LichDebugLogTailer.ResolveTempDirectory(
+                _core.Config.LichPath, _core.Config.LichArguments);
+        }
+        catch (FormatException ex)
+        {
+            GameText.AddSystemLine($"[lich-debug] {ex.Message} Fix #config lichargs.");
+            return;
+        }
+
         if (string.IsNullOrEmpty(tempDir))
         {
             GameText.AddSystemLine("[lich-debug] cannot resolve Lich temp directory (set #config lichpath).");

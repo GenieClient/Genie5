@@ -20,6 +20,11 @@ public sealed class LichDebugLogTailer : IDisposable
     /// <c>--temp-dir=PATH</c> from <paramref name="lichArgs"/>, else
     /// <c>{dirname(lichPath)}/temp</c>.
     /// </summary>
+    /// <exception cref="FormatException">
+    /// <paramref name="lichArgs"/> has an unterminated quote. Propagated rather than
+    /// swallowed into the <c>{dirname(lichPath)}/temp</c> fallback, which would tail
+    /// the wrong directory (or nothing) and read as "Lich just isn't logging".
+    /// </exception>
     public static string? ResolveTempDirectory(string? lichPath, string? lichArgs)
     {
         if (TryParseTempFromArgs(lichArgs, out var fromArgs))
@@ -225,14 +230,17 @@ public sealed class LichDebugLogTailer : IDisposable
         catch { /* best-effort */ }
     }
 
-    /// <summary>Parse <c>--temp=</c>, <c>--temp-dir=</c>, or <c>--temp PATH</c> from a lichargs string.</summary>
+    /// <summary>Parse <c>--temp=</c>, <c>--temp-dir=</c>, or <c>--temp PATH</c> from a
+    /// lichargs string. Tokenized through <see cref="LichArgs.Tokenize"/> — the same
+    /// splitter <see cref="LichLauncher"/> uses to build argv — so a quoted path with
+    /// spaces resolves to the directory Lich was actually handed.</summary>
     internal static bool TryParseTempFromArgs(string? lichArgs, out string path)
     {
         path = string.Empty;
         if (string.IsNullOrWhiteSpace(lichArgs)) return false;
 
-        var tokens = lichArgs.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        for (var i = 0; i < tokens.Length; i++)
+        var tokens = LichArgs.Tokenize(lichArgs);
+        for (var i = 0; i < tokens.Count; i++)
         {
             var t = tokens[i];
             if (t.StartsWith("--temp=", StringComparison.OrdinalIgnoreCase))
@@ -248,7 +256,7 @@ public sealed class LichDebugLogTailer : IDisposable
             if (t.Equals("--temp", StringComparison.OrdinalIgnoreCase) ||
                 t.Equals("--temp-dir", StringComparison.OrdinalIgnoreCase))
             {
-                if (i + 1 >= tokens.Length) return false;
+                if (i + 1 >= tokens.Count) return false;
                 path = TrimTrailingSeparators(tokens[i + 1]);
                 return path.Length > 0;
             }

@@ -38,6 +38,28 @@ public class LichDebugLogTailerTests
     }
 
     [Fact]
+    public void ResolveTempDirectory_handles_a_quoted_temp_path_with_spaces()
+    {
+        var spaced = Path.Combine(Path.GetTempPath(), "Application Support", "lich", "temp");
+
+        Assert.Equal(spaced, LichDebugLogTailer.ResolveTempDirectory(
+            "/unused/lich.rbw", $"--login Char --temp \"{spaced}\""));
+        Assert.Equal(spaced, LichDebugLogTailer.ResolveTempDirectory(
+            "/unused/lich.rbw", $"--temp=\"{spaced}\" --without-frontend"));
+        Assert.Equal(spaced, LichDebugLogTailer.ResolveTempDirectory(
+            "/unused/lich.rbw", $"--temp-dir '{spaced}'"));
+    }
+
+    [Fact]
+    public void ResolveTempDirectory_throws_rather_than_falling_back_on_a_bad_quote()
+    {
+        // Silently falling back to {lichdir}/temp would tail the wrong directory
+        // and read as "Lich just isn't logging".
+        Assert.Throws<FormatException>(() =>
+            LichDebugLogTailer.ResolveTempDirectory("/unused/lich.rbw", "--temp \"/a b/temp"));
+    }
+
+    [Fact]
     public void TryFindLatestDebugLog_ignores_files_written_before_notBefore()
     {
         var tempDir = Directory.CreateTempSubdirectory("lich-debug-old-").FullName;

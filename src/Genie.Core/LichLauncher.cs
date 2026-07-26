@@ -142,6 +142,21 @@ public static class LichLauncher
             return new(LichLaunchOutcome.Failed,
                 $"[lich] Ruby not found at '{rubyPath}'. Fix #config lichruby, or clear it to use Ruby from PATH.");
 
+        // 2b. Tokenize the argument string before anything is started. A malformed
+        //     value (unterminated quote) aborts loudly here rather than launching
+        //     Lich with mangled argv — a Lich that came up with the wrong --temp or
+        //     a split --login value fails later, in ways that don't point back at a
+        //     stray quote in #config lichargs.
+        IReadOnlyList<string> argv;
+        try
+        {
+            argv = SplitArguments(arguments);
+        }
+        catch (FormatException ex)
+        {
+            return new(LichLaunchOutcome.Failed, $"[lich] {ex.Message} Fix #config lichargs.");
+        }
+
         // 3. Launch ruby <lichPath> <arguments> and keep the PID + start time for
         //    ownership / debug-log tailing. Progress is best-effort and must NEVER
         //    abort the launch — callers often push lines into a UI ObservableCollection,
@@ -159,7 +174,7 @@ public static class LichLauncher
                 WorkingDirectory = Path.GetDirectoryName(lichPath) ?? string.Empty,
             };
             psi.ArgumentList.Add(lichPath);
-            foreach (var a in SplitArguments(arguments))
+            foreach (var a in argv)
                 psi.ArgumentList.Add(a);
 
             var launchedAt = DateTime.UtcNow;
@@ -289,15 +304,14 @@ public static class LichLauncher
     /// <c>.exe</c> automatically under CreateProcess).</summary>
     private static string DefaultRubyExecutable => "ruby";
 
-    /// <summary>Split a Lich argument string into individual tokens on whitespace.
-    /// Lich arguments are simple flags (<c>--login X --without-frontend
-    /// --detachable-client=8000</c>), so a whitespace split is sufficient;
-    /// quoting is intentionally not supported (a single config value rarely needs
-    /// it, and it keeps behaviour predictable).</summary>
-    private static IEnumerable<string> SplitArguments(string arguments) =>
-        string.IsNullOrWhiteSpace(arguments)
-            ? Array.Empty<string>()
-            : arguments.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+    /// <summary>Split a Lich argument string into argv entries. Lich arguments are
+    /// mostly simple flags (<c>--login X --without-frontend --detachable-client=8000</c>),
+    /// but quoting is honoured so a path with spaces stays one entry — see
+    /// <see cref="LichArgs.Tokenize"/>, which <see cref="LichDebugLogTailer"/> shares
+    /// so both resolve <c>--temp</c> identically. Throws <see cref="FormatException"/>
+    /// on an unterminated quote; callers abort the launch.</summary>
+    private static IReadOnlyList<string> SplitArguments(string arguments) =>
+        LichArgs.Tokenize(arguments);
 
     /// <summary>
     /// True when something is already bound to <paramref name="host"/>:<paramref name="port"/>.
