@@ -909,6 +909,11 @@ public sealed class DrXmlParser : IDisposable
         // <switchQuickBar id='quick-simu'/> — Wrayth/StormFront quick-bar
         // selection, pure client UI chrome with no game data (public #188).
         "switchquickbar",
+        // <link id='1' value='Game Info' cmd='url:/dr/info/'/> — server-defined
+        // menu/nav link (populates the client's Game/Help menus with URLs).
+        // Self-closing UI chrome, no game-state data; distinct from the in-text
+        // clickable <a>/<d> links, which ARE handled (public #198).
+        "link",
         // ── Text styling ────────────────────────────────────────────────────
         // "preset" is NOT here — its </preset> must reach HandleEndElement to
         // flush the room description before exits appear on the next line.
