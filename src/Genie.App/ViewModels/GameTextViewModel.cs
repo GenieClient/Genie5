@@ -142,7 +142,7 @@ public class GameTextViewModel : ReactiveObject
                 var links     = unchanged ? e.Links       : null;
                 var bolds     = unchanged ? e.BoldSpans   : null;
                 var presets   = unchanged ? e.PresetSpans : null;
-                AddLine(text, StreamColor.Main, links, bolds, presets);
+                AddLine(text, StreamColor.Main, links, bolds, presets, mono: e.Mono);
             });
 
         // ── Game prompt ───────────────────────────────────────────────────
@@ -314,7 +314,8 @@ public class GameTextViewModel : ReactiveObject
                          IReadOnlyList<LinkSpan>? links = null,
                          IReadOnlyList<BoldSpan>? bolds = null,
                          IReadOnlyList<PresetSpan>? presets = null,
-                         bool isPrompt = false)
+                         bool isPrompt = false,
+                         bool mono = false)
     {
         // #90: per-window timestamp. When the "game-text" window has the Layout-
         // tab "prepend timestamp to each line" toggle on, stamp each content line
@@ -331,7 +332,7 @@ public class GameTextViewModel : ReactiveObject
             bolds   = bolds?.Select(s   => s with { Start = s.Start + shift }).ToList();
             presets = presets?.Select(s => s with { Start = s.Start + shift }).ToList();
         }
-        Lines.Add(new TextLine(text, color, links, bolds, presets));
+        Lines.Add(new TextLine(text, color, links, bolds, presets, Mono: mono));
         TrimScrollback();
         // Only a prompt line arms the dedup; every other line clears it so the
         // next prompt is allowed through (Genie 4 LastRowWasPrompt semantics).
@@ -464,16 +465,28 @@ public record TextLine(string Text, StreamColor Color,
     {
         get
         {
-            if (EchoColor is not null || Mono)
+            // Echo lines (#echo / script output) render as one run, optionally
+            // styled with a colour and/or the monospace font (EchoColor implies
+            // an echo line, so this branch owns both #echo cases).
+            if (IsEcho)
             {
+                if (EchoColor is null && !Mono) return [new Run(Text)];
                 var run = new Run(Text);
                 if (Mono) run.FontFamily = MonoFont;
                 if (EchoColor is not null && TryParseColor(EchoColor, out var c))
                     run.Foreground = new SolidColorBrush(c);
                 return [run];
             }
-            return IsEcho ? [new Run(Text)]
-                          : DefaultHighlights.Tokenize(Text, Links, BoldSpans, PresetSpans, Window);
+
+            // Game text: full highlighting. A <output class="mono"> block —
+            // maps, stat tables, appraisals — keeps its highlights but renders
+            // in the monospace font, so a proportional game font doesn't break
+            // the column alignment (public #178).
+            var inlines = DefaultHighlights.Tokenize(Text, Links, BoldSpans, PresetSpans, Window);
+            if (Mono)
+                foreach (var inl in inlines)
+                    inl.FontFamily = MonoFont;
+            return inlines;
         }
     }
 
