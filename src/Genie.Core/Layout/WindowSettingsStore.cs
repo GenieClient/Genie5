@@ -54,6 +54,7 @@ public sealed class WindowSettingsStore
         new(StringComparer.OrdinalIgnoreCase)
         {
             ["backpack"] = "Backpack",   // → "Inventory" (2026-06)
+            ["scripts"]  = "Scripts",    // → "Script Manager" (public #197)
         };
 
     public void Apply(WindowSettingsPersistenceModel m)
