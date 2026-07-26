@@ -232,13 +232,20 @@ public sealed class GameConnection : IAsyncDisposable
 
     public async Task DisconnectAsync()
     {
+        // Only emit Disconnected here if there was no read loop to unwind —
+        // when one exists, its own finally block (below, in ReadLoopAsync)
+        // already emits it after being cancelled, so emitting again here
+        // would double-fire the event for every normal disconnect.
+        bool hadReadLoop = _readLoop is not null;
+
         await _cts.CancelAsync();
         if (_readLoop is not null)
             await _readLoop.ConfigureAwait(false);
         if (_watchdogLoop is not null)
             await _watchdogLoop.ConfigureAwait(false);
         Cleanup();
-        _stateSubject.OnNext(new ConnectionEvent(ConnectionEventKind.Disconnected));
+        if (!hadReadLoop)
+            _stateSubject.OnNext(new ConnectionEvent(ConnectionEventKind.Disconnected));
     }
 
     // ── Connection establishment ─────────────────────────────────────────────
