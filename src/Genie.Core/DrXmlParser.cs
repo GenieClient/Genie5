@@ -52,6 +52,10 @@ public sealed class DrXmlParser : IDisposable
     private string _handExist = "";      // HeldItemEvent fires at the close tag with the body text (#172)
     private bool _inCompass   = false;
     private bool _inPrompt    = false;   // <prompt>…</prompt> body — route to _promptBuffer, fire on close
+    // #178: text between <output class="mono"/> and <output class=""/> is a
+    // column-aligned block (maps, stat tables) the display renders in the
+    // monospace font. Set on the mono bracket, cleared on the empty bracket.
+    private bool _inMono      = false;
     // #176: a genuine blank line (server sent `\n\n` in the TEXT stream) is
     // preserved, but the empty produced by a `\n` right after a tag close
     // (component/prompt/style/etc.) is not — those aren't real output. This is
@@ -642,7 +646,7 @@ public sealed class DrXmlParser : IDisposable
         if (newsLink is not null)
             links = links is null ? new[] { newsLink } : links.Append(newsLink).ToArray();
 
-        _events.OnNext(new TextEvent(_activeStream, stripped, links, boldSpans, presetSpans));
+        _events.OnNext(new TextEvent(_activeStream, stripped, links, boldSpans, presetSpans, Mono: _inMono));
         _emittedTextLine = true;   // a real blank line may now follow (#176)
     }
 
@@ -902,6 +906,9 @@ public sealed class DrXmlParser : IDisposable
         // are handled explicitly; non-injuries dialog content is still
         // discarded there.
         "opendialog", "detach", "skin", "radio",
+        // <switchQuickBar id='quick-simu'/> — Wrayth/StormFront quick-bar
+        // selection, pure client UI chrome with no game data (public #188).
+        "switchquickbar",
         // ── Text styling ────────────────────────────────────────────────────
         // "preset" is NOT here — its </preset> must reach HandleEndElement to
         // flush the room description before exits appear on the next line.
@@ -1429,6 +1436,10 @@ public sealed class DrXmlParser : IDisposable
                     _textLineBuffer.Clear();   // drop any partial suppressed line
                     break;
                 }
+                // #178: track the mono bracket so lines between mono and the
+                // empty-class close render in the monospace font. "mono" opens;
+                // "" (or any other class) closes.
+                _inMono = string.Equals(cls, "mono", StringComparison.OrdinalIgnoreCase);
                 _events.OnNext(new OutputClassEvent(cls));
                 break;
             }

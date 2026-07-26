@@ -1,3 +1,93 @@
+# Genie 5 — v5.0.0-beta.1
+
+**Genie 5 graduates to beta** — plus a round of display-polish fixes.
+
+## 🎓 Alpha → Beta
+
+Genie 5 has been in alpha long enough to prove the shape is right: SGE and
+Lich login, the Genie 4 `.cmd` script engine, the mapper, plugins, themes,
+floating and docked windows, and — since alpha.10 — EV-signed Windows
+builds. This release graduates the version line from `alpha` to **beta**.
+
+Nothing about how you install or update changes. Beta builds still ship as
+GitHub **pre-releases**, and the Core updater's **beta channel** delivers
+them — so **Help → Check for Updates** will offer `beta.1` as a delta from
+alpha.10. The stable `5.0.0` channel arrives once the beta soak and the
+remaining roadmap items (cross-platform auto-update, server-driven dialog
+windows) are done.
+
+## 🐛 Fixes in this release
+
+- **Monospace game text** — `<output class="mono">` blocks (stat tables,
+  ASCII maps, some menus) now render in the monospace font while normal
+  prose keeps your configured game font; highlights still paint. (#178)
+- **Combat text keeps its color** — lines echoed from a side stream
+  (combat, thoughts, whispers…) to the main window no longer lose their
+  bold, link, and preset colors, so combat hits paint yellow again. (#187)
+- **Floating windows restore correctly** — a minimized floating window
+  comes back to its previous floated bounds instead of jumping to full
+  screen, and a new **right-click title-bar menu** (Restore / Maximize /
+  Minimize / Close) gives minimized floats a direct way back. (#196)
+- **Script Manager keeps its name** — the panel no longer flips between
+  "Script Manager" and "Scripts" depending on connection state. (#197)
+- **Cleaner XML handling** — the server's `<switchQuickBar>` UI element is
+  now recognized and discarded instead of leaking as stray output. (#188)
+
+Thanks to everyone who filed these on GitHub.
+
+---
+
+# Genie 5 — v5.0.0-alpha.10
+
+**The first code-signed release** — plus a batch of community fixes.
+
+## 🔏 Signed Windows builds
+
+Starting with this release, the Windows binary is **code-signed with an
+Extended Validation (EV) certificate** issued by GlobalSign to
+**Shadow Realms LLC**, the project's support partner. Every release is
+built from this repository's source by GitHub Actions, submitted to
+[SignPath.io](https://signpath.io/) automatically, and manually approved
+by the maintainer before the HSM-held key applies the signature (with an
+RFC 3161 timestamp, so signatures stay valid past certificate expiry).
+
+What you'll notice: the signed `Genie5.exe` verifies as
+**Shadow Realms LLC** under Properties → Digital Signatures, and the
+"unknown publisher" era is over. SmartScreen reputation accrues per
+file, so a reduced warning may still appear on brand-new builds while
+download counts build up. macOS and Linux builds remain unsigned for
+now. Details in the README's Code signing policy section.
+
+The version jumps from the alpha.8.x series to **alpha.10** to mark the
+milestone.
+
+## 🆕 New
+
+- **Lich: dynamic `lichargs` + owned auto-launch lifecycle** — the
+  auto-launcher rebuilds Lich arguments per connection and properly owns
+  the process it starts. Thanks @simtel12! (#182)
+
+## 🔧 Fixed
+
+- **Script Manager works before the first connect/command** — opening it
+  on a fresh launch no longer requires a live session. Thanks @simtel12!
+  (#193)
+- **No more double `Disconnected` on a normal disconnect.** Thanks
+  @simtel12! (#195)
+- **Lich: `GENIE5-IDENT` probe is nil-safe** when `XMLData.name` is
+  unset. Thanks @simtel12! (#185)
+- **Lich: FE-port probe binding + owned PID preserved on reconnect.**
+  Thanks @simtel12! (#186)
+- **Folder/editor launches handle paths with spaces** via a shared
+  FileBrowser helper. Thanks @simtel12! (#192)
+- **Configuration → Layout → Windows keeps Apply/Reset reachable** on
+  small screens. (#184)
+
+## 📝 Docs
+
+- New wiki exploration: **using an iPhone with Genie 5**. (#189)
+- README **Code signing policy** rewritten for the EV certificate.
+
 # Genie 5 — v5.0.0-alpha.8.17
 
 A community bug-fix round — display polish and a Genie 4 command.

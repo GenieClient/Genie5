@@ -74,7 +74,7 @@ Grab the [latest release](https://github.com/GenieClient/Genie5/releases/latest)
 | **macOS (Intel)** | `03-macOS-Intel-Genie5.dmg` (or `.pkg`) | `03-macOS-Intel-Genie5-Portable.zip` |
 | **Linux (x64)** | `04-Linux-Genie5.AppImage` | — |
 
-The **Setup.exe** / **.pkg** / **AppImage** builds register for in-app updates; the **Portable** `.zip` builds don't. Builds are **unsigned** for now, so you'll see a first-launch warning — the [Installation guide](https://github.com/GenieClient/Genie5/wiki/Installation) has the per-platform "unknown publisher" / Gatekeeper steps.
+The **Setup.exe** / **.pkg** / **AppImage** builds register for in-app updates; the **Portable** `.zip` builds don't. Windows release binaries are EV code-signed (see [Code signing policy](#code-signing-policy)); macOS and Linux builds are unsigned for now, so those platforms show a first-launch warning — the [Installation guide](https://github.com/GenieClient/Genie5/wiki/Installation) has the per-platform "unknown publisher" / Gatekeeper steps.
 
 ### Build from source
 
@@ -172,9 +172,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports, feature requests, and PRs a
 
 ## Code signing policy
 
-Free code signing for Windows release builds is provided by [SignPath.io](https://signpath.io/), with a free code signing certificate from the [SignPath Foundation](https://signpath.org/).
+Windows release binaries are code-signed through [SignPath.io](https://signpath.io/), using an Extended Validation (EV) code signing certificate issued by GlobalSign to **Shadow Realms LLC**, the project's support partner (certificates can only be issued to a registered legal entity, which the community project itself is not). The private key is generated and held in SignPath's hardware security module and never leaves it.
 
-**Current alpha builds are not yet code-signed** — Windows SmartScreen and macOS Gatekeeper will show a first-launch "unknown publisher" warning. Trusted-signed Windows binaries are planned for a future release, pending SignPath Foundation certificate approval. Once active, each release will be built from this repository's source via GitHub Actions and manually approved before signing.
+Each release is built from this repository's source by GitHub Actions and submitted to SignPath automatically; the maintainer reviews and manually approves every signing request before the signature is applied. Releases published before EV signing went live are unsigned, as are macOS and Linux builds for now — those show a first-launch "unknown publisher" / Gatekeeper warning ([Installation guide](https://github.com/GenieClient/Genie5/wiki/Installation) has the per-platform steps). SmartScreen reputation accrues per file over time, so early signed builds may still show a reduced warning while download counts build up.
 
 ### Roles
 
@@ -182,7 +182,7 @@ Free code signing for Windows release builds is provided by [SignPath.io](https:
 - **Reviewers:** [@monil2233](https://github.com/monil2233) (reviews each signing request in the SignPath UI before approval).
 - **Approvers:** [@monil2233](https://github.com/monil2233) (final approval that triggers the signing operation).
 
-For solo-maintainer alpha-stage projects, all three roles consolidated on the maintainer is the standard SignPath Foundation arrangement. As the contributor base grows and a co-maintainer takes ownership, this section will be updated to reflect a separation between Reviewer and Approver per [SignPath's two-person-rule guidance](https://about.signpath.io/documentation/projects).
+For a solo-maintainer alpha-stage project, all three roles consolidate on the maintainer. As the contributor base grows and a co-maintainer takes ownership, this section will be updated to reflect a separation between Reviewer and Approver per [SignPath's two-person-rule guidance](https://about.signpath.io/documentation/projects).
 
 ### Privacy policy
 

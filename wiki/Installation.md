@@ -4,7 +4,7 @@ Genie 5 is in **alpha**, but you no longer have to build it yourself — **pre-b
 
 > **Coming from Genie 4?** Install fresh first, then jump to [Importing from Genie 4](Importing-Genie4-Config) to bring your aliases, triggers, highlights, etc. across.
 
-> ⚠️ **Alpha builds are unsigned.** Windows and macOS will show a first-launch warning (SmartScreen / Gatekeeper). That's the missing code-signing certificate, not a problem with the file — see [Platform first-launch notes](#platform-first-launch-notes). Signed Windows builds are expected from an upcoming release.
+> ⚠️ **Signing status — Windows is signed; macOS & Linux aren't yet.** **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner — a GlobalSign Extended Validation certificate, signed through [SignPath.io](https://signpath.io/) with maintainer approval on every release. **macOS and Linux** builds are unsigned for now and trip a first-launch warning (Gatekeeper) — see [Platform first-launch notes](#platform-first-launch-notes). Windows builds published *before* EV signing went live are also unsigned, and because SmartScreen reputation accrues per file over time, freshly-signed builds may still show a reduced warning until downloads add up.
 
 ## Download a pre-built build (recommended)
 
@@ -49,7 +49,7 @@ The other release assets — the `*.nupkg` packages, `RELEASES*`, and `releases.
 
 ## Platform first-launch notes
 
-Because alpha builds aren't code-signed yet, your OS may warn the first time you run one:
+Windows release binaries are now EV-signed by **Shadow Realms LLC** (see above); macOS and Linux builds aren't signed yet, so your OS may warn the first time you run one:
 
 ### macOS — Gatekeeper
 
@@ -63,7 +63,7 @@ An unsigned build trips Gatekeeper ("developer cannot be verified" or "damaged")
 
 ### Windows — SmartScreen
 
-An unsigned `.exe` shows a blue "Windows protected your PC" panel: click **More info → Run anyway**. SmartScreen remembers it for that exact file.
+Windows release binaries are EV-signed by **Shadow Realms LLC**, so recent builds show that publisher name rather than "unknown publisher." SmartScreen reputation still accrues per file, so a brand-new signed build may briefly show the blue "Windows protected your PC" panel — click **More info → Run anyway**, and it's remembered for that file. Older builds from before signing went live are unsigned and always show the panel.
 
 ### Linux
 

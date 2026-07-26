@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Reactive.Linq;
 using Genie.Core;
 using Genie.Core.Events;
@@ -81,21 +82,25 @@ public class StreamTabsViewModel : ReactiveObject
                     "itemlog" or "itemLog" => ItemLog,
                     _                      => null
                 };
-                buf?.Add(e.Text);
+                // #187: pass the parser's span metadata (bold / link / preset)
+                // through so the stream panel renders monster-bold, clickable
+                // links and preset colours just like the main window does.
+                buf?.Add(e.Text, e.BoldSpans, e.Links, e.PresetSpans);
 
                 // Per-stream "Also show in Main" (Layout tab). When on, echo the
                 // line into the main game window in addition to its own panel.
                 // buf.Settings is the same WindowSettings instance the Layout tab
                 // mutates, so the toggle takes effect live with no re-subscribe —
-                // exactly like the Timestamp / NameListOnly toggles above.
+                // exactly like the Timestamp / NameListOnly toggles above. Carry
+                // the spans so the echoed combat hit is gold in Main too (#187).
                 if (buf?.Settings?.EchoToMain == true)
-                    _main?.EchoStreamToMain(e.Text);
+                    _main?.EchoStreamToMain(e.Text, e.BoldSpans, e.Links, e.PresetSpans);
 
                 // The Log window is a consolidated conversation feed: mirror
                 // the speech streams into it (matches the Genie 4 / dylb0t
                 // prototype "Log" window).
                 if (e.Stream is "talk" or "whispers")
-                    Log.Add(e.Text);
+                    Log.Add(e.Text, e.BoldSpans, e.Links, e.PresetSpans);
             });
     }
 }
@@ -130,7 +135,10 @@ public class StreamBuffer(string name) : ReactiveObject
     /// the window right-click menu; mirrors <see cref="WindowSettings.NameListOnly"/>.</summary>
     public bool NameListOnly { get; set; }
 
-    public void Add(string line)
+    public void Add(string line,
+                    IReadOnlyList<BoldSpan>? bolds = null,
+                    IReadOnlyList<LinkSpan>? links = null,
+                    IReadOnlyList<PresetSpan>? presets = null)
     {
         // #90 Name List Only: skip lines that don't reference a tracked name.
         // No names configured (Names null / empty regex) → Match returns null
@@ -139,15 +147,28 @@ public class StreamBuffer(string name) : ReactiveObject
         if (NameListOnly && Names is { Rules.Count: > 0 } && Names.Match(line) is null)
             return;
 
+        // #187: carry the parser's span metadata (bold / link / preset) through
+        // so side streams render with the same styling as the main window. The
+        // combat stream in particular wraps the hit result in <pushBold> — that's
+        // the gold "monster bold" Genie 4 / Wrayth shows; dropping the span here
+        // was why combat text rendered plain white.
+        //
         // #90: per-window timestamp. When the Layout-tab "prepend timestamp to
         // each line" toggle is on for this window, stamp each line as it arrives
         // (going forward — existing scrollback is not retro-stamped, matching
-        // Genie 4). Side-stream lines carry no span metadata (user highlights
-        // tokenize at render time, not stored as offsets), so prepending to the
-        // raw text is safe here.
+        // Genie 4). The spans are ABSOLUTE offsets into the raw text, so shift
+        // them right by the prefix length or the styling lands on the wrong
+        // characters (mirrors GameTextViewModel.AddLine).
         if (Settings?.Timestamp == true)
-            line = WindowTimestamp.Prefix() + line;
-        Lines.Add(new TextLine(line, StreamColor.Main, Window: Name));
+        {
+            var prefix = WindowTimestamp.Prefix();
+            var shift  = prefix.Length;
+            line    = prefix + line;
+            bolds   = bolds?.Select(s   => s with { Start = s.Start + shift }).ToList();
+            links   = links?.Select(s   => s with { Start = s.Start + shift }).ToList();
+            presets = presets?.Select(s => s with { Start = s.Start + shift }).ToList();
+        }
+        Lines.Add(new TextLine(line, StreamColor.Main, links, bolds, presets, Window: Name));
         while (Lines.Count > Max)
             Lines.RemoveAt(0);
     }

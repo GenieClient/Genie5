@@ -29,12 +29,20 @@ public abstract record GameEvent;
 /// parser records each region's id + offsets so the renderer can apply that
 /// preset's configured colour. Null when the line had no preset markup.
 /// </param>
+/// <param name="Mono">
+/// True when the line arrived inside a <c>&lt;output class="mono"/&gt;</c> …
+/// <c>&lt;output class=""/&gt;</c> bracket — DR marks maps, stat tables, and
+/// other column-aligned blocks this way. The display renders these in the
+/// monospace font while normal prose uses the configured game font (public
+/// #178), so a proportional normal font doesn't break table alignment.
+/// </param>
 public sealed record TextEvent(
     string Stream,
     string Text,
     IReadOnlyList<LinkSpan>? Links       = null,
     IReadOnlyList<BoldSpan>? BoldSpans   = null,
-    IReadOnlyList<PresetSpan>? PresetSpans = null
+    IReadOnlyList<PresetSpan>? PresetSpans = null,
+    bool Mono = false
 ) : GameEvent;
 
 /// <summary>

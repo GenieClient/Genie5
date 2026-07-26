@@ -1542,28 +1542,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             var scriptsDir = _core is not null
                                  ? _core.Config.ScriptDir
                                  : Path.Combine(Path.GetDirectoryName(_configDir)!, "Scripts");
-            try
-            {
-                if (!Directory.Exists(scriptsDir)) Directory.CreateDirectory(scriptsDir);
-                // explorer.exe/open/xdg-open with the resolved absolute path —
-                // the SAME pattern as every other folder-open (Maps, Recordings,
-                // Plugins, Open Directory). The previous ShellExecute-on-the-dir
-                // route is exactly what OpenMapsFolder documents as failing with
-                // "Location is not available" on some Windows setups.
-                var nativePath = Path.GetFullPath(scriptsDir);
-                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                        System.Runtime.InteropServices.OSPlatform.Windows))
-                    System.Diagnostics.Process.Start("explorer.exe", nativePath);
-                else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                             System.Runtime.InteropServices.OSPlatform.OSX))
-                    System.Diagnostics.Process.Start("open", nativePath);
-                else
-                    System.Diagnostics.Process.Start("xdg-open", nativePath);
-            }
-            catch (Exception ex)
-            {
-                GameText.AddSystemLine($"[scripts] could not open {scriptsDir} ({ex.Message})");
-            }
+            OpenFolder(scriptsDir, "OpenScriptsFolder");
         });
 
         // Seed the Help ▸ Update Settings checkboxes from update-feeds.json,
@@ -1876,7 +1855,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleAtmosphericsCommand = MakeToggleCommand("atmospherics", v => AtmosphericsVisible = v);
         ToggleLogCommand      = MakeToggleCommand("log",       v => LogVisible      = v);
         ToggleItemLogCommand  = MakeToggleCommand("itemlog",   v => ItemLogVisible  = v);
-        ToggleScriptsCommand  = MakeToggleCommand("scripts",   v => ScriptsVisible  = v);
+        // The panel reads live off Core (script library scan, running-scripts
+        // list, folder open) but Core itself is built lazily on first
+        // connect/command (EnsureCoreBuilt). Opening the panel before either
+        // of those has happened must not leave it stuck showing an empty
+        // library — build Core first via beforeShow, the same on-demand
+        // pattern Genie4ImportCommand uses. See also EnsureScriptsPanelReady.
+        ToggleScriptsCommand  = MakeToggleCommand("scripts",   v => ScriptsVisible  = v, beforeShow: EnsureScriptsPanelReady);
         ToggleSceneCommand    = MakeToggleCommand("scene",     v => SceneVisible    = v);
         ToggleMobsCommand     = MakeToggleCommand("mobs",      v => MobsVisible     = v);
         TogglePlayersCommand  = MakeToggleCommand("players",   v => PlayersVisible  = v);
@@ -2350,22 +2335,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     }
 
     /// <summary>Open a folder in the OS file browser, creating it if missing.
-    /// Cross-platform (explorer / open / xdg-open).</summary>
+    /// See <see cref="Genie.Core.Runtime.FileBrowser"/> for why this must use
+    /// <c>ArgumentList</c> rather than string arguments (paths with spaces,
+    /// e.g. macOS <c>~/Library/Application Support/Genie5</c>).</summary>
     private static void OpenFolder(string dir, string logTag)
     {
-        if (string.IsNullOrWhiteSpace(dir)) return;
         try
         {
-            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-            var nativePath = Path.GetFullPath(dir);
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                    System.Runtime.InteropServices.OSPlatform.Windows))
-                System.Diagnostics.Process.Start("explorer.exe", nativePath);
-            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                         System.Runtime.InteropServices.OSPlatform.OSX))
-                System.Diagnostics.Process.Start("open", nativePath);
-            else
-                System.Diagnostics.Process.Start("xdg-open", nativePath);
+            Genie.Core.Runtime.FileBrowser.OpenDirectory(dir, createIfMissing: true);
         }
         catch (Exception ex) { ErrorLog.Log(logTag, ex); }
     }
@@ -2421,34 +2398,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             return;
         }
 
-        try
-        {
-            // First-run users typically haven't pulled the Maps repo yet, so
-            // the configured directory may not exist on disk. Create it so
-            // the menu item actually opens a folder instead of silently
-            // failing — matches OpenRecordingsFolder's behavior.
-            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-            // Canonical Windows pattern: Process.Start(filename, argument).
-            // Quoting / escaping handled internally. The ProcessStartInfo
-            // route with explicit Arguments was failing here with
-            // "Location is not available" — likely because the quoted arg
-            // was being passed to explorer.exe in a form it interpreted
-            // as a literal filename to OPEN (not navigate to). The simpler
-            // overload works reliably.
-            var nativePath = Path.GetFullPath(dir);
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                    System.Runtime.InteropServices.OSPlatform.Windows))
-                System.Diagnostics.Process.Start("explorer.exe", nativePath);
-            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                         System.Runtime.InteropServices.OSPlatform.OSX))
-                System.Diagnostics.Process.Start("open", nativePath);
-            else
-                System.Diagnostics.Process.Start("xdg-open", nativePath);
-        }
-        catch (Exception ex)
-        {
-            ErrorLog.Log("OpenMapsFolder", ex);
-        }
+        // First-run users typically haven't pulled the Maps repo yet, so
+        // OpenFolder creates the configured directory when missing.
+        OpenFolder(dir, "OpenMapsFolder");
     }
 
     /// <summary>
@@ -2456,28 +2408,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <see cref="OpenMapsFolder"/>. Creates the directory if it doesn't
     /// exist yet (user may have installed but never recorded).
     /// </summary>
-    private void OpenRecordingsFolder()
-    {
-        var dir = _logsDir;
-        try
-        {
-            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+    private void OpenRecordingsFolder() => OpenFolder(_logsDir, "OpenRecordingsFolder");
 
-            var nativePath = Path.GetFullPath(dir);
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                    System.Runtime.InteropServices.OSPlatform.Windows))
-                System.Diagnostics.Process.Start("explorer.exe", nativePath);
-            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                         System.Runtime.InteropServices.OSPlatform.OSX))
-                System.Diagnostics.Process.Start("open", nativePath);
-            else
-                System.Diagnostics.Process.Start("xdg-open", nativePath);
-        }
-        catch (Exception ex)
-        {
-            ErrorLog.Log("OpenRecordingsFolder", ex);
-        }
-    }
 
     private async Task SetMapsDirectoryAsync()
     {
@@ -2756,20 +2688,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             GameText.AddSystemLine("[analyst] no capture folder set — use Analyst → Set Capture Folder first.");
             return;
         }
-        try
-        {
-            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-            var nativePath = Path.GetFullPath(dir);
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                    System.Runtime.InteropServices.OSPlatform.Windows))
-                System.Diagnostics.Process.Start("explorer.exe", nativePath);
-            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                         System.Runtime.InteropServices.OSPlatform.OSX))
-                System.Diagnostics.Process.Start("open", nativePath);
-            else
-                System.Diagnostics.Process.Start("xdg-open", nativePath);
-        }
-        catch (Exception ex) { ErrorLog.Log("OpenCaptureFolder", ex); }
+        OpenFolder(dir, "OpenCaptureFolder");
     }
 
     /// <summary>
@@ -3383,17 +3302,31 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// menu's check mark and the dock's true state aligned even if the user
     /// closed a tool by some other means (e.g. the X on its tab).
     /// </summary>
-    private ReactiveCommand<Unit, Unit> MakeToggleCommand(string toolId, Action<bool> updateBool)
+    private ReactiveCommand<Unit, Unit> MakeToggleCommand(string toolId, Action<bool> updateBool, Action? beforeShow = null)
         => ReactiveCommand.Create(() =>
         {
             if (DockFactory is not GenieDockFactory factory) return;
             var newVisible = !factory.IsToolVisible(toolId);
+            // Only run beforeShow on the transition TO visible — a hide should
+            // never have a side effect meant for "the panel is about to be seen".
+            if (newVisible) beforeShow?.Invoke();
             factory.SetToolVisibility(toolId, newVisible);
             // The Opened/Closed events also push this; explicitly setting it
             // here covers cases where the event already fired with the same
             // value (no PropertyChanged would otherwise refresh the binding).
             updateBool(newVisible);
         });
+
+    /// <summary>Build Core on demand (see <see cref="EnsureCoreBuilt"/>) before
+    /// the Script Manager panel is shown. The panel is fully Core-driven —
+    /// script library scan, running-scripts list, folder open — but Core is
+    /// otherwise built lazily on first connect/command, so showing the panel
+    /// without this would leave it stuck with an empty library and a dead
+    /// folder-open button. Called from both places the panel can become
+    /// visible: <see cref="ToggleScriptsCommand"/> and the dock-driven
+    /// "scripts" case in <see cref="SetVisibilityBool"/> (tab dragged back
+    /// into view, layout restore, etc.).</summary>
+    private void EnsureScriptsPanelReady() => EnsureCoreBuilt(null, eagerLoadOfflineRules: true);
 
     /// <summary>
     /// Sync the matching <c>XxxVisible</c> bool to <paramref name="visible"/>
@@ -3428,7 +3361,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "atmospherics": ForceSet(visible, v => AtmosphericsVisible = v, () => AtmosphericsVisible); break;
             case "log":       ForceSet(visible, v => LogVisible      = v, () => LogVisible);      break;
             case "itemlog":   ForceSet(visible, v => ItemLogVisible  = v, () => ItemLogVisible);  break;
-            case "scripts":   ForceSet(visible, v => ScriptsVisible  = v, () => ScriptsVisible);  break;
+            case "scripts":
+                // Dock-driven show (drag the tab back into view, restore a
+                // layout, etc.) bypasses ToggleScriptsCommand — this Core
+                // side effect on a checkmark-sync path is intentional; see
+                // EnsureScriptsPanelReady.
+                if (visible) EnsureScriptsPanelReady();
+                ForceSet(visible, v => ScriptsVisible = v, () => ScriptsVisible);
+                break;
             case "scene":     ForceSet(visible, v => SceneVisible    = v, () => SceneVisible);    break;
             case "mobs":      ForceSet(visible, v => MobsVisible     = v, () => MobsVisible);     break;
             case "players":   ForceSet(visible, v => PlayersVisible  = v, () => PlayersVisible);  break;
@@ -5750,6 +5690,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// </summary>
     private string LaunchExternalEditor(string file)
     {
+        // Normalize once so every rung — custom/config candidates and the OS
+        // default — passes the editor the same absolute path.
+        var fullPath = System.IO.Path.GetFullPath(file);
+
         // 1) explicit GUI override, then 2) the #config editor value.
         foreach (var candidate in new[] { Display.EditorPath, _core?.Config?.Editor })
         {
@@ -5757,8 +5701,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             try
             {
                 System.Diagnostics.Process.Start(
-                    new System.Diagnostics.ProcessStartInfo(candidate, $"\"{file}\"")
-                    { UseShellExecute = false });
+                    new System.Diagnostics.ProcessStartInfo(candidate)
+                    { UseShellExecute = false, ArgumentList = { fullPath } });
                 return candidate;
             }
             catch (Exception ex)
@@ -5768,16 +5712,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
         }
 
-        // 3) OS default plain-text editor.
-        if (OperatingSystem.IsWindows())
-            System.Diagnostics.Process.Start("notepad.exe", $"\"{file}\"");
-        else if (OperatingSystem.IsMacOS())
-            // -t opens in the default TEXT editor regardless of extension.
-            System.Diagnostics.Process.Start("open", $"-t \"{file}\"");
-        else
-            // Linux doesn't treat `.cmd` as executable, so xdg-open routes it to
-            // the text/plain handler (a text editor).
-            System.Diagnostics.Process.Start("xdg-open", $"\"{file}\"");
+        // 3) OS default plain-text editor (see Genie.Core.Runtime.FileBrowser
+        // for the platform ladder and the ArgumentList spaces rationale).
+        System.Diagnostics.Process.Start(Genie.Core.Runtime.FileBrowser.BuildOpenInDefaultTextEditorInfo(fullPath));
         return "OS default";
     }
 

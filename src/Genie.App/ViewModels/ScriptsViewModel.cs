@@ -454,18 +454,12 @@ public class ScriptsViewModel : ReactiveObject
     {
         if (SelectedFile is not { } n) return;
         var dir = n.IsFolder ? n.FullPath : Path.GetDirectoryName(n.FullPath);
-        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+        if (string.IsNullOrEmpty(dir)) return;
         try
         {
-            // Same explicit file-manager launch as the Open Scripts Folder
-            // menu (issue #37 — ShellExecute-on-the-dir fails on some setups).
-            var native = Path.GetFullPath(dir);
-            if (OperatingSystem.IsWindows())
-                System.Diagnostics.Process.Start("explorer.exe", $"\"{native}\"");
-            else if (OperatingSystem.IsMacOS())
-                System.Diagnostics.Process.Start("open", $"\"{native}\"");
-            else
-                System.Diagnostics.Process.Start("xdg-open", $"\"{native}\"");
+            // Reveal-only: createIfMissing: false — a missing dir is a no-op
+            // inside OpenDirectory itself (see FileBrowser.OpenDirectory).
+            Genie.Core.Runtime.FileBrowser.OpenDirectory(dir, createIfMissing: false);
         }
         catch (Exception ex)
         {
