@@ -53,7 +53,7 @@ You can mix them: a Lich script can be doing one thing while a Genie `.cmd` scri
 
   Backslashes are literal (so Windows paths like `--temp=C:\lich\temp` work as-is); there is no escape character. A quote you never close aborts the connect with `[lich] unterminated " quote in the Lich arguments…` rather than starting Lich with a mangled argument list.
 
-  **Lich's path flags require the `=` form.** `lich.rbw` matches `--temp=PATH`, `--home=PATH`, `--scripts=PATH`, `--data=PATH` and friends; it does *not* read a space-separated value, and it silently ignores anything it doesn't match. Note that `lich --help` currently advertises `--temp-dir=`, `--script-dir=` and `--data-dir=`, none of which are implemented — use `--temp=`, `--scripts=` and `--data=` instead. Genie refuses to launch on a form Lich would discard:
+  **Lich's path flags require the `=` form.** `lich.rbw` matches `--temp=PATH`, `--home=PATH`, `--scripts=PATH`, `--data=PATH` and friends; it does *not* read a space-separated value, and it silently ignores anything it doesn't match. Note that `lich --help` currently advertises `--temp-dir=`, `--script-dir=` and `--data-dir=`, none of which are implemented — use `--temp=`, `--scripts=` and `--data=` instead. Rather than start Lich with an argument it would throw away, Genie aborts the connect and says so:
 
   ```text
   [lich] Lich ignores '--temp-dir=/tmp/lich' — use --temp=PATH instead (the '=' is
