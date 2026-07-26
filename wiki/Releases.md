@@ -4,7 +4,20 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.1 — Coming of Age
+## Latest: v5.0.0-beta.2 — Proxy & Polish
+
+Lich-proxy diagnostics and combat-color polish — the second beta.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.2** as a delta from beta.1.
+
+- **🔌 New `#config lichdebug`** — when Genie auto-launches (owns) Lich, live-tails that session's `temp/debug-*.log` into the game window as `[lich-debug]` lines. Independent of `conndebug` (the Genie-side connection trace) — enable both for a full Lich-proxy diagnosis. Auto-launch status now shows the Lich PID. Thanks @simtel12!
+- **Lich temp-directory resolution** — Genie now resolves Lich's temp dir the way `lich.rbw` actually parses its args (`--temp=PATH`, else `--home=PATH/temp`), honours quotes in `#config lichargs` so paths with spaces survive, and refuses to auto-launch with a directory flag Lich silently ignores (naming the spelling that works). Thanks @simtel12!
+- **Combat text bold is aligned** (#199) — bold/preset/link coloring no longer lands a few characters off on lines that contain an HTML entity (combat lines open with a literal `<`); offsets are rebased into the decoded text, correct in both the Combat and Main windows.
+- **Cleaner XML stream** (#198) — the server's `<link>` menu element is recognized and discarded instead of leaking as stray output.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.2)
+
+## v5.0.0-beta.1 — Coming of Age
 
 **Genie 5 graduates to beta** — plus a round of display-polish fixes.
 

@@ -1,3 +1,39 @@
+# Genie 5 — v5.0.0-beta.2
+
+Lich-proxy diagnostics and combat-color polish — the second beta.
+
+## 🔌 New: `#config lichdebug`
+
+When Genie auto-launches (owns) Lich, `#config lichdebug true` live-tails that
+session's `temp/debug-*.log` into the game window as `[lich-debug]` lines for
+the whole owned session — a direct window into what Lich is doing during a
+proxy connect. It's independent of `#config conndebug` (the Genie-side
+connection trace); enable both for a full Lich-proxy diagnosis. Auto-launch
+status messages now include the Lich PID.
+
+As part of this, Genie now resolves Lich's temp directory the way `lich.rbw`
+actually parses its arguments (`--temp=PATH`, else `--home=PATH/temp`) and
+honours quotes in `#config lichargs`, so a path with spaces survives. If
+`lichargs` carries a directory flag Lich silently ignores (the space form, or
+the `--help`-only `--temp-dir=`/`--script-dir=`/`--data-dir=` aliases), the
+auto-launch now stops and names the working spelling instead of writing
+somewhere you didn't ask for. Thanks @simtel12!
+
+## 🐛 Fixes
+
+- **Combat text bold is aligned** — bold/preset/link coloring landed a few
+  characters off when a line contained an HTML entity before it (combat lines
+  open with a literal `<`). Span offsets are now rebased into the decoded
+  text, so the damage phrase paints correctly in both the Combat and Main
+  windows. (#199)
+- **Cleaner XML stream** — the server's `<link>` menu element (Game/Help menu
+  URLs) is recognized and discarded instead of surfacing as stray output.
+  (#198)
+
+Thanks to @simtel12 for all three.
+
+---
+
 # Genie 5 — v5.0.0-beta.1
 
 **Genie 5 graduates to beta** — plus a round of display-polish fixes.
