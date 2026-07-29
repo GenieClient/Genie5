@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Genie.Core.Connection;
 using Xunit;
@@ -165,6 +167,99 @@ public class LichDebugLogTailerTests
         {
             try { Directory.Delete(tempDir, recursive: true); } catch { /* ignore */ }
         }
+    }
+
+    [Fact]
+    public async Task StopAfterProcessExitAsync_keeps_mirroring_until_the_process_exits()
+    {
+        // Lich's shutdown lines (FE detach, disconnect reason) are written after Genie
+        // asks it to stop. Cutting the tail at the stop request loses exactly those.
+        var tempDir = Directory.CreateTempSubdirectory("lich-debug-linger-").FullName;
+        using var proc = StartLongLivedProcess();
+        Assert.NotNull(proc);
+
+        try
+        {
+            var logPath = Path.Combine(tempDir, "debug-session.log");
+            await File.WriteAllTextAsync(logPath, "first\n");
+            File.SetLastWriteTimeUtc(logPath, DateTime.UtcNow);
+
+            var shuttingDown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var bound = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            using var tailer = new LichDebugLogTailer();
+            tailer.Start(
+                tempDir,
+                DateTime.UtcNow.AddSeconds(-2),
+                onLine: line => { if (line == "shutting down") shuttingDown.TrySetResult(); },
+                onFileBound: _ => bound.TrySetResult());
+
+            await bound.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // Stop requested while the process is still alive: the tail must stay up.
+            var stopping = tailer.StopAfterProcessExitAsync(
+                proc!.Id, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250));
+
+            await File.AppendAllTextAsync(logPath, "shutting down\n");
+            await shuttingDown.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(stopping.IsCompleted);
+
+            // ...and come down once the process is gone.
+            proc.Kill();
+            proc.WaitForExit(5_000);
+            await stopping.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        finally
+        {
+            try { if (!proc!.HasExited) proc.Kill(); } catch { /* ignore */ }
+            try { Directory.Delete(tempDir, recursive: true); } catch { /* ignore */ }
+        }
+    }
+
+    [Fact]
+    public async Task StopAfterProcessExitAsync_gives_up_on_a_lich_that_never_exits()
+    {
+        // A Lich that ignores the stop must not pin the tail (and its file handle) open.
+        using var proc = StartLongLivedProcess();
+        Assert.NotNull(proc);
+
+        var tempDir = Directory.CreateTempSubdirectory("lich-debug-linger-cap-").FullName;
+        try
+        {
+            using var tailer = new LichDebugLogTailer();
+            tailer.Start(tempDir, DateTime.UtcNow, onLine: _ => { });
+
+            await tailer.StopAfterProcessExitAsync(
+                    proc!.Id, TimeSpan.FromMilliseconds(400), TimeSpan.Zero)
+                .WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.False(proc.HasExited);   // gave up on the wait, not on the process
+        }
+        finally
+        {
+            try { if (!proc!.HasExited) proc.Kill(); } catch { /* ignore */ }
+            try { Directory.Delete(tempDir, recursive: true); } catch { /* ignore */ }
+        }
+    }
+
+    private static Process? StartLongLivedProcess()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return Process.Start(new ProcessStartInfo
+            {
+                FileName        = "cmd.exe",
+                Arguments       = "/c ping -n 60 127.0.0.1 >NUL",
+                UseShellExecute = false,
+                CreateNoWindow  = true,
+            });
+
+        return Process.Start(new ProcessStartInfo
+        {
+            FileName        = "/bin/sleep",
+            Arguments       = "60",
+            UseShellExecute = false,
+            CreateNoWindow  = true,
+        });
     }
 
     [Fact]

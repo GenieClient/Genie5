@@ -949,6 +949,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// when <c>#config lichdebug</c> is on. Null when not tailing.</summary>
     private Genie.Core.Connection.LichDebugLogTailer? _lichDebugTailer;
 
+    /// <summary>How long a teardown waits for the owned Lich to actually exit before
+    /// dropping its debug tail anyway. Bounds a Lich that ignores the stop.</summary>
+    private static readonly TimeSpan OwnedLichExitWait = TimeSpan.FromSeconds(15);
+
+    /// <summary>Extra tail time after the owned Lich is gone, so its last buffered
+    /// writes land on disk and get polled before the mirror shuts down.</summary>
+    private static readonly TimeSpan OwnedLichPostExitGrace = TimeSpan.FromSeconds(3);
+
     /// <summary>Base name of the recipe script whose completion should auto-stop
     /// the current capture (null for a manual capture, which the user stops).</summary>
     private string? _activeCaptureScript;
@@ -3555,11 +3563,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             else
             {
                 // Owned PID gone (crash / external kill) — drop the stale claim so a
-                // fresh Launched outcome can take ownership again.
+                // fresh Launched outcome can take ownership again. The tail lingers
+                // instead of stopping dead: whatever Lich wrote as it died is the most
+                // useful thing lichdebug can show here.
                 if (_ownedLichProcessId is int stalePid
                     && !Genie.Core.Connection.LichLauncher.TryIsProcessAlive(stalePid))
                 {
-                    StopOwnedLichDebugTail();
+                    LingerOwnedLichDebugTail(stalePid);
                     _ownedLichProcessId = null;
                     _ownedLichProcessStartUtc = null;
                     _ownedLichLaunchKey = null;
@@ -3606,7 +3616,6 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private void StopOwnedLich()
     {
         if (_ownedLichProcessId is not int pid) return;
-        StopOwnedLichDebugTail();
         _ownedLichProcessId = null;
         _ownedLichProcessStartUtc = null;
         _ownedLichLaunchKey = null;
@@ -3614,6 +3623,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Genie.Core.Connection.LichLauncher.TryStop(pid, out var message);
         if (!string.IsNullOrEmpty(message))
             GameText.AddSystemLine(message);
+        // Kill first, tail after: Lich logs the FE detach, script shutdown and its
+        // disconnect reason on the way out, and those are the lines lichdebug is
+        // wanted for. LingerOwnedLichDebugTail keeps reading until the process is
+        // actually gone.
+        LingerOwnedLichDebugTail(pid);
     }
 
     /// <summary>
@@ -3675,12 +3689,52 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     "directory in #config lichargs, Lich only honours the --temp=PATH form.")));
     }
 
+    /// <summary>Stop the debug tail immediately. For "the user turned lichdebug off" —
+    /// a teardown of the Lich process itself should use <see cref="LingerOwnedLichDebugTail"/>
+    /// so the shutdown lines still arrive.</summary>
     private void StopOwnedLichDebugTail()
     {
         var tailer = _lichDebugTailer;
         _lichDebugTailer = null;
         try { tailer?.Dispose(); }
         catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// Hand the current tailer off to a background wait that keeps mirroring until
+    /// <paramref name="processId"/> exits (plus <see cref="OwnedLichPostExitGrace"/>),
+    /// then stops it.
+    /// </summary>
+    /// <remarks>
+    /// The field is cleared up front, so a reconnect that launches a fresh Lich starts
+    /// its own tailer immediately instead of waiting on this one — the two read
+    /// different files, and the dying session's last lines are the point of the linger.
+    /// </remarks>
+    private void LingerOwnedLichDebugTail(int processId)
+    {
+        var tailer = _lichDebugTailer;
+        _lichDebugTailer = null;
+        if (tailer is null) return;
+
+        GameText.AddSystemLine(
+            "[lich-debug] Lich is shutting down — still mirroring its final lines.");
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await tailer.StopAfterProcessExitAsync(
+                    processId, OwnedLichExitWait, OwnedLichPostExitGrace);
+            }
+            catch { /* best-effort */ }
+            finally
+            {
+                try { tailer.Dispose(); } catch { /* best-effort */ }
+            }
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => GameText.AddSystemLine("[lich-debug] stopped (Lich exited)."));
+        });
     }
 
     private static DateTime? TryGetProcessStartUtc(int processId)
