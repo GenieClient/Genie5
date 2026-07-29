@@ -15,6 +15,11 @@ namespace Genie.Core.Extensions.Builtin;
 ///
 /// <para>Skill names are accepted dynamically from the stream; the 35 learning-state
 /// names are hardcoded (they effectively never change in DR).</para>
+///
+/// <para>Both live-pulse shapes are handled: DR's per-character <c>BRIEFEXP</c>
+/// setting swaps the mindstate word for a <c>[ n/34]</c> number, so a character
+/// with BRIEFEXP ON emits <c>Stealth:  550 73% [ 5/34]</c> where another emits
+/// <c>Stealth:  550 73% dabbling</c>.</para>
 /// </summary>
 public sealed class ExperienceExtension : IGameExtension
 {
@@ -88,6 +93,16 @@ public sealed class ExperienceExtension : IGameExtension
     private static readonly Regex SkillLineRe = new(
         @"([A-Z][A-Za-z '\-]+?):\s+(\d+)\s+(\d+)%\s+([a-z][a-z ]*?)(?=\s*\(|\s{2,}|$)",
         RegexOptions.Compiled);
+
+    /// <summary>BRIEFEXP-ON form of the live pulse: the mindstate arrives as
+    /// <c>[ 5/34]</c> instead of the word ("dabbling"). <c>BRIEFEXP</c> is a
+    /// per-character DR setting, so one character's Experience window would go
+    /// stale between manual <c>exp</c> dumps while another's updated live — the
+    /// full-dump text table always spells the mindstate out, which is why the
+    /// manual path kept working. Matches Lich's <c>BriefExpOn</c> pattern.</summary>
+    private static readonly Regex SkillLineBriefRe = new(
+        @"([A-Z][A-Za-z '\-]*?):\s+(\d+)\s+(\d+)%\s*\[\s*(\d+)\s*/\s*34\s*\]",
+        RegexOptions.Compiled);
     private static readonly Regex TdpRe = new(
         @"Time Development Points:\s*(\d+)", RegexOptions.Compiled);
 
@@ -146,7 +161,12 @@ public sealed class ExperienceExtension : IGameExtension
             _host.Globals[$"{Var(sub)}.LearningRate"] = "0";
             return;
         }
-        ApplyLine(inner);
+        // The component id always carries the FULL skill name; the body doesn't.
+        // Under BRIEFEXP ON, DR abbreviates it there ("IM", "Aug", "Outdoors"),
+        // which would register a second, duplicate entry alongside the full-named
+        // one the `exp` dump produces. Lich sidesteps this the same way, reading
+        // the name from <d cmd='skill Inner Magic'> rather than the text.
+        ApplyLine(inner, sub);
     }
 
     public void OnGameLine(string line)
@@ -154,8 +174,17 @@ public sealed class ExperienceExtension : IGameExtension
         // The `exp`/`experience` full dump arrives as plain text (two skills per
         // line). The skill regex is specific enough to be safe across streams.
         if (line.IndexOf('%') >= 0 && line.IndexOf(':') >= 0)
-            foreach (Match m in SkillLineRe.Matches(line))
-                Apply(m.Groups[1].Value.Trim(), m.Groups[2].Value, m.Groups[3].Value, m.Groups[4].Value);
+        {
+            // The dump spells the mindstate out even under BRIEFEXP ON, but a
+            // frontend-echoed pulse can reach this path too — accept both shapes.
+            var brief = SkillLineBriefRe.Matches(line);
+            if (brief.Count > 0)
+                foreach (Match m in brief)
+                    ApplyBrief(m.Groups[1].Value.Trim(), m.Groups[2].Value, m.Groups[3].Value, m.Groups[4].Value);
+            else
+                foreach (Match m in SkillLineRe.Matches(line))
+                    Apply(m.Groups[1].Value.Trim(), m.Groups[2].Value, m.Groups[3].Value, m.Groups[4].Value);
+        }
 
         var tdp = TdpRe.Match(line);
         if (tdp.Success)
@@ -193,19 +222,46 @@ public sealed class ExperienceExtension : IGameExtension
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private void ApplyLine(string line)
+    /// <summary>Parse one pulse body. <paramref name="skillName"/> overrides the name
+    /// the regex reads out of the text — callers that know the canonical name (the
+    /// component id) must pass it, because BRIEFEXP ON abbreviates the name in the
+    /// body.</summary>
+    private void ApplyLine(string line, string? skillName = null)
     {
+        // BRIEFEXP ON first: its "[ n/34]" tail can't match the word form, but
+        // checking the numeric shape up front keeps the two mutually exclusive.
+        var b = SkillLineBriefRe.Match(line);
+        if (b.Success)
+        {
+            ApplyBrief(skillName ?? b.Groups[1].Value.Trim(), b.Groups[2].Value, b.Groups[3].Value, b.Groups[4].Value);
+            return;
+        }
         var m = SkillLineRe.Match(line);
         if (m.Success)
-            Apply(m.Groups[1].Value.Trim(), m.Groups[2].Value, m.Groups[3].Value, m.Groups[4].Value);
+            Apply(skillName ?? m.Groups[1].Value.Trim(), m.Groups[2].Value, m.Groups[3].Value, m.Groups[4].Value);
     }
 
     private void Apply(string name, string rankText, string pctText, string mindstateText)
     {
         if (!int.TryParse(rankText, out var rank) || !int.TryParse(pctText, out var pct)) return;
         mindstateText = mindstateText.Trim();
-        var mind = MindstateValue(mindstateText);
+        Apply(name, rank, pct, MindstateValue(mindstateText), mindstateText);
+    }
 
+    /// <summary>BRIEFEXP-ON variant: the mindstate is already the 0–34 number, so
+    /// the learning-rate word is looked up rather than parsed. Out-of-range values
+    /// are clamped — the globals and the renderer both index
+    /// <see cref="MindStates"/> directly.</summary>
+    private void ApplyBrief(string name, string rankText, string pctText, string mindText)
+    {
+        if (!int.TryParse(rankText, out var rank) || !int.TryParse(pctText, out var pct) ||
+            !int.TryParse(mindText, out var mind)) return;
+        mind = Math.Clamp(mind, 0, MindStates.Length - 1);
+        Apply(name, rank, pct, mind, MindStates[mind]);
+    }
+
+    private void Apply(string name, int rank, int pct, int mind, string mindstateText)
+    {
         var v = Var(name);
         _host.Globals[$"{v}.Ranks"]            = rank.ToString();
         _host.Globals[$"{v}.LearningRate"]     = mind.ToString();

@@ -219,4 +219,123 @@ public class ExperienceDensityTests
         // Baseline re-captured after the reset, so the session total starts at zero.
         Assert.Contains("Total gained: +0.00 ranks", host.Window);
     }
+
+    // ── BRIEFEXP ON: numeric "[ n/34]" mindstate in the live pulse ─────────────
+    // DR's per-character BRIEFEXP setting swaps the mindstate word for a number, so
+    // the Experience window went stale between manual `exp` dumps on any character
+    // that had it on — the dump always spells the mindstate out, which is why the
+    // manual path kept working while the live pulses were silently dropped.
+
+    [Fact]
+    public void OnGameEvent_BriefExpOn_UpdatesWindow()
+    {
+        var host = new FakeHost();
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        ext.OnGameEvent(Exp("Stealth", "550 73% [ 5/34]"));   // BRIEFEXP ON pulse
+        ext.OnPrompt();
+
+        Assert.Contains("Learning Skills: 1", host.Window);
+        Assert.Contains("Stealth", host.Window);
+        // Rendered through the same table as the word form: mindstate 5 = "thinking".
+        Assert.Contains("550 73%  thinking (5/34)", host.Window);
+    }
+
+    [Fact]
+    public void OnGameEvent_BriefExpOn_PublishesSameGlobalsAsWordForm()
+    {
+        var host = new FakeHost();
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        ext.OnGameEvent(Exp("Small Edged", "142 71% [13/34]"));
+
+        Assert.Equal("142", host.Globals["Small_Edged.Ranks"]);
+        Assert.Equal("13",  host.Globals["Small_Edged.LearningRate"]);
+        Assert.Equal("examining", host.Globals["Small_Edged.LearningRateName"]);
+    }
+
+    [Fact]
+    public void OnGameEvent_BriefExpOn_RaisesSkillUpdated()
+    {
+        var host = new FakeHost();
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        (string Name, int Rank, int Pct, int Mind)? seen = null;
+        ext.SkillUpdated += (n, r, p, m) => seen = (n, r, p, m);
+
+        ext.OnGameEvent(Exp("Thievery", "1750 0% [34/34]"));   // mind lock, top of range
+
+        Assert.Equal(("Thievery", 1750, 0, 34), seen);
+    }
+
+    [Fact]
+    public void OnGameEvent_BriefExpOn_UsesComponentIdNameNotTheAbbreviation()
+    {
+        var host = new FakeHost();
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        // BRIEFEXP ON abbreviates the name in the body; the id keeps the full one.
+        ext.OnGameEvent(new ComponentEvent("exp Inner Magic", "IM: 112 20% [32/34]"));
+        ext.OnGameEvent(new ComponentEvent("exp Outdoorsmanship", "Outdoors: 243 76% [22/34]"));
+        ext.OnPrompt();
+
+        Assert.Contains("Inner Magic", host.Window);
+        Assert.Contains("Outdoorsmanship", host.Window);
+        Assert.Equal("32", host.Globals["Inner_Magic.LearningRate"]);
+        Assert.DoesNotContain("IM ", host.Window);
+        Assert.False(host.Globals.ContainsKey("IM.Ranks"));
+    }
+
+    [Fact]
+    public void OnGameEvent_BriefExpOn_DoesNotDuplicateSkillsSeenInTheDump()
+    {
+        var host = new FakeHost();
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        // `exp` dump (full names) then a live brief pulse (abbreviated body) for the
+        // same skills — one row each, not two.
+        ext.OnGameLine("      Inner Magic:  112 20% clear        Locksmithing:  135 72% dabbling");
+        ext.OnGameEvent(new ComponentEvent("exp Inner Magic", "IM: 112 20% [32/34]"));
+        ext.OnGameEvent(new ComponentEvent("exp Locksmithing", "Locks: 135 72% [ 1/34]"));
+        ext.OnPrompt();
+
+        Assert.Contains("Learning Skills: 2", host.Window);
+    }
+
+    [Fact]
+    public void OnGameLine_BriefExpOn_IsNotMisreadAsWordForm()
+    {
+        var host = new FakeHost();
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        // A frontend-echoed brief pulse arriving as plain text must parse as the
+        // numeric form, not fall through to the word regex.
+        ext.OnGameLine("Athletics:  300 22% [ 9/34]");
+        ext.OnPrompt();
+
+        Assert.Equal("9", host.Globals["Athletics.LearningRate"]);
+        Assert.Contains("concentrating", host.Window);
+    }
+
+    [Fact]
+    public void OnGameLine_WordForm_StillParsesUnderTheBriefCheck()
+    {
+        var host = new FakeHost();
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        // The `exp` dump packs two skills per line and spells the mindstate out.
+        ext.OnGameLine("      Attunement:  550 73% dabbling        Stealth:  142 71% examining");
+        ext.OnPrompt();
+
+        Assert.Contains("Learning Skills: 2", host.Window);
+        Assert.Equal("1",  host.Globals["Attunement.LearningRate"]);
+        Assert.Equal("13", host.Globals["Stealth.LearningRate"]);
+    }
 }
