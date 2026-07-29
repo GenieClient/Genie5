@@ -31,12 +31,21 @@ public sealed class LichDebugLogTailer : IDisposable
     /// <paramref name="lichPath"/>.
     /// </summary>
     /// <remarks>
-    /// Mirrors <c>lich.rbw</c>'s argument loop (<c>/^--temp=(.+)/</c>,
+    /// <para>Mirrors <c>lich.rbw</c>'s argument loop (<c>/^--temp=(.+)/</c>,
     /// <c>/^--home=(.+)/</c>) and <c>lib/constants.rb</c>
     /// (<c>TEMP_DIR ||= File.join(LICH_DIR, "temp")</c>). Only the <c>=</c> form is
     /// recognised because that is the only form Lich accepts — see
     /// <see cref="LichArgs.TryFindIgnoredDirFlag"/>, which rejects the others at
-    /// launch rather than letting Genie tail a directory Lich silently ignored.
+    /// launch rather than letting Genie tail a directory Lich silently ignored.</para>
+    /// <para><paramref name="lichArgs"/> must be the argument string the process was
+    /// actually launched with — i.e. after <see cref="LichLauncher.TryExpandArguments"/>
+    /// has filled <c>{character}</c> / <c>{port}</c>. Passing the raw
+    /// <c>#config lichargs</c> template makes <c>--temp=temp-{character}</c> resolve to
+    /// a literal <c>temp-{character}</c> directory nothing ever writes to.</para>
+    /// <para>Lich stores a relative <c>--temp=</c> / <c>--home=</c> verbatim, so it
+    /// lands relative to Lich's working directory — which the launcher sets to the
+    /// directory holding <c>lich.rbw</c>, not Genie's own cwd. Relative values are
+    /// rooted there for the same reason.</para>
     /// </remarks>
     /// <exception cref="FormatException">
     /// <paramref name="lichArgs"/> has an unterminated quote. Propagated rather than
@@ -46,21 +55,29 @@ public sealed class LichDebugLogTailer : IDisposable
     public static string? ResolveTempDirectory(string? lichPath, string? lichArgs)
     {
         var tokens = LichArgs.Tokenize(lichArgs);
+        var lichDir = string.IsNullOrWhiteSpace(lichPath)
+            ? null
+            : Path.GetDirectoryName(Path.GetFullPath(lichPath.Trim()));
 
         if (LichArgs.TryParseDirFlag(tokens, "--temp", out var temp))
-            return temp;
+            return RootAtLichDir(temp, lichDir);
 
         // No --temp: TEMP_DIR is {LICH_DIR}/temp, and LICH_DIR is --home= when given,
         // otherwise the directory lich.rbw lives in.
         if (LichArgs.TryParseDirFlag(tokens, "--home", out var home))
-            return Path.Combine(home, "temp");
+            return Path.Combine(RootAtLichDir(home, lichDir), "temp");
 
-        if (string.IsNullOrWhiteSpace(lichPath))
-            return null;
-
-        var dir = Path.GetDirectoryName(Path.GetFullPath(lichPath.Trim()));
-        return string.IsNullOrEmpty(dir) ? null : Path.Combine(dir, "temp");
+        return string.IsNullOrEmpty(lichDir) ? null : Path.Combine(lichDir, "temp");
     }
+
+    /// <summary>Resolve a relative <c>--temp=</c> / <c>--home=</c> value against Lich's
+    /// working directory (<paramref name="lichDir"/>), which is where Lich itself
+    /// resolves it. Absolute values, and any value we have no Lich directory for, are
+    /// returned unchanged.</summary>
+    private static string RootAtLichDir(string path, string? lichDir) =>
+        Path.IsPathRooted(path) || string.IsNullOrEmpty(lichDir)
+            ? path
+            : Path.GetFullPath(Path.Combine(lichDir, path));
 
     /// <summary>
     /// Newest <c>debug-*.log</c> under <paramref name="tempDir"/> whose
