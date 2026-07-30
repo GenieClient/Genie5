@@ -965,6 +965,12 @@ public sealed class DrXmlParser : IDisposable
         // Self-closing UI chrome, no game-state data; distinct from the in-text
         // clickable <a>/<d> links, which ARE handled (public #198).
         "link",
+        // <forging outfitting engineering alchemy enchanting custom={set}> —
+        // Wrayth's crafting-UI config from the settings dump (value-less flag
+        // attributes + a {set} preset placeholder), not live crafting state.
+        // Discarded chrome; if the crafting panels are ever rendered they'd come
+        // through the server-driven dialog path (#156), not this tag (public #208).
+        "forging",
         // ── Text styling ────────────────────────────────────────────────────
         // "preset" is NOT here — its </preset> must reach HandleEndElement to
         // flush the room description before exits appear on the next line.
