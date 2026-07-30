@@ -1007,7 +1007,7 @@ public sealed class DrXmlParser : IDisposable
     private static readonly HashSet<string> _handledTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "a", "app", "b", "casttime", "clearstream", "compass", "component", "container",
-        "d", "dialogdata", "dir", "endsetup", "image", "indicator", "inv",
+        "crtrstatus", "d", "dialogdata", "dir", "endsetup", "image", "indicator", "inv",
         "left", "nav", "openwindow", "output", "popbold", "popstream",
         "preset", "progressbar", "prompt", "pushbold", "pushstream",
         "resource", "right", "roundtime", "settingsinfo", "spell",
@@ -1111,6 +1111,22 @@ public sealed class DrXmlParser : IDisposable
                 var id      = r["id"]      ?? "";
                 var visible = r["visible"] == "y";
                 _events.OnNext(new IndicatorEvent(id, visible));
+                break;
+            }
+
+            // ── Per-creature combat status ───────────────────────────────
+            // <crtrStatus exist="91586721" hostile="0" disengaged="1" flying="1"/>
+            // Keyed by exist id; the flags are "1"/"0". No exist = nothing to
+            // key on, so drop it (public #202).
+            case "crtrstatus":
+            {
+                var exist = r["exist"];
+                if (string.IsNullOrEmpty(exist)) break;
+                _events.OnNext(new CreatureStatusEvent(
+                    exist,
+                    r["hostile"]    == "1",
+                    r["disengaged"] == "1",
+                    r["flying"]     == "1"));
                 break;
             }
 

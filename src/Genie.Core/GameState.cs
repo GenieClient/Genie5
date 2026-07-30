@@ -116,7 +116,16 @@ public sealed class CombatState
     /// <c>$spelltime</c>); 0 when no spell is prepared.</summary>
     public double           SpellTimeSeconds =>
         SpellTimeStart is { } t ? Math.Max(0, (DateTimeOffset.UtcNow - t).TotalSeconds) : 0;
+
+    /// <summary>Latest per-creature combat status from <c>&lt;crtrStatus&gt;</c>,
+    /// keyed by the creature's <c>exist</c> object id (public #202). Cleared on
+    /// room change — engagement is room-local.</summary>
+    public ConcurrentDictionary<string, CreatureStatusReading> CreatureStatuses { get; } = new();
 }
+
+/// <summary>Per-creature combat flags from <c>&lt;crtrStatus&gt;</c>. <see cref="Disengaged"/>
+/// is you relative to the creature (false = engaged).</summary>
+public readonly record struct CreatureStatusReading(bool Hostile, bool Disengaged, bool Flying);
 
 // ── Inventory ────────────────────────────────────────────────────────────────
 
@@ -242,6 +251,7 @@ public sealed class GameState
         Combat.CastTimeEnd   = default;
         Combat.SpellTimeStart = null;
         Combat.Stance        = Stance.Neutral;
+        Combat.CreatureStatuses.Clear();
 
         Inventory.LeftHand = Inventory.RightHand = Inventory.LeftHandNoun = Inventory.RightHandNoun =
             Inventory.LeftExistId = Inventory.RightExistId = "";

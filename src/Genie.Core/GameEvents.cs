@@ -160,6 +160,19 @@ public sealed record ComponentEvent(
 /// </summary>
 public sealed record IndicatorEvent(string IndicatorId, bool Visible) : GameEvent;
 
+/// <summary>
+/// &lt;crtrStatus exist="91586721" hostile="0" disengaged="1" flying="1"/&gt;
+///
+/// Per-creature combat status keyed by the creature's <c>exist</c> object id.
+/// <paramref name="Hostile"/> — the creature is hostile; <paramref name="Disengaged"/>
+/// — you are disengaged from it (0 = engaged); <paramref name="Flying"/> — it is
+/// airborne. Emitted per creature; the engine keeps the latest reading per
+/// <paramref name="ExistId"/> in <c>CombatState.CreatureStatuses</c>, cleared
+/// on room change since engagement is room-local (public #202).
+/// </summary>
+public sealed record CreatureStatusEvent(
+    string ExistId, bool Hostile, bool Disengaged, bool Flying) : GameEvent;
+
 // ── Injuries ─────────────────────────────────────────────────────────────────
 
 /// <summary>What the injuries dialog reports for a body region. Severity runs

@@ -124,8 +124,19 @@ public sealed class GameStateEngine : IDisposable
 
             // ── Navigation ────────────────────────────────────────────────
             case NavEvent nav:
-                if (int.TryParse(nav.RoomId, out var rid))
+                if (int.TryParse(nav.RoomId, out var rid) && rid != _state.Room.RoomId)
+                {
                     _state.Room.RoomId = rid;
+                    // Engagement is room-local — the old room's creatures (and
+                    // their exist ids) are gone once we move (public #202).
+                    _state.Combat.CreatureStatuses.Clear();
+                }
+                break;
+
+            // ── Per-creature combat status ────────────────────────────────
+            case CreatureStatusEvent crtr:
+                _state.Combat.CreatureStatuses[crtr.ExistId] =
+                    new CreatureStatusReading(crtr.Hostile, crtr.Disengaged, crtr.Flying);
                 break;
 
             // ── Guild (from `info` verb) ──────────────────────────────────
