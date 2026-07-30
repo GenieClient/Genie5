@@ -151,6 +151,51 @@ public sealed class LichDebugLogTailer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Keep tailing until the owned Lich process has exited, then a little longer, and
+    /// only then <see cref="Stop"/>. Idempotent with <see cref="Stop"/>.
+    /// </summary>
+    /// <remarks>
+    /// Lich writes its most useful diagnostics on the way out — the FE detach, script
+    /// shutdown, the disconnect reason. Stopping the tail the moment Genie asks Lich to
+    /// quit loses exactly those lines, so a stop request only starts a wait here.
+    /// <paramref name="postExitGrace"/> covers the gap between "the process is gone" and
+    /// "its final buffered writes have landed on disk and been polled".
+    /// <paramref name="maxWaitForExit"/> bounds a Lich that never dies.
+    /// </remarks>
+    /// <param name="processId">PID of the owned Lich. Non-positive is treated as already gone.</param>
+    /// <param name="maxWaitForExit">Upper bound on the wait for the process to exit.</param>
+    /// <param name="postExitGrace">Extra tail time after the process is gone.</param>
+    /// <param name="ct">Cancels the wait and stops immediately.</param>
+    public async Task StopAfterProcessExitAsync(
+        int processId,
+        TimeSpan maxWaitForExit,
+        TimeSpan postExitGrace,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var deadline = DateTime.UtcNow + maxWaitForExit;
+            while (processId > 0
+                   && DateTime.UtcNow < deadline
+                   && LichLauncher.TryIsProcessAlive(processId))
+            {
+                await Task.Delay(PollInterval, ct).ConfigureAwait(false);
+            }
+
+            if (postExitGrace > TimeSpan.Zero)
+                await Task.Delay(postExitGrace, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Caller wants the tail down now — fall through to Stop().
+        }
+        finally
+        {
+            Stop();
+        }
+    }
+
     /// <summary>Stop the background loop. Idempotent.</summary>
     public void Stop()
     {
