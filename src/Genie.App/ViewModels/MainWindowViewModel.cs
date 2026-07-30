@@ -936,6 +936,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// character/port switch that needs a stop-then-relaunch before connect.</summary>
     private string? _ownedLichLaunchKey;
 
+    /// <summary>The <em>expanded</em> lichargs the owned Lich was actually launched with
+    /// ({character}/{port} already filled). The debug-log tailer resolves <c>--temp=</c>
+    /// from this, not from the live <c>#config lichargs</c> template: a template like
+    /// <c>--temp=temp-{character}</c> would otherwise send the tailer to a literal
+    /// <c>temp-{character}</c> directory, and lichdebug would look like it does nothing.
+    /// It also pins the tail to where the running process writes when the template is
+    /// edited mid-session.</summary>
+    private string? _ownedLichArguments;
+
     /// <summary>Live-tails the owned Lich's <c>temp/debug-*.log</c> into the game window
     /// when <c>#config lichdebug</c> is on. Null when not tailing.</summary>
     private Genie.Core.Connection.LichDebugLogTailer? _lichDebugTailer;
@@ -3554,6 +3563,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     _ownedLichProcessId = null;
                     _ownedLichProcessStartUtc = null;
                     _ownedLichLaunchKey = null;
+                    _ownedLichArguments = null;
                 }
 
                 // EnsureRunningAsync uses ConfigureAwait(false); marshal progress onto
@@ -3578,6 +3588,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     _ownedLichProcessId = pid;
                     _ownedLichProcessStartUtc = lich.ProcessStartTimeUtc ?? DateTime.UtcNow;
                     _ownedLichLaunchKey = launchKey;
+                    _ownedLichArguments = lichArgs;   // expanded — the tailer resolves --temp= from these
                     SyncOwnedLichDebugTail();
                 }
             }
@@ -3599,6 +3610,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _ownedLichProcessId = null;
         _ownedLichProcessStartUtc = null;
         _ownedLichLaunchKey = null;
+        _ownedLichArguments = null;
         Genie.Core.Connection.LichLauncher.TryStop(pid, out var message);
         if (!string.IsNullOrEmpty(message))
             GameText.AddSystemLine(message);
@@ -3621,13 +3633,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                         ?? DateTime.UtcNow;
         _ownedLichProcessStartUtc ??= notBefore;
 
-        // lichargs can be edited after the owned Lich was launched, so a malformed
-        // value can reach us even though the launcher validated it at start.
+        // Resolve --temp= from the args the owned process was launched with, not the
+        // live template: placeholders are already expanded there ({character} in a
+        // --temp= path), and a mid-session #config lichargs edit doesn't move where the
+        // running Lich writes. Falling back to the template keeps a tail possible if the
+        // launch args were never recorded; that value can be malformed (the launcher
+        // only validated what it launched), hence the catch.
         string? tempDir;
         try
         {
             tempDir = Genie.Core.Connection.LichDebugLogTailer.ResolveTempDirectory(
-                _core.Config.LichPath, _core.Config.LichArguments);
+                _core.Config.LichPath, _ownedLichArguments ?? _core.Config.LichArguments);
         }
         catch (FormatException ex)
         {

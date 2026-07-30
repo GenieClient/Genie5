@@ -72,6 +72,44 @@ public class LichDebugLogTailerTests
     }
 
     [Fact]
+    public void ResolveTempDirectory_roots_a_relative_temp_at_the_lich_directory()
+    {
+        // Lich keeps --temp= verbatim, so a relative value lands under its working
+        // directory — which the launcher sets to the dir holding lich.rbw. Resolving it
+        // against Genie's own cwd instead would tail a directory that doesn't exist.
+        var home = Path.Combine(Path.GetTempPath(), "lich-home");
+        var lich = Path.Combine(home, "lich.rbw");
+
+        Assert.Equal(
+            Path.Combine(home, "temp-Drazoken"),
+            LichDebugLogTailer.ResolveTempDirectory(lich, "--temp=temp-Drazoken"));
+
+        Assert.Equal(
+            Path.Combine(home, "run", "temp"),
+            LichDebugLogTailer.ResolveTempDirectory(lich, "--home=run"));
+    }
+
+    [Fact]
+    public void ResolveTempDirectory_tails_the_expanded_temp_when_lichargs_uses_placeholders()
+    {
+        // The tailer must be fed the args the process was launched with. Handed the raw
+        // template it resolves a literal `temp-{character}` directory nothing writes to,
+        // and lichdebug presents as doing nothing at all.
+        var home = Path.Combine(Path.GetTempPath(), "lich-home");
+        var lich = Path.Combine(home, "lich.rbw");
+        const string template = "--login {character} --detachable-client={port} --temp=temp-{character}";
+
+        Assert.True(LichLauncher.TryExpandArguments(template, "Drazoken", 8000, out var expanded, out _));
+        Assert.Equal(
+            Path.Combine(home, "temp-Drazoken"),
+            LichDebugLogTailer.ResolveTempDirectory(lich, expanded));
+
+        Assert.Equal(
+            Path.Combine(home, "temp-{character}"),
+            LichDebugLogTailer.ResolveTempDirectory(lich, template));
+    }
+
+    [Fact]
     public void ResolveTempDirectory_throws_rather_than_falling_back_on_a_bad_quote()
     {
         // Silently falling back to {lichdir}/temp would tail the wrong directory
