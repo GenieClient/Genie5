@@ -33,7 +33,12 @@ namespace Genie.Core.Extensions.Builtin.CircleCalc;
 /// <para><b>Config</b> (optional, read from a persistent <c>#var</c> first, then a
 /// session global): <c>$CircleCalc.Guild</c> default guild, <c>$CircleCalc.Sort</c>
 /// (1 = highest-circle reqs first), <c>$CircleCalc.Display</c> (0 = up to circle 200,
-/// 1 = all, 2 = next binding circle only) — matching the Genie 4 plugin's settings.</para>
+/// 1 = all, 2 = next binding circle only) — matching the Genie 4 plugin's settings.
+/// Result output honours two independent toggles, both default on:
+/// <c>$CircleCalc.Echo</c> (0 = don't display the result) and <c>$CircleCalc.Parse</c>
+/// (0 = don't feed the result to script actions/triggers). Set <c>Echo 0</c> +
+/// <c>Parse 1</c> to consume the output from a script without cluttering the window
+/// (public #207).</para>
 /// </summary>
 public sealed class CircleCalcExtension : IGameExtension
 {
@@ -261,10 +266,28 @@ public sealed class CircleCalcExtension : IGameExtension
             {
                 lines = CircleEngine.Sort(_ranks, _sortLabel, _sortFilter);
             }
-            foreach (var l in lines) _host.Echo(l);
+            EmitResult(lines);
         }
         catch (Exception ex) { Echo("Circle Calc error: " + ex.Message); }
         finally { Reset(); }
+    }
+
+    /// <summary>Emit the calculation/sort result honouring the Genie 4 display/parse
+    /// toggles, both default ON:
+    /// <list type="bullet">
+    /// <item><c>$CircleCalc.Echo = 0</c> — don't show the result in the game window.</item>
+    /// <item><c>$CircleCalc.Parse = 0</c> — don't feed the result to script actions/triggers.</item>
+    /// </list>
+    /// The two legs are independent, so a script can parse the output silently
+    /// (<c>Echo 0</c>, <c>Parse 1</c>) — the reporter's use case in public #207.
+    /// Usage/error lines still go through the plain <see cref="Echo(string)"/> path
+    /// (always shown); the toggles govern the result only, matching Genie 4.</summary>
+    private void EmitResult(IReadOnlyList<string> lines)
+    {
+        var echo  = Cfg("CircleCalc.Echo")  != "0";   // default on ("0" suppresses the window echo)
+        var parse = Cfg("CircleCalc.Parse") != "0";   // default on ("0" suppresses action feeding)
+        foreach (var l in lines)
+            _host.EchoRouted(l, echo, parse);
     }
 
     private void Reset()
@@ -334,6 +357,8 @@ public sealed class CircleCalcExtension : IGameExtension
         Echo("  /sort <group>          a custom group from SortGroups.xml");
         Echo("  /sort [...] <rank>     only skills at or above <rank>");
         Echo("  /cc reload[reqs|sort]  reload the data files");
+        Echo("  settings: $CircleCalc.Echo 0 hides the result; $CircleCalc.Parse 0 stops");
+        Echo("            it feeding actions (both default on).");
     }
 
     private void Echo(string line) => _host.Echo(line);

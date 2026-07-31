@@ -230,6 +230,8 @@ public sealed class ScriptEngine
         public EngineExtensionHost(ScriptEngine engine) { _engine = engine; }
         public IDictionary<string, string> Globals  => _engine.Globals;
         public void Echo(string text)               => _engine.EchoFromExtension(text);
+        public void EchoRouted(string text, bool display, bool parse)
+                                                    => _engine.EchoFromExtension(text, display, parse);
         public void SendCommand(string command)     => _engine._sendCommand(command);
         public void SetWindow(string window, string content)
             => _engine.SetWindow?.Invoke(window, content);
@@ -801,10 +803,16 @@ public sealed class ScriptEngine
     /// CircleCalc's <c>/sort</c> emits results a script's <c>action … when</c> is meant to
     /// capture). Guarded so an extension can't re-consume its own echo (OnGameLine skips
     /// extension dispatch while the flag is set) and a nested echo displays without looping.</summary>
-    private void EchoFromExtension(string text)
+    private void EchoFromExtension(string text) => EchoFromExtension(text, display: true, parse: true);
+
+    /// <summary>Extension output with independent <paramref name="display"/> /
+    /// <paramref name="parse"/> legs (Genie 4 plugin display/parse toggles). The
+    /// parse feed is guarded by <see cref="_inExtensionEcho"/> so a plugin's own
+    /// output never re-dispatches back into that plugin's OnGameLine.</summary>
+    private void EchoFromExtension(string text, bool display, bool parse)
     {
-        _echo(text);                                     // display — unchanged behaviour
-        if (_inExtensionEcho || _injectGameLine is null) return;
+        if (display) _echo(text);
+        if (!parse || _inExtensionEcho || _injectGameLine is null) return;
         _inExtensionEcho = true;
         try { _injectGameLine(text); }
         finally { _inExtensionEcho = false; }

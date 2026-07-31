@@ -45,6 +45,16 @@ public interface IExtensionHost
     /// for hosts without a pipeline.</summary>
     void InjectParsedLine(string line) { }
 
+    /// <summary>Echo with explicit control over the two legs plain <see cref="Echo"/>
+    /// couples: <paramref name="display"/> shows the line in the game window;
+    /// <paramref name="parse"/> feeds it to script actions/triggers (through the same
+    /// re-entrancy-guarded <c>#parse</c> seam <see cref="Echo"/> uses, so an
+    /// extension's own output can't loop back into it). Lets a plugin honour Genie 4
+    /// display/parse toggles (e.g. <c>$CircleCalc.Echo</c> / <c>$CircleCalc.Parse</c>)
+    /// independently. Default routes to <see cref="Echo"/> (both legs) so hosts that
+    /// don't distinguish them keep current behaviour.</summary>
+    void EchoRouted(string text, bool display, bool parse) => Echo(text);
+
     /// <summary>Run a <c>#command</c> (e.g. <c>#browser &lt;url&gt;</c>) through the
     /// host's command engine — <see cref="SendCommand"/> is game-bound and would leak
     /// a hash command to the server. Default no-op.</summary>
