@@ -449,8 +449,10 @@ public record TextLine(string Text, StreamColor Color,
     public bool IsEcho => Color == StreamColor.System;
 
     /// <summary>Monospaced font for <c>#echo mono</c> lines — falls back through
-    /// the chain if the first family is unavailable.</summary>
-    private static readonly FontFamily MonoFont = new("Consolas,Courier New,monospace");
+    /// the chain if the first family is unavailable. Internal (not private) so the
+    /// AvaloniaEdit renderer's colorizer can force the identical family for a mono
+    /// line instead of keeping a second copy of the fallback chain (#178).</summary>
+    internal static readonly FontFamily MonoFont = new("Consolas,Courier New,monospace");
 
     /// <summary>
     /// The line broken into styled <see cref="Inline"/> segments by
@@ -489,6 +491,15 @@ public record TextLine(string Text, StreamColor Color,
             return inlines;
         }
     }
+
+    /// <summary>The explicit <c>#echo</c> colour as a brush, or null when the line
+    /// carries none / it doesn't parse (caller keeps the default echo colour).
+    /// Same parse as the <see cref="Inlines"/> echo branch, exposed so the
+    /// AvaloniaEdit colorizer resolves it identically instead of re-deriving it.</summary>
+    internal IBrush? EchoForeground()
+        => EchoColor is not null && TryParseColor(EchoColor, out var c)
+            ? new SolidColorBrush(c)
+            : null;
 
     /// <summary>Parse a Genie 4 echo colour — a named colour (Yellow, DodgerBlue)
     /// or <c>#rrggbb</c> hex. Returns false (caller keeps the default colour) on

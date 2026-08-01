@@ -54,6 +54,13 @@
     <PackageReference Include="Avalonia.Desktop" Version="11.3.11" />
     <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.9" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.11" />
+    <!-- AvaloniaEdit backs the experimental editor-based Game window
+         (GenieConfig.UseEditorGameWindow, default off). Pinned to 11.4.1: it
+         floors at Avalonia >= 11.0.0 (no ceiling), so it resolves against our
+         11.3.11 pin without lifting it. 12.0.0 is NOT usable — it requires
+         Avalonia 12 exactly, which would drag the whole app plus the
+         Avalonia.ReactiveUI → ReactiveUI.Avalonia rename with it. -->
+    <PackageReference Include="Avalonia.AvaloniaEdit" Version="11.4.1" />
     <!-- Docking framework. The MVVM model variant (CommunityToolkit.Mvvm-based)
          is used instead of Dock.Model.ReactiveUI so the MDI document layout +
          skinned MDI window chrome are available WITHOUT forcing a ReactiveUI

@@ -142,6 +142,23 @@ public class GenieDockFactory : Factory
         WireLastKnownPositionTracking();
     }
 
+    /// <summary>
+    /// Build the main Game document, picking the renderer once. With
+    /// <c>#config useeditorgamewindow off</c> (the default) this is the ordinary
+    /// <see cref="GameTextDocument"/> and nothing about the shipped path changes;
+    /// with it on, the <see cref="EditorGameTextDocument"/> subtype selects the
+    /// AvaloniaEdit template instead. Read once here rather than made
+    /// live-switchable — swapping renderers under a populated scrollback isn't
+    /// worth the complexity, and a restart is a fair price for an experiment.
+    /// </summary>
+    private GameTextDocument NewGameText(Genie.Core.Layout.WindowSettingsStore ws)
+    {
+        var settings = ws.Get("game-text");
+        return _vm.UseEditorGameWindow
+            ? new EditorGameTextDocument(_vm.GameText, settings)
+            : new GameTextDocument(_vm.GameText, settings);
+    }
+
     public override IRootDock CreateLayout()
     {
         // Wire the host-window locator. Dock.Avalonia's FloatDockable silently
@@ -171,7 +188,7 @@ public class GenieDockFactory : Factory
         // Hand each Tool its WindowSettings entry so Layout-tab edits repaint
         // live (font, foreground, background, title).
         var ws       = _vm.WindowSettings;
-        var gameText = new GameTextDocument(_vm.GameText,         ws.Get("game-text"));
+        var gameText = NewGameText(ws);
         var vitals   = new VitalsTool      (_vm.Vitals,           ws.Get("vitals"));
         var room     = new RoomTool        (_vm.Room,             ws.Get("room"));
         var backpack = new BackpackTool    (_vm.Inventory,        ws.Get("backpack"));
@@ -428,7 +445,7 @@ public class GenieDockFactory : Factory
         };
 
         var ws         = _vm.WindowSettings;
-        var gameText   = new GameTextDocument(_vm.GameText,           ws.Get("game-text"));
+        var gameText   = NewGameText(ws);
         var vitals     = new VitalsTool      (_vm.Vitals,             ws.Get("vitals"));
         var room       = new RoomTool        (_vm.Room,               ws.Get("room"));
         var backpack   = new BackpackTool    (_vm.Inventory,          ws.Get("backpack"));
