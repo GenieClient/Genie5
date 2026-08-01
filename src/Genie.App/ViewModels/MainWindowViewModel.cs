@@ -556,6 +556,31 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     [Reactive] public bool RawXmlVisible   { get; private set; }   // hidden by default (opt-in, #14)
     [Reactive] public bool InjuriesVisible { get; private set; }   // hidden by default (opt-in, #18)
 
+    /// <summary>
+    /// Is a text stream's dock panel currently open? Handed to
+    /// <see cref="StreamTabsViewModel.Attach"/> so the closed-panel fallback
+    /// (mirror the line into Main so it isn't lost) is decided next to the
+    /// EchoToMain echo, which the same event also has to consider. The
+    /// visibility flags live here, the routing rule lives there.
+    /// <para>
+    /// Streams with no case fall through as visible, i.e. never mirrored:
+    /// "main" needs no mirroring, and atmospherics / log / itemlog are
+    /// deliberately excluded (they're opt-in or already consolidated feeds).
+    /// </para>
+    /// </summary>
+    private bool IsStreamPanelVisible(string stream) => stream.ToLowerInvariant() switch
+    {
+        "logons"   => LogonsVisible,
+        "talk"     => TalkVisible,
+        "whispers" => WhispersVisible,
+        "thoughts" => ThoughtsVisible,
+        "combat"   => CombatVisible,
+        "familiar" => FamiliarVisible,
+        "death"    => DeathVisible,
+        "assess"   => AssessVisible,
+        _          => true,
+    };
+
     // ── Toggle commands (one per dockable) ───────────────────────────────────
     public ReactiveCommand<Unit, Unit> ToggleGameCommand     { get; }
     public ReactiveCommand<Unit, Unit> ToggleVitalsCommand   { get; }
@@ -4385,7 +4410,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Room.Attach(_core);
         Inventory.Attach(_core);
         Mapper.Attach(_core);
-        StreamTabs.Attach(_core, GameText);
+        StreamTabs.Attach(_core, GameText, IsStreamPanelVisible);
         Experience.Attach(_core);
         ActiveSpells.Attach(_core);
         TimeTracker.Attach(_core);
@@ -4596,31 +4621,6 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     _containerNouns.TryRemove(e.TargetId, out _);
                 else
                     _containerNouns[e.TargetId] = e.Title;
-            });
-
-        // ── Fallback: when a stream tool is hidden, mirror its text into the
-        // main Game window so the player still sees it. The StreamBuffer
-        // continues to accumulate either way, so the history is preserved
-        // when the tool is re-opened.
-        _core.GameEvents
-            .OfType<TextEvent>()
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(e =>
-            {
-                var streamVisible = e.Stream.ToLowerInvariant() switch
-                {
-                    "logons"   => LogonsVisible,
-                    "talk"     => TalkVisible,
-                    "whispers" => WhispersVisible,
-                    "thoughts" => ThoughtsVisible,
-                    "combat"   => CombatVisible,
-                    "familiar" => FamiliarVisible,
-                    "death"    => DeathVisible,
-                    "assess"   => AssessVisible,
-                    _          => true   // main + non-tool streams: nothing to mirror
-                };
-                if (!streamVisible)
-                    GameText.AddStreamLine(e.Stream, e.Text);
             });
 
         // Surface timed connect-progress (TLS attempt, per-SGE-step timings,
