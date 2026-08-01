@@ -478,7 +478,7 @@ public sealed class GameConnection : IAsyncDisposable
     /// and emits each as a discrete chunk to both the parser and AI streams.
     /// Incomplete tags are left in the buffer for the next read.
     /// </summary>
-    private void EmitChunks(StringBuilder pending)
+    internal void EmitChunks(StringBuilder pending)
     {
         if (pending.Length == 0) return;
 
@@ -509,8 +509,18 @@ public sealed class GameConnection : IAsyncDisposable
             var chunk = raw.Substring(pos, splitAt - pos);
             pos = splitAt;
 
-            // Skip empty / whitespace-only chunks
-            if (string.IsNullOrWhiteSpace(chunk)) continue;
+            // Publish everything with content. A whitespace-only chunk can only
+            // ever be a '\n'-terminated one (whitespace sitting between two tags
+            // is swallowed into the chunk that ends at the following '>'), i.e. a
+            // BLANK LINE — and dropping those here defeated the parser's
+            // blank-line preservation (public #176) on the live path: DrXmlParser
+            // never saw the newline, so INFO/LOOK/HELP spacing and blank rows
+            // inside a mono block collapsed. Whether a blank is real output or
+            // just a tag-adjacent formatting newline is the PARSER's call — it
+            // has the context (_emittedTextLine) to tell them apart; the chunker
+            // does not. Feeding the parser directly (unit tests, TestHarness
+            // REPLAY) bypasses this method, which is why the drop went unnoticed.
+            if (chunk.Length == 0) continue;
 
             Publish(chunk);
         }

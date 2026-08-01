@@ -20,6 +20,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The chunker (GameConnection.EmitChunks) is the live path's line
+         splitter and has its own regression tests; it stays internal so it
+         isn't part of Core's public surface. -->
+    <InternalsVisibleTo Include="Genie.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Reactive event streams (no WinForms dependency) -->
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />

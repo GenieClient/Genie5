@@ -677,7 +677,16 @@ core.GameEvents
 
         parsedLog?.WriteLine(display);
 
-        if (isCompare)
+        // COMPARE capture skips blank lines, matching GenerateXmlBaseline's own
+        // empty-line filter. The baseline strips tags and collapses whitespace,
+        // which turns a markup-only line (<pushStream/>, <indicator/>, a compass
+        // block) into exactly the same empty string as a genuine blank — it
+        // cannot represent a blank line, so it drops them all. Capturing them on
+        // the parsed side would report one "only in parsed" empty entry that no
+        // baseline could ever match. COMPARE measures text the parser drops or
+        // reformats; a blank carries no text. The full parsedLog above still
+        // records them — that file is a rendering of the session, not a diff input.
+        if (isCompare && e.Text.Length > 0)
             parsedLines.Add(display);
 
         Console.ForegroundColor = StreamColor(e.Stream);
