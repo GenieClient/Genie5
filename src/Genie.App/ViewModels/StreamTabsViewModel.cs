@@ -52,9 +52,22 @@ public class StreamTabsViewModel : ReactiveObject
     /// stream with its <c>EchoToMain</c> toggle on can also post into Main.</summary>
     private GameTextViewModel? _main;
 
-    public void Attach(GenieCore core, GameTextViewModel? main = null)
+    /// <summary>
+    /// Is this stream's dock panel currently open? Supplied by
+    /// <see cref="MainWindowViewModel"/> (which owns the per-tool visibility
+    /// flags) so the closed-panel fallback can be decided here, alongside the
+    /// <c>EchoToMain</c> echo, rather than from a second subscription racing
+    /// over the same event. Absent (or unknown stream) ⇒ treated as open, i.e.
+    /// no fallback.
+    /// </summary>
+    private Func<string, bool>? _isPanelVisible;
+
+    public void Attach(GenieCore core,
+                       GameTextViewModel? main = null,
+                       Func<string, bool>? isPanelVisible = null)
     {
-        _main = main;
+        _main           = main;
+        _isPanelVisible = isPanelVisible;
 
         // Hand each buffer the live Names engine so the per-window "Name List
         // Only" right-click toggle can filter to lines mentioning a tracked
@@ -87,14 +100,8 @@ public class StreamTabsViewModel : ReactiveObject
                 // links and preset colours just like the main window does.
                 buf?.Add(e.Text, e.BoldSpans, e.Links, e.PresetSpans);
 
-                // Per-stream "Also show in Main" (Layout tab). When on, echo the
-                // line into the main game window in addition to its own panel.
-                // buf.Settings is the same WindowSettings instance the Layout tab
-                // mutates, so the toggle takes effect live with no re-subscribe —
-                // exactly like the Timestamp / NameListOnly toggles above. Carry
-                // the spans so the echoed combat hit is gold in Main too (#187).
-                if (buf?.Settings?.EchoToMain == true)
-                    _main?.EchoStreamToMain(e.Text, e.BoldSpans, e.Links, e.PresetSpans);
+                if (buf is not null)
+                    RouteToMain(buf, e);
 
                 // The Log window is a consolidated conversation feed: mirror
                 // the speech streams into it (matches the Genie 4 / dylb0t
@@ -102,6 +109,53 @@ public class StreamTabsViewModel : ReactiveObject
                 if (e.Stream is "talk" or "whispers")
                     Log.Add(e.Text, e.BoldSpans, e.Links, e.PresetSpans);
             });
+    }
+
+    /// <summary>
+    /// Decide whether a side-stream line also lands in the main game window,
+    /// and in which form. The two routes are mutually exclusive — a line is
+    /// mirrored into Main at most once:
+    /// <list type="bullet">
+    /// <item><b>EchoToMain on</b> (the default) — Genie 4's per-stream "also
+    /// show in Main". Echoed plain, no prefix, whether the stream's own panel
+    /// is open or closed.</item>
+    /// <item><b>EchoToMain off, panel closed</b> — the visibility fallback, so
+    /// text isn't silently lost while its window is hidden. Prefixed
+    /// <c>[stream]</c> to mark where it came from.</item>
+    /// <item><b>EchoToMain off, panel open</b> — nothing; the panel has it.</item>
+    /// </list>
+    /// <para>
+    /// Both routes are settled here, from the one subscription that already
+    /// resolved the buffer, so they cannot both fire for the same event — the
+    /// bug that showed up as every combat line appearing twice in Main (once
+    /// plain, once <c>[combat] …</c>) the moment the Combat panel was closed.
+    /// Reading <c>buf.Settings</c> rather than the settings store also keeps
+    /// the decision on the same instance the echo uses; a buffer with no
+    /// settings yet (pre dock-build) reads as "not echoing" and falls through
+    /// to the fallback, so a line can never vanish.
+    /// </para>
+    /// <para>
+    /// Where a closed panel's text goes is hard-wired to Main here.
+    /// <see cref="WindowSettings.IfClosed"/> — which can name a different
+    /// target window (talk → conversation, and so on) — is still unimplemented;
+    /// honouring it means resolving that id to a sink and following the chain
+    /// when the target is itself closed. This is the single place that changes.
+    /// </para>
+    /// </summary>
+    private void RouteToMain(StreamBuffer buf, TextEvent e)
+    {
+        // buf.Settings is the same WindowSettings instance the Layout tab
+        // mutates, so the toggle takes effect live with no re-subscribe —
+        // exactly like the Timestamp / NameListOnly toggles. Carry the spans so
+        // the echoed combat hit is gold in Main too (#187).
+        if (buf.Settings?.EchoToMain == true)
+        {
+            _main?.EchoStreamToMain(e.Text, e.BoldSpans, e.Links, e.PresetSpans);
+            return;
+        }
+
+        if (_isPanelVisible?.Invoke(e.Stream) == false)
+            _main?.AddStreamLine(e.Stream, e.Text);
     }
 }
 
