@@ -37,6 +37,8 @@ public sealed class WindowMenuModel : ReactiveObject
     private readonly Action<bool>? _onScrollPauseToggled;
     private readonly Action<bool>? _onWordWrapToggled;
     private readonly Func<bool>?   _floatStateProbe;
+    private readonly Action?       _onToggleTitleBar;
+    private readonly Func<bool>?   _titleBarHiddenProbe;
 
     public WindowMenuModel(
         ICommand?     clear                 = null,
@@ -55,7 +57,9 @@ public sealed class WindowMenuModel : ReactiveObject
         bool          wordWrapOn            = true,
         Action<bool>? onWordWrapToggled     = null,
         bool          echoToMainOn          = true,
-        Action<bool>? onEchoToMainToggled   = null)
+        Action<bool>? onEchoToMainToggled   = null,
+        Action?       onToggleTitleBar      = null,
+        Func<bool>?   titleBarHiddenProbe   = null)
     {
         ClearCommand           = clear;
         CloseCommand           = close;
@@ -73,12 +77,21 @@ public sealed class WindowMenuModel : ReactiveObject
         _isWordWrapOn          = wordWrapOn;
         _onWordWrapToggled     = onWordWrapToggled;
         _floatStateProbe       = floatStateProbe;
+        _onToggleTitleBar      = onToggleTitleBar;
+        _titleBarHiddenProbe   = titleBarHiddenProbe;
 
         if (onToggleFloat is not null)
             ToggleFloatCommand = ReactiveCommand.Create(() =>
             {
                 onToggleFloat();
                 RefreshFloatState();   // verb flips immediately after the action
+            });
+
+        if (onToggleTitleBar is not null)
+            ToggleTitleBarCommand = ReactiveCommand.Create(() =>
+            {
+                onToggleTitleBar();
+                RefreshFloatState();   // "Hide" ⇄ "Show" flips immediately
             });
 
         // Seed the float verb from the live tree (almost always "Float" — the
@@ -94,6 +107,9 @@ public sealed class WindowMenuModel : ReactiveObject
     /// <summary>"Find…" — open the window's in-window search bar (#120).</summary>
     public ICommand? FindCommand        { get; }
     public ICommand? ToggleFloatCommand { get; }
+    /// <summary>#181: collapse / restore the float's title bar (only meaningful when
+    /// floating; the item hides itself when docked via <see cref="ShowHideTitleBar"/>).</summary>
+    public ICommand? ToggleTitleBarCommand { get; }
 
     // Capability flags drive each MenuItem's IsVisible — a window only shows the
     // items it actually supports. Timestamp / Name List Only / Pause are
@@ -111,13 +127,24 @@ public sealed class WindowMenuModel : ReactiveObject
     public bool ShowWordWrap     => _onWordWrapToggled    is not null;
     public bool ShowFloat        => ToggleFloatCommand    is not null;
 
+    /// <summary>#181: "Hide/Show Title Bar" applies only to a window that's floating
+    /// in its own frame — a docked panel has no float title bar — so the item shows
+    /// only when the toggle was wired AND the window is currently floating. Kept live
+    /// by <see cref="RefreshFloatState"/> on each menu-open.</summary>
+    public bool ShowHideTitleBar => ToggleTitleBarCommand is not null && _isFloating;
+
+    /// <summary>#181: "Hide Title Bar" when the bar is shown, "Show Title Bar" when
+    /// it's collapsed. Reflects the live float-window state (probed on menu-open).</summary>
+    public string TitleBarHeader =>
+        (_titleBarHiddenProbe?.Invoke() ?? false) ? "Show Title Bar" : "Hide Title Bar";
+
     /// <summary>Render the separator above "Close Window" only when Close
     /// coexists with at least one item above it (so a Close-only menu has no
     /// dangling leading separator).</summary>
     public bool ShowCloseSeparator =>
         ShowClose && (ShowCopyAll || ShowClear || ShowSaveAs || ShowFind
                       || ShowTimestamp || ShowNameListOnly || ShowEchoToMain
-                      || ShowPauseScroll || ShowWordWrap || ShowFloat);
+                      || ShowPauseScroll || ShowWordWrap || ShowFloat || ShowHideTitleBar);
 
     /// <summary>Time Stamp checkbox state. Set by the TwoWay menu binding —
     /// flipping it runs the toggle handler (which updates the window's
@@ -200,11 +227,18 @@ public sealed class WindowMenuModel : ReactiveObject
     /// <see cref="WindowMenuBehavior"/>) and right after a Float / Re-dock.</summary>
     public void RefreshFloatState()
     {
+        // #181: the title-bar item's visibility and its Hide/Show verb both depend on
+        // live float-window state, so re-raise them on every open even when the float
+        // flag itself didn't move (the user may have hidden/shown the bar since).
+        this.RaisePropertyChanged(nameof(ShowHideTitleBar));
+        this.RaisePropertyChanged(nameof(TitleBarHeader));
+
         if (_floatStateProbe is null) return;
         var floating = _floatStateProbe();
         if (_isFloating == floating) return;
         _isFloating = floating;
         this.RaisePropertyChanged(nameof(FloatHeader));
+        this.RaisePropertyChanged(nameof(ShowHideTitleBar));
     }
 
     /// <summary>Mirror an external Time Stamp change (e.g. the Layout tab) into

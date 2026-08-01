@@ -170,6 +170,9 @@
                           <MenuItem Header="{Binding WindowMenu.FloatHeader}"
                                     Command="{Binding WindowMenu.ToggleFloatCommand}"
                                     IsVisible="{Binding WindowMenu.ShowFloat}" />
+                          <MenuItem Header="{Binding WindowMenu.TitleBarHeader}"
+                                    Command="{Binding WindowMenu.ToggleTitleBarCommand}"
+                                    IsVisible="{Binding WindowMenu.ShowHideTitleBar}" />
                           <Separator IsVisible="{Binding WindowMenu.ShowCloseSeparator}" />
                           <MenuItem Header="Close Window"
                                     Command="{Binding WindowMenu.CloseCommand}"

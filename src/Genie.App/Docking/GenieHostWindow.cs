@@ -29,6 +29,17 @@ public sealed class GenieHostWindow : HostWindow
 
     private Control? _titleBar;
 
+    /// <summary>#181: Dock's chrome bar (accent title bar with the tool name), cached
+    /// once resolved from the visual tree. This — not <see cref="_titleBar"/> — is the
+    /// bar the user sees on a float and the one <see cref="SetTitleBarHidden"/> collapses.</summary>
+    private ToolChromeControl? _toolChrome;
+
+    /// <summary>#181: title bar collapsed to reclaim vertical space. Session-only —
+    /// a reopened float starts with the bar shown. Restore by double-clicking the
+    /// window's top edge (the bar and its menu are hidden, so that's the on-window
+    /// way back).</summary>
+    private bool _titleBarHidden;
+
     public GenieHostWindow()
     {
         // #170: floated panels are secondary tool windows of the one Genie
@@ -207,11 +218,44 @@ public sealed class GenieHostWindow : HostWindow
         }
     }
 
+    /// <summary>#181: whether this float's title bar is currently collapsed.</summary>
+    public bool IsTitleBarHidden => _titleBarHidden;
+
+    /// <summary>#181: collapse / restore the float's title bar — Dock's
+    /// <see cref="ToolChromeControl"/> (the accent bar showing the tool name, the
+    /// bar the user actually sees; NOT the HostWindow's PART_TitleBar). Collapsing
+    /// it (IsVisible=false) takes it out of layout so the panel content reclaims the
+    /// ~30px, which is the request (#181). Restore is a double-click on the window's
+    /// top edge (see <see cref="OnWindowDoubleTapped"/>) — the bar carries the drag
+    /// handle and its own menu, so hiding it removes the on-bar way back.</summary>
+    public void SetTitleBarHidden(bool hidden)
+    {
+        _titleBarHidden = hidden;
+        // Resolve lazily: the chrome isn't in the tree until the float is shown,
+        // and it can be recreated, so re-search whenever we don't hold a live one.
+        if (_toolChrome is null || _toolChrome.GetVisualRoot() is null)
+            _toolChrome = this.GetVisualDescendants().OfType<ToolChromeControl>().FirstOrDefault();
+        if (_toolChrome is not null) _toolChrome.IsVisible = !hidden;
+    }
+
     private void OnTitleBarDoubleTapped(object? sender, TappedEventArgs e) => ToggleMaximize(e);
 
     private void OnWindowDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (e.Handled || _titleBar is not null) return;            // precise handler covers it
+        if (e.Handled) return;
+
+        // #181: with the title bar hidden, a double-click in the top band brings it
+        // back. The hidden bar receives no pointer events, so this window-level
+        // handler is the restore path. Checked before the maximize fallback so it
+        // wins over "double-click top → maximize".
+        if (_titleBarHidden && e.GetPosition(this).Y <= TitleBarBandHeight)
+        {
+            SetTitleBarHidden(false);
+            e.Handled = true;
+            return;
+        }
+
+        if (_titleBar is not null) return;            // precise handler covers it
         if (e.GetPosition(this).Y <= TitleBarBandHeight)
             ToggleMaximize(e);
     }

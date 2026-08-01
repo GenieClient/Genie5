@@ -872,6 +872,13 @@ public class GenieDockFactory : Factory
             ? (null, null)
             : ((Action?)(() => ToggleFloat(id)), (Func<bool>?)(() => IsToolFloating(id)));
 
+        // #181: Hide / Show Title Bar — same set as Float (any detachable tool); the
+        // menu item shows only while the window is actually floating (WindowMenuModel
+        // gates it on live float state).
+        (Action? toggleTitleBar, Func<bool>? titleBarHidden) = dockable is GameTextDocument
+            ? (null, null)
+            : ((Action?)(() => ToggleFloatTitleBar(id)), (Func<bool>?)(() => IsFloatTitleBarHidden(id)));
+
         // Copy All — windows with a copyable line buffer. Game window reuses its
         // existing clipboard command (also on Ctrl+Shift+C); streams + raw-XML
         // copy their buffer text.
@@ -959,7 +966,9 @@ public class GenieDockFactory : Factory
                 wordWrapOn:        wrapInit,
                 onWordWrapToggled: wrapToggle,
                 onToggleFloat:     toggleFloat,
-                floatStateProbe:   floatProbe);
+                floatStateProbe:   floatProbe,
+                onToggleTitleBar:  toggleTitleBar,
+                titleBarHiddenProbe: titleBarHidden);
 
         var settings = _vm.WindowSettings.Get(id);
 
@@ -1020,7 +1029,9 @@ public class GenieDockFactory : Factory
             wordWrapOn:            wrapInit,
             onWordWrapToggled:     wrapToggle,
             echoToMainOn:          echoInit,
-            onEchoToMainToggled:   echoToggle);
+            onEchoToMainToggled:   echoToggle,
+            onToggleTitleBar:      toggleTitleBar,
+            titleBarHiddenProbe:   titleBarHidden);
 
         // Keep the checkmarks in sync if the same settings are edited elsewhere
         // (e.g. the Configuration → Layout tab's Time Stamp checkbox).
@@ -1619,6 +1630,21 @@ public class GenieDockFactory : Factory
     {
         if (IsToolFloating(id)) RedockTool(id);
         else                    FloatTool(id);
+    }
+
+    /// <summary>#181: whether the tool's floating window currently has its title bar
+    /// (Dock chrome) collapsed. False when the tool is docked or its host isn't a
+    /// <see cref="GenieHostWindow"/>.</summary>
+    public bool IsFloatTitleBarHidden(string id) =>
+        FindWindowHosting(id)?.Host is GenieHostWindow g && g.IsTitleBarHidden;
+
+    /// <summary>#181: collapse / restore a floating tool's title bar to reclaim the
+    /// chrome's vertical space. No-op unless the tool is floating in a
+    /// <see cref="GenieHostWindow"/> (a docked panel has no float title bar).</summary>
+    public void ToggleFloatTitleBar(string id)
+    {
+        if (FindWindowHosting(id)?.Host is GenieHostWindow g)
+            g.SetTitleBarHidden(!g.IsTitleBarHidden);
     }
 
     /// <summary>
