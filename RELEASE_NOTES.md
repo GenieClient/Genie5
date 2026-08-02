@@ -1,3 +1,51 @@
+# Genie 5 — v5.0.0-beta.3
+
+Window routing that finally works, a Hide Title Bar fix, and a batch of stream,
+Lich, and experience fixes — several from @simtel12.
+
+## ✨ New
+
+- **Hide a floated window's title bar** to reclaim space — from either the window
+  menu or the title-bar right-click menu; restore by double-clicking the window's
+  top edge. (#181)
+- **CircleCalc output toggles** — `#var CircleCalc.Echo 0` hides the result and
+  `#var CircleCalc.Parse 0` stops it feeding scripts (both default on). (#207)
+- **Per-creature combat status** — `<crtrStatus>` (hostile / disengaged / flying)
+  is now tracked in game state, cleared on room change. (#202)
+
+## 🐛 Fixes
+
+- **Closed stream panels honour their "If Closed" routing** — a closed panel's
+  text can redirect to another window (Talk/Whispers consolidate into Log by
+  default), follows the chain if that window is also closed, and is never
+  silently dropped; the Layout-tab dropdown now round-trips. (#211)
+- **Hide Title Bar no longer blanks the window** — it collapses only the title
+  strip, leaving the panel content in place. (#181)
+- **No more double-printed stream lines in Main** when a stream panel is closed.
+  (#210)
+- **Blank lines are preserved** — `INFO`, `LOOK`, `HELP`, and experience spacing
+  no longer collapse into a wall of text. (#209)
+- **Crafting no longer leaks markup** — the `<forging>` UI element is recognized
+  and discarded instead of showing as garbled text. (#208)
+- **Live experience under `BRIEFEXP ON`** — the Experience window updates from the
+  shorthand pulses. (#204)
+- **Lich debug logging** — resolves the temp directory from the arguments Lich
+  actually received, and keeps the mirror up until the owned Lich exits. (#205,
+  #206)
+- **Extension output feeds scripts** — a built-in extension's game-window output
+  now drives script actions and triggers, matching Genie 4.
+
+## 💡 Notes
+
+- **DR front-end features:** DR gates `EXPBRIEF` and richer clickable-command
+  markup to the Wrayth front end. To enable them, set `#config frontend wrayth`
+  and reconnect.
+
+Thanks to @simtel12 (Gregorios Leach) for #204, #205, #206, #209, #210, #212, and
+for reporting #211.
+
+---
+
 # Genie 5 — v5.0.0-beta.2
 
 Lich-proxy diagnostics and combat-color polish — the second beta.
