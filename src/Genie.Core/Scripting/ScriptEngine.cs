@@ -2608,13 +2608,22 @@ public sealed class ScriptEngine
     /// can request "send eagerly" (negative ⇒ no wait). The number must be
     /// followed by whitespace (or be the whole segment) to count as a delay —
     /// otherwise a command that merely starts with a digit (e.g. <c>2nd</c>)
-    /// is left intact. Returns <c>(0, trimmedSegment)</c> when no delay is
-    /// present. <paramref name="seg"/> arrives already trimmed.
+    /// is left intact.
+    /// <para>A leading <c>-</c> that is NOT part of a number (e.g. <c>-cast</c>,
+    /// <c>-touch my orb</c>) is the same "fire eagerly" marker in bare-verb form:
+    /// long-standing community scripts (uber.cmd et al.) prefix a verb with
+    /// <c>-</c> as an inline no-wait hint. DR rejects a hyphen-prefixed verb
+    /// ("Please rephrase"), so left intact it would silently bounce. We strip the
+    /// lone leading <c>-</c> (zero delay) so the verb actually reaches the game.
+    /// Only a hyphen at position 0 qualifies — a hyphen mid-token is left be.</para>
+    /// Returns <c>(0, trimmedSegment)</c> when no delay/marker is present.
+    /// <paramref name="seg"/> arrives already trimmed.
     /// </summary>
     internal static (double delay, string cmd) ParseSendDelay(string seg)
     {
         int i = 0;
-        if (i < seg.Length && seg[i] == '-') i++;
+        bool hadMinus = false;
+        if (i < seg.Length && seg[i] == '-') { i++; hadMinus = true; }
         bool dot = false, sawDigit = false;
         while (i < seg.Length && (char.IsDigit(seg[i]) || (seg[i] == '.' && !dot)))
         {
@@ -2622,11 +2631,13 @@ public sealed class ScriptEngine
             i++;
         }
         bool boundary = i >= seg.Length || seg[i] == ' ' || seg[i] == '\t';
-        if (!sawDigit || !boundary) return (0.0, seg.Trim());
-        if (!double.TryParse(seg[..i], System.Globalization.NumberStyles.Float,
-                             System.Globalization.CultureInfo.InvariantCulture, out var d))
-            return (0.0, seg.Trim());
-        return (d, seg[i..].Trim());
+        if (sawDigit && boundary &&
+            double.TryParse(seg[..i], System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out var d))
+            return (d, seg[i..].Trim());
+        // Bare leading '-' (not a numeric delay) → eager, strip it. See remarks.
+        if (hadMinus && !sawDigit) return (0.0, seg[1..].Trim());
+        return (0.0, seg.Trim());
     }
 
     /// <summary>The current Genie4 <c>%argcount</c> for this instance — the

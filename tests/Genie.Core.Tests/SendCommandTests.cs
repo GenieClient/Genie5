@@ -129,6 +129,45 @@ public class SendCommandTests : IDisposable
     }
 
     [Fact]
+    public void Send_bare_dash_verb_queues_the_stripped_verb_eagerly()
+    {
+        // Community "fire eagerly" idiom: `send -cast` must reach the game as
+        // `cast`, not the hyphen-prefixed form DR rejects. Shared ParseSendDelay
+        // strip, exercised through the #send path.
+        var (_, queue, engine) = NewEngine();
+        engine.ProcessInput("#send -cast");
+
+        var item = Assert.Single(queue.EventList);
+        Assert.Equal(0.0, item.Delay);
+        Assert.Equal("cast", item.Action);
+    }
+
+    [Fact]
+    public void Send_bare_dash_multiword_verb_is_stripped_intact()
+    {
+        var (_, queue, engine) = NewEngine();
+        engine.ProcessInput("#send -touch my orb");
+
+        var item = Assert.Single(queue.EventList);
+        Assert.Equal(0.0, item.Delay);
+        Assert.Equal("touch my orb", item.Action);
+    }
+
+    [Fact]
+    public void Put_leaves_a_leading_dash_verb_verbatim()
+    {
+        // Regression guard: the eager-dash strip is a send/#send behavior only.
+        // #put stays immediate and verbatim (Genie 4 parity) — a `-cast` typed
+        // via #put is the user's literal text.
+        var (host, queue, engine) = NewEngine();
+        engine.ProcessInput("#put -cast");
+
+        var sent = Assert.Single(host.SendToGameCalls);
+        Assert.Equal("-cast", sent);
+        Assert.Empty(queue.EventList);
+    }
+
+    [Fact]
     public void Send_with_no_arguments_is_a_no_op()
     {
         var (host, queue, engine) = NewEngine();
