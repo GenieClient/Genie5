@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
+using Avalonia.Data;
 using Avalonia.Input;
 using System.Linq;
 using Avalonia.Platform;
@@ -29,9 +30,10 @@ public sealed class GenieHostWindow : HostWindow
 
     private Control? _titleBar;
 
-    /// <summary>#181: Dock's chrome bar (accent title bar with the tool name), cached
-    /// once resolved from the visual tree. This — not <see cref="_titleBar"/> — is the
-    /// bar the user sees on a float and the one <see cref="SetTitleBarHidden"/> collapses.</summary>
+    /// <summary>#181: Dock's chrome control (accent title bar with the tool name),
+    /// cached once resolved from the visual tree. This — not <see cref="_titleBar"/> —
+    /// is the bar the user sees on a float; <see cref="SetTitleBarHidden"/> collapses
+    /// its header band (leaving the content presenter intact).</summary>
     private ToolChromeControl? _toolChrome;
 
     /// <summary>#181: title bar collapsed to reclaim vertical space. Session-only —
@@ -68,7 +70,7 @@ public sealed class GenieHostWindow : HostWindow
             // The chrome's template is applied by now, but give the visual
             // tree one more tick before searching it for the button strip.
             Avalonia.Threading.Dispatcher.UIThread.Post(
-                TryInjectMinimizeButton,
+                () => { TryInjectMinimizeButton(); TryAddHideTitleBarToChromeFlyout(); },
                 Avalonia.Threading.DispatcherPriority.Loaded);
         };
         Closed += (_, _) => { _mainStateSub?.Dispose(); _mainStateSub = null; };
@@ -128,6 +130,55 @@ public sealed class GenieHostWindow : HostWindow
 
         var idx = strip.Children.IndexOf(maximize);
         strip.Children.Insert(idx < 0 ? 0 : idx, minimize);
+    }
+
+    /// <summary>Guard: the "Hide Title Bar" item is added to Dock's SHARED
+    /// <c>ToolFlyout</c> once per process (the flyout is a single DynamicResource
+    /// instance reused by every chrome), so later floats must not re-add it.</summary>
+    private static bool _hideTitleBarFlyoutItemAdded;
+
+    /// <summary>#181 follow-up: also expose "Hide Title Bar" on the title-bar
+    /// right-click menu (Dock's <see cref="ToolChromeControl"/> flyout), not only on
+    /// our content menu — a user reaching to hide the bar naturally right-clicks the
+    /// bar itself (field request). That flyout is Dock's own shared MenuFlyout
+    /// (Float / Dock / Dock as Tabbed / Close), assigned to every chrome via the
+    /// theme, so we add ONE item to it, gated to floating chromes (mirroring Dock's
+    /// own AutoHide item, which uses the same <c>$parent[ToolChromeControl]</c>
+    /// binding). The item hides THIS window's bar via the active float — right-clicking
+    /// a float activates it, and a hidden bar can't be right-clicked, so the item is
+    /// always "hide" (restore stays the double-click-top-edge path).
+    /// Best-effort: if Dock's flyout shape changes, this quietly does nothing.</summary>
+    private void TryAddHideTitleBarToChromeFlyout()
+    {
+        if (_hideTitleBarFlyoutItemAdded) return;
+        if (_toolChrome is null || _toolChrome.GetVisualRoot() is null)
+            _toolChrome = this.GetVisualDescendants().OfType<ToolChromeControl>().FirstOrDefault();
+        if (_toolChrome?.ToolFlyout is not MenuFlyout flyout) return;
+
+        var item = new MenuItem { Name = "GenieHideTitleBarItem", Header = "Hide Title Bar" };
+        // Only on floating chromes — a docked tool has no separable title bar to hide.
+        item.Bind(IsVisibleProperty, new Binding
+        {
+            Path           = "IsFloating",
+            RelativeSource  = new RelativeSource(RelativeSourceMode.FindAncestor)
+            {
+                AncestorType = typeof(ToolChromeControl),
+            },
+        });
+        // The shared flyout has no per-window context, so act on the float the user
+        // just right-clicked = the active one.
+        item.Click += (_, _) =>
+        {
+            if (Application.Current?.ApplicationLifetime is
+                    IClassicDesktopStyleApplicationLifetime desktop)
+                desktop.Windows.OfType<GenieHostWindow>()
+                       .FirstOrDefault(w => w.IsActive)
+                       ?.SetTitleBarHidden(true);
+        };
+
+        flyout.Items.Add(new Separator());
+        flyout.Items.Add(item);
+        _hideTitleBarFlyoutItemAdded = true;
     }
 
     private IDisposable? _mainStateSub;
@@ -221,13 +272,19 @@ public sealed class GenieHostWindow : HostWindow
     /// <summary>#181: whether this float's title bar is currently collapsed.</summary>
     public bool IsTitleBarHidden => _titleBarHidden;
 
-    /// <summary>#181: collapse / restore the float's title bar — Dock's
-    /// <see cref="ToolChromeControl"/> (the accent bar showing the tool name, the
-    /// bar the user actually sees; NOT the HostWindow's PART_TitleBar). Collapsing
-    /// it (IsVisible=false) takes it out of layout so the panel content reclaims the
-    /// ~30px, which is the request (#181). Restore is a double-click on the window's
-    /// top edge (see <see cref="OnWindowDoubleTapped"/>) — the bar carries the drag
-    /// handle and its own menu, so hiding it removes the on-bar way back.</summary>
+    /// <summary>#181: collapse / restore the float's title bar — the header band of
+    /// Dock's <see cref="ToolChromeControl"/> (the accent bar showing the tool name;
+    /// NOT the HostWindow's PART_TitleBar). The chrome template is a Grid(Auto,*):
+    /// row 0 = the header (<c>PART_Border</c>, which holds the title + pin/max/close
+    /// buttons) and its divider (<c>PART_Panel</c>); row 1 = <c>PART_ContentPresenter</c>,
+    /// the tool's actual content. We collapse ONLY the row-0 header parts, so the Auto
+    /// row shrinks to 0 and the content reclaims the ~30px (the request, #181).
+    /// <para>Hiding the whole ToolChromeControl — the first cut of this fix — blanked
+    /// the content too, since the content presenter lives inside it (field report:
+    /// "we hide the content too").</para>
+    /// Restore is a double-click on the window's top edge (see
+    /// <see cref="OnWindowDoubleTapped"/>) — the header carries the drag handle and its
+    /// own menu, so hiding it removes the on-bar way back.</summary>
     public void SetTitleBarHidden(bool hidden)
     {
         _titleBarHidden = hidden;
@@ -235,7 +292,20 @@ public sealed class GenieHostWindow : HostWindow
         // and it can be recreated, so re-search whenever we don't hold a live one.
         if (_toolChrome is null || _toolChrome.GetVisualRoot() is null)
             _toolChrome = this.GetVisualDescendants().OfType<ToolChromeControl>().FirstOrDefault();
-        if (_toolChrome is not null) _toolChrome.IsVisible = !hidden;
+        if (_toolChrome is null) return;
+
+        // The chrome's template root is the Grid(Auto,*); its DIRECT children are the
+        // content presenter (row 1) and the header Border + divider Panel (row 0).
+        // Target only those direct children — our ToolControl skin ALSO names a Border
+        // "PART_Border", but that one lives deep inside the content presenter, so a
+        // blanket descendant search would wrongly collapse the content.
+        var root = _toolChrome.GetVisualChildren().OfType<Grid>().FirstOrDefault();
+        if (root is null) return;
+        foreach (var child in root.GetVisualChildren().OfType<Control>())
+        {
+            if (child.Name is "PART_Border" or "PART_Panel")
+                child.IsVisible = !hidden;
+        }
     }
 
     private void OnTitleBarDoubleTapped(object? sender, TappedEventArgs e) => ToggleMaximize(e);
