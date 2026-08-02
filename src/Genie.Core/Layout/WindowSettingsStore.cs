@@ -16,17 +16,18 @@ public sealed class WindowSettingsStore
         FontSize = 13, Foreground = "Default", Background = "", Timestamp = false, IfClosed = null,
     };
 
+    // Per-window IfClosed defaults, keyed by REGISTERED window id (public #211).
+    // Any id absent here defaults to null = "route to Main when closed", so we
+    // only list the streams that want a different target. The Log window is our
+    // consolidated conversation feed (id "log", Genie 4 "conversation" parity),
+    // and talk/whispers are already mirrored into it at StreamTabsViewModel.
+    // Values must be registered ids (or the "main"/game-text main-window target)
+    // or the IfClosedResolver treats them as unknown and safely routes to Main.
     private static readonly Dictionary<string, string?> DefaultIfClosed =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ["activespells"] = "", ["arrivals"] = "", ["assess"] = null,
-            ["atmospherics"] = "main", ["chatter"] = null, ["combat"] = "main",
-            ["conversation"] = "log", ["death"] = "", ["deaths"] = "", ["debug"] = null,
-            ["expmods"] = null, ["familiar"] = null, ["game"] = "",
-            ["group"] = "", ["inv"] = null, ["inventory"] = null,
-            ["itemlog"] = null, ["log"] = null, ["ooc"] = "",
-            ["portrait"] = null, ["raw"] = "", ["room"] = null,
-            ["talk"] = "conversation", ["thoughts"] = null, ["whispers"] = "conversation",
+            ["talk"]     = "log",
+            ["whispers"] = "log",
         };
 
     public WindowSettings Register(string id, string defaultTitle)

@@ -62,12 +62,21 @@ public class StreamTabsViewModel : ReactiveObject
     /// </summary>
     private Func<string, bool>? _isPanelVisible;
 
+    /// <summary>Live per-window settings store, handed in by <see cref="Attach"/>
+    /// so <see cref="RouteToMain"/> can honour <see cref="WindowSettings.IfClosed"/>
+    /// (public #211) — resolving a closed stream's redirect target and following
+    /// the chain when that target is itself closed. Absent ⇒ the pre-#211
+    /// behaviour (closed panel → Main).</summary>
+    private WindowSettingsStore? _store;
+
     public void Attach(GenieCore core,
                        GameTextViewModel? main = null,
-                       Func<string, bool>? isPanelVisible = null)
+                       Func<string, bool>? isPanelVisible = null,
+                       WindowSettingsStore? store = null)
     {
         _main           = main;
         _isPanelVisible = isPanelVisible;
+        _store          = store;
 
         // Hand each buffer the live Names engine so the per-window "Name List
         // Only" right-click toggle can filter to lines mentioning a tracked
@@ -135,11 +144,14 @@ public class StreamTabsViewModel : ReactiveObject
     /// to the fallback, so a line can never vanish.
     /// </para>
     /// <para>
-    /// Where a closed panel's text goes is hard-wired to Main here.
-    /// <see cref="WindowSettings.IfClosed"/> — which can name a different
-    /// target window (talk → conversation, and so on) — is still unimplemented;
-    /// honouring it means resolving that id to a sink and following the chain
-    /// when the target is itself closed. This is the single place that changes.
+    /// Where a closed panel's text goes is resolved from
+    /// <see cref="WindowSettings.IfClosed"/> via <see cref="IfClosedResolver"/>
+    /// (public #211): a redirect can name another stream window (talk → log,
+    /// and so on), the resolver follows the chain when that target is itself
+    /// closed, and an unknown target falls back to Main rather than dropping.
+    /// The sentinels are <c>null</c> = Main (the default) and <c>""</c> = drop.
+    /// With no store wired (pre dock-build) this degrades to the historical
+    /// closed-panel → Main behaviour, so a line can never vanish.
     /// </para>
     /// </summary>
     private void RouteToMain(StreamBuffer buf, TextEvent e)
@@ -154,9 +166,53 @@ public class StreamTabsViewModel : ReactiveObject
             return;
         }
 
-        if (_isPanelVisible?.Invoke(e.Stream) == false)
+        // EchoToMain off: the stream shows only in its own panel. If that panel
+        // is open (or visibility is unknown), there's nothing more to do.
+        if (_isPanelVisible?.Invoke(e.Stream) != false)
+            return;
+
+        // Panel closed → honour IfClosed. Without a store, keep the old default.
+        if (_store is null)
+        {
             _main?.AddStreamLine(e.Stream, e.Text);
+            return;
+        }
+
+        var decision = IfClosedResolver.Resolve(
+            e.Stream, _store, id => _isPanelVisible?.Invoke(id) == true);
+
+        switch (decision.Kind)
+        {
+            case IfClosedSinkKind.Drop:
+                return;
+            case IfClosedSinkKind.Stream when TryGetBuffer(decision.StreamId!) is { } sink:
+                sink.Add(e.Text, e.BoldSpans, e.Links, e.PresetSpans);
+                return;
+            default:
+                // Main, or a stream target with no backing buffer → never lose it.
+                _main?.AddStreamLine(e.Stream, e.Text);
+                return;
+        }
     }
+
+    /// <summary>Map a registered window id to its <see cref="StreamBuffer"/>, or
+    /// null if the id is the main window / a non-stream dockable. Mirrors the
+    /// inbound stream→buffer switch in <see cref="Attach"/>.</summary>
+    private StreamBuffer? TryGetBuffer(string id) => id switch
+    {
+        "logons"               => Logons,
+        "talk"                 => Talk,
+        "whispers"             => Whispers,
+        "thoughts"             => Thoughts,
+        "combat"               => Combat,
+        "familiar"             => Familiar,
+        "death"                => Death,
+        "assess"               => Assess,
+        "atmospherics"         => Atmospherics,
+        "log"                  => Log,
+        "itemlog" or "itemLog" => ItemLog,
+        _                      => null,
+    };
 }
 
 public class StreamBuffer(string name) : ReactiveObject

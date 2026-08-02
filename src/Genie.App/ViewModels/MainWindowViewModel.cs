@@ -4410,7 +4410,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Room.Attach(_core);
         Inventory.Attach(_core);
         Mapper.Attach(_core);
-        StreamTabs.Attach(_core, GameText, IsStreamPanelVisible);
+        StreamTabs.Attach(_core, GameText, IsStreamPanelVisible, WindowSettings);
         Experience.Attach(_core);
         ActiveSpells.Attach(_core);
         TimeTracker.Attach(_core);
