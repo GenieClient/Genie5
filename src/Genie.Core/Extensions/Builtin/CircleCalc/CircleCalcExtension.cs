@@ -357,8 +357,8 @@ public sealed class CircleCalcExtension : IGameExtension
         Echo("  /sort <group>          a custom group from SortGroups.xml");
         Echo("  /sort [...] <rank>     only skills at or above <rank>");
         Echo("  /cc reload[reqs|sort]  reload the data files");
-        Echo("  settings: $CircleCalc.Echo 0 hides the result; $CircleCalc.Parse 0 stops");
-        Echo("            it feeding actions (both default on).");
+        Echo("  settings: #var CircleCalc.Echo 0 hides the result; #var CircleCalc.Parse 0");
+        Echo("            stops it feeding actions (both default on).");
     }
 
     private void Echo(string line) => _host.Echo(line);

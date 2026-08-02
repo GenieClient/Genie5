@@ -212,10 +212,13 @@ public sealed class GenieConfig
 
     /// <summary>
     /// Front-end identifier sent in the post-auth FE handshake (e.g.
-    /// <c>FE:GENIE</c> or <c>FE:STORM</c>). DR appears to gate some click
-    /// markup on this — clients identifying as <c>STORM</c> (Wrayth) may
-    /// get more <c>&lt;d cmd&gt;</c> tags than <c>GENIE</c>. Default
-    /// matches Genie 4. Toggle via <c>#config frontend storm</c>.
+    /// <c>FE:GENIE</c> or <c>FE:WRAYTH</c>). DR gates some features on this —
+    /// server-side toggles like <c>EXPBRIEF</c> and richer <c>&lt;d cmd&gt;</c>
+    /// click markup are only granted to clients identifying as Wrayth. For DR the
+    /// value is <c>WRAYTH</c> (Genie 4's own DR handshake, Core/Game.cs:3218) —
+    /// NOT <c>STORM</c>/<c>STORMFRONT</c>, which is the GemStone-side name and does
+    /// NOT unlock DR's Wrayth gate (verified live 2026-08-01). Default matches
+    /// Genie 4 (<c>GENIE</c>). Set via <c>#config frontend wrayth</c>, then reconnect.
     /// </summary>
     public string FrontEndIdentifier { get; set; } = "GENIE";
 
