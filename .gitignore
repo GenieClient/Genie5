@@ -115,3 +115,10 @@ appsettings.*.local.json
 *.pfx
 *.key
 *.pem
+
+# ─── Internal / private docs ──────────────────────────────────────────────
+# Belt-and-braces for public-lineage checkouts: never publish the private
+# working docs (internal policy/compliance analysis, archived drafts) that
+# live in the dev repo. Mirrors the dev repo's rule so a stray `git add -A`
+# on a public checkout can't stage them.
+docs/internal/private/
