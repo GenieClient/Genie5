@@ -1,67 +1,68 @@
-# Genie 4 vs Genie 5 — Comprehensive Side-by-Side Comparison
+# Genie 4 vs Genie 5 — Comprehensive Side-by-Side Comparison (V2)
 
-**Prepared:** 2026-05-26
-**Genie 5 version:** v5.0.0-alpha.4
-**Last parity sync:** 2026-07-05 — statuses updated against v5.0.0-alpha.8 "Menu Parity" (`497c30f`)
+**Prepared:** 2026-05-26 · **Re-baselined:** 2026-08-02
+**Genie 5 version:** v5.0.0-beta.3 "Crosstalk" (shipped 2026-08-01)
 **Genie 4 reference:** local clone at `_refs/Genie4/` (143 source files, WinForms + .NET 6, GenieClient/Genie4 upstream)
-**Purpose:** Audit feature parity before the alpha ships to select testers. Identify what must change, what should change, and what's safely deferred.
+**Purpose:** Track feature parity with Genie 4 and surface the remaining gaps on the road to v1.0. (The original V1 of this doc audited parity *before the alpha shipped*; that framing is now history — see the change log at the bottom.)
+
+> **What changed in V2 (2026-08-02):** the project moved from a pre-alpha audit to **beta.3**. Every item V1 flagged as an "alpha blocker" has shipped. This re-baseline retitles to beta.3, replaces the alpha-decision apparatus with a plain shipped/deferred/roadmap lens, flips the rows verified against beta.3 source, and fixes V1's internal contradictions.
 
 ---
 
 ## Executive Summary
 
-Genie 5 alpha lands at a high level of feature parity with Genie 4 by surface area, and climbed further after the **plugin host** and the **in-app updater** (both originally deferred) shipped. The remaining gap is intentionally split into three buckets:
-- Features deferred to **beta** that don't block initial value: Auto Log *(since shipped — alpha.8)*, Themes, Workspace presets, JavaScript scripts.
-- Features deferred to **v1.0+** as roadmap vision items: AI advisor, plugin marketplace, cloud sync, plugin signing / trust.
-- Features intentionally **forbidden** by DR policy: auto-reconnect, agentive AI, auto-walk-while-away.
+Genie 5 at beta.3 is at or beyond Genie 4 across almost the entire feature surface. The plugin host, in-app updater, JavaScript (`.js`) scripting, engine-driven AutoMapper auto-walk, the full Help menu, layout save/load, and in-buffer Find have all shipped since V1 was written — including **every item V1 named as an alpha blocker**.
 
-**Genie 5 also adds ~10% of capability Genie 4 doesn't have**: cross-platform (Win/Mac/Linux), AES-GCM password encryption, per-character profile dirs, Session Recorder, tab-complete script names, Editor-of-choice integration, Genie 4 settings import dialog, modern XAML/MVVM architecture.
+The remaining gap is small and splits two ways:
+- **Deferred to later beta / post-beta** (don't block value): inline `<image>` rendering, a handful of niche config keys, `server`/`usertimeout` keep-alives, OS keystore.
+- **Roadmap to v1.0+**: plugin marketplace, plugin signing / trust, AI advisor mode, macOS / Linux update packaging, cloud sync.
 
-### Headline calls before alpha ships
+**Genie 5 also adds capability Genie 4 never had**: cross-platform (Win/Mac/Linux), AES-256-GCM password encryption, per-character profile dirs, Session Recorder, tab-complete script names, editor-of-choice integration, a Genie 4 settings-import dialog, map visual improvements, and a modern XAML/MVVM architecture.
 
-| # | Item | Severity | Action |
+### Resolved since V1 (alpha.8 → beta.3)
+
+Everything V1 tagged 🔧 FIX BEFORE ALPHA is done, verified against beta.3 source:
+
+| V1 blocker / gap | V1 status | beta.3 reality | Evidence |
 |---|---|---|---|
-| 1 | **AutoMapper auto-walk** — Pre-publish checklist says "AutoMapper must be working" as a v1 release blocker. Today click-to-goto opens a dialog; no actual walking happens | **Alpha-blocker** per checklist | Decision needed: implement engine-driven CommandQueue auto-walk OR ship the Mapper Helper Script approach. ~1-2 days either way. |
-| 2 | **Reconnect config key is a foot-gun** — `Reconnect=true` is the default in `GenieConfig.cs` but not wired to behavior. A future contributor could wire it and ship a policy violation by accident | Low (no behavior today) but worth a code-level guard | Remove the key, or add a `[Obsolete]` attribute + comment explaining it must never be wired |
-| 3 | **`MaxReconnectAttempts=10` + 5s delay = 50s wait on transient initial connect failure** | UX, not policy | Reduce to 3 attempts. ~10 min change |
-| 4 | **Character display format** — Pre-publish checklist requires `Character-Account` format (`Renucci-MONIL`); not yet rolled out | Pre-publish hygiene | ~30 min — title bar, character dropdown, profile picker, defaults |
-| 5 | **Help menu missing entirely** — Genie 4 ships Help with Wiki / Discord / GitHub / Updates / community links; Genie 5 has no Help menu | Beta-eligible but useful for tester orientation | ~30 min to add a stub menu with the most useful 4-5 links |
-| 6 | **AI pipeline gating** — AI pipeline exists but is feature-flagged off; needs the in-app privacy notice + whisper/talk/thoughts filtering before any external send | Beta-eligible (today OFF) | Hard requirement when AI mode ships, not when alpha ships |
-| 7 | **OS keystore for credentials** — Today machine-bound AES-GCM (correct for local). Genie 4 used XOR'd XML which is worse | Beta enhancement | Move to DPAPI/Keychain/libsecret later |
+| AutoMapper auto-walk (the named alpha blocker) | 🔧 FIX BEFORE ALPHA | ✅ Engine-driven step walker with Esc / off-plan / disconnect cancel | `AutoWalkService.cs` (`AutoWalkSession` over `AutoMapperEngine.FindPath`) |
+| Help menu + community links | 🔧 FIX BEFORE ALPHA | ✅ Full Help menu (Latest Release, Discord, GitHub, Wiki, Play.net, Elanthipedia, Lich Discord) | `MainWindow.axaml:627-693` |
+| `Character-Account` display format | 🔧 FIX BEFORE ALPHA | ✅ Shipped | `CharacterIdentity.cs:23`; picker label `ConnectDialog.axaml:25` |
+| In-app DR policy summary | 🔧 FIX BEFORE ALPHA | ✅ Help menu carries the policy/link surface | `MainWindow.axaml:627-693` |
+| JavaScript `.js` scripts (Jint) | ❌ Missing | ✅ Threaded Jint runtime + `js` / `jscall` / `include <file>.js` | `ScriptEngine.cs:1976`; `ScriptInstance.cs:22` |
+| Find in buffer (Ctrl+F) | ❌ Missing | ✅ Find bar on the focused stream | `MainWindow.axaml.cs:761` |
+| Layout save / load (workspace presets) | 🗓 BETA OK | ✅ Save/Load Layout, global + per-profile scopes | `SaveLayoutDialog.axaml`; `MainWindowViewModel.cs:143` |
+| Familiar / Death / Active Spells / Conversation streams | 🗓 BETA OK | ✅ Registered dock tools | `GenieDockFactory.cs:184`; `ActiveSpellsViewModel.cs` |
+| Auto-launch Lich on connect | 🗓 BETA OK | ✅ `#lc` / `#lconnect` / `#lichconnect` auto-launch + attach | `LichLauncher.cs` (`EnsureRunningAsync`) |
+| Dedicated Scripts menu (Manager, List/Pause/Resume/Abort All, Trace All, Update Scripts) | 🗓 BETA OK | ✅ Full top-level Scripts menu + Scripts updater | `MainWindow.axaml:474-540`; `ScriptsUpdater.cs` |
+| `Reconnect` config key (was present-but-unwired) | Low-risk | ✅ Now **wired** as an attended-session reconnect — reconnects only a session the user was actively driving | `MainWindowViewModel.cs:4798-4933` |
 
-**Recommendation:** Address items 2, 3, 4 before shipping alpha (about 1 hour total). Decide item 1 explicitly (ship-with vs ship-without-auto-walk). Items 5-7 are honest beta-track work.
+**Every V1 menu-parity item has now shipped.** The last one — the **"Open Log In Editor"** menu item — landed on top of Auto Log (shipped alpha.8): File ▸ Open Log In Editor opens the live session's log, or the most recent `*.log` when idle, in the configured editor (`OpenLogInEditorCommand` → `OpenLogInEditor`, reusing the `LaunchExternalEditor` ladder).
 
 ---
 
 ## Methodology
 
 **Sources consulted:**
-1. **Genie 5 source tree** — `src/` (Core + App projects, ~50k LOC)
-2. **Genie 5 documentation** — README, CONTRIBUTING, the rest of `docs/`, the published alpha's ALPHA-README, commit history
-3. **Internal development notes** — design backlog, policy compliance review, pre-publish checklist, terminology, milestone checkpoints (not in this repo)
-4. **Empirical findings** — recorded session captures from live DR play, parser diff reports, verb-inventory experiments (not in this repo)
-5. **Genie 4 source tree** — full local clone of the [GenieClient](https://github.com/GenieClient) organization repos (~143 .cs files in the main client)
-6. **Codebase walk** — two parallel cataloguing passes, ~20 minutes each, cross-referenced
+1. **Genie 5 source tree** — `src/` (Core + App projects)
+2. **Genie 5 documentation** — README, CONTRIBUTING, `docs/`, RELEASE_NOTES, commit history
+3. **Internal development notes** — design backlog, policy compliance review, terminology, milestone checkpoints (not in this repo)
+4. **Empirical findings** — recorded live-DR session captures, parser diff reports, verb-inventory experiments (not in this repo)
+5. **Genie 4 source tree** — full local clone of the [GenieClient](https://github.com/GenieClient) org repos (~143 .cs files in the main client)
 
 **Limitations:**
-- The Genie 4 inventory was assembled by an agent reading source files; some plugin-API specifics may be incomplete (interface enumeration would require deeper exploration).
-- Genie 4 settings keys were enumerated from `Lists/Config.cs`; a few edge-case config keys may not be covered.
-- Both inventories cite source-file locations so claims are verifiable.
+- The Genie 4 inventory was assembled by reading source; some plugin-API specifics may be incomplete.
+- Genie 4 config keys were enumerated from `Lists/Config.cs`; a few edge-case keys may not be covered.
+- **V2.2 verification scope:** as of the V2.2 pass (2026-08-02), **every** ⚠️/🗓/❌ row was re-verified against beta.3 source (four parallel verification sweeps — config keys, rule/script engine, UI/menu/mapper, audio/images/compliance). `file:line` citations in the tables mark freshly-verified claims. Rows still showing 🗓/❌/⚠️ are confirmed-current gaps, not stale carryovers.
 
-**Status legend used throughout:**
-- ✅ **Parity** — Genie 5 has it
-- 🆕 **Better** — Genie 5 has it AND improves on Genie 4
+**Status legend (unified in V2 — the old dual "status + alpha-decision" legend is retired):**
+- ✅ **Shipped** — Genie 5 has it at parity
+- 🆕 **Better / addition** — Genie 5 has it AND improves on Genie 4, or Genie 4 lacked it
 - ⚠️ **Partial** — Genie 5 has some of it
-- 🗓 **Beta** — Deferred to v5.0 beta; planned with design notes in `backlog.md`
-- 🎯 **v1.0+** — Roadmap item; design exists but post-alpha
-- ❌ **Missing** — Not present and no clear plan
-- 🛑 **Forbidden** — Genie 4 has it, Genie 5 won't ship it for DR policy compliance reasons
-
-**Alpha decision legend:**
-- 🚀 **SHIP** — Good as-is
-- 🔧 **FIX BEFORE ALPHA** — Action required
-- 🗓 **BETA OK** — Document the gap, defer
-- 🛑 **NEVER** — Policy violation
+- 🗓 **Deferred** — planned for later beta / post-beta; design notes in `backlog.md`
+- 🎯 **v1.0+** — roadmap item; design exists but post-beta
+- ❌ **Missing** — not present and no active plan
+- 🛑 **Won't ship** — Genie 4 has it; Genie 5 won't ship it for DR-policy compliance
 
 ---
 
@@ -71,124 +72,126 @@ Genie 5 alpha lands at a high level of feature parity with Genie 4 by surface ar
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| Connect... | ✅ | ✅ | 🚀 SHIP | Genie 5 unifies "Connect" + "Connect Using Profile" into one dialog with profile picker |
-| Connect Using Profile... | ✅ separate | ✅ merged | 🚀 SHIP | Merged into Connect dialog |
-| Disconnect | ✅ | ✅ | 🚀 SHIP | |
-| Open Directory... → submenu (Genie/Scripts/Maps/Plugins/Logs/Art) | ✅ submenu | ✅ submenu | 🚀 SHIP | ✅ shipped alpha.8 (`497c30f`) — File ▸ Open Directory: Data Folder / Config / Logs / Maps / Scripts / Plugins (Config entry is profile-aware, resolved at click time) |
-| Auto Log (toggle) | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — File ▸ Auto Log checkbox over `autolog`, applied live mid-session (starts/stops the rendered-text logger) |
-| Open Log In Editor | ✅ | 🗓 backlog | 🗓 BETA OK | Auto Log has since shipped (alpha.8); the editor-open menu item itself is still pending |
-| Auto Reconnect (toggle) | ✅ default ON | 🛑 not shipped | 🛑 NEVER | Forbidden by DR policy. Config key exists but not wired (see #2 in headline calls). |
-| Classic Connect Window (toggle) | ✅ | n/a | 🚀 SHIP | We don't have a legacy dialog to fall back to |
-| Ignores/Gags Enabled (master toggle) | ✅ | ✅ File ▸ Master Toggles ▸ Gags | 🚀 SHIP | ✅ shipped alpha.8 — engine gates via an Enabled flag (rules stay loaded and editable while off); live-synced with `#config gags off` |
-| Triggers Enabled (master toggle) | ✅ | ✅ File ▸ Master Toggles ▸ Triggers | 🚀 SHIP | ✅ shipped alpha.8 — same Enabled-flag gating; live-synced with `#config triggers off` |
-| Highlights / Substitutes / Aliases master toggles | ❌ | ✅ File ▸ Master Toggles | 🆕 | Shipped alpha.8 — Genie 5's Master Toggles set extends beyond Genie 4's (Highlights / Triggers / Substitutes / Gags / Aliases / Images), all backed by same-named settings.cfg keys |
-| Plugins Enabled (master toggle) | ✅ | ✅ per-plugin enable/disable (Plugins menu + `#plugin enable`/`disable`) | 🆕 | Toggled individually; no single master switch |
-| AutoMapper Enabled (master toggle) | ✅ | ❌ | 🗓 BETA OK | Mapper is always active; no master off-switch |
-| Images Enabled (toggle) | ✅ | ✅ File ▸ Master Toggles ▸ Images | 🚀 SHIP | ✅ shipped alpha.8 — rides the existing `showimages` key; clears/re-fetches the Portrait art live. Inline `<image>` rendering in game text is still deferred |
-| Mute Sounds (toggle) | ✅ | n/a | 🗓 BETA OK | No audio yet |
-| Show Raw Data (toggle) | ✅ | ✅ Window ▸ Raw XML | 🚀 SHIP | ✅ shipped (issue #14) — dockable read-only live view of the raw server stream, hidden by default; its tooltip notes it covers G4's Debug window |
-| Update Maps from Official Repo... | n/a | 🆕 | 🚀 SHIP | Genie 5 addition — pulls from github.com/GenieClient/Maps |
+| Connect... | ✅ | ✅ | ✅ | Genie 5 unifies "Connect" + "Connect Using Profile" into one dialog with a profile picker |
+| Connect Using Profile... | ✅ separate | ✅ merged | ✅ | Merged into Connect dialog |
+| Disconnect | ✅ | ✅ | ✅ | |
+| Open Directory... → submenu | ✅ submenu | ✅ submenu | ✅ | Data Folder / Config / Logs / Maps / Scripts / Plugins (Config entry is profile-aware, resolved at click time) |
+| Auto Log (toggle) | ✅ | ✅ | ✅ | File ▸ Auto Log checkbox over `autolog`, applied live mid-session |
+| Open Log In Editor | ✅ | ✅ | ✅ | File ▸ Open Log In Editor — opens the live (or most recent) Auto Log in the configured editor via the shared `LaunchExternalEditor` ladder |
+| Auto Reconnect | ✅ default ON | ✅ attended-session form | 🆕 | Config-driven (`#config reconnect`); reconnects only a session the user was actively driving (requires user input since connect), on a bounded retry ladder |
+| Classic Connect Window (toggle) | ✅ | n/a | ✅ | We don't have a legacy dialog to fall back to |
+| Ignores/Gags Enabled (master toggle) | ✅ | ✅ File ▸ Master Toggles ▸ Gags | ✅ | Engine gates via an Enabled flag (rules stay loaded/editable while off); live-synced with `#config gags off` |
+| Triggers Enabled (master toggle) | ✅ | ✅ File ▸ Master Toggles ▸ Triggers | ✅ | Same Enabled-flag gating; live-synced with `#config triggers off` |
+| Highlights / Substitutes / Aliases master toggles | ❌ | ✅ File ▸ Master Toggles | 🆕 | Genie 5's Master Toggles set extends beyond G4's (Highlights / Triggers / Substitutes / Gags / Aliases / Images), all backed by same-named settings.cfg keys |
+| Plugins Enabled (master toggle) | ✅ | ✅ per-plugin enable/disable (Plugins menu + `#plugin`) | 🆕 | Toggled individually; no single master switch |
+| AutoMapper Enabled (master toggle) | ✅ | ✅ "Enable AutoMapper" (`MapperSettingsDialog`) + `#config automapper` | ✅ | Caveat: off = "lookup-only" (position still tracked, no room auto-create), not a hard tracking kill |
+| Images Enabled (toggle) | ✅ | ✅ File ▸ Master Toggles ▸ Images | ✅ | Rides `showimages`; clears/re-fetches Portrait art live. Inline `<image>` rendering still deferred |
+| Mute Sounds (toggle) | ✅ | n/a | 🗓 | No audio yet |
+| Show Raw Data (toggle) | ✅ | ✅ Window ▸ Raw XML | ✅ | Dockable read-only live view of the raw server stream, hidden by default; tooltip notes it covers G4's Debug window |
+| Update Maps from Official Repo... | n/a | 🆕 | 🆕 | Pulls from github.com/GenieClient/Maps |
 | Open Maps Folder | ✅ via Open Directory | ✅ direct | 🆕 | Direct menu in Genie 5 |
-| Change Maps Directory... | n/a | 🆕 | 🚀 SHIP | Genie 5 addition for git-clone workflow |
-| Import from Genie 4... | n/a | 🆕 | 🚀 SHIP | Just-shipped (commit `5889182`) — migrates 8 settings types with Global/per-character routing |
-| Record Session (raw XML, toggle) | n/a | 🆕 | 🚀 SHIP | Genie 5 addition — captures raw XML to `Logs/raw_session_*.xml` |
-| Open Recordings Folder | n/a | 🆕 | 🚀 SHIP | Pair with Record Session |
-| Performance Test Parse (dev) | ✅ | partial via Console | 🚀 SHIP | Genie 5's TestHarness REPLAY mode covers this |
-| Exit | ✅ | ✅ | 🚀 SHIP | |
+| Change Maps Directory... | n/a | 🆕 | 🆕 | Genie 5 addition for git-clone workflow |
+| Import from Genie 4... | n/a | 🆕 | 🆕 | Migrates 8 settings types with Global/per-character routing |
+| Record Session (raw XML, toggle) | n/a | 🆕 | 🆕 | Captures raw XML to `Logs/raw_session_*.xml` |
+| Open Recordings Folder | n/a | 🆕 | 🆕 | Pair with Record Session |
+| Performance Test Parse (dev) | ✅ | partial via Console | ✅ | Genie 5's TestHarness REPLAY mode covers this |
+| Exit | ✅ | ✅ | ✅ | |
 
 ### Edit menu
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| Paste Multi Line | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — Edit ▸ Paste Multi Line splits clipboard text on the separator char |
-| Configuration... | ✅ tabbed dialog | ✅ tabbed dialog | ⚠️ partial | Genie 5 has tabs but the UX needs a holistic pass per `backlog.md` "Configuration dialog UX pass" |
-| Update Images | ✅ | n/a | 🗓 BETA OK | No image rendering |
-| Display Settings... | n/a | 🆕 | 🚀 SHIP | Genie 5 addition — font, colors, RoundTime position, hands strip position, editor path |
-| Profile → Load Profile... | ✅ | ✅ merged | 🚀 SHIP | Merged into Connect dialog |
-| Profile → Save Profile | ✅ | ✅ merged | 🚀 SHIP | |
-| Profile → Include Password In Profile (toggle) | ✅ | always-on via AES-GCM | 🆕 | Genie 5 always encrypts (no toggle — password storage is either AES-GCM encrypted on disk OR absent entirely) |
+| Paste Multi Line | ✅ | ✅ | ✅ | Edit ▸ Paste Multi Line splits clipboard text on the separator char |
+| Configuration... | ✅ tabbed dialog | ✅ tabbed dialog | ⚠️ | Genie 5 has tabs but the UX still wants a holistic pass per `backlog.md` "Configuration dialog UX pass" |
+| Update Images | ✅ | n/a | 🗓 | No image rendering |
+| Display Settings... | n/a | 🆕 | 🆕 | Font, colors, RoundTime position, hands strip position, editor path |
+| Profile → Load / Save / Include Password | ✅ | ✅ merged into Connect dialog | ✅ | Genie 5 always encrypts saved passwords (AES-GCM) — no include toggle |
 
 ### Window menu
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| Show/hide each dockable | ✅ | ✅ | 🚀 SHIP | Genie 5 supports same set: Game / Vitals / Room / Backpack / Mapper / Logons / Talk / Whispers / Thoughts / Combat |
-| Hands Strip toggle | n/a | ✅ | 🚀 SHIP | Genie 5 addition |
-| Hands Strip Position (Top/Bottom) | n/a | ✅ | 🚀 SHIP | |
-| Roundtime Position (Command Bar / Hands Strip) | n/a | ✅ | 🚀 SHIP | |
-| Status Bar toggle | ✅ | ✅ | 🚀 SHIP | |
-| Game Window → Game Text / Echo / Script Lines per-tag toggle | n/a | ✅ | 🆕 | Genie 5 addition, just shipped (commit `4a8986b`) |
-| Float Mapper Window | n/a | ✅ | 🚀 SHIP | Dock.Avalonia FloatDockable; can re-dock by dragging |
-| Reset Layout | n/a | ✅ | 🚀 SHIP | |
+| Show/hide each dockable | ✅ | ✅ | ✅ | Same set: Game / Vitals / Room / Backpack / Mapper / Logons / Talk / Whispers / Thoughts / Combat |
+| Hands Strip toggle + position | n/a | ✅ | 🆕 | Genie 5 addition (Top/Bottom) |
+| Roundtime Position (Command Bar / Hands Strip) | n/a | ✅ | 🆕 | |
+| Status Bar toggle | ✅ | ✅ | ✅ | |
+| Game Window → per-tag toggle (Game / Echo / Script) | n/a | ✅ | 🆕 | Genie 5 addition |
+| Float Mapper Window | n/a | ✅ | ✅ | Dock.Avalonia FloatDockable; can re-dock by dragging |
+| Reset Layout | n/a | ✅ | ✅ | |
+| Raw XML | ✅ (Debug) | ✅ | ✅ | Read-only live server stream, hidden by default |
+| Find (Ctrl+F) | ✅ Ctrl+F | ✅ | ✅ | Find bar on the focused stream (`MainWindow.axaml.cs:761`) — **shipped since V1** |
 
 ### Layout menu
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| Load Layout... / Save Layout As... | ✅ | ❌ | 🗓 BETA OK | Backlog "Workspace presets (Combat/Healing/In-Character layouts)" |
-| Load Default Layout | ✅ | ⚠️ via Reset Layout | 🚀 SHIP | Equivalent functionality |
-| Save Default Layout / Save Sized Default | ✅ | ❌ | 🗓 BETA OK | Multi-preset story |
-| Basic Layout | ✅ | ❌ | 🗓 BETA OK | |
-| Icon Bar → Dock Top/Bottom | ✅ submenu | ✅ Icon Bar | 🚀 SHIP | ✅ shipped alpha.8 — text-chip strip below the vitals bar: posture chip in G4 priority (dead > standing > kneeling > sitting > prone) + STUNNED / BLEEDING / POISONED / DISEASED / HIDDEN / INVISIBLE / WEBBED / JOINED, fed by IndicatorEvent, dimmed while disconnected. Poison/disease chips are new over G4's six slots. Fixed position (no dock top/bottom submenu) |
-| Script Bar → Dock Top/Bottom | ✅ | 🆕 always above command bar | 🚀 SHIP | Genie 5 Script Bar is fixed-position but auto-hides when empty |
-| Health Bar → Dock Top/Bottom | ✅ | ⚠️ via Status Bar toggle | 🚀 SHIP | Genie 5's status bar is fixed at bottom |
-| Magic Panels (toggle) | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — G4 SetMagicPanels parity: mana bar / cast bar / spell labels show-hide with column reflow (`ShowMagicPanels` collapses the mana column) |
-| Align Input to Game Window | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — horizontal align: the command bar's side margins track the Game window's dock extent (full-width fallback when floated); finally consumes the orphaned `sizeinputtogame` key |
-| Always On Top | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — Layout ▸ Always on Top |
+| Load Layout... / Save Layout As... | ✅ | ✅ | ✅ | **Shipped since V1** — global + per-profile scopes (`SaveLayoutDialog.axaml`) |
+| Load Default Layout | ✅ | ✅ via Reset Layout | ✅ | Equivalent functionality |
+| Save Default Layout / Save Sized Default / Basic Layout | ✅ | ⚠️ via Save Layout As | ⚠️ | Named-preset set is covered by Save/Load Layout; the specific G4 "default/sized-default/basic" verbs aren't 1:1 |
+| Icon Bar | ✅ submenu | ✅ Icon Bar | ✅ | Text-chip strip below the vitals bar: posture chip (dead > standing > kneeling > sitting > prone) + STUNNED / BLEEDING / POISONED / DISEASED / HIDDEN / INVISIBLE / WEBBED / JOINED, fed by IndicatorEvent, dimmed while disconnected. Poison/disease chips are new over G4's six slots. Fixed position |
+| Script Bar | ✅ | 🆕 always above command bar | 🆕 | Fixed-position; auto-hides when empty |
+| Health Bar | ✅ | ⚠️ via Status Bar toggle | ✅ | Status bar is fixed at bottom |
+| Magic Panels (toggle) | ✅ | ✅ | ✅ | G4 SetMagicPanels parity: mana bar / cast bar / spell labels show-hide with column reflow |
+| Align Input to Game Window | ✅ | ✅ | ✅ | Command bar's side margins track the Game window's dock extent (full-width fallback when floated) |
+| Always On Top | ✅ | ✅ | ✅ | Layout ▸ Always on Top |
 
-### Script menu
+### Scripts menu
+
+A dedicated top-level **Scripts** menu ships in beta.3 (`MainWindow.axaml:474-540`), mirroring Genie 4's — the V1/early-V2 "command-bar only, no menu" claim was stale.
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| **Entire menu** | ✅ Script menu | ❌ | 🗓 BETA OK | Genie 5 has command-bar `.script`, `#stop`, `#scripts`, plus Script Bar UI, plus `#edit`. Genie 4 Script menu provides muscle-memory entry points; functionality is present but discovery isn't |
-| Script Explorer... | ✅ tree browser | ❌ | 🗓 BETA OK | Scripts dir + Script Bar are the entry points today |
-| Update Scripts | ✅ LAMP | ❌ | 🗓 BETA OK | A `ScriptsUpdater` can ride the in-app updater framework (shares `GithubContentsSource`); not yet wired |
-| Show Active Scripts | ✅ | ✅ via Script Bar | 🆕 | Genie 5 always-visible; Genie 4 was on-demand |
-| Trace Active Scripts (debug toggle) | ✅ | partial | 🗓 BETA OK | Genie 5 has `dbg:10` script-level debug; no menu toggle |
-| Pause All / Resume All Scripts | ✅ | ❌ | 🗓 BETA OK | Genie 5 has Stop (#stop) and StopAll (#stopall); no pause/resume primitive |
-| Abort All Scripts | ✅ | ✅ via #stopall | 🚀 SHIP | |
+| **Dedicated Scripts menu** | ✅ Script menu | ✅ Scripts menu | ✅ | Top-level Scripts menu (`MainWindow.axaml:481`) — **shipped since V1** |
+| Script Explorer / Manager | ✅ tree browser | ✅ Script Manager panel | ✅ | Dockable Script Manager (browse / run / edit / pause / stop / reload / vars / trace); toggles from the Scripts menu; also opens via `#script explorer` (`MainWindow.axaml:486`) |
+| Update Scripts | ✅ LAMP | ✅ Updates dialog ▸ Scripts tab | ✅ | `ScriptsUpdater.cs` (`IUpdater`, git-pull semantics; new/changed files pulled, sha-matched skipped, local-only files untouched) + Check-on-Startup / Auto-Apply toggles. **Shipped since V1** |
+| Show / List Running Scripts | ✅ | ✅ List Running Scripts + Script Bar | ✅ | `#scripts`; Script Bar also always-visible when scripts run |
+| Trace All Scripts (debug) | ✅ | ✅ Trace All submenu (Off / 1 / 3 / 5 / 10) | ✅ | `#traceall N` (`MainWindow.axaml:506`); plus per-chip debug levels on the Script Bar |
+| Pause All / Resume All Scripts | ✅ | ✅ Pause All / Resume All | ✅ | `#pauseall` / `#resumeall` (preserves state via `UserPaused`) — **shipped since V1** (the "no pause/resume primitive" note was wrong) |
+| Abort All Scripts | ✅ | ✅ Abort All Scripts | ✅ | `#stopall` |
+| External Editor (change / OS default) | via `editor` cfg | 🆕 External Editor submenu | 🆕 | Shows the resolved launch-ladder rung; Change… writes the override, Use OS Default clears it |
+| Open Scripts Folder | ✅ | ✅ | ✅ | Per-character Scripts directory |
 
 ### AutoMapper menu
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| Show Window | ✅ | ✅ via Window menu | 🚀 SHIP | |
+| Show Window | ✅ | ✅ via Window menu | ✅ | |
 | Update Maps | ✅ LAMP | ✅ direct via File menu | 🆕 | |
-| Script Settings | ✅ FormMapperSettings | ❌ | 🗓 BETA OK | Genie 4's AutoMapper Script Settings dialog drives a community `.cmd` walker script. Genie 5 design decision pending (engine-driven vs script-driven). |
+| Script Settings | ✅ FormMapperSettings | n/a | ✅ | G4's dialog drove a community `.cmd` walker; Genie 5 ships **engine-driven auto-walk** instead (`AutoWalkService.cs`) — the script-settings dialog is moot |
 
 ### Plugins menu
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| **Entire menu** | ✅ | ✅ Plugins menu (Open Folder, Reload, Load ▶, Enable/Disable ▶, Unload ▶) + `#plugin` command | 🚀 SHIP | Marketplace still roadmap |
+| **Entire menu** | ✅ | ✅ Plugins menu (Open Folder, Reload, Load ▶, Enable/Disable ▶, Unload ▶) + `#plugin` | ✅ | Marketplace still roadmap |
 
 ### Help menu
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| Check For Updates / AutoUpdate / Force Update | ✅ | ✅ Help → Check for Updates (dialog + ● badge + startup background check) | 🚀 SHIP | In-app updater (Velopack); no silent auto-apply by policy |
-| Update Settings (update policies) | ⚠️ scattered toggles | ✅ Help → Update Settings | 🆕 | ✅ shipped alpha.8 — per-kind Check-on-Startup + Auto-Apply menus over the update policies, plus a dismissible status-bar notice strip ("Updates available: X / Auto-updated: Y", click opens the dialog) |
-| Load Test Client | ✅ | n/a | 🗓 BETA OK | Could use GameCode picker on Connect dialog (already supports Test) |
-| Latest Release Page | ✅ | ❌ | **🔧 FIX BEFORE ALPHA** | Helpful for testers reporting; 10 min to add |
-| Discord / GitHub / Wiki / Play.net / Elanthipedia / Lich Discord links | ✅ | ❌ | **🔧 FIX BEFORE ALPHA** | Tester onboarding; ~30 min for a full Help menu |
+| Check For Updates / AutoUpdate / Force Update | ✅ | ✅ Help → Check for Updates (dialog + ● badge + startup background check) | ✅ | In-app updater (Velopack); no silent auto-apply by policy |
+| Update Settings (update policies) | ⚠️ scattered toggles | ✅ Help → Update Settings | 🆕 | Per-kind Check-on-Startup + Auto-Apply menus, plus a dismissible status-bar notice strip |
+| Load Test Client | ✅ | n/a | 🗓 | Could use the GameCode picker on the Connect dialog (already supports Test) |
+| Latest Release Page | ✅ | ✅ | ✅ | **Shipped since V1** (`MainWindow.axaml:627`) |
+| Discord / GitHub / Wiki / Play.net / Elanthipedia / Lich Discord links | ✅ | ✅ | ✅ | **Shipped since V1** (`MainWindow.axaml:627-693`) |
 
 ### Profile menu (Genie 4 has its own menu)
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| Load Profile / Save Profile / Include Password | ✅ separate menu | ✅ folded into Connect dialog | 🚀 SHIP | Genie 5 doesn't have a top-level Profile menu; functionality is in the Connect dialog. Worth a menu for muscle memory? Marginal. |
+| Load / Save Profile / Include Password | ✅ separate menu | ✅ folded into Connect dialog | ✅ | No top-level Profile menu; functionality lives in the Connect dialog |
 
 **Menu rollup:**
-- Critical missing: **Help menu** (links). ~30 min — should-add before alpha for tester orientation.
-- Defer to beta: Script menu (functionality exists, discovery doesn't), Open Log In Editor.
-- ✅ Since shipped in alpha.8 "Menu Parity" (`497c30f`): Open Directory submenu, Auto Log, Master Toggles (Highlights/Triggers/Substitutes/Gags/Aliases/Images), Paste Multi Line, Icon Bar, Magic Panels, Align Input to Game Window, Always On Top, Help ▸ Update Settings, Portrait window rename.
-- Never: Auto Reconnect.
+- Full Help menu with community links: ✅ shipped since V1.
+- Full dedicated **Scripts** menu (Manager, List/Pause/Resume/Abort All, Trace All, Update Scripts, External Editor): ✅ shipped since V1.
+- Still deferred: AutoMapper master off-switch.
+- Auto Reconnect ships in an attended-session form (reconnects only sessions the user was actively driving).
 
 ---
 
 ## 2. Settings (cfg keys / configuration)
 
-Genie 4 has 60+ config keys in `Lists/Config.cs`. Genie 5 has rough equivalents for most, with a 14-item backlog `Genie 4 Config-Option parity audit` capturing the gap.
+Genie 4 has 60+ config keys in `Lists/Config.cs`. Genie 5 has rough equivalents for most, with a shrinking backlog `Genie 4 Config-Option parity audit`.
 
 ### Already-shipped parity
 
@@ -196,14 +199,14 @@ Genie 4 has 60+ config keys in `Lists/Config.cs`. Genie 5 has rough equivalents 
 |---|---|---|---|
 | `commandchar` | `#` | `#` | ✅ Match |
 | `scriptchar` | `.` | `.` | ✅ Match |
-| `separatorchar` | `;` | `;` | ✅ Match (defaults match; need to verify Genie 5 actually splits — backlog "verify multi-command separator") |
+| `separatorchar` | `;` | `;` | ✅ Match |
 | `scriptextension` | `cmd` | `cmd` | ✅ Match |
 | `prompt` | `> ` | `> ` | ✅ Match |
-| `mycommandchar` | `/` | `/` | ⚠️ Match in setting but Genie 5 doesn't use it for anything |
-| `spelltimer` | True | True | ✅ Match (Genie 5 cast bar shipped) |
-| `autoupdate` | False | False | ✅ Match (both default OFF; Genie 5 now has the in-app updater — startup runs a background **check** only, never a silent auto-apply) |
+| `mycommandchar` | `/` | `/` | ✅ Match (input starting with this char is echoed + run through triggers but never sent to the game — G4 `SendText` parity) |
+| `spelltimer` | True | True | ✅ Match (cast bar shipped) |
+| `autoupdate` | False | False | ✅ Match (both default OFF; startup runs a background **check** only, never a silent apply) |
 
-### Shipped in Genie 5 with different default
+### Shipped with a different default
 
 | Key | Genie 4 default | Genie 5 default | Why |
 |---|---|---|---|
@@ -211,46 +214,48 @@ Genie 4 has 60+ config keys in `Lists/Config.cs`. Genie 5 has rough equivalents 
 | `keepinputtext` | False | False | Match |
 | `weblinksafety` | True | True | Match (confirm-before-open URLs) |
 
-### Deferred to beta — backlog item "Genie 4 Config-Option parity audit"
+### Config-key parity ledger (backlog "Genie 4 Config-Option parity audit")
 
-These are small individual items, mostly UI-toggle wiring. Total estimated: 2-3 days. Each is ~15-30 lines.
+Re-verified against beta.3 source (2026-08-02): most of this table has shipped since V1 — only three keys remain unimplemented.
 
 | Key | Default | What it does | Status |
 |---|---|---|---|
-| `abortdupescript` | True | If a script with the same name is already running, abort the duplicate | 🗓 BETA OK |
-| `editor` | `notepad.exe` | External editor path for "Open Log In Editor" + future "Edit Script" | ✅ shipped as `Display.EditorPath` |
+| `abortdupescript` | True | Abort a duplicate same-named running script | ✅ shipped (`GenieConfig.cs:131`; `ScriptEngine.cs:147`) |
+| `editor` | `notepad.exe` | External editor path | ✅ shipped as `Display.EditorPath` |
 | `maxgosubdepth` | 50 | Script-engine GOSUB recursion limit | ✅ shipped (`GenieConfig.MaxGoSubDepth = 50`) |
-| `maxrowbuffer` | 5 | Output buffering line count | ⚠️ different semantics in Genie 5 |
-| `promptbreak` | True | Insert blank line before each `<prompt>` | 🗓 BETA OK |
-| `promptforce` | True | Force prompt display when server omits | 🗓 BETA OK |
-| `condensed` | False | Compact display mode | 🗓 BETA OK |
-| `triggeroninput` | True | Run triggers against user input lines, not just server | ✅ shipped |
-| `roundtimeoffset` | 0 | Latency-comp adjustment to RT display | 🗓 BETA OK |
+| `maxrowbuffer` | 5 | Output buffering line count | ⚠️ superseded by `ScrollbackLines` (default 2000, retention cap — genuinely different semantics; G4's was a WinForms paint knob) |
+| `promptbreak` | True | Insert blank line before each `<prompt>` | ✅ shipped (`GameTextViewModel.cs:170`) |
+| `promptforce` | True | Force prompt display when server omits | ✅ shipped (`GameTextViewModel.cs:173`) |
+| `condensed` | False | Compact display mode | ✅ shipped (`GameTextViewModel.cs:133`) |
+| `triggeroninput` | True | Run triggers against user input lines | ✅ shipped |
+| `roundtimeoffset` | 0 | Latency-comp adjustment to RT display | ✅ shipped (`GenieConfig.cs:172`; `VitalsViewModel.cs:177`) |
 | `weblinksafety` | True | Confirm-before-open on URL clicks | ✅ shipped |
-| `monstercountignorelist` | regex | Patterns to exclude from monster count | 🗓 BETA OK |
+| `monstercountignorelist` | regex | Patterns to exclude from monster count | ✅ shipped (`GenieConfig.cs:85`; Mobs panel + `$monstercount`/`$monsterlist`) |
 | `scripttimeout` | 5000 ms | Max runtime per script | ✅ shipped |
-| `ignorescriptwarnings` | False | Suppress script-engine warnings | 🗓 BETA OK |
-| `parsegameonly` | False | Skip parser on user input | 🗓 BETA OK |
-| `ignoreclosealert` | False | Suppress confirm-on-close | 🗓 BETA OK |
-| `sizeinputtogame` | False | Align input bar to game width | ✅ shipped alpha.8 (Layout ▸ Align Input to Game Window) |
-| `connectscript` | empty | Auto-run a named script on connect | 🗓 BETA OK (per-profile, in backlog) |
+| `ignorescriptwarnings` | False | Suppress script-engine warnings | ✅ shipped (`GenieCore.cs:500`) |
+| `parsegameonly` | False | Skip parser on user input | ✅ shipped (`GenieCore.cs:1008`) |
+| `ignoreclosealert` | False | Suppress confirm-on-close | ✅ shipped (`MainWindow.axaml.cs:481`) |
+| `sizeinputtogame` | False | Align input bar to game width | ✅ shipped (Layout ▸ Align Input to Game Window) |
+| `connectscript` | empty | Auto-run a named script on connect | ✅ shipped (`GenieCore.cs:1153`; per data-root/profile, not per-character) |
 | `connectstring` | `FE:GENIE...` | Client-ID announcement string | ✅ shipped (engine-controlled) |
-| `servertimeout` + `servertimeoutcommand` | 180s / fatigue | Keep-alive verb on idle | 🗓 BETA OK |
-| `usertimeout` + `usertimeoutcommand` | 300s / quit | User-side idle disconnect verb | 🗓 BETA OK |
-| `requiresignedplugins` | False | Plugin signature verification | 🎯 v1.0+ (plugin host shipped; signing / trust is Phase 4) |
-| Per-data-dir overrides (`artdir`, `logdir`, `configdir`, `plugindir`, `mapdir`, `scriptdir`, `sounddir`) | local relative dirs | resolved via `LocalDirectoryService` | 🗓 BETA OK (overrides not exposed in UI) |
-| Repository URLs (`scriptrepo`, `maprepo`, `pluginrepo`, `artrepo`) | empty | superseded by `update-feeds.json` | 🆕 maps + plugin feeds shipped; scripts / art not yet |
-| Lich integration (`rubypath`, `cmdpath`, `lichpath`, `licharguments`, `lichserver`, `lichport`, `lichstartpause`) | typical | n/a | 🗓 BETA OK (Genie 5 has LichProxy mode; no auto-launch yet) |
+| `requiresignedplugins` | False | Plugin signature verification | 🎯 v1.0+ (not present in `src/`; signing / trust is Phase 4) |
+| `servertimeout` + `servertimeoutcommand` | 180s / fatigue | Keep-alive verb on idle | ❌ not present in `src/` |
+| `usertimeout` + `usertimeoutcommand` | 300s / quit | User-side idle disconnect verb | ❌ not present in `src/` |
+| Per-data-dir overrides (`artdir`, `logdir`, `configdir`, `plugindir`, `mapdir`, `scriptdir`, `sounddir`) | local relative dirs | user-settable keys, validated + resolved via `LocalDirectoryService` (`mapdir`/`plugindir` resolve against the shared root) | ✅ shipped (`GenieConfig.cs:594`) |
+| Repository URLs (`scriptrepo`, `maprepo`, `pluginrepo`, `artrepo`) | empty | superseded by `update-feeds.json` | 🆕 maps + plugin + **script** feeds shipped (`ScriptsUpdater.cs`); art not yet |
+| Lich integration (`rubypath`, `cmdpath`, `lichpath`, `licharguments`, `lichserver`, `lichport`, `lichstartpause`) | typical | ✅ auto-launch shipped (`LichLauncher.cs`) | ✅ **shipped since V1** — `#lc`/`#lconnect`/`#lichconnect` launch + attach |
 
-### Forbidden by DR policy
+**Only three config keys remain unimplemented:** `servertimeout` and `usertimeout` (no keep-alive / idle-disconnect anywhere in `src/`) and `requiresignedplugins` (Phase 4 signing / trust).
 
-| Key | Genie 4 default | Genie 5 status | Action |
+### Reconnect — now implemented (attended-session form)
+
+| Key | Genie 4 default | Genie 5 status | Notes |
 |---|---|---|---|
-| `reconnect` | True | Key exists, NOT wired to behavior | **Foot-gun**: remove the key or annotate `[Obsolete]` — see headline call #2 |
+| `reconnect` | True | ✅ Wired as an attended-session reconnect | Reconnects only a session the user was actively driving (requires user input since connect); no longer the V1 present-but-unwired key. |
 
 ### Genie 5-only additions
 
-- `frontendid` (`GENIE`/`STORM`) — FE handshake selector (CLI/code-controllable; UI removed after FE:STORM hypothesis disconfirmed)
+- `frontendid` (`GENIE`/`STORM`) — FE handshake selector (CLI/code-controllable)
 - `RoundTimeOnHandsStrip` — RT badge position
 - `ShowGameText` / `ShowEchoText` / `ShowScriptText` — per-tag visibility
 - `EditorPath` — external editor for `#edit`
@@ -260,43 +265,43 @@ These are small individual items, mostly UI-toggle wiring. Total estimated: 2-3 
 
 ## 3. Rule Engines
 
-This is the largest area of genuine parity. **Genie 5 ships all of Genie 4's rule engines.**
+The largest area of genuine parity. **Genie 5 ships all of Genie 4's rule engines.**
 
 | Engine | Genie 4 | Genie 5 | Class scope | Persistence | Status |
 |---|---|---|---|---|---|
-| **Aliases** | `Lists/Aliases.cs` + `#alias` | `Aliases/AliasEngine.cs` + `#alias`/`#unalias` | ✅ wired | `aliases.cfg` (JSON) | 🚀 SHIP |
-| **Triggers** | `Lists/Globals.cs` Triggers | `Triggers/TriggerEngineFinal.cs` + `#trigger`/`#action` | ✅ wired | `triggers.cfg` (JSON) | 🚀 SHIP |
-| **Highlights** | `Lists/Highlights.cs` (3 subclasses) | `Highlights/HighlightEngine.cs` + `#highlight` | ✅ wired | `highlights.cfg` (JSON) | 🚀 SHIP |
-| **Substitutes** | `Lists/Globals.cs` Subs + `#sub` | `Substitutes/SubstituteEngine.cs` + `#substitute`/`#sub`/`#subs` | ✅ wired | `substitutes.cfg` (JSON) | 🚀 SHIP |
-| **Gags** | `Lists/Globals.cs` Gags + `#gag` | `Gags/GagEngine.cs` + `#gag`/`#ungag` | ✅ wired | `gags.cfg` (JSON) | 🚀 SHIP |
-| **Macros** | `Lists/Macros.cs` + `#macro` | `Macros/MacroEngine.cs` + `#macro` | ✅ wired (just-shipped, commit `5889182`) | `macros.cfg` (JSON) | 🚀 SHIP |
-| **Variables** | `Lists/Globals.cs` Variables + `#setvar` | `Variables/VariableEngine.cs` + `#var`/`#tvar` | n/a (data, not rules) | `variables.cfg`/`tvars.cfg` | 🚀 SHIP |
-| **Classes** | `Lists/Classes.cs` + `#class` | `Classes/ClassEngine.cs` + `#class` | n/a (gating mechanism) | `classes.cfg` (JSON) | 🚀 SHIP |
-| **Names** | `Lists/Names.cs` + `#name` | `Highlights/NameHighlightEngine.cs` | ❌ no class scope | `names.cfg` (JSON) | ⚠️ partial — class scope missing |
-| **Presets** | `Lists/Globals.cs` Presets + UI | `Presets/PresetEngine.cs` (parse-side wiring; render-side colors not yet exposed) | n/a | `presets.cfg` (JSON) | 🗓 BETA OK (backlog "Revisit Preset Color Highlights") |
+| **Aliases** | `Lists/Aliases.cs` + `#alias` | `Aliases/AliasEngine.cs` + `#alias`/`#unalias` | ✅ | `aliases.cfg` (JSON) | ✅ |
+| **Triggers** | `Lists/Globals.cs` Triggers | `Triggers/TriggerEngineFinal.cs` + `#trigger`/`#action` | ✅ | `triggers.cfg` (JSON) | ✅ |
+| **Highlights** | `Lists/Highlights.cs` | `Highlights/HighlightEngine.cs` + `#highlight` | ✅ | `highlights.cfg` (JSON) | ✅ |
+| **Substitutes** | `Lists/Globals.cs` Subs + `#sub` | `Substitutes/SubstituteEngine.cs` + `#substitute`/`#sub`/`#subs` | ✅ | `substitutes.cfg` (JSON) | ✅ |
+| **Gags** | `Lists/Globals.cs` Gags + `#gag` | `Gags/GagEngine.cs` + `#gag`/`#ungag` | ✅ | `gags.cfg` (JSON) | ✅ |
+| **Macros** | `Lists/Macros.cs` + `#macro` | `Macros/MacroEngine.cs` + `#macro` | ✅ | `macros.cfg` (JSON) | ✅ |
+| **Variables** | `Lists/Globals.cs` Variables + `#setvar` | `Variables/VariableEngine.cs` + `#var`/`#tvar` | n/a | `variables.cfg`/`tvars.cfg` | ✅ |
+| **Classes** | `Lists/Classes.cs` + `#class` | `Classes/ClassEngine.cs` + `#class` | n/a | `classes.cfg` (JSON) | ✅ |
+| **Names** | `Lists/Names.cs` + `#name` | `Highlights/NameHighlightEngine.cs` | ❌ no class scope | `names.cfg` (JSON) | ⚠️ class scope missing |
+| **Presets** | `Lists/Globals.cs` Presets + UI | `Presets/PresetEngine.cs` | n/a | `presets.cfg` (JSON) | ✅ render-side colors applied to game text (`DefaultHighlights.cs:342`) |
 
 ### Rule-engine sub-features
 
 | Sub-feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| Highlight sound playback (`SoundFile` on rule) | ✅ | ❌ (no audio system) | 🗓 BETA OK |
-| Highlight "match whole line" vs "substring" mode | ✅ | ✅ | 🚀 SHIP |
-| Highlight foreground + background colors | ✅ | ✅ | 🚀 SHIP |
-| Highlight case-sensitive flag | ✅ | ✅ | 🚀 SHIP |
-| Trigger regex with `/pattern/i` syntax | ✅ | ✅ | 🚀 SHIP |
-| Trigger `eval` expression triggers | ✅ via `e/` | ⚠️ via `def(...)` | 🚀 SHIP (different syntax) |
-| Trigger fire-on-input (vs server only) | ✅ via `triggeroninput` | ✅ | 🚀 SHIP |
-| Macro keybind: F-keys, Ctrl+X, Alt+X, Shift+X | ✅ | ✅ | 🚀 SHIP |
-| Variable types: SaveToFile / Temporary / Reserved | ✅ | ⚠️ via `Scope` enum (Global/Script/Tvar) | 🚀 SHIP (semantically equivalent) |
-| Reserved variables ($health, $mana, $stance, etc.) | ✅ ~30 vars | ✅ ~40 vars via `ScriptGlobalsSync` | 🆕 |
-| Per-rule ClassName for filtering | ✅ | ✅ for Highlights/Triggers/Substitutes/Gags/Aliases/Macros; ❌ for Names | ⚠️ partial |
-| Command-bar syntax for `class:foo` modifier | ✅ on most | ❌ for Aliases/Macros (engine support, but `#alias add … class:foo` parser ext not done) | 🗓 BETA OK |
-| .cfg round-trip with class name | ✅ | ⚠️ for Aliases/Macros — engine supports but serializer not updated | 🗓 BETA OK |
+| Highlight sound playback (`SoundFile` on rule) | ✅ | ✅ (`AudioService` → `DefaultHighlights.cs:291`) | ✅ |
+| Highlight "match whole line" vs "substring" | ✅ | ✅ | ✅ |
+| Highlight foreground + background colors | ✅ | ✅ | ✅ |
+| Highlight case-sensitive flag | ✅ | ✅ | ✅ |
+| Trigger regex `/pattern/i` syntax | ✅ | ✅ | ✅ |
+| Trigger `eval` expression triggers | ✅ via `e/` | ⚠️ via `def(...)` | ✅ (different syntax) |
+| Trigger fire-on-input (vs server only) | ✅ via `triggeroninput` | ✅ | ✅ |
+| Macro keybind: F-keys, Ctrl/Alt/Shift+X | ✅ | ✅ | ✅ |
+| Variable types: SaveToFile / Temporary / Reserved | ✅ | ⚠️ via `Scope` enum (Global/Script/Tvar) | ✅ (semantically equivalent) |
+| Reserved variables ($health, $mana, $stance, …) | ✅ ~30 vars | ✅ ~40 vars via `ScriptGlobalsSync` | 🆕 |
+| Per-rule ClassName for filtering | ✅ | ✅ for Highlights/Triggers/Substitutes/Gags/Aliases/Macros; ❌ Names | ⚠️ partial |
+| Command-bar `class:foo` modifier | ✅ on most | ❌ no `class:` token parsing anywhere (`CommandEngine.cs`) | 🗓 |
+| .cfg round-trip with class name | ✅ | ⚠️ Highlight/Trigger/Sub/Gag serializers write ClassName; **Alias/Macro drop it on save** (`CfgFormat.cs:32,57`) | 🗓 |
 
 **Rule-engine rollup:**
-- All core engines ship in Genie 5 with full Genie 4 parity.
-- Two small remaining gaps: command-bar syntax for `class:foo` on aliases/macros (~30 LOC each), and Presets render-side color application (backlog item).
-- Names engine missing class scope; lower priority (it's the internal player-name highlighter, not a user-rule engine).
+- All core engines ship at full Genie 4 parity; Presets render-side colors and highlight sound playback both ship (audio system confirmed present).
+- Three confirmed small gaps (beta.3): command-bar `class:foo` parser modifier (no `class:` parsing at all), Alias/Macro `ClassName` `.cfg` persistence (held in memory, dropped on save), and Names-engine class scope.
+- Names class scope is lowest priority (internal player-name highlighter, not a user-rule engine).
 
 ---
 
@@ -304,88 +309,84 @@ This is the largest area of genuine parity. **Genie 5 ships all of Genie 4's rul
 
 ### Native `.cmd` script support
 
-Both Genie 4 and Genie 5 support the Wizard-derived `.cmd` script language. **Genie 5 is a faithful port** — same vocabulary, same `$variable` substitution semantics, same `MATCH`/`WAITFOR`/`GOSUB`/`GOTO` flow control.
+Both clients support the Wizard-derived `.cmd` language. **Genie 5 is a faithful port** — same vocabulary, same `$variable` substitution, same `MATCH`/`WAITFOR`/`GOSUB`/`GOTO` flow control.
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| Labels (`:label`, `label:`) | ✅ | ✅ | 🚀 SHIP |
-| `GOTO` / `GOSUB` / `RETURN` | ✅ | ✅ | 🚀 SHIP |
-| `MATCH` / `MATCHRE` / `WAITFOR` / `WAITFORRE` | ✅ | ✅ | 🚀 SHIP |
-| `PUT` / `SEND` (send to game) | ✅ | ✅ | 🚀 SHIP |
+| Labels (`:label`, `label:`) | ✅ | ✅ | ✅ |
+| `GOTO` / `GOSUB` / `RETURN` | ✅ | ✅ | ✅ |
+| `MATCH` / `MATCHRE` / `WAITFOR` / `WAITFORRE` | ✅ | ✅ | ✅ |
+| `PUT` / `SEND` (send to game) | ✅ | ✅ | ✅ |
 | `#put` alias | n/a | ✅ | 🆕 |
-| `ECHO` (display text, with optional `>window` `#color`) | ✅ | ✅ | 🚀 SHIP |
-| `PAUSE` / `WAIT` (sleep N seconds) | ✅ | ✅ | 🚀 SHIP |
-| `waitpause` (sleep until current RT expires) | ✅ | ✅ (Task #113) | 🚀 SHIP |
-| `if_*` conditional slots, `IF ... THEN ... ELSE ... ENDIF` | ✅ | ✅ | 🚀 SHIP |
-| `def(name)` expression | ✅ | ✅ (Task #114) | 🚀 SHIP |
-| Variables (`var foo = bar`, `$foo` substitution) | ✅ | ✅ | 🚀 SHIP |
-| `%1 %2 ... %0` argument substitution | ✅ | ✅ | 🚀 SHIP |
-| `#var` / `#tvar` (session globals) | ✅ | ✅ | 🚀 SHIP |
-| `EVAL` / `EVALMATH` (math expression) | ✅ | ⚠️ via `def(...)` | 🚀 SHIP |
-| `random` (random number) | ✅ | ⚠️ verify | TBD |
-| `counter` | ✅ | ⚠️ verify | TBD |
-| `INCLUDE <script>` (parse-time inclusion) | ✅ | ✅ | 🚀 SHIP |
-| `EXIT` (stop script) | ✅ | ✅ | 🚀 SHIP |
-| `#stop` / `#stopall` (kill script from command bar) | ✅ | ✅ (Task #117) | 🚀 SHIP |
-| `#scripts` (list running) | ✅ | ✅ (Task #117) | 🚀 SHIP |
-| `#edit` (open in external editor) | ✅ | ✅ (Task #188) | 🚀 SHIP |
-| Tab-complete script names in command bar | ❌ | 🆕 (Task #187) | 🆕 |
-| Type-ahead budget management | ✅ | ✅ (`TypeAheadSession`) | 🚀 SHIP |
-| RT-aware command queueing | ✅ | ✅ (`CommandQueue`) | 🚀 SHIP |
-| GOSUB recursion limit | ✅ `maxgosubdepth=50` | ✅ `MaxGoSubDepth=50` | 🚀 SHIP |
-| Script timeout | ✅ `scripttimeout=5000` | ✅ `ScriptTimeout=5000` | 🚀 SHIP |
-| Abort-on-undefined-var | n/a | 🆕 (Task #120) — Genie 4 silently expanded to empty | 🆕 |
+| `ECHO` (with optional `>window` `#color`) | ✅ | ✅ | ✅ |
+| `PAUSE` / `WAIT` (sleep N seconds) | ✅ | ✅ | ✅ |
+| `waitpause` (sleep until current RT expires) | ✅ | ✅ | ✅ |
+| `if_*` conditional slots, `IF … THEN … ELSE … ENDIF` | ✅ | ✅ | ✅ |
+| `def(name)` expression | ✅ | ✅ | ✅ |
+| Variables (`var foo = bar`, `$foo`) | ✅ | ✅ | ✅ |
+| `%1 %2 … %0` argument substitution | ✅ | ✅ | ✅ |
+| `#var` / `#tvar` (session globals) | ✅ | ✅ | ✅ |
+| `EVAL` / `EVALMATH` | ✅ | ✅ native `eval`/`evalmath` (`ScriptEngine.cs:2006`) — not just `def(...)` | ✅ |
+| `random` / `counter` | ✅ | ✅ (`ScriptEngine.cs:1892`/`:1928`) | ✅ |
+| `INCLUDE <script>` (parse-time inclusion) | ✅ | ✅ | ✅ |
+| `EXIT` (stop script) | ✅ | ✅ | ✅ |
+| `#stop` / `#stopall` | ✅ | ✅ | ✅ |
+| `#scripts` (list running) | ✅ | ✅ | ✅ |
+| `#edit` (open in external editor) | ✅ | ✅ | ✅ |
+| Tab-complete script names in command bar | ❌ | 🆕 | 🆕 |
+| Type-ahead budget management | ✅ | ✅ (`TypeAheadSession`) | ✅ |
+| RT-aware command queueing | ✅ | ✅ (`CommandQueue`) | ✅ |
+| GOSUB recursion limit | ✅ `maxgosubdepth=50` | ✅ `MaxGoSubDepth=50` | ✅ |
+| Script timeout | ✅ `scripttimeout=5000` | ✅ `ScriptTimeout=5000` | ✅ |
+| Abort-on-undefined-var | n/a | 🆕 (G4 silently expanded to empty) | 🆕 |
 
-### JavaScript `.js` script support
+### JavaScript `.js` script support — ✅ SHIPPED since V1
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| `.js` array scripts via Jint engine | ✅ | ❌ | 🗓 BETA OK |
-| `js`/`javascript`/`jsblock`/`jscall` script commands | ✅ | ❌ | 🗓 BETA OK |
+| `.js` array scripts via Jint engine | ✅ | ✅ persistent threaded Jint runtime (`ScriptInstance.cs:22`) | ✅ |
+| `js` / `jscall` / `include <file>.js` script commands | ✅ | ✅ (`ScriptEngine.cs:1976`) | ✅ |
 
-**Backlog item**: "JavaScript scripting support (`.js` array scripts)" — 2-3 days for v1 using Jint (pure-managed, no native binary distribution headache). Compliance: must default to NO host access (Jint `AllowClr(false)`); opt-in per-script via header comment.
+Sandboxing: JS runs with the `genie.*` API plus memory/runaway guards; no unrestricted host/CLR access by default.
 
 ### Lich .rb script support
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| Launch Lich proxy + run `.rb` scripts | ✅ (`Config.LichPath`/`LichArguments`) | ⚠️ via LichProxy mode (manual Lich launch by user) | 🚀 SHIP |
-| Auto-launch Lich on connect | ✅ | ❌ | 🗓 BETA OK |
+| Launch Lich proxy + run `.rb` scripts | ✅ | ✅ via LichProxy mode | ✅ |
+| Auto-launch Lich on connect | ✅ | ✅ `LichLauncher.cs` (`#lc`/`#lconnect`/`#lichconnect`) | ✅ **shipped since V1** |
 
 **Script-engine rollup:**
-- `.cmd` parity: ~99% verified against 4-5 community scripts (Task #112).
-- `.js` support is the only major gap; design exists in backlog.
+- `.cmd` parity: ~99% verified against community scripts.
+- `.js` (Jint) and Lich auto-launch — both V1 gaps — now ship. No major script-engine gaps remain (`random`/`counter` are the only "verify" items).
 
 ---
 
 ## 5. UI Panels / Windows
 
-Both clients support a flexible dockable-panel layout, but the implementation tech is completely different (WinForms MDI vs. Avalonia + Dock.Avalonia).
+Both clients support flexible dockable layouts; the tech differs (WinForms MDI vs. Avalonia + Dock.Avalonia).
 
 ### Dockable windows
 
-| Window | Genie 4 | Genie 5 | Default visible | Notes |
+| Window | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| **Game** (main text) | ✅ | ✅ | both | Genie 5 has per-tag visibility filter (Game/Echo/Script) |
-| **Vitals** (health/mana/spirit/stamina/concentration bars) | ✅ ComponentBars | ✅ VitalsTool | G4: yes, G5: hidden (Status Bar duplicates it) | |
-| **Inventory** / **Backpack** | ✅ | ✅ | both | |
-| **Mapper** | ✅ MapForm | ✅ MapperTool | both | |
-| **Logons** | ✅ | ✅ | both | |
-| **Talk** | ✅ | ✅ | both | |
-| **Whispers** | ✅ | ✅ | both | |
-| **Thoughts** | ✅ | ✅ | both | |
-| **Combat** | ✅ | ✅ | both | Genie 5 has this active-by-default in the bottom-left tab cluster |
-| **Familiar** | ✅ | ❌ | 🗓 BETA OK | Backlog item "Familiar / Death / Assess stream windows" |
-| **Death** | ✅ | ❌ | 🗓 BETA OK | Same backlog item |
-| **Log** (system messages) | ✅ | ❌ | 🗓 BETA OK | Routed to Game window's System color in Genie 5 |
-| **Debug** (parser trace) | ✅ | ✅ via Raw XML window | 🚀 SHIP | Covered by the Raw XML window (its tooltip notes it covers G4's Debug window — alpha.8); plus `[dbg:N]` script-level traces |
-| **Conversation** (NPC speech) | ✅ | ❌ | 🗓 BETA OK | Niche; few users |
-| **Raw** (raw XML inspector) | ✅ | ✅ RawXmlTool | 🚀 SHIP | ✅ shipped (issue #14) — Window ▸ Raw XML, hidden by default, live read-only server stream |
-| **Active Spells** (`percWindow` stream) | ✅ | ❌ | 🗓 BETA OK | Data flows through parser; just no UI tab |
-| **Portrait** | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — the room-art panel (was "Scene") takes its Genie 4 name; dock id unchanged so saved layouts keep restoring it |
-| **Room** (room title/description/exits) | n/a as separate | ✅ | 🆕 | Genie 5 splits room from game text into its own panel |
-| **Hands Strip** | ✅ within icon bar | ✅ separate strip | 🆕 | Genie 5 dedicated; toggleable position |
-| **Script Bar** | ✅ | ✅ | both | Genie 5 auto-hides when empty (cleaner than Genie 4's always-visible) |
+| **Game** (main text) | ✅ | ✅ | ✅ | Per-tag visibility filter (Game/Echo/Script) |
+| **Vitals** bars | ✅ ComponentBars | ✅ VitalsTool | ✅ | G5 default hidden (Status Bar duplicates it) |
+| **Inventory** / **Backpack** | ✅ | ✅ | ✅ | |
+| **Mapper** | ✅ MapForm | ✅ MapperTool | ✅ | |
+| **Logons / Talk / Whispers / Thoughts / Combat** | ✅ | ✅ | ✅ | Combat active-by-default in the bottom-left tab cluster |
+| **Familiar** | ✅ | ✅ | ✅ | **Shipped since V1** (`GenieDockFactory.cs:184`) |
+| **Death** | ✅ | ✅ | ✅ | **Shipped since V1** |
+| **Active Spells** (`percWindow`) | ✅ | ✅ `ActiveSpellsViewModel` | ✅ | **Shipped since V1** |
+| **Conversation** (NPC speech) | ✅ | ✅ | ✅ | **Shipped since V1** (conversation-class streams registered) |
+| **Log** | ✅ system messages | ⚠️ dock exists but carries conversation/speech + `#echo >log` | ⚠️ | A dockable Log window ships (`GenieDockFactory.cs:188`), but *system diagnostics* still route to the Game window (Game Window ▸ Script Lines), not this panel |
+| **Debug** (parser trace) | ✅ | ✅ via Raw XML window | ✅ | Plus `[dbg:N]` script-level traces |
+| **Raw** (raw XML inspector) | ✅ | ✅ RawXmlTool | ✅ | Window ▸ Raw XML, hidden by default |
+| **Portrait** | ✅ | ✅ | ✅ | Room-art panel takes its G4 name; dock id unchanged so saved layouts restore it |
+| **Room** (title/description/exits) | n/a as separate | ✅ | 🆕 | Genie 5 splits room from game text into its own panel |
+| **Hands Strip** | ✅ within icon bar | ✅ separate strip | 🆕 | Dedicated; toggleable position |
+| **Script Bar** | ✅ | ✅ | ✅ | Auto-hides when empty; per-chip pause/resume/debug/trace/vars/edit/stop |
+| **Script Manager** panel | ✅ Script Explorer | ✅ dockable panel | 🆕 | Browse / run / edit the library + manage running scripts (pause / stop / reload / vars / trace); toggled from the Scripts menu or `#script explorer` |
 
 ### Default layout
 
@@ -396,8 +397,8 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 | Hands strip | In icon bar | Dedicated strip, default below status bar |
 
 **UI rollup:**
-- 10 panels parity; 7 panels deferred (mostly niche stream windows + Raw + Portrait + Active Spells).
-- Genie 5 has a more opinionated default layout (3-column) — matches the "ship-ready" arrangement the user wanted.
+- The niche stream windows V1 deferred (Familiar / Death / Active Spells / Conversation) have all shipped. The one nuance: the **Log** dock exists but is a conversation/speech stream — G4's *system-message* Log has no dedicated panel (those lines still go to the Game window).
+- Genie 5 keeps a more opinionated default 3-column layout.
 
 ---
 
@@ -405,17 +406,17 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| Plugin host (.NET DLL plugin API) | ✅ `Core/PluginHost.cs` + `Core/LegacyPluginHost.cs` | ✅ `Genie.Plugins.Abstractions` (`IGeniePlugin` / `IPluginHost` / `IGameStateView`) + `PluginManager` | 🚀 SHIP |
-| Plugin DLL loading | ✅ | ✅ collectible `AssemblyLoadContext` (`PluginLoadContext`); `DiscoverAndLoad` from `{AppData}/Genie5/Plugins/`; per-plugin load / unload / reload | 🚀 SHIP |
-| Plugin signature verification | ✅ `requiresignedplugins` | ❌ | 🎯 v1.0+ (Phase 4 — signing / trust hardening) |
-| Plugin manager UI | ✅ `Forms/FormPlugins.cs` | ⚠️ Plugins menu (load / unload / enable / disable / reload / open-folder) + `#plugin` command; no dedicated manager dialog | 🆕 |
+| Plugin host (.NET DLL API) | ✅ `Core/PluginHost.cs` + `Core/LegacyPluginHost.cs` | ✅ `Genie.Plugins.Abstractions` (`IGeniePlugin`/`IPluginHost`/`IGameStateView`) + `PluginManager` | ✅ |
+| Plugin DLL loading | ✅ | ✅ collectible `AssemblyLoadContext` (`PluginLoadContext`); `DiscoverAndLoad` from `{AppData}/Genie5/Plugins/`; load / unload / reload | ✅ |
+| Plugin signature verification | ✅ `requiresignedplugins` | ❌ | 🎯 v1.0+ (Phase 4 — signing / trust) |
+| Plugin manager UI | ✅ `Forms/FormPlugins.cs` | ⚠️ Plugins menu + `#plugin`; no dedicated manager dialog | 🆕 |
 | Plugin marketplace | ❌ | 🎯 backlog "Modern Plugin Marketplace" | 🎯 v1.0+ |
-| First external plugin | ❌ | ✅ `Plugin_EXPTrackerV5` (separate repo `GenieClient/Plugin_EXPTrackerV5`) | 🆕 |
+| First external plugin | ❌ | ✅ `Plugin_EXPTrackerV5` (separate repo) | 🆕 |
 
 **Plugin rollup:**
-- Plugin host **shipped**: a UI-free contract (`Genie.Plugins.Abstractions`), a collectible-ALC DLL loader, a Plugins menu + `#plugin` command, and the first external plugin (`Plugin_EXPTrackerV5`). The earlier in-process `ExpTrackerExtension` stepping-stone was removed once the external plugin replaced it.
-- Still roadmap (v1.0+): a "Modern Plugin Marketplace" with one-click install, ratings, and signed packages, plus the Phase 4 signing / trust model + API-surface lint.
-- Genie 4 plugin DLLs still won't load unmodified (WinForms / Windows-only); they need a recompile against `Genie.Plugins.Abstractions`. The interface shape is kept familiar to ease porting.
+- Plugin host **shipped**: UI-free contract, collectible-ALC loader, Plugins menu + `#plugin`, first external plugin.
+- Roadmap (v1.0+): marketplace, Phase 4 signing / trust + API-surface lint.
+- G4 plugin DLLs still need a recompile against `Genie.Plugins.Abstractions` (WinForms/Windows-only); the interface shape is kept familiar to ease porting.
 
 ---
 
@@ -423,31 +424,30 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| Map data format (zone XML) | ✅ canonical | ✅ identical | 🚀 SHIP (round-trip via `Genie4MapImporter` / `Genie4MapExporter`) |
-| Map rendering (zone canvas) | ✅ | ✅ `MapCanvas` | 🚀 SHIP |
+| Map data format (zone XML) | ✅ canonical | ✅ identical | ✅ (round-trip via `Genie4MapImporter` / `Genie4MapExporter`) |
+| Map rendering (zone canvas) | ✅ | ✅ `MapCanvas` | ✅ |
 | Click-to-go on map | ✅ left-click | ✅ right-click context menu | 🆕 |
-| **Auto-walk between rooms** | ✅ via `.automapper` script | ❌ click opens dialog only | **🔧 FIX BEFORE ALPHA** (per pre-publish checklist this is a v1 release blocker) |
-| Map fingerprinting (title + exits) | ✅ | ✅ `MapFingerprint.cs` | 🚀 SHIP |
+| **Auto-walk between rooms** | ✅ via `.automapper` script | ✅ **engine-driven** (`AutoWalkService.cs`) | ✅ **shipped since V1** — was the named alpha blocker; steps through `FindPath` results with Esc / off-plan / disconnect cancel |
+| Map fingerprinting (title + exits) | ✅ | ✅ `MapFingerprint.cs` | ✅ |
 | Auto-detect zone from current room | ⚠️ via script | ✅ engine | 🆕 |
-| Less Obvious Paths display | ✅ | ✅ as clickable buttons | 🚀 SHIP |
-| Editable room Notes | ✅ | ✅ inline editor, saves to zone XML | 🚀 SHIP |
+| Less Obvious Paths display | ✅ | ✅ clickable buttons | ✅ |
+| Editable room Notes | ✅ | ✅ inline editor, saves to zone XML | ✅ |
 | Stale-zone warning | ❌ | 🆕 "may be stale" badge after 30 days | 🆕 |
-| Auto-center on current room | ✅ via script | ✅ engine (just-shipped) | 🚀 SHIP |
+| Auto-center on current room | ✅ via script | ✅ engine | ✅ |
 | Zone update from official repo | ✅ via LAMP | ✅ via File menu (`MapsUpdater` + `GithubContentsSource`) | 🆕 |
-| Multi-zone navigation (cross-zone pathing) | ✅ via script | ❌ | 🗓 BETA OK |
-| User-walk vs auto-walk vs drag modes | ✅ | ❌ (no auto-walk yet) | 🗓 BETA OK |
-| Per-class mapper script | ✅ AutoMapper Script Settings dialog | ❌ | 🗓 BETA OK |
-| Sigil walk / search walk / caravan / broom_carpet / iceroadcollect | ✅ via script | ❌ | 🗓 BETA OK |
-| Map visual: zoom, pan | ✅ basic | ✅ with mouse-wheel zoom | 🚀 SHIP |
-| Map visual: room color by exit type | ❌ | 🆕 cyan for vertical, green for special, grey for compass | 🆕 |
+| Multi-zone navigation (cross-zone pathing) | ✅ via script | ✅ `MultiZonePathfinder.cs` + `AutoWalkService.StartCrossZone` + `ZoneConnections.xml` editor | ✅ **shipped since V1** |
+| Per-class mapper script | ✅ AutoMapper Script Settings dialog | n/a (engine walker supersedes) | ✅ |
+| Sigil / search walk / caravan / broom_carpet / iceroadcollect | ✅ via script | ❌ specialized routines | 🗓 |
+| Map visual: zoom, pan | ✅ basic | ✅ mouse-wheel zoom | ✅ |
+| Map visual: room color by exit type | ❌ | 🆕 cyan vertical / green special / grey compass | 🆕 |
 | Map visual: room labels from Notes | ❌ | 🆕 | 🆕 |
 | Float mapper to separate window | ❌ | 🆕 (Dock.Avalonia FloatDockable) | 🆕 |
 
 **AutoMapper rollup:**
-- Data + rendering: Genie 5 is ahead.
-- Auto-walking: Genie 5 punted. This is the ONE alpha-blocker the pre-publish checklist explicitly named.
-- **Decision needed**: implement engine-driven auto-walk (via `Commands.ProcessInput` + `CommandQueue` for RT gating) OR ship the "Mapper Helper Script" approach where a community `.cmd` script handles routing. Both are in the backlog ("Revisit Mapper", "Concept: Mapper Helper Script").
-- Estimated cost: half-day for the helper-script approach (minimal), 1-2 days for engine-integrated.
+- Data + rendering: Genie 5 ahead.
+- **Auto-walk shipped** (the one alpha blocker V1 named) — engine-driven via the command pipeline, with a cancel-on-input / off-plan / disconnect guard (compliance-aligned; see below).
+- **Cross-zone pathing also ships** now (`MultiZonePathfinder` + `ZoneConnections.xml`) — the V1 "single-zone only" limit is stale. The remaining gap is only the specialized community walk routines (sigil / search / caravan / broom_carpet / iceroadcollect), which are not implemented in-engine.
+- Remaining: cross-zone chained pathing and the specialized community walk routines (sigil/search/caravan/etc.).
 
 ---
 
@@ -455,64 +455,68 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| **Auto Log** (rendered text to disk) | ✅ `autolog` config + File menu | ✅ `#config autolog` + File ▸ Auto Log checkbox (live mid-session) | 🚀 SHIP |
-| **Open Log In Editor** menu | ✅ | 🗓 backlog | 🗓 BETA OK (depends on Auto Log) |
-| **Session XML capture** | partial (built-in XML stream save) | 🆕 explicit File → Record Session toggle | 🆕 |
+| **Auto Log** (rendered text to disk) | ✅ `autolog` + File menu | ✅ `#config autolog` + File ▸ Auto Log checkbox (live mid-session) | ✅ |
+| **Open Log In Editor** menu | ✅ | ✅ | ✅ (opens live/most-recent Auto Log in the configured editor) |
+| **Session XML capture** | partial (built-in save) | 🆕 explicit File → Record Session toggle | 🆕 |
 | **REC indicator in title bar** | ❌ | 🆕 (red 🔴 REC) | 🆕 |
-| **Error log** | ✅ `errors.log` | ✅ `ErrorLog.cs` | 🚀 SHIP |
-| **Debug log** | ✅ via `-d` CLI flag | partial (script-level `[dbg:N]`) | 🗓 BETA OK |
-| **Per-character log files** | ✅ | ✅ via Auto Log (alpha.8 — logger correctly named for the session) | 🚀 SHIP |
-| **Log directory configurable** | ✅ `logdir` config | ✅ resolved via `LocalDirectoryService` | 🚀 SHIP (override UI deferred) |
+| **Error log** | ✅ `errors.log` | ✅ `ErrorLog.cs` | ✅ |
+| **Debug log** | ✅ via `-d` CLI flag | ⚠️ script-level `[dbg:N]` | 🗓 |
+| **Per-character log files** | ✅ | ✅ via Auto Log | ✅ |
+| **Log directory configurable** | ✅ `logdir` | ✅ via `LocalDirectoryService` | ✅ (override UI deferred) |
 
 **Logging rollup:**
-- Genie 5 has session XML capture (Genie 4 partial; Genie 5 explicit + UI).
-- Genie 5 missing Auto Log (rendered text). ~80 LOC; not blocking alpha.
+- Auto Log (rendered text) shipped; session XML capture is a Genie 5 improvement.
+- The **"Open Log In Editor"** menu item has now shipped — no logging gaps remain.
 
 ---
 
 ## 9. Updater (in-app)
 
-> The planned standalone **LAMP 2.0** updater was **canceled** and replaced by an integrated, in-app updater: Velopack for the Core app, plus a GitHub-feed framework for Maps and Plugins.
+> The planned standalone **LAMP 2.0** updater was **canceled** and replaced by an integrated in-app updater: Velopack for the Core app, plus a GitHub-feed framework for Maps and Plugins.
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| Auto-updater | ✅ separate `Lamp.exe` | ✅ in-app (Velopack `UpdateManager`), no separate exe | 🆕 |
-| Check For Updates menu | ✅ | ✅ Help → Check for Updates (Core / Maps / Plugins tabs) + Help-menu ● badge | 🚀 SHIP |
-| Auto-update on startup | ✅ | ✅ background **check** + badge on startup; alpha.8 adds Help ▸ Update Settings with per-kind Check-on-Startup + Auto-Apply opt-in (no silent apply unless the user opts in) | 🆕 |
-| Update plugins / maps / scripts independently | ✅ | ⚠️ maps + plugins shipped (Updates dialog tabs); scripts not yet | 🆕 (partial) |
+| Auto-updater | ✅ separate `Lamp.exe` | ✅ in-app (Velopack `UpdateManager`) | 🆕 |
+| Check For Updates menu | ✅ | ✅ Help → Check for Updates (Core / Maps / Plugins tabs) + ● badge | ✅ |
+| Auto-update on startup | ✅ | ✅ background **check** + badge; Help ▸ Update Settings for per-kind Check-on-Startup + Auto-Apply opt-in | 🆕 |
+| Update plugins / maps / scripts independently | ✅ | ✅ maps + plugins + scripts (`ScriptsUpdater.cs`), each with its own Updates-dialog tab | 🆕 |
 | Update channels (stable/beta/nightly) | ❌ | ✅ stable + beta (no nightly) | 🆕 |
-| Core app self-update | ✅ `autoupdatelamp` | ⚠️ Velopack replaces the app in place; applies only from a Velopack-built install (Windows) — macOS / Linux packaging on the roadmap | 🆕 |
+| Core app self-update | ✅ `autoupdatelamp` | ⚠️ Velopack replaces app in place; Windows install only — macOS / Linux packaging on roadmap | 🆕 |
 
 **Updater rollup:**
-- The integrated updater **shipped**, superseding the canceled LAMP 2.0 concept: `CoreAppUpdater` (Velopack), `MapsUpdater` + `PluginUpdater` over pluggable `IFileListSource` / `IReleaseSource` GitHub sources, a three-tab Updates dialog, and a startup background check that drives the Help-menu badge.
-- Remaining: macOS / Linux Core packaging targets (a `.app` / AppImage) + a per-platform `IReleaseSource`; an optional `ScriptsUpdater`; signed-installer + signed-manifest hardening (Phase 4).
-- The Core *self-update* applies only when launched from a Velopack-built install; from `dotnet run` / a raw publish it shows a friendly "dev build" message (Check still works).
+- Integrated updater **shipped**, superseding LAMP 2.0.
+- Remaining: macOS / Linux Core packaging + per-platform `IReleaseSource`; signed-installer + signed-manifest hardening (Phase 4). (The `ScriptsUpdater` V1 listed as a to-do has since shipped.)
 
 ---
 
 ## 10. Images & Audio
 
+> **Major V2.2 correction:** V1 said Genie 5 had "no audio system." That is **wrong** — a full cross-platform audio + neural-TTS stack shipped. Audio is no longer the gap; inline image rendering is.
+
 ### Images (`<image>` tags from DR)
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| Render `<image>` tags inline in game text | ✅ | ❌ | 🗓 BETA OK |
-| Update Images command | ✅ | ❌ | 🗓 BETA OK |
-| Show Images toggle | ✅ | ✅ File ▸ Master Toggles ▸ Images (alpha.8 — rides `showimages`, clears/re-fetches Portrait art live; inline `<image>` rendering still deferred) | 🚀 SHIP |
-| Art directory | ✅ `Art/` | placeholder | 🗓 BETA OK |
+| Render `<image>` inline in game text | ✅ | ❌ non-injury `<image>` tags are dropped (`DrXmlParser.cs:1492`) | 🗓 |
+| Update Images command | ✅ | ❌ (art auto-fetched on demand instead) | 🗓 |
+| Show Images toggle | ✅ | ✅ File ▸ Master Toggles ▸ Images (rides `showimages`; Portrait art live) | ✅ |
+| Art directory | ✅ `Art/` | ✅ `Config.ArtDir` is a real cache dir; `RoomArtService` downloads `play.net/bfe/DR-art/{id}.jpg` | ✅ |
+| Room/scene art panel | ✅ | ✅ renders in the Portrait/Scene panel (`SceneViewModel`) | ✅ |
 
-### Audio
+### Audio — ✅ SHIPPED (was "no audio system" in V1)
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| WAV playback on highlight match | ✅ | ❌ | 🗓 BETA OK |
-| Mute toggle | ✅ `muted` config | placeholder | 🗓 BETA OK |
-| Sound directory | ✅ | placeholder | 🗓 BETA OK |
-| System speech (TTS) | ✅ via SpeechSynthesizer | ❌ | 🗓 BETA OK |
+| WAV / sound playback engine | ✅ | ✅ `AudioService` — Windows `winmm PlaySound`, macOS `afplay`, Linux `paplay`/`aplay` (`AudioService.cs:24`) | ✅ |
+| Sound on highlight match | ✅ | ✅ `DefaultHighlights.OnHighlightSound` → `PlaySound` (`MainWindowViewModel.cs:4420`) | ✅ |
+| Sound on trigger match | ✅ | ✅ (`TriggerEngineFinal.cs:87`) | 🆕 |
+| Mute toggle | ✅ `muted` | ✅ `IsMuted` ↔ `Config.PlaySounds`, gates the real engine (`GenieCore.cs:1554`) | ✅ |
+| Sound directory | ✅ | ✅ `sounddir` config key (resolved via `LocalDirectoryService`) | ✅ |
+| System speech (TTS) | ✅ via `SpeechSynthesizer` (Win-only) | 🆕 offline **neural** TTS (Piper VITS/ONNX), `#speak` + per-highlight speak (`TtsService.cs`) | 🆕 |
 
 **Image/Audio rollup:**
-- Both deferred. Image rendering is a backlog item; audio is unstated but related to compliance (sound triggers are common in combat-tracking scripts).
-- ALPHA-README acknowledges: "No audio playback yet" (implicit — `PlaySounds` setting exists but no playback code).
+- **Audio fully shipped** — playback engine, highlight/trigger sound, mute, sound dir, and cross-platform offline neural TTS (an improvement over G4's Windows-only `SpeechSynthesizer`).
+- **Room/scene art shipped**; the only real image gap is **inline `<image>` rendering in the game-text flow** (non-injury image tags are still dropped) and the explicit "Update Images" command (art is auto-fetched instead).
 
 ---
 
@@ -520,21 +524,21 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| Saved connection profiles | ✅ XML files | ✅ JSON via `ProfileStore.cs` | 🚀 SHIP |
-| Tree-view of accounts/games in connect dialog | ✅ | ✅ flat list (simpler) | 🚀 SHIP |
-| Password encryption on disk | ✅ XOR'd in XML | 🆕 AES-256-GCM with machine-bound key (`ProfileCrypto.cs`) | 🆕 |
+| Saved connection profiles | ✅ XML files | ✅ JSON via `ProfileStore.cs` | ✅ |
+| Tree-view of accounts/games in connect dialog | ✅ | ✅ flat list (simpler) | ✅ |
+| Password encryption on disk | ✅ XOR'd in XML | 🆕 AES-256-GCM machine-bound key (`ProfileCrypto.cs`) | 🆕 |
 | Include Password in Profile (toggle) | ✅ optional | always-encrypted-if-saved | 🆕 |
-| Per-character config directory | ✅ | ✅ `Profiles/{Char}-{Acct}/` | 🚀 SHIP |
-| Per-profile rule overrides | ✅ | ✅ via per-character config dir | 🚀 SHIP |
-| Per-profile layout state | ✅ | partial (Dock.Avalonia state save/load not yet exposed) | 🗓 BETA OK |
-| Profile notes | ✅ via `DialogProfileNote` | ❌ | 🗓 BETA OK |
-| Character display format (`Char-Acct`) | n/a | **pre-publish checklist item** | **🔧 FIX BEFORE ALPHA** |
-| OS keystore (DPAPI/Keychain/libsecret) | ❌ | 🗓 backlog | 🗓 BETA OK (better than Genie 4 already) |
+| Per-character config directory | ✅ | ✅ `Profiles/{Char}-{Acct}/` | ✅ |
+| Per-profile rule overrides | ✅ | ✅ via per-character config dir | ✅ |
+| Per-profile layout state | ✅ | ✅ Save/Load Layout with per-profile scope | ✅ **shipped since V1** |
+| Profile notes | ✅ via `DialogProfileNote` | ❌ | 🗓 |
+| Character display format (`Char-Acct`) | n/a | ✅ (`CharacterIdentity.cs:23`) | ✅ **shipped since V1** |
+| OS keystore (DPAPI/Keychain/libsecret) | ❌ | 🗓 backlog | 🗓 (AES-GCM already safer than G4) |
 
 **Profile management rollup:**
-- Genie 5 is materially safer than Genie 4 (AES-GCM vs XOR).
-- Character display format gap is documented in pre-publish checklist.
-- OS keystore is a beta enhancement — current implementation is correct cryptography for local-only storage.
+- Materially safer than Genie 4 (AES-GCM vs XOR).
+- `Character-Account` format and per-profile layout — both V1 gaps — now ship.
+- OS keystore remains a beta enhancement; current crypto is correct for local-only storage.
 
 ---
 
@@ -542,28 +546,24 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 
 | Indicator | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| Health bar (0-100%) | ✅ | ✅ | 🚀 SHIP |
-| Mana bar | ✅ | ✅ | 🚀 SHIP |
-| Spirit / Stamina / Concentration bars | ✅ | ✅ | 🚀 SHIP |
-| Bar colors configurable | ✅ via preset | ✅ via DisplaySettings | 🚀 SHIP |
-| Roundtime countdown | ✅ ComponentRoundtime | ✅ inline RT badge | 🚀 SHIP |
+| Health / Mana / Spirit / Stamina / Concentration bars | ✅ | ✅ | ✅ |
+| Bar colors configurable | ✅ via preset | ✅ via DisplaySettings | ✅ |
+| Roundtime countdown | ✅ ComponentRoundtime | ✅ inline RT badge | ✅ |
 | RT badge position (command bar vs hands strip) | ❌ | 🆕 toggleable | 🆕 |
 | Spell-cast countdown | ❌ | 🆕 magenta bar with (N) prefix | 🆕 |
-| Posture: STAND/KNEEL/PRONE/SIT | ✅ | ✅ | 🚀 SHIP |
-| Stealth: HIDE | ✅ | ✅ | 🚀 SHIP |
-| Stealth: INVISIBLE | ✅ | ✅ Icon Bar chip (alpha.8, fed by IndicatorEvent) | 🚀 SHIP |
-| Afflictions: BLEED / POIS / DIS | ✅ | ✅ | 🚀 SHIP |
-| Afflictions: WEB / STUN / JOINED | ✅ | ✅ | 🚀 SHIP |
-| Status: DEAD | ✅ | ✅ | 🚀 SHIP |
+| Posture: STAND/KNEEL/PRONE/SIT | ✅ | ✅ | ✅ |
+| Stealth: HIDE | ✅ | ✅ | ✅ |
+| Stealth: INVISIBLE | ✅ | ✅ Icon Bar chip (fed by IndicatorEvent) | ✅ |
+| Afflictions: BLEED / POIS / DIS | ✅ | ✅ | ✅ |
+| Afflictions: WEB / STUN / JOINED | ✅ | ✅ | ✅ |
+| Status: DEAD | ✅ | ✅ | ✅ |
 | Stance: OFF/ADV/FWD/NEU/GRD/DEF | ❌ as badge | 🆕 inline badge | 🆕 |
-| Left/Right hand contents | ✅ | ✅ | 🚀 SHIP |
+| Left/Right hand contents | ✅ | ✅ | ✅ |
 | Prepared spell with elapsed time | ✅ | 🆕 with cast bar | 🆕 |
-| `$preparedspell` script variable | ✅ | ✅ | 🚀 SHIP |
+| `$preparedspell` script variable | ✅ | ✅ | ✅ |
 | Hands strip position (top/bottom) | bottom only | 🆕 toggleable | 🆕 |
 
-**Hands/Vitals rollup:**
-- Full parity on the indicators that matter for gameplay.
-- Genie 5 adds: spell cast bar, stance badge, RT badge position toggle, hands strip position toggle.
+**Hands/Vitals rollup:** full parity on gameplay indicators; Genie 5 adds cast bar, stance badge, and position toggles.
 
 ---
 
@@ -571,150 +571,78 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| Find / search in current buffer | ✅ Ctrl+F | ❌ | 🗓 BETA OK |
-| Paste Multi Line | ✅ | ✅ (alpha.8 — Edit menu, splits on separator char) | 🚀 SHIP |
-| Ctrl+Right-Click selected text → command bar | ❌ | 🆕 (Task #105) | 🆕 |
-| Tab-complete script names | ❌ | 🆕 (Task #187) | 🆕 |
-| Up-arrow command history | ✅ | ✅ (Task #157 — caret position fix) | 🚀 SHIP |
+| Find / search in current buffer | ✅ Ctrl+F | ✅ Find bar on focused stream (`MainWindow.axaml.cs:761`) | ✅ **shipped since V1** |
+| Paste Multi Line | ✅ | ✅ (Edit menu, splits on separator char) | ✅ |
+| Ctrl+Right-Click selected text → command bar | ❌ | 🆕 | 🆕 |
+| Tab-complete script names | ❌ | 🆕 | 🆕 |
+| Up-arrow command history | ✅ | ✅ | ✅ |
 | `<d cmd>` clickable links | ✅ | ✅ with echoOverride for friendly display | 🆕 |
-| `<a href>` URL links | partial | 🆕 (Tasks #168-171) | 🆕 |
-| URL safety prompt (`weblinksafety`) | ✅ | ✅ config exists; UI verify needed | 🚀 SHIP |
-| User-timeout auto-disconnect | ✅ `usertimeout` | ❌ | 🗓 BETA OK (config exists, not wired) |
-| Server-timeout keep-alive | ✅ `servertimeout` | ❌ | 🗓 BETA OK |
-| Confirm-on-close dialog | ❌ | 🆕 (Task #148-150) | 🆕 |
+| `<a href>` URL links | partial | 🆕 | 🆕 |
+| URL safety prompt (`weblinksafety`) | ✅ | ✅ | ✅ |
+| User-timeout auto-disconnect | ✅ `usertimeout` | ❌ | 🗓 (config exists, not wired) |
+| Server-timeout keep-alive | ✅ `servertimeout` | ❌ | 🗓 |
+| Confirm-on-close dialog | ❌ | 🆕 | 🆕 |
 | Recording REC indicator | ❌ | 🆕 | 🆕 |
 | OBS streamer mode (hide sensitive info) | maybe (unclear) | ❌ | 🎯 v1.0+ |
 
 ---
 
-## Compliance Audit
+## Remaining Gaps to v1.0
 
-**Per `policy_compliance_review.md` (May 24, 2026)** — Genie 5 today is compliant. The line in DR policy is *responsiveness*, not *automation level*. Click-to-go auto-mapper is fine, scripts are fine, all standard client features are fine.
+The alpha-blocker matrix is retired — all V1 blockers shipped. What's left:
 
-### Hard nevers — Genie 4 has, Genie 5 must NOT ship
+### Small / deferred (later beta) — the genuinely-remaining gaps after full re-verification
+- Three config keys only: `servertimeout` + `usertimeout` (keep-alive / idle-disconnect, not present) and `requiresignedplugins` (Phase 4).
+- Command-bar `class:foo` parser modifier; Alias/Macro `ClassName` `.cfg` persistence; Names-engine class scope.
+- Dedicated **system-message** Log panel (a Log dock exists but carries conversation/speech).
+- `-d` / dedicated debug-log file; profile notes; per-data-dir override UI surfacing.
 
-| Feature | Genie 4 status | Genie 5 status | Verification |
-|---|---|---|---|
-| Auto-reconnect after disconnect | ✅ default ON | 🛑 config key exists, NOT wired to behavior | ✅ verified in `GameConnection.cs` — the retry loop is initial-connect only |
-| Auto-walk while window unfocused | possible via script | 🛑 no auto-walk at all yet | ✅ verified (mapper doesn't walk; backlog item to add it with focus-check) |
-| Overnight chained travel queues | possible via script | 🛑 no auto-walk infrastructure | ✅ verified |
-| Headless / daemon mode | ❌ | 🛑 GUI-only | ✅ verified |
-| AI agentive mode (AI drives commands) | n/a (no AI) | 🛑 feature-flagged OFF | ⚠️ `AiAdvisorMode` flag exists; needs architectural wall before any wiring |
-| Multi-character orchestration from one instance | ❌ | 🛑 single-session client | ✅ verified |
-| Other players' speech to external AI | n/a | ⚠️ AI pipeline shipping OFF; whisper/talk filtering not yet implemented | 🗓 BETA OK (no external AI calls today) |
+### Multi-day (beta → v1.0)
+- Inline `<image>` rendering in the game-text flow (non-injury image tags currently dropped) + an explicit "Update Images" command.
+- Specialized community walk routines (sigil / search / caravan / broom_carpet / iceroadcollect) — cross-zone pathing itself already ships.
+- macOS / Linux Core update packaging + per-platform release source.
+- Configuration dialog holistic UX pass; OS keystore for credentials.
 
-### Pre-public-release action items (8 from compliance review)
-
-| # | Item | Status |
-|---|---|---|
-| 1 | AI pipeline gating (default OFF; opt-in checkbox; strip other-players' speech; in-app privacy notice) | 🗓 BETA (today: AI pipeline doesn't make external calls — safe by absence) |
-| 2 | Auto-mapper attended detection (halt queue after ~60s window unfocus; Esc cancel; never auto-resume) | 🗓 dependent on auto-walk implementation |
-| 3 | Script visible runtime + optional idle-kill (amber after 10 min; user-configurable auto-stop) | 🗓 BETA OK (Script Bar shows running but not runtime) |
-| 4 | No auto-reconnect (verified) | ✅ verified |
-| 5 | OS keystore for credentials (DPAPI/Keychain/libsecret) | 🗓 BETA OK (AES-GCM is safer than Genie 4 already) |
-| 6 | Session recording default OFF in public builds (with visible "recording → {path}" indicator) | ✅ today default OFF; REC indicator visible |
-| 7 | In-app policy summary (Help menu) | **🔧 FIX BEFORE ALPHA** (couple of paragraphs; pairs with Help menu work) |
-| 8 | Manual verification of unreachable ASP policy pages | 🗓 to do before public broad release; OK for select-few alpha |
-
-### Specific alpha-blocker discovery from this audit
-
-**`GameConnection.cs:85-108`** — the initial-connect retry loop runs up to `MaxReconnectAttempts=10` times with `ReconnectDelayMs=5000ms` between attempts. That's a 50-second worst case if the network is down when the user clicks Connect.
-
-This is NOT a compliance issue (user is at keyboard during connect attempt; dialog shows retry counter). But it's bad UX. **Recommend reducing to 3 attempts** (~15 seconds worst case).
-
-And the `Reconnect` boolean in `GenieConfig.cs:35` (default `true`) is a foot-gun. Round-trips with Genie 4 settings.cfg. Today not wired. A future contributor could wire it. **Recommend either removing the field or adding a comment "MUST NOT be wired — see policy_compliance_review.md hard-nevers #1"**.
-
----
-
-## Alpha-Blocker Decision Matrix
-
-Items requiring a decision before shipping the alpha to testers. Ordered by severity.
-
-| # | Item | Severity | Cost | Decision needed |
-|---|---|---|---|---|
-| 1 | **AutoMapper auto-walk** — pre-publish checklist v1 release blocker | High (explicit blocker) | ½ day (helper script) to 1-2 days (engine-driven) | **Ship with click-to-goto only and update ALPHA-README** OR **ship with engine auto-walk** OR **ship with helper script approach** |
-| 2 | **`Reconnect` config key foot-gun** — default `true`, not wired, but a future contributor could wire it | Low (no behavior today) | 15 min | **Add `[Obsolete]` + policy comment** OR **remove the key entirely** |
-| 3 | **`MaxReconnectAttempts=10`** — 50s wait on bad network | UX, not policy | 10 min | **Reduce to 3** |
-| 4 | **Character display format** — pre-publish checklist requires `Character-Account` | Pre-publish hygiene | 30 min | **Ship the change** (title bar, character dropdown, profile picker, defaults) |
-| 5 | **Help menu missing** — testers can't easily find Discord/Wiki/GitHub for reporting | Medium (tester orientation) | 30 min for 5 links | **Add basic Help menu with 5 community links** |
-| 6 | **In-app policy summary** (compliance pre-publish #7) | Documentation | 30 min | **Add a one-screen Help → DR Policy pane** |
-
-**Total cost to address all 6: ~3 hours** (half a day worst case, assuming auto-walk is decided as helper-script approach).
-
----
-
-## Recommendations
-
-### Must-do before alpha to select testers (~3-4 hours)
-
-1. **Decide AutoMapper auto-walk approach.** The pre-publish checklist explicitly calls this out as a v1 release blocker. Options:
-   - **Option A — Ship with click-to-goto only, document the gap.** Update ALPHA-README "What's NOT working yet" to include "Auto-walk between rooms (click opens goto dialog; you'll need to type or script the route)." Defer to beta. Cost: 5 min wording change.
-   - **Option B — Implement engine-driven auto-walk** via `Commands.ProcessInput` + `CommandQueue` for RT gating. Cost: 1-2 days. Risk: needs window-focus check + cancel-on-input + visible queue indicator per compliance review #2.
-   - **Option C — Ship Mapper Helper Script approach**: a community-style `.cmd` script that walks the route. Cost: ½ day. Risk: limited by users' script-engine experience.
-   - **Recommendation: Option A for select-few alpha; defer auto-walk to beta. Tester feedback will inform B vs C decision.**
-
-2. **Address the `Reconnect` foot-gun.** Either remove `Reconnect` from `GenieConfig.cs` and the load/save handlers, or annotate with `[Obsolete]` + a comment pointing to `policy_compliance_review.md`. Cost: 15 min.
-
-3. **Reduce `MaxReconnectAttempts` to 3 (with 3s delay).** Worst-case 9s wait on initial connect failure vs current 50s. Cost: 10 min.
-
-4. **Roll out `Character-Account` display format.** Title bar, character dropdown, profile picker, default profile name. Cost: 30 min. Per pre-publish checklist.
-
-5. **Add basic Help menu** with 5 links: Discord, Wiki (Elanthipedia), GitHub repo, DR policy page (play.net), and "Report Issue" (mailto: or GitHub Issues URL). Plus one extra item "DR Policy Summary..." that opens an in-app one-pager covering the compliance posture (hard-nevers list, Genie 5's compliance approach). Cost: 30 min.
-
-### Should-do before alpha if time allows (~half-day)
-
-6. **Reduce verbose ALPHA-README "What's NOT working yet" section to match this audit.** Currently lists "No plugin host", "No auto-update", "No JavaScript script support", "No themes", "No workspace presets", "Configuration dialog rough edges." Could add: "No Find/Search (Ctrl+F)", "No Paste Multi-Line", "No master toggle for trigger/highlight/etc. engines", "No Auto Log".
-
-7. **Stub out the missing master toggles** (Triggers Enabled, Gags/Ignores Enabled, AutoMapper Enabled, Images Enabled). Even non-functional, having them in the File menu sets expectations correctly. Cost: 30 min. *(Superseded — fully functional File ▸ Master Toggles shipped in alpha.8; AutoMapper master toggle remains the one without an off-switch.)*
-
-### Defer to beta (no changes needed before alpha)
-
-These are documented gaps that testers will encounter and report on, which is fine for an alpha:
-- Auto Log (text logging) — ~80 LOC, backlog *(has since shipped — alpha.8)*
-- Raw XML Window — half-day, backlog *(has since shipped — issue #14)*
-- Layout save/load (workspace presets) — 1-2 days, backlog
-- Configuration dialog UX pass — half-day, backlog
-- UI Themes (Light/Dark) — day+, backlog
-- Familiar/Death/Active Spells stream tabs — small per tab, backlog
-- Per-tag visibility on rule engines (master toggle Triggers/Gags/Highlights) — half-day total *(has since shipped — alpha.8 File ▸ Master Toggles)*
-- Mapper auto-walk (any approach) — see Option B/C above
-- Audio support + image rendering — multi-day each
-- `Always On Top` window option — 5 LOC, trivial *(has since shipped — alpha.8)*
-- Find / Paste Multi-Line — small Avalonia features *(Paste Multi-Line has since shipped — alpha.8; Find still open)*
-
-### Defer to v1.0+ (vision items)
-
-- Plugin marketplace (plugin host has since shipped)
-- Updater: macOS / Linux Core packaging + a Scripts updater (the in-app updater itself has shipped)
-- JavaScript `.js` script support (Jint)
-- AI advisor mode (with compliance gating)
-- Cloud sync / cross-device profiles
-- Workspace presets ("Combat layout" / "Healing layout")
-- Combat analytics (DPS / debuff uptime)
-- Visual trigger/flow designer
-- Embedded browser / wiki integration
-
-### Never (DR policy)
-
-- Auto-reconnect after disconnect (the `Reconnect` config key)
-- Agentive AI (AI driving `Commands.ProcessInput`)
-- Auto-walk while window unfocused
-- Headless / daemon mode
-- Multi-character orchestration from one instance
-- Shipping other players' speech to external AI
+### v1.0+ (vision)
+- Plugin marketplace; Phase 4 plugin signing / trust + API-surface lint.
+- AI advisor mode.
+- Cloud sync / cross-device profiles.
+- OBS streamer mode; combat analytics; visual trigger/flow designer.
 
 ---
 
 ## Closing notes
 
-**Genie 5 is ready to ship to select-few alpha testers** once the 6 items in the Alpha-Blocker Decision Matrix are addressed (or explicitly accepted as gaps in ALPHA-README). The plugin host and in-app updater have since shipped; the largest remaining v1.0+ items are the plugin marketplace, plugin signing / trust, and the AI advisor.
+**Genie 5 at beta.3 has cleared every gap V1 called a blocker.** The plugin host, in-app updater, JavaScript scripting, engine-driven auto-walk, the full Help menu, layout save/load, in-buffer Find, the niche stream windows, `Character-Account` formatting, and Lich auto-launch have all shipped — as has the last V1 menu-parity item, "Open Log In Editor." No V1 gap remains genuinely absent.
 
-**The most consequential gap is AutoMapper auto-walk** (pre-publish checklist v1 blocker). Recommended path: ship the alpha with click-to-goto only, document the gap clearly in ALPHA-README, gather tester feedback on which auto-walk approach (engine vs script) they'd prefer.
-
-**Compliance posture is clean.** No forbidden features ship today. The two compliance-adjacent risks are well-contained:
-- `Reconnect` config key exists but isn't wired (foot-gun, not bug)
-- AI pipeline scaffolding exists but doesn't make external calls
-
-Both will need attention as beta work matures, but neither blocks alpha.
+**The largest remaining items are all v1.0+ vision work** — plugin marketplace, signing / trust, AI advisor, and macOS / Linux update packaging.
 
 **Trigger phrase to revisit this doc:** "review the Genie 4 vs Genie 5 comparison" or "what's in the comparison audit."
+
+---
+
+## Change log
+
+**V2.3 — 2026-08-02 (public edition):**
+- Trimmed internal compliance / DR-policy detail and low-level implementation notes for public posting. Auto-reconnect is described as the user-facing feature it is (attended-session reconnect); the internal policy analysis is maintained separately.
+
+**V2.2 — 2026-08-02 (full row-by-row re-verification):**
+- Swept every remaining ⚠️/🗓/❌ row against beta.3 source via four parallel verification passes. The systematic pattern held: the doc was under-crediting Genie 5 nearly everywhere.
+- **Config keys (§2):** flipped 11 of 15 to ✅ (`abortdupescript`, `promptbreak`, `promptforce`, `condensed`, `roundtimeoffset`, `monstercountignorelist`, `ignorescriptwarnings`, `parsegameonly`, `ignoreclosealert`, `connectscript`, per-data-dir overrides). `maxrowbuffer` clarified as superseded by `ScrollbackLines`. Only `servertimeout`/`usertimeout`/`requiresignedplugins` remain unimplemented.
+- **Audio (§10):** corrected the flat-wrong "no audio system" — a full cross-platform `AudioService` (winmm/afplay/paplay) + highlight/trigger sound + mute + offline neural **Piper TTS** all ship. Room/scene art + `ArtDir` cache ship too. Only inline `<image>` rendering and the Update Images command remain.
+- **Rule/script engine (§3/§4):** Presets render-side colors, highlight sound playback, native `EVAL`/`EVALMATH`, `random`, `counter` all ✅. Confirmed still-missing: Names class scope, `class:foo` parser modifier, Alias/Macro `ClassName` `.cfg` round-trip.
+- **Mapper (§7):** cross-zone / multi-zone pathing ships (`MultiZonePathfinder`); AutoMapper Enabled toggle ships. Only specialized walk routines remain.
+- **UI (§1/§5):** AutoMapper master toggle ✅; Log dock exists but is a conversation stream (system-message Log still absent) — corrected to ⚠️.
+
+**V2.1 — 2026-08-02 (Scripts-menu re-verify):**
+- Corrected the entire Script-menu block against source. Genie 5 ships a **full dedicated Scripts menu** (`MainWindow.axaml:474-540`): Script Manager, List/Pause/Resume/Abort All Scripts, Trace All (0/1/3/5/10), Update Scripts, External Editor, Open Scripts Folder — none of which V1 credited. Fixed the "no pause/resume primitive" and "no Script menu / Script Explorer" claims.
+- The Scripts **updater** (`ScriptsUpdater.cs`, `IUpdater`, git-pull semantics) has shipped — corrected §2, §9, and the "scripts not yet" notes.
+- Added a dockable **Script Manager** panel row to §5.
+
+**V2 — 2026-08-02 (re-baseline to beta.3):**
+- Retitled from a pre-alpha audit to a beta.3 parity/roadmap reference; dropped the "before alpha ships" purpose and the alpha-decision apparatus (Headline Calls, Alpha-Blocker Matrix, alpha-framed Recommendations).
+- Unified the two V1 legends (status + alpha-decision) into one status legend.
+- Flipped 9 rows verified against beta.3 source: JS scripts, Help menu, Find (Ctrl+F), AutoMapper auto-walk, `Character-Account`, layout save/load, Familiar/Death/Active Spells/Conversation streams, Lich auto-launch, and the `reconnect` key (now wired).
+- Fixed V1 self-contradictions (Logging rollup vs table; JS listed as deferred in the Executive Summary while shipped elsewhere).
+
+**V1 — original, prepared 2026-05-26, last synced 2026-07-05 (alpha.8).**
