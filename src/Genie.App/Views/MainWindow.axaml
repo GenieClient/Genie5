@@ -37,6 +37,9 @@
                   IsChecked="{Binding IsRecording, Mode=OneWay}"
                   Command="{Binding ToggleRecordingCommand}"
                   ToolTip.Tip="Capture the raw game XML stream to a file under AppData/Genie5/Logs/ for later review. One file per Start. Stops automatically on disconnect. While active, the title bar shows ● REC. Use AFTER you connect — toggling before a live session is open captures nothing."/>
+        <MenuItem Header="Open _Log In Editor"
+                  Command="{Binding OpenLogInEditorCommand}"
+                  ToolTip.Tip="Open the Auto Log text file in your text editor (Genie 4's File ▸ Open Log In Editor). Uses the live session's log when one is being written, otherwise the most recent log in the Logs folder. Editor is Edit → Configuration → Display Settings → Editor Path, then `#config editor`, then the OS default."/>
         <MenuItem Header="Open _Directory"
                   ToolTip.Tip="Open a Genie data folder in your file browser — Genie 4's File ▸ Open Directory, split out per folder. Each entry also lives on its own menu (Maps, Scripts, Plugins).">
           <MenuItem Header="_Data Folder"

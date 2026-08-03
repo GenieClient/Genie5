@@ -473,6 +473,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// </summary>
     public ReactiveCommand<Unit, Unit>                    OpenRecordingsFolderCommand { get; }
 
+    /// <summary>File ▸ Open Log In Editor — opens the current (or most recent)
+    /// Auto Log file in the configured external editor. Genie 4 parity; see
+    /// <see cref="OpenLogInEditor"/>.</summary>
+    public ReactiveCommand<Unit, Unit>                    OpenLogInEditorCommand { get; }
+
     // File ▸ Open Directory submenu (issue #26 — Genie 4 had a single "Open
     // Directory" that opened the data root; the submenu adds direct jumps).
     // Maps / Scripts / Plugins reuse their existing commands.
@@ -1959,6 +1964,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         SetMapsDirectoryCommand     = ReactiveCommand.CreateFromTask(SetMapsDirectoryAsync);
         OpenMapsFolderCommand       = ReactiveCommand.Create(OpenMapsFolder);
         OpenRecordingsFolderCommand = ReactiveCommand.Create(OpenRecordingsFolder);
+        OpenLogInEditorCommand      = ReactiveCommand.Create(OpenLogInEditor);
         // File ▸ Open Directory: data root + active config dir (Logs/Maps/
         // Scripts/Plugins reuse their existing commands). The config dir is
         // read at click time so it tracks the per-character profile switch.
@@ -2480,6 +2486,63 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// exist yet (user may have installed but never recorded).
     /// </summary>
     private void OpenRecordingsFolder() => OpenFolder(_logsDir, "OpenRecordingsFolder");
+
+    /// <summary>
+    /// File ▸ Open Log In Editor (Genie 4 parity). Opens the Auto Log text file
+    /// in the configured external editor via the shared
+    /// <see cref="LaunchExternalEditor"/> ladder (Display Settings → #config
+    /// editor → OS default). Prefers the live session's open log
+    /// (<see cref="SessionTextLogger.CurrentFile"/>); when nothing is being
+    /// logged right now it falls back to the most recently written
+    /// <c>*.log</c> in the Logs folder, so it's still useful after a session
+    /// ends. With no logs on disk it reports how to start logging and opens the
+    /// Logs folder instead of failing silently.
+    /// </summary>
+    private void OpenLogInEditor()
+    {
+        try
+        {
+            var target = AutoLogger.CurrentFile;
+            if (string.IsNullOrEmpty(target) || !File.Exists(target))
+                target = MostRecentLogFile();
+
+            if (string.IsNullOrEmpty(target))
+            {
+                GameText.AddSystemLine(
+                    "[log] No log files yet. Turn on File ▸ Auto Log (or #config autolog true) to start writing one. Opening the Logs folder…");
+                OpenRecordingsFolder();
+                return;
+            }
+
+            var opened = LaunchExternalEditor(target);
+            GameText.AddSystemLine($"[log] Opened {Path.GetFileName(target)} in {opened}.");
+        }
+        catch (Exception ex)
+        {
+            ErrorLog.Log("OpenLogInEditor", ex);
+            GameText.AddSystemLine($"[log] Could not open the log in an editor: {ex.Message}");
+        }
+    }
+
+    /// <summary>Newest <c>*.log</c> in the Logs folder by last-write time, or
+    /// null when the folder is missing or empty. Used as the Open-Log fallback
+    /// when no session is actively logging.</summary>
+    private string? MostRecentLogFile()
+    {
+        try
+        {
+            if (!Directory.Exists(_logsDir)) return null;
+            return new DirectoryInfo(_logsDir)
+                .EnumerateFiles("*.log")
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .FirstOrDefault()?.FullName;
+        }
+        catch (Exception ex)
+        {
+            ErrorLog.Log("MostRecentLogFile", ex);
+            return null;
+        }
+    }
 
 
     private async Task SetMapsDirectoryAsync()
