@@ -65,13 +65,13 @@ Script-compat regressions are treated as bugs — please [file an issue](https:/
 ## Mapper
 
 **The map doesn't match where I am.**
-Turn on the AutoMapper (learning) toggle and walk through the area so rooms get stamped, or pull a fresh copy of the zone via **File → Update Maps from Official Repo…**. Dense cities with duplicate room titles can briefly fail to lock on — Genie declines rather than guessing wrong. See [The Mapper](Mapper).
+Turn on the AutoMapper (learning) toggle and walk through the area so rooms get stamped, or pull a fresh copy of the zone via **Maps ▸ Update from Official Repo…**. Dense cities with duplicate room titles can briefly fail to lock on — Genie declines rather than guessing wrong. See [The Mapper](Mapper).
 
 **Click-to-walk stopped partway.**
 Expected if you typed a command, pressed Esc, the window lost focus for ~60s, or you got knocked off the route — the walker cancels rather than firing the wrong command. Click again to restart. See [Policy Compliance](Policy-Compliance).
 
-**Cross-zone routes don't walk yet.**
-Single-zone walking works; feeding full cross-zone routes to the walker is still being finished. See [Cross-Zone Travel](Cross-Zone-Travel).
+**A route won't cross zones.**
+Cross-zone routing is built in — `#goto` a room in another zone (or click one while browsing another zone's map) and Genie walks you across the boundary. If a particular route won't cross, the zone link is probably missing: the maps' border-room notes may not mark that crossing, or the transit table may need an entry — check **Maps ▸ Cross-Zone Connections…**. See [Cross-Zone Travel](Cross-Zone-Travel).
 
 ## Updating
 

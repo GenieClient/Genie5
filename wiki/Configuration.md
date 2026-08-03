@@ -2,7 +2,7 @@
 
 Genie 5 ships all of Genie 4's **rule engines** — the pattern-driven helpers that color text, expand shortcuts, react to the game, and bind keys. You manage them two ways:
 
-- **The Configuration dialog** — **Edit → Configuration…** opens a tabbed, form-based editor for every rule type. Easiest for browsing and editing. The list-based tabs (Aliases, Triggers, Highlight Strings, Substitutes, Gags) each have a **type-to-filter box**, so a several-hundred-line trigger list stays navigable.
+- **The Configuration dialog** — **Edit → Configuration…** opens a tabbed, form-based editor. The tabs are **Layout** (with Windows and Settings sub-tabs), **Highlights**, **Triggers**, **Substitutes**, **Gags**, **Aliases**, **Scripts**, **Text-to-Speech**, **Macros**, **Variables**, and **Classes** — so it covers script settings and [Text-to-Speech](Text-to-Speech) alongside the rule engines. The list-based rule tabs each have a **type-to-filter box**, so a several-hundred-line trigger list stays navigable.
 - **The command bar** — `#`-prefixed commands add and remove rules on the fly, exactly as in Genie 4.
 
 Either way, rules are saved to plain-text `.cfg` files and reloaded automatically next launch. Command syntax follows the **Genie 4 dialect**; when in doubt about a specific option, the Configuration dialog is the reliable surface.
@@ -124,6 +124,10 @@ A **class** is an on/off switch that gates a group of rules. Tag highlights, tri
 ```
 
 This is how you keep, say, a full set of combat triggers ready but inactive until you start hunting.
+
+## Themes
+
+The whole client is themeable from the **Edit → Theme** submenu. Seven themes are built in — **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light**, and **Wrayth-style** — and a **theme editor** lets you tweak any of them into your own. Custom themes are saved as JSON files in `Config/Themes`, so they're easy to back up or share.
 
 ## Where rules are stored
 

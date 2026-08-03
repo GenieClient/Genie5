@@ -1,6 +1,6 @@
 # AutoMapper AutoWalk — Design Document
 
-**Status:** design proposal, in active build. Phase 1 implementation in flight.
+**Status:** design record — all four phases shipped (see [docs/mapper.md](mapper.md) and [docs/multi-zone-travel.md](multi-zone-travel.md) for current behaviour). Kept as the historical design; details below may differ from what shipped.
 **Prepared:** 2026-05-26
 **Scope:** full auto-walk feature including skill-weighted paths + cross-zone travel + user-editable database, per alpha-blocker decision.
 
@@ -12,7 +12,7 @@
 2. **Cross-zone travel.** Type `Crossing → Throne City` or click a Throne City room while in Crossing — pathfinder spans zone boundaries.
 3. **Skill-weighted paths.** If the route requires Climbing 50 and the character has Climbing 30, skip that edge and find an alternate route. Boats with wait times factor into time-to-destination.
 4. **User-editable database.** Users discover that a wall requires climbing 50, or that a boat takes 5-10 min — they edit the exit in the Mapper, the data persists to zone XML, the community Maps repo absorbs it over time.
-5. **DR policy compliance.** Walks halt on window unfocus > 60s, cancel on any typed command, never auto-resume across disconnects. Attended-mode by construction.
+5. **DR policy compliance.** Walks cancel on any typed command, never auto-resume across disconnects. Attended-mode by construction. *(As shipped: the unfocus pause is an **optional** idle backstop, **off by default** — `GenieConfig.AutoWalkPauseOnUnfocus`; the attended-mode gates — Esc / typed-command / disconnect cancel — are the compliance mechanism.)*
 
 ---
 
@@ -30,7 +30,7 @@ Before any new code, these pieces exist:
 | `NavEvent` from parser | `src/Genie.Core/Events/` | Fires when player walks into a new room |
 | `CurrentNodeChanged` event on `AutoMapperEngine` | already wired | What we hook into to advance the walk |
 | Skill data | `GameState.Components` dict with keys like `exp Climbing` | Raw text content; needs parser |
-| `MapperViewModel.GotoNode` | `src/Genie.App/ViewModels/MapperViewModel.cs:626` | Currently sends all moves in a burst — replace with stepwise execution |
+| `MapperViewModel.GotoNode` | `src/Genie.App/ViewModels/MapperViewModel.cs:626` | At design time sent all moves in a burst; shipped as stepwise execution via `AutoWalkService` |
 
 **What the pre-Automapper checkpoint taught us** (May 2026 rollback):
 
@@ -297,6 +297,8 @@ public sealed class MapExit
     public string    Requires      { get; set; } = string.Empty;
 
     // NEW — structured fields, written to XML as separate attributes
+    // (Shipped differently: MapExit kept the free-form `Requires` string,
+    //  parsed on demand by ExitRequirement.Parse — no RequiredSkills dict.)
     public Dictionary<string, int> RequiredSkills { get; init; } = new();
     public string?   RequiredClass { get; set; }
     public int?      MinLevel      { get; set; }
@@ -384,7 +386,7 @@ When pathfinding spans zones, the engine loads each zone file as needed via the 
 
 ### UI: Cross-zone connection editor
 
-A new dialog reachable from the Mapper panel's Details column:
+A new dialog (shipped as `Views/ZoneConnectionsDialog.axaml`, reached from **Maps ▸ Cross-Zone Connections…**):
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -422,7 +424,7 @@ The walker sends the transit verb (`board boat`), then waits for the destination
 - `ZoneConnection.cs` model in Genie.Core/Mapper/
 - `ZoneConnectionsRepository.cs` for I/O
 - Multi-zone Dijkstra in `AutoMapperEngine.FindPath` (signature changes to accept origin/destination as `(zone, room)` tuples)
-- `CrossZoneConnectionsDialog.axaml`
+- `ZoneConnectionsDialog.axaml` (in `Views/`)
 - `AutoWalkService` handles cross-zone transit verb + wait timer
 - Mapper Details panel gets a "Cross-zone connections" expander
 
@@ -461,19 +463,19 @@ The walker sends the transit verb (`board boat`), then waits for the destination
    - **Recommendation**: separate file. Cleaner for community curation; doesn't pollute per-zone schema; one place to look for the meta-graph.
 
 6. **Pre-populated cross-zone data**: ship with a starter set (boats, well-known climb spots) or empty?
-   - User said "We don't need to have all the Map weighted features in the database" — so **empty** for alpha. Document the format in `docs/MAPS_FORMAT.md` and let the community grow it.
+   - User said "We don't need to have all the Map weighted features in the database" — so **empty** for alpha. *(Shipped: a documented seeded baseline template, plus cross-zone links derived automatically from the maps' own border-room notes — see [multi-zone-travel.md](multi-zone-travel.md); no separate `MAPS_FORMAT.md` was written.)*
 
 ---
 
 ## Compliance posture (final check)
 
 All four phases respect the `policy_compliance_review.md` hard-nevers:
-- ❌ Auto-walk while window unfocused — pause at 60s
+- ❌ Unattended walking — as shipped, the unfocus pause is an **optional idle pause, off by default**; the attended-mode gates (Esc / typed-command / disconnect cancel, never auto-resume) are the compliance mechanism
 - ❌ Auto-reconnect-and-resume — never resume across disconnects
 - ❌ Overnight chained travel — single trip per Start; no daisy-chained queues
 - ❌ Headless / daemon mode — only fires when App window exists
 - ❌ Agentive AI — pathfinder is deterministic; AI not involved
 - ❌ Multi-character orchestration — single-session client
 
-The visible indicator + Esc cancel + typed-command-cancel + focus-check make this the responsive auto-walker the policy permits. **Same surface as Lich's `go2`** (which Simu has tolerated for 20+ years).
+The visible indicator + Esc cancel + typed-command-cancel (plus the optional focus-pause backstop) make this the responsive auto-walker the policy permits. **Same surface as Lich's `go2`** (which Simu has tolerated for 20+ years).
 

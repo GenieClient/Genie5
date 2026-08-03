@@ -68,13 +68,13 @@ Once matched, `ServerRoomId` is stamped (when learning is on) so future visits r
 
 ## Pathfinding
 
-[FindPath(start, destination)](../src/Genie.Core/Mapper/AutoMapperEngine.cs#L547) is **Dijkstra** over the exit graph of the active zone. Edge weight is baseline 1 per room today (RT-cost weighting is wired for the cross-zone pathfinder; see below). Each exit is gated by [ExitRequirement.Parse(exit.Requires).IsMet(Skills, CharacterClass, CharacterLevel)](../src/Genie.Core/Mapper/ExitRequirement.cs) — an exit the character can't take (climb wall below the skill threshold, guild-locked door, level gate) is excluded entirely. When `Skills` is null (no character data), every exit passes and the result matches a plain BFS. It returns the ordered list of `MoveCommand` strings to send.
+[FindPath(start, destination)](../src/Genie.Core/Mapper/AutoMapperEngine.cs#L547) is **Dijkstra** over the exit graph of the active zone. Edges are **weighted** (`EdgeCost` / `IntraZoneEdgeCost`): cost = `1` baseline `+ (rt + 1)/2` when the exit has an authored `RtCost` — otherwise a verb-inferred effort penalty (`EffortPenalty`: swim/climb moves cost more, scaled down by the character's Athletics rank) — `+ waitAvg/30` for scheduled waits (boats). A brutal high-RT swim costs as much as ~8 dry rooms, so a nearby bridge or gate wins the route. Each exit is gated by [ExitRequirement.Parse(exit.Requires).IsMet(Skills, CharacterClass, CharacterLevel)](../src/Genie.Core/Mapper/ExitRequirement.cs) — an exit the character can't take (climb wall below the skill threshold, guild-locked door, level gate) is excluded entirely. When `Skills` is null (no character data), every exit passes and the result matches a plain BFS. It returns the ordered list of `MoveCommand` strings to send.
 
 Cross-zone routing is **not** done here — the engine only ever sees one zone. That's [MultiZonePathfinder](../src/Genie.Core/Mapper/MultiZonePathfinder.cs), documented in [multi-zone-travel.md](multi-zone-travel.md).
 
 ## Walking (the UI)
 
-There is **no `#goto` command**. Walking is initiated from the Mapper panel: the user clicks a room (`GotoNodeCommand`), the view-model calls `FindPath`, and hands the plan to [AutoWalkService](../src/Genie.App/Services/AutoWalkService.cs).
+Walking starts two ways. From the Mapper panel: **right-click a room → Go Here**, or **Ctrl+Left-Click** (a plain left-click never walks in navigate mode — see `MapCanvas`). Or from the **`#goto` command** (alias `#go2`, [CommandEngine.cs:617](../src/Genie.Core/Commanding/CommandEngine.cs#L617)): `#goto <room id | label | title | @tag>` — numeric map id, note label, room title, or `@tag` for nearest-tagged-room routing (`MapperViewModel.GotoByName`). Targets in *another* zone work too: `#goto` falls through to the whole-Maps `ZoneRoomIndex` and plans with `MultiZonePathfinder` (`TryStartCrossZoneGoto` / `AutoWalkService.StartCrossZone`), and clicking a room while viewing a non-current zone does the same. Either way the view-model builds the plan (`FindPath` in-zone) and hands it to [AutoWalkService](../src/Genie.App/Services/AutoWalkService.cs).
 
 ```
 GotoNode(target)
@@ -86,14 +86,14 @@ GotoNode(target)
                      else → advance step, DispatchNextStep()
 ```
 
-Moves go through `Commands.ProcessInput` so the same alias/trigger/command-queue path runs as if typed — the queue handles RT gating, so the walker doesn't sleep itself. Step matching trusts `FindPath`'s ordering: if the player gets bounced off-path, the next move won't match and the walk **cancels** rather than firing arbitrary commands.
+Moves go through `Commands.ProcessInput` so the same alias/trigger/command-queue path runs as if typed. The walker also paces itself: before each step it checks roundtime **and** movability (stunned / webbed / prone / kneeling / sitting) and retries on a short timer instead of firing blind; it auto-sends `stand` when the character is down and `retreat` (capped per step) when combat engagement bounces a move (`CanMoveNow` / `DispatchNextStep` in `AutoWalkService`). Step matching trusts `FindPath`'s ordering: if the player gets bounced off-path, the next move won't match and the walk **cancels** rather than firing arbitrary commands.
 
 ### Attended-mode posture
 
 The walker is deliberately conservative, to stay within DR's allowed-software policy (see the project README and `AutoWalkService`'s class comment):
 
-- **Auto-pauses** after `UnfocusPauseSeconds` (60s) of the window being unfocused; the user must click **Resume**.
 - **Cancels** on: Esc, any typed non-meta command, disconnect, or walking off-plan.
+- **Optional idle pause** — **off by default** (`GenieConfig.AutoWalkPauseOnUnfocus`): when opted in, a walk pauses after the configured unfocus window (the 60 s constant is only a fallback floor) and the user must click **Resume**. The always-on gates above are the compliance mechanism; DR policy is about responsiveness, not window focus.
 - **Never auto-resumes** across a disconnect — a fresh walk needs a fresh click.
 - A visible indicator strip shows progress and a Cancel/Resume control.
 
@@ -104,8 +104,8 @@ For a cross-zone hop with a known wait window (boats, ferries), `AutoWalkService
 ## Zone files, import, and updates
 
 - **Import from Genie 4** — **File → Import from Genie 4…** brings `.cfg` rules across; map XML is imported via the mapper. See the [Importing Genie4 Config](../wiki/Importing-Genie4-Config.md) wiki page.
-- **Update Maps from Official Repo** — **File → Update Maps from Official Repo…** pulls fresh zone XML from the community [GenieClient/Maps](https://github.com/GenieClient) repo via [MapsUpdater](../src/Genie.Core/Update/Updaters/MapsUpdater.cs) (built on the shared updates framework's [GithubContentsSource](../src/Genie.Core/Update/Sources/GithubContentsSource.cs)), merging upstream layout changes while preserving your stamped `ServerRoomId`s. See [Updating Maps and Scripts](../wiki/Updating-Maps-and-Scripts.md).
-- **Maps directory** — **File → Open Maps Folder** / **Change Maps Directory…**. Configurable via `#config mapdir`.
+- **Update from Official Repo** — **Maps ▸ Update from Official Repo…** pulls fresh zone XML from the community [GenieClient/Maps](https://github.com/GenieClient) repo via [MapsUpdater](../src/Genie.Core/Update/Updaters/MapsUpdater.cs) (built on the shared updates framework's [GithubContentsSource](../src/Genie.Core/Update/Sources/GithubContentsSource.cs)), merging upstream layout changes while preserving your stamped `ServerRoomId`s. See [Updating Maps and Scripts](../wiki/Updating-Maps-and-Scripts.md).
+- **Maps directory** — **Maps ▸ Open Maps Folder** / **Maps ▸ Change Maps Directory…**. Configurable via `#config mapdir`.
 
 ## Code references
 

@@ -28,7 +28,7 @@ Genie 5 is built so all three of DragonRealms' scripting worlds coexist:
 | --- | --- | --- |
 | **Native scripts** | Genie `.cmd` (Wizard dialect) | Run directly by Genie's [script engine](Scripting). |
 | **Lich scripts** | Ruby (`.rb`) | Run by Lich behind the proxy; transparent to Genie. |
-| **Plugins** 🚧 | .NET DLLs | Loaded by Genie's [plugin host](Plugins). |
+| **Plugins** | .NET DLLs | Loaded by Genie's [plugin host](Plugins). |
 
 You can mix them: a Lich script can be doing one thing while a Genie `.cmd` script and a highlight rule do others.
 

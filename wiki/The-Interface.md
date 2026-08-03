@@ -27,9 +27,10 @@ Out of the box you get a three-column arrangement:
 | **Mobs / Players** | The creatures and the other players in the room, as their own glanceable lists. |
 | **Inventory / Backpack** | What you're carrying. |
 | **Inventory View** | A searchable catalog of everything your characters own — person, vault, deed register, home, and Trader storage — with item weight/size columns and a player-shop price search. See [the Inventory View window](#the-inventory-view-window) below. |
-| **Mapper** | The zone map with your current room highlighted; click a room to walk there. Starts **floating** in its own window; dock it by dragging. See [The Mapper](Mapper). |
+| **Mapper** | The zone map with your current room highlighted; click a room to walk there. Starts **floating** in its own window; dock it by dragging. A top-level **Maps** menu collects the mapper actions — show/float the Mapper, AutoMapper settings, map updates, and the cross-zone connection editor. See [The Mapper](Mapper). |
 | **Experience** | Live skill learning states. A **Density** slider on the panel condenses each skill line to taste (**Full → No count → Numbers only → Short names → Brief**); the same setting is scriptable as `#config experiencedensity`. |
 | **Active Spells** | Your running spell effects with time remaining. |
+| **Time Tracker** | Elanthian date, moon/sun rise-set countdowns, and the observed sky, tracked by the built-in Time Tracker (`/tt help`). |
 | **Analytics** | Charts over your experience history — session gain bars, a long-horizon rank curve per skill, and session-vs-session comparison. See [the Analytics panel](#the-analytics-panel) below. |
 | **Scripts** | A separate scrollback for script output (`[script]` lines, `#echo`, debug traces), so a busy hunt script doesn't clutter the main window. |
 | **Injuries** | A body silhouette showing per-region wounds and scars from the game's injury data, colour-coded by severity, with a text list alongside. An opt-in auto-refresh (`#config injuriespoll N`) can poll `health` every *N* seconds to refine the nervous-system reading while the panel is open. |
@@ -37,7 +38,7 @@ Out of the box you get a three-column arrangement:
 | **Raw XML** | The unparsed server stream, for debugging and parser spelunking. |
 | **Stream tabs** | DragonRealms routes certain text to named streams. Genie surfaces **Talk**, **Whispers**, **Thoughts**, **Combat**, **Logons**, **Familiar**, **Deaths**, **Assess**, **Atmospherics**, **Log**, and **Item Log** as their own windows so they each keep a clean scrollback. (Speech and whispers also appear in the main window — DragonRealms sends them to both by design.) |
 
-Toggle any panel from the **Window** menu. Drag a panel's tab to re-dock it; drag it out to **float** it in its own window, and drag it back to re-dock. For a picture-by-picture guide to the dock targets — docking **as a tab** vs. splitting off a **new section** — see [Docking Windows](Docking-Windows).
+Toggle any panel from the **Window** menu. Drag a panel's tab to re-dock it; drag it out to **float** it in its own window, and drag it back to re-dock. A floated window's title-bar menu has a **Hide Title Bar** option for a leaner look. For a picture-by-picture guide to the dock targets — docking **as a tab** vs. splitting off a **new section** — see [Docking Windows](Docking-Windows).
 
 ![The Experience panel shown five times, once per Density stop from Brief at the top to Full at the bottom](images/interface-experience-density.png)
 
@@ -47,7 +48,7 @@ Toggle any panel from the **Window** menu. Drag a panel's tab to re-dock it; dra
 
 *The Active Spells panel — each effect with its time remaining.*
 
-Every stream window also has an **"Also show this stream in the Main window"** toggle (Configuration → **Layout** tab, per window) that additionally echoes its lines into the main game window, Genie 4-style. The Layout tab is also where each window's font is set.
+Every stream window also has an **"Also show this stream in the Main window"** toggle (Configuration → **Layout** tab, per window) that additionally echoes its lines into the main game window, Genie 4-style. The Layout tab is also where each window's font is set. Highlight rules can likewise be **scoped to specific windows** — see [Configuration & Rules](Configuration#highlights--coloring-text).
 
 Scripts can create their **own named windows** too — the Genie 4 menu-script commands (`#window`, `#link`, `#echo >window`) build clickable menu panels that dock like any other. See the [Scripting Reference](Scripting-Reference#named-windows-links-and-logging).
 
@@ -83,8 +84,9 @@ The catalog is saved to `InventoryView.xml` in your data folder in the same form
 
 - **Vitals** — bars for **health, mana, fatigue, spirit, and concentration** (fatigue is DR's stamina bar — Genie labels it the way the game does), plus status badges (kneeling, prone, stunned, hidden, bleeding, …).
 - **Icon Bar** — Genie 4's status strip: colour-coded chips below the vitals bar for your posture (dead / standing / kneeling / sitting / prone) plus **STUNNED**, **BLEEDING**, **HIDDEN**, **INVISIBLE**, **WEBBED**, **JOINED** — and two Genie 4 never had: **POISONED** and **DISEASED**. It dims while disconnected. Hide it via **Layout → Icon Bar**.
-- **Hands strip** — what's in your **left** and **right** hands, your **prepared spell** (with a cast-time bar), and your **stance**. Its position (top or bottom) is configurable from the **Window** menu.
-- **Command bar** — where you type. A **roundtime** indicator shows here (or on the hands strip — your choice) so you can see when you can act again.
+- **Hands strip** — what's in your **left** and **right** hands, your **prepared spell** (with a cast-time bar), and your **stance**. Its position (top or bottom) is set via **Layout → Hands Strip Position**, and **Layout → Enhanced Hands Strip** adds icon widgets (compass rose, posture sprite, status-effect strip).
+- **Command bar** — where you type. A **roundtime** indicator shows here (or on the hands strip — pick via **Layout → Roundtime Position**) so you can see when you can act again.
+- **Status slots** — scripts can write a Genie 4-style ten-slot status row just above the vitals bar with `#statusbar [N] text` (`#statusbar clearall` empties it); it stays hidden while every slot is empty.
 
 ## Notices
 
@@ -133,13 +135,23 @@ Rearrange the panels however you like, then keep the arrangement — the **Layou
 - **Layout → Align Input to Game Window** makes the command bar track the Game window's width instead of spanning the full frame.
 - **Layout → Magic Panels** hides the mana bar, cast bar, and spell labels — tidy on a non-caster.
 - **Layout → Icon Bar** shows or hides the status-chip strip.
+- The Layout menu also holds the rest of the window chrome: **Hands Strip** / **Enhanced Hands Strip** / **Hands Strip Position**, **Roundtime Position**, **Status Bar**, **Zone / Room ID** (with **Zone as Number**), **Guild in Title Bar**, **Disconnect Popup**, and **Reset Layout** (restores all windows to visible).
+- The **Connect dialog** has a per-profile **startup layout** picker, so a character can load its saved layout automatically on connect.
 - Floating the Mapper, hiding panels you don't use, and moving the hands strip are all remembered.
 
-> 🚧 **Roadmap:** light/dark themes are planned but not in the alpha yet.
+## Themes
+
+Genie ships **seven built-in themes** under **Edit → Theme** — **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light**, and **Wrayth-style** — plus a theme editor for making your own, saved as JSON in `Config/Themes`. See [Configuration & Rules](Configuration#themes).
 
 ## Display settings
 
 **Edit → Display Settings…** controls fonts, colors, the roundtime indicator's position, the hands-strip position, and the external editor used by `#edit`.
+
+A few more odds and ends:
+
+- **File → Open Log In Editor** opens the current (or most recent) Auto Log text file in your editor — Genie 4 parity, new in beta.4.
+- An opt-in **AvaloniaEdit-based game window renderer** is available behind `#config useeditorgamewindow on` (default off), also new in beta.4.
+- **Help → Performance → Show Performance Overlay** shows live per-stage pipeline timing (parse, scripts, triggers, highlights, substitutes, gags, plugins).
 
 ## Related
 

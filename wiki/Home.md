@@ -31,7 +31,8 @@ Day-to-day playing, customizing, and automating.
 | Page | What it covers |
 | --- | --- |
 | **[Connecting & Profiles](Connecting)** | The three connection modes (SGE, Lich, replay), the Connect dialog, and encrypted per-character profiles. |
-| **[The Interface](The-Interface)** | The dockable panels — game text, vitals, hands, room, stream tabs, mapper — plus the command bar, clickable links, and saved layouts. |
+| **[The Interface](The-Interface)** | The dockable panels — game text, vitals, hands, room, stream tabs, mapper — plus the command bar, clickable links, themes, and saved layouts. |
+| **[Text-to-Speech](Text-to-Speech)** | Natural neural voices that read the game aloud — offline, free, and private, with per-stream read-aloud and spoken alerts. |
 | **[Configuration & Rules](Configuration)** | Aliases, triggers, highlights, substitutes, gags, macros, variables, and classes — set from the command bar or the Configuration dialog. |
 | **[Scripting](Scripting)** | Write and run `.cmd` scripts — a friendly tour from "hello world" up. |
 | **[The Mapper](Mapper)** | Room tracking, click-to-walk, Less Obvious Paths, and the attended-mode walking rules. |
@@ -45,6 +46,7 @@ The deep end: the full scripting language, the mapper's internals, plugins, and 
 | Page | What it covers |
 | --- | --- |
 | **[Scripting Reference](Scripting-Reference)** | The complete `.cmd` vocabulary, `%`/`$` variable scopes, the roundtime gate, type-ahead, and where Genie 5 diverges from Genie 4. |
+| **[JavaScript Scripting](JavaScript-Scripting)** | Write scripts in JavaScript (`.js`) alongside `.cmd` — the `genie.*` API, `include`, and `js`/`jscall` interop. |
 | **[Cross-Zone Travel](Cross-Zone-Travel)** | The `ZoneConnections.xml` transit graph, the multi-zone pathfinder, and the connection editor. |
 | **[Plugins](Plugins)** | The plugin contract, the `#plugin` command, the Experience-tracker example, and the trust model. |
 | **[Keeping Up to Date](Updates)** | The integrated updater — Core app, maps, plugins, and scripts — and the per-kind auto-update settings. |
@@ -60,7 +62,7 @@ The deep end: the full scripting language, the mapper's internals, plugins, and 
 
 Genie 5 reaches DragonRealms three ways — all chosen from **File → Connect…**:
 
-- **Simutronics SGE login** — the standard "log in with your DragonRealms account" flow. Genie 5 authenticates and finds the right game server itself.
+- **Simutronics SGE login** — the standard "log in with your DragonRealms account" flow. Genie 5 authenticates and finds the right game server itself — over TLS by default, with a 🔒 padlock in the title bar to show it.
 - **Lich proxy** — point Genie at a running [Lich 5](https://github.com/elanthia-online/lich-5) on `127.0.0.1:8000`; your Ruby scripts keep working.
 - **Dev replay** — replay a recorded session through the engine (development and testing).
 

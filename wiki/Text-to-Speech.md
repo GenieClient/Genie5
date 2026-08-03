@@ -56,6 +56,7 @@ Turn on per-stream read-aloud to have Genie announce game text automatically.
 | `#tts read on` / `#tts read off` | Master switch |
 | `#tts read <stream>` | Add a stream (e.g. `#tts read combat`) and turn read-aloud on |
 | `#tts mute <stream>` | Stop reading a stream |
+| `#tts priority <stream> <low\|normal\|high\|default>` | Set a stream's speaking priority — high barges in, low yields; `default` removes the override. Bare `#tts priority` lists them |
 
 Default streams are **whispers, talk, thoughts, deaths** — the "someone's
 talking to me / something important happened" set. The chatty streams (combat,
@@ -91,8 +92,12 @@ These persist with your profile (see [Configuration & Rules](Configuration)):
 | `ttsvoice` | Selected voice folder name (set by `#tts use`) |
 | `ttsread` | Master read-aloud on/off |
 | `ttsreadstreams` | Comma-separated streams to read aloud |
+| `ttsstreampriority` | Per-stream priority overrides, `stream:level` pairs (set by `#tts priority`) |
 | `ttsrate` | Speaking speed multiplier, 0.5–3 (default 1) |
 | `ttsvolume` | Volume percent, 0–100 (default 100) |
+
+The same settings are also editable in the GUI — the Configuration dialog
+(**Edit → Configuration…**) has a **Text-to-Speech** tab.
 
 ## Coming next
 

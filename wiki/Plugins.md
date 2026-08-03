@@ -1,25 +1,33 @@
 # Plugins
 
-Plugins extend Genie 5 with compiled .NET code — drop a plugin in your `Plugins/` folder and load it, no rebuild required. The first shipped plugin is an **Experience tracker** (a port of Genie 4's `EXPTracker`), built on the same contract so it doubles as the proving ground for the plugin API.
+Plugins extend Genie 5 with compiled .NET code — drop a plugin in your `Plugins/` folder and load it, no rebuild required. The five classic trackers — **Experience**, **Spell Timer**, **Time Tracker**, **Circle Calculator**, and **Inventory View** — began life on this contract and have since been absorbed into the engine as **built-in extensions**, so they're always available with nothing to install. (A leftover plugin DLL with one of those ids is skipped at load so it can't shadow the built-in version.) The plugin host itself is fully shipped for your own and third-party plugins.
 
 > 🚧 A one-click **plugin marketplace** with ratings and signed packages is on the roadmap. Today you load plugins from disk and trust them by curation (see [Trust model](#trust-model)).
 
 ## Loading a plugin
 
 - Place a plugin DLL in `{AppData}/Genie5/Plugins/` (see [Application Folders](Application-Folders)).
-- Manage it from the command bar:
+- Manage it from the **Plugins menu** — **Open Plugins Folder**, **Reload Plugins**, **Load** (individual DLLs found in the folder), **Enable / Disable** per plugin, and **Unload**. Panels a plugin opens appear under **Window → Plugin Windows**.
+- Or from the command bar:
 
 ```
-#plugin load <name>     # load a plugin
-#plugin unload <name>   # unload it
-#plugin list            # show loaded plugins
+#plugin list            # show loaded plugins (also bare #plugin)
+#plugin enable <id>     # enable a loaded plugin
+#plugin disable <id>    # disable it (stays loaded; re-enable is instant)
+#plugin unload <id>     # fully unload it and release the DLL
+#plugin load <file>     # load an individual DLL from the Plugins folder
+#plugin reload          # re-scan the Plugins folder
+#plugin folder          # open the Plugins folder
+#plugin sources         # list plugin update sources
+#plugin add <url>       # add an update source
+#plugin update [<id>]   # update plugins from their sources
 ```
 
 Each plugin loads in its own isolated assembly context, so it can be enabled, disabled, and unloaded cleanly without restarting Genie.
 
-## The Experience tracker
+## The Experience tracker — the contract in action
 
-The bundled experience plugin watches the live experience stream and your `exp` output, tracks each skill's rank and mindstate, and renders a formatted panel — sortable, grouped by category (Armor / Weapon / Magic / Survival / Lore), with a "Learning: N" counter, session gain, and TDPs. It demonstrates the whole plugin surface: reading the raw stream, reading parsed text, and emitting to its own window.
+The **Experience** tracker (a port of Genie 4's `EXPTracker`, now a built-in Core extension) shows what the contract can do. It watches the live experience stream and your `exp` output, tracks each skill's rank and mindstate, and renders a formatted panel — sortable, grouped by category (Armor / Weapon / Magic / Survival / Lore), with a "Learning: N" counter, session gain, and TDPs. It exercises the whole plugin-shaped surface: reading the raw stream, reading parsed text, and emitting to its own window. The other four built-in trackers (Spell Timer, Time Tracker, Circle Calculator, Inventory View) are built the same way.
 
 ## How plugins work (for developers)
 
@@ -57,7 +65,7 @@ Old Genie 4 plugin DLLs won't load directly — they're WinForms/Windows-only. T
 
 ## Roadmap
 
-- 🚧 Plugins menu (enable/disable/settings/reload UI), plugin marketplace, signing/trust UX, an SDK + project template, and a Genie 4 → Genie 5 porting guide.
+- 🚧 Plugin marketplace, signing/trust UX, an SDK + project template, and a Genie 4 → Genie 5 porting guide. (The Plugins menu itself — enable/disable, load/unload, reload, folder — is shipped; see [Loading a plugin](#loading-a-plugin).)
 
 ## Related
 

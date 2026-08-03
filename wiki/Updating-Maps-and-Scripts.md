@@ -4,13 +4,13 @@ The DragonRealms community maintains shared zone maps (and a few helper walking 
 
 ## Where maps live
 
-Zone maps are XML files — one per zone — in your **Maps** folder (`Map1_Crossing.xml`, `Map60_Southern_Trade_Road.xml`, …), alongside a single `ZoneConnections.xml` that describes cross-zone transit links (boats, ferries, climb-walls). See [Application Folders](Application-Folders) for the path, and **File → Open Maps Folder** to jump there. Change the location with **File → Change Maps Directory…** (or `#config mapdir`).
+Zone maps are XML files — one per zone — in your **Maps** folder (`Map1_Crossing.xml`, `Map60_Southern_Trade_Road.xml`, …), alongside a single `ZoneConnections.xml` that describes cross-zone transit links (boats, ferries, climb-walls). See [Application Folders](Application-Folders) for the path, and **Maps ▸ Open Maps Folder** to jump there. Change the location with **Maps ▸ Change Maps Directory…** (or `#config mapdir`).
 
 Genie 5 uses the **same Genie 4 XML map format**, so maps move between the two clients cleanly.
 
 ## Updating from the official repo
 
-Choose **File → Update Maps from Official Repo…**. Genie 5 fetches the latest zone XML from the community Maps repository via [MapsUpdater](https://github.com/GenieClient/Genie5/blob/main/src/Genie.Core/Update/Updaters/MapsUpdater.cs) (built on the shared [GithubContentsSource](https://github.com/GenieClient/Genie5/blob/main/src/Genie.Core/Update/Sources/GithubContentsSource.cs)) and reports progress in the main game window as `[mapper] …` lines.
+Choose **Maps ▸ Update from Official Repo…**. Genie 5 fetches the latest zone XML from the community Maps repository via [MapsUpdater](https://github.com/GenieClient/Genie5/blob/main/src/Genie.Core/Update/Updaters/MapsUpdater.cs) (built on the shared [GithubContentsSource](https://github.com/GenieClient/Genie5/blob/main/src/Genie.Core/Update/Sources/GithubContentsSource.cs)) and reports progress in the main game window as `[mapper] …` lines.
 
 ### How the merge works
 
@@ -42,11 +42,11 @@ If you have a folder of Genie 4 `*.xml` zone files, import them once without goi
 2. Point it at your Genie 4 `Maps` folder.
 3. Files are brought into your [Maps folder](Application-Folders).
 
-You can still run **Update Maps from Official Repo…** afterward to pull newer community versions; the merge preserves your stamped data where it can.
+You can still run **Maps ▸ Update from Official Repo…** afterward to pull newer community versions; the merge preserves your stamped data where it can.
 
 ## Cross-zone connections
 
-The transit graph the [multi-zone pathfinder](Cross-Zone-Travel) uses lives in `ZoneConnections.xml` at the root of the Maps folder. On first launch Genie 5 seeds a documented starter template there. Edit it via **File → Cross-Zone Connections…** (a grid editor), or let the community Maps repo curate richer versions over time. If you delete the file deliberately, Genie 5 won't silently re-create it.
+The transit graph the [multi-zone pathfinder](Cross-Zone-Travel) uses lives in `ZoneConnections.xml` at the root of the Maps folder. On first launch Genie 5 seeds a documented starter template there. Edit it via **Maps ▸ Cross-Zone Connections…** (a grid editor), or let the community Maps repo curate richer versions over time. If you delete the file deliberately, Genie 5 won't silently re-create it.
 
 ## Troubleshooting
 

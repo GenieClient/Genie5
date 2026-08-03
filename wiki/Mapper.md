@@ -21,7 +21,7 @@ Genie identifies your current room from what the game sends — the room title, 
 
 ## Click-to-walk
 
-Click (or right-click → go) a room on the map and Genie plans a route and walks you there, one room at a time. Pathfinding is **skill-aware**: exits your character can't take — a climb beyond your skill, a guild-locked door, a level-gated arc — are excluded from the route, so it won't try to send you somewhere you can't go.
+Right-click a room on the map and choose **Go Here** (or **Ctrl+click** the room — a plain click never starts a walk, so you can't walk by accident) and Genie plans a route and walks you there, one room at a time. Pathfinding is **skill-aware**: exits your character can't take — a climb beyond your skill, a guild-locked door, a level-gated arc — are excluded from the route, so it won't try to send you somewhere you can't go.
 
 ![The Mapper's skills banner offering "Fetch skills now", "Skip", and "Don't ask again"](images/mapper-skills-banner.png)
 
@@ -54,20 +54,20 @@ With learning on, you can add notes to a room (a landmark, a warning, a shop nam
 
 ## Where maps live
 
-Zone files are XML — one per zone — in your **Maps** folder (`Map1_Crossing.xml`, `Map60_Southern_Trade_Road.xml`, …), alongside a single `ZoneConnections.xml` describing cross-zone transit links. Jump there with **File → Open Maps Folder**; change the location with **File → Change Maps Directory…**. See [Application Folders](Application-Folders).
+Zone files are XML — one per zone — in your **Maps** folder (`Map1_Crossing.xml`, `Map60_Southern_Trade_Road.xml`, …), alongside an optional `ZoneConnections.xml` for extra cross-zone transit links (most links are read straight out of the maps' own border-room notes; the file augments and overrides those). Jump there with **Maps ▸ Open Maps Folder**; change the location with **Maps ▸ Change Maps Directory…**. See [Application Folders](Application-Folders).
 
 Because Genie 5 uses the **same Genie 4 map format**, maps move between the two clients cleanly, and the 24+ community map forks all work.
 
 ## Getting and updating maps
 
-- **From the community repo** — **File → Update Maps from Official Repo…** pulls the latest zone XML and merges it with your local progress (upstream layout changes come down; your stamped room ids survive).
+- **From the community repo** — **Maps ▸ Update from Official Repo…** pulls the latest zone XML and merges it with your local progress (upstream layout changes come down; your stamped room ids survive).
 - **From a Genie 4 install** — import your existing `*.xml` zone files once.
 
 Full details: [Updating Maps & Scripts](Updating-Maps-and-Scripts).
 
 ## Cross-zone travel
 
-Single-zone walking is built in. Routing **across** zones — boats, ferries, climb-walls between map files — runs on a separate transit graph (`ZoneConnections.xml`) with its own pathfinder and editor. The infrastructure and the editor are in place; feeding full cross-zone routes to the walker is being finished. See [Cross-Zone Travel](Cross-Zone-Travel).
+Routing **across** zones — boats, ferries, climb-walls between map files — is built in too. Most zone links are derived automatically from the maps' border-room notes, augmented by an editable transit table (**Maps ▸ Cross-Zone Connections…**). `#goto` a room in another zone, or click a room while browsing a different zone's map, and Genie routes across the boundary and walks you there. See [Cross-Zone Travel](Cross-Zone-Travel).
 
 ## Related
 

@@ -21,11 +21,15 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.2
+## Where we are — v5.0.0-beta.4 "Fresh Ink"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
-last parity gaps. Highlights of what works today:
+last parity gaps. Since this roadmap was rebuilt, beta.3 shipped If-Closed
+stream routing (#211), Hide Title Bar on floating windows (#181), and
+crtrStatus handling (#202), and beta.4 shipped the opt-in AvaloniaEdit game
+window (#200), File ▸ Open Log In Editor (#89), and the `send` eager-dash
+marker. Highlights of what works today:
 
 - **Connection** — SGE direct auth (TLS on 7910 by default, plaintext 7900
   fallback), Lich 5 proxy (with owned-Lich auto-launch and `#config lichdebug`
@@ -121,14 +125,8 @@ Burn down real-user reports on the beta builds before we call it stable:
 
 - Cross-machine window/state consistency
   ([#203](https://github.com/GenieClient/Genie5/issues/203)).
-- Hide the top bar on floating windows
-  ([#181](https://github.com/GenieClient/Genie5/issues/181)).
 - Nested-variable resolution edge case
   ([#180](https://github.com/GenieClient/Genie5/issues/180)).
-
-Plus the installer (`Setup.exe`) signing follow-up (binary signing is already
-live; the installer is next) and a docs cleanup pass (unsigned-build warnings,
-SignPath setup notes).
 
 ---
 
@@ -232,14 +230,16 @@ Every AI-driven item is constrained by [POLICY.md](POLICY.md): the AI may
 `Commands.ProcessInput`; and other players' speech is stripped before any
 external send. The advisory/agentive line is a hard architectural wall.
 
-### Accessibility / text-to-speech
+### Accessibility — screen-reader support
 
-Text MUDs have a real blind / low-vision audience and nothing in the client
-serves them yet. The parser already tags every line by stream, so this is mostly
-screen-reader (Avalonia automation-peer) labelling of the game window, vitals,
-and hands strips, plus *selective* per-stream read-aloud (speak whispers +
-combat, mute atmospherics). Inclusive, compliance-free, and a clear
-differentiator. A strong first pick for Horizon 3.
+Text MUDs have a real blind / low-vision audience. The text-to-speech half of
+this already **shipped in alpha.7.5** — offline neural voices, `#speak` /
+`#tts`, selective per-stream read-aloud (speak whispers + combat, mute
+atmospherics), and per-rule Speak. What remains is the screen-reader half:
+Avalonia automation-peer support and labelling of the game window, vitals, and
+hands strips so assistive tech (NVDA, Narrator, VoiceOver) can navigate the
+client itself. Inclusive, compliance-free, and a clear differentiator. A
+strong first pick for Horizon 3.
 
 ### Plugin marketplace + signing / trust
 

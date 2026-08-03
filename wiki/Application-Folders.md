@@ -49,7 +49,9 @@ Genie5/
 ├── Maps/        ← zone files (Map##_*.xml) + ZoneConnections.xml
 ├── Logs/        ← AutoLog output, one file per character per session
 ├── Sounds/      ← sound files for #play / triggers
-├── Plugins/     ← plugin host (roadmap)
+├── Voices/      ← TTS voice models
+├── Layouts/     ← saved window layouts
+├── Plugins/     ← plugin DLLs — see the Plugins page
 └── Art/         ← image assets
 ```
 
@@ -58,7 +60,7 @@ Genie5/
 | `Config/` | `settings.cfg` (app settings) and the shared rule files: `aliases.cfg`, `triggers.cfg`, `highlights.cfg`, `substitutes.cfg`, `gags.cfg`, `macros.cfg`, `variables.cfg`, `classes.cfg`. Each is a plain-text list of the commands that recreate the rules. | Mostly managed via **Edit → Configuration…**. Hand-editable — Genie 5 reloads on next launch. |
 | `Profiles/` | One subfolder per character (`<Char>-<Account>/`) holding that character's own copy of the rule `.cfg` files. The first time a character connects, the folder is seeded from your shared `Config/` files, then diverges independently. | Created automatically. Edit the per-character files here, or via the GUI while that character is connected. |
 | `Scripts/` | Your `.cmd` script files, plus any helper scripts you pull from the community repo. | Drop any script here to run it as `.scriptname` (or `put .scriptname`). |
-| `Maps/` | Zone files in Genie 4's XML format (`Map1_Crossing.xml`, …) and `ZoneConnections.xml` (the cross-zone transit graph). | Populated via **File → Import from Genie 4…** or **File → Update Maps from Official Repo…**. Jump there via **File → Open Maps Folder**. |
+| `Maps/` | Zone files in Genie 4's XML format (`Map1_Crossing.xml`, …) and `ZoneConnections.xml` (the cross-zone transit graph). | Populated via **File → Import from Genie 4…** or **Maps ▸ Update from Official Repo…**. Jump there via **Maps ▸ Open Maps Folder**. |
 | `Logs/` | When AutoLog is on, each session writes a `<character>_<timestamp>` log of plain in/out text. Toggle it live with the **File → Auto Log** checkbox — it applies mid-session. | Read-only from the app's view. Safe to delete or archive. |
 
 > **Jumping to any of these:** **File → Open Directory** opens the folder of your choice — Data root, Config (profile-aware), Logs, Maps, Scripts, or Plugins — in your system file manager.

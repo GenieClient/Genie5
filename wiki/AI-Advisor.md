@@ -18,7 +18,7 @@ The single most important rule: the AI **must not drive the game**. It does not 
 
 ## How it's isolated
 
-The AI path hangs off a **separate, toggleable branch** of the raw game stream. It can be turned on or off without touching the parser, and a slow response can never block the game loop — analysis runs fully asynchronously. A rolling context buffer feeds an external AI service only when you've explicitly enabled it.
+The AI path hangs off a **separate, toggleable branch** of the raw game stream. It can be turned on or off without touching the parser, and a slow response can never block the game loop — analysis runs fully asynchronously. There is currently **no way to enable it at all** — no setting, checkbox, or `#config` key exposes it in any build, so the rolling context buffer never feeds an external service. When it does ship, enabling it will be an explicit opt-in behind a plain-language disclosure.
 
 ```
 raw game stream
