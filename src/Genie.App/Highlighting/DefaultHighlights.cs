@@ -123,6 +123,12 @@ public static class DefaultHighlights
     private static IBrush MakeBrush(byte r, byte g, byte b)
         => new SolidColorBrush(Color.FromRgb(r, g, b));
 
+    /// <summary>The foreground a link span paints with — game-command blue or
+    /// external-URL green. Shared with the AvaloniaEdit renderer's link element
+    /// (<c>Controls.GameLinkGenerator</c>) so both paths colour <c>&lt;d cmd&gt;</c>
+    /// spans identically rather than each keeping their own copy of the palette.</summary>
+    internal static IBrush LinkForeground(bool isUrl) => isUrl ? UrlBrush : LinkBrush;
+
     // ── Tokenizer ─────────────────────────────────────────────────────────────
 
     // ── User-rule brush cache (parsed hex → IBrush) ──────────────────────────
@@ -198,6 +204,51 @@ public static class DefaultHighlights
     {
         if (string.IsNullOrEmpty(text))
             return new[] { new Run(string.Empty) };
+
+        var map = BuildStyleMap(text, links, boldSpans, presetSpans, window);
+        return EmitInlines(text, map);
+    }
+
+    /// <summary>
+    /// The per-character style layers <see cref="BuildStyleMap"/> resolves for a
+    /// line, before anything is committed to a particular renderer's element
+    /// type. <see cref="Tokenize"/> turns these into Avalonia <see cref="Inline"/>s
+    /// for the legacy per-line renderer; <c>Controls.GameTextColorizer</c> turns
+    /// the same maps into AvaloniaEdit <c>ChangeLinePart</c> runs. Both consume
+    /// one implementation of the highlight semantics — the maps ARE the contract.
+    ///
+    /// <para><see cref="Foreground"/> / <see cref="Background"/> / <see cref="Bold"/>
+    /// are all <c>text.Length</c> long and indexed by character position; a null
+    /// brush means "leave the renderer's default". <see cref="Links"/> is the
+    /// validated, start-ordered link span list — empty when links are disabled or
+    /// the line carries none. Characters inside a link span are NOT styled from
+    /// the maps: a link paints as a link (see <see cref="MakeLinkRun"/>), which is
+    /// why the emit pass skips those ranges.</para>
+    /// </summary>
+    public readonly record struct StyleMap(
+        IBrush?[] Foreground,
+        IBrush?[] Background,
+        bool[] Bold,
+        IReadOnlyList<LinkSpan> Links);
+
+    /// <summary>
+    /// Resolve every highlight layer for <paramref name="text"/> into per-character
+    /// maps. This is <see cref="Tokenize"/> minus the final emit pass — same rules,
+    /// same precedence, same side effects (highlight sound / TTS fire here, once per
+    /// matching line, exactly as before).
+    /// <para>Layer order, top to bottom: player names (#154, supreme) → user
+    /// highlight rules (#143) → built-in defaults → MonsterBold colour (#131) →
+    /// preset spans (base). Earlier layers win: each writes only where the channel
+    /// is still null.</para>
+    /// </summary>
+    public static StyleMap BuildStyleMap(string text,
+                                         IReadOnlyList<LinkSpan>? links = null,
+                                         IReadOnlyList<BoldSpan>? boldSpans = null,
+                                         IReadOnlyList<PresetSpan>? presetSpans = null,
+                                         string window = "main")
+    {
+        if (string.IsNullOrEmpty(text))
+            return new StyleMap([], [], [], []);
 
         // Build a per-char color map. Null = use the default TextBlock foreground.
         var brushes = new IBrush?[text.Length];
@@ -376,6 +427,24 @@ public static class DefaultHighlights
             sortedLinks.Sort((a, b) => a.Start.CompareTo(b.Start));
         }
 
+        return new StyleMap(brushes, backgrounds, bolds,
+                            (IReadOnlyList<LinkSpan>?)sortedLinks ?? []);
+    }
+
+    /// <summary>
+    /// The emit pass: walk <paramref name="map"/> and turn it into Avalonia
+    /// <see cref="Inline"/>s. Unchanged from the original <see cref="Tokenize"/>
+    /// tail — an empty <see cref="StyleMap.Links"/> behaves exactly as the old
+    /// null <c>sortedLinks</c> did (no link boundary before <c>text.Length</c>,
+    /// loop breaks after the first styled range).
+    /// </summary>
+    private static IReadOnlyList<Inline> EmitInlines(string text, StyleMap map)
+    {
+        var brushes     = map.Foreground;
+        var backgrounds = map.Background;
+        var bolds       = map.Bold;
+        var sortedLinks = map.Links;
+
         var inlines = new List<Inline>();
         int cursor = 0;
         int linkIdx = 0;
@@ -385,7 +454,7 @@ public static class DefaultHighlights
         // link itself, then continue past.
         while (cursor < text.Length)
         {
-            int nextLinkStart = sortedLinks is not null && linkIdx < sortedLinks.Count
+            int nextLinkStart = linkIdx < sortedLinks.Count
                 ? sortedLinks[linkIdx].Start
                 : text.Length;
 
@@ -393,7 +462,7 @@ public static class DefaultHighlights
             EmitStyledRange(text, brushes, backgrounds, bolds, cursor, nextLinkStart, inlines);
             cursor = nextLinkStart;
 
-            if (sortedLinks is null || linkIdx >= sortedLinks.Count) break;
+            if (linkIdx >= sortedLinks.Count) break;
 
             var link = sortedLinks[linkIdx++];
             var end  = link.Start + link.Length;

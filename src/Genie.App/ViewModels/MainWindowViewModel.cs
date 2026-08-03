@@ -1029,6 +1029,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <see cref="RunStartupConnectAsync"/> after the window is shown.</summary>
     public StartupOptions? Startup { get; }
 
+    /// <summary>Render the main Game window with AvaloniaEdit instead of the
+    /// per-line ItemsControl (<c>#config useeditorgamewindow</c>, default off).
+    /// Read once from settings.cfg in the constructor — before the dock layout is
+    /// built and long before GenieCore exists — and consumed by
+    /// <see cref="Genie.App.Docking.GenieDockFactory"/> when it creates the Game
+    /// document. Changing the setting needs a restart.</summary>
+    public bool UseEditorGameWindow { get; private set; }
+
     public MainWindowViewModel() : this(null) { }
 
     public MainWindowViewModel(StartupOptions? startup)
@@ -1056,6 +1064,27 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _globalLayouts = new Settings.LayoutStore(layoutsDir);
 
         ErrorLog.Initialize(_configDir);
+
+        // ── Game-window renderer (experimental, default off) ───────────────
+        // The dock layout is built further down this constructor, and the
+        // renderer has to be chosen when the Game document is constructed — but
+        // GenieCore (and with it the live GenieConfig) is built lazily, on the
+        // first connect or command. So read settings.cfg once, here, through the
+        // real config parser rather than a bespoke one, so the value always
+        // agrees with `#config useeditorgamewindow`. The instance is discarded:
+        // it exists only to answer this single question.
+        try
+        {
+            var startupConfig = new Genie.Core.Config.GenieConfig(dir);
+            startupConfig.Load();
+            UseEditorGameWindow = startupConfig.UseEditorGameWindow;
+        }
+        catch (Exception ex)
+        {
+            // An unreadable/odd settings.cfg must never stop the window opening;
+            // fall back to the shipped renderer.
+            ErrorLog.Log("MainWindowViewModel.ReadRendererFlag", ex);
+        }
 
         // Announce the resolved data root as the first game-window line.
         // "Which folder is Genie actually reading?" is the first question in

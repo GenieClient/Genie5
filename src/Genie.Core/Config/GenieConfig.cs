@@ -47,6 +47,12 @@ public sealed class GenieConfig
     /// was a WinForms paint-batch knob with no Avalonia equivalent). Clamped to
     /// [100, 100000] on set.</summary>
     public int ScrollbackLines { get; set; } = 2000;
+    /// <summary>Render the main Game window with AvaloniaEdit instead of the
+    /// per-line ItemsControl. Experimental; default off. The legacy renderer
+    /// stays the shipped path until parity is proven. Read ONCE, when the dock
+    /// layout is built — swapping renderers under a populated buffer is not
+    /// worth the complexity, so changing it needs a restart.</summary>
+    public bool UseEditorGameWindow { get; set; }
     public bool ShowSpellTimer { get; set; } = true;
     /// <summary>Built-in Experience tracker ($Skill.* / $TDPs globals + "Experience"
     /// dock panel). Default on. Was the external Plugin_EXPTrackerV5, now in Core.</summary>
@@ -570,6 +576,7 @@ public sealed class GenieConfig
         ("gags", EnableGags.ToString()),
         ("aliases", EnableAliases.ToString()),
         ("scrollbacklines", ScrollbackLines.ToString()),
+        ("useeditorgamewindow", UseEditorGameWindow.ToString()),
         ("spelltimer", ShowSpellTimer.ToString()),
         ("showexperience", ShowExperience.ToString()),
         ("experiencedensity", ExperienceDensity.ToString()),
@@ -681,7 +688,7 @@ public sealed class GenieConfig
     {
         ("Connection",       new[] { "classicconnect", "conndebug", "connectscript", "frontend", "reconnect" }),
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
-        ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines" }),
+        ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
@@ -725,6 +732,7 @@ public sealed class GenieConfig
                 case "gags": EnableGags = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
                 case "aliases": EnableAliases = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
                 case "scrollbacklines": ScrollbackLines = Math.Clamp(UtilityCore.StringToInteger(value), 100, 100000); break;
+                case "useeditorgamewindow": UseEditorGameWindow = ToBool(value); break;
                 case "spelltimer": ShowSpellTimer = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "showexperience": ShowExperience = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "experiencedensity": ExperienceDensity = Math.Clamp(UtilityCore.StringToInteger(value), 0, 4); Notify(ConfigFieldUpdated.Trackers); break;

@@ -5,6 +5,7 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.VisualTree;
 using Genie.App.Controls;
 
@@ -45,6 +46,22 @@ public static class WindowMenuBehavior
     /// highlighted selection of whichever window the menu was opened on. Bound
     /// from XAML via <c>{x:Static docking:WindowMenuBehavior.CopySelectionCommand}</c>.</summary>
     public static ICommand CopySelectionCommand => _copy;
+
+    /// <summary>The Copy gesture the <b>editor</b> game window actually answers to.
+    /// That renderer inherits Copy/Select-All from AvaloniaEdit's own
+    /// <c>CommandBindings</c>, which match the platform gesture — Cmd+C on macOS —
+    /// rather than the Ctrl-only binding Genie 4 inherited from Windows. Labelling
+    /// it "Ctrl+C" there would advertise a shortcut that does nothing.
+    ///
+    /// <para>Deliberately <b>not</b> used by the legacy game window or the tool
+    /// windows: those handle Ctrl+C themselves (<c>SelectableLinesControl</c>'s key
+    /// handler) and really are Ctrl-bound on every platform, so their menus keep the
+    /// hardcoded label. Resolved per read rather than cached, since
+    /// <c>Application.Current</c> may not be up when this type is first touched.</para></summary>
+    public static KeyGesture CopySelectionGesture =>
+        new(Key.C,
+            Application.Current?.PlatformSettings?.HotkeyConfiguration.CommandModifiers
+            ?? KeyModifiers.Control);
 
     static WindowMenuBehavior()
     {
@@ -121,7 +138,22 @@ public static class WindowMenuBehavior
         var target = _currentTarget ?? PageScroll.CurrentTarget;
         if (target is null) { trace = "no target"; return null; }
 
-        // 1) Game window: cross-line selection owned by the LineSelection
+        // 1) Game window on the experimental AvaloniaEdit renderer: selection is
+        //    native to the editor, so ask it directly. Checked first because a
+        //    TextEditor's subtree contains neither a LineSelection-enabled
+        //    ItemsControl nor a SelectableTextBlock, and it never appears in the
+        //    legacy path — with the renderer flag off this branch cannot match, so
+        //    the shipped resolution order below is unchanged.
+        var editor = target.GetSelfAndVisualDescendants()
+                           .OfType<AvaloniaEdit.TextEditor>()
+                           .FirstOrDefault(e => e.SelectionLength > 0);
+        if (editor?.SelectedText is { Length: > 0 } editorSelection)
+        {
+            trace = $"target={target.GetType().Name} editor len={editorSelection.Length}";
+            return editorSelection;
+        }
+
+        // 2) Game window: cross-line selection owned by the LineSelection
         //    behavior (its rendered per-line SelectionStart/End survive a
         //    right-click; the behavior holds the authoritative range).
         var list = target.GetSelfAndVisualDescendants()
@@ -133,7 +165,7 @@ public static class WindowMenuBehavior
             return cross;
         }
 
-        // 2) Streams / other feeds — and the game window when its behavior
+        // 3) Streams / other feeds — and the game window when its behavior
         //    state is empty but rendered per-line selections remain. Aggregate
         //    EVERY selected block in visual (= line) order: taking just the
         //    first can silently truncate a visible multi-line highlight to a

@@ -96,3 +96,24 @@ public class GameTextDocument : Document, IWindowMenuHost, IFindHost
             : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
     }
 }
+
+/// <summary>
+/// The main Game window rendered by <see cref="Controls.GameTextEditor"/>
+/// (AvaloniaEdit) instead of the per-line <c>ItemsControl</c>. Created by
+/// <see cref="GenieDockFactory"/> in place of a plain <see cref="GameTextDocument"/>
+/// when <c>GenieConfig.UseEditorGameWindow</c> is on. Experimental; default off.
+///
+/// <para>Renderer selection is a <b>type</b> distinction rather than a flag on the
+/// document on purpose: <c>App.axaml</c> declares a <c>DataTemplate</c> for this
+/// type ahead of the one for the base type, so the legacy subtree is not merely
+/// hidden — it is never built. That keeps the flag-off path byte-identical, and it
+/// avoids two competing <c>PageScroll</c> targets in one window. Everything else
+/// (the window menu, Find, Copy All, Save As, per-window settings) is inherited
+/// unchanged, and every <c>is GameTextDocument</c> check in the factory still
+/// matches.</para>
+/// </summary>
+public sealed class EditorGameTextDocument : GameTextDocument
+{
+    public EditorGameTextDocument(GameTextViewModel vm, WindowSettings? settings = null)
+        : base(vm, settings) { }
+}

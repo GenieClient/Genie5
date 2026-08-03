@@ -35,6 +35,11 @@
     <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml"/>
     <!-- DataGrid likewise — used by the Configuration dialog's rule tables. -->
     <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+    <!-- AvaloniaEdit ships its own control theme; without this the experimental
+         editor-backed Game window (#config useeditorgamewindow) renders as blank
+         space. Inert when the flag is off — nothing else in the app is a
+         TextEditor, so these styles match no control. -->
+    <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml"/>
 
     <!-- Tool header: just the title -->
     <Style Selector="ToolControl">
@@ -84,6 +89,112 @@
   </Application.Styles>
 
   <Application.DataTemplates>
+
+    <!-- ── Game text (experimental AvaloniaEdit renderer) ─────────────────── -->
+    <!-- MUST stay ABOVE the GameTextDocument template below: template matching
+         is first-match-wins on IsInstanceOfType, and EditorGameTextDocument is a
+         GameTextDocument. Only reached when #config useeditorgamewindow is on —
+         GenieDockFactory constructs the subtype only then, so with the flag off
+         (the default) this template matches nothing and the legacy subtree below
+         is built exactly as it always was.
+         Everything outside the text surface itself — the window menu, the
+         ↓ Bottom overlay, the Find bar — is a deliberate copy of the legacy
+         template's chrome so the two renderers are swappable without the shared
+         parts drifting; the differences are the GameTextEditor in place of the
+         ScrollViewer+ItemsControl, and the overlay binding to the editor's own
+         IsScrolledUp / JumpToBottomCommand instead of AutoScrollBehavior's. -->
+    <DataTemplate DataType="docking:EditorGameTextDocument">
+      <Grid Background="{Binding ToolBackground}">
+        <Grid.ContextMenu>
+          <ContextMenu docking:WindowMenuBehavior.RefreshOnOpen="True">
+            <!-- Platform gesture, not Ctrl: this renderer gets Copy/Select-All from
+                 AvaloniaEdit's CommandBindings, so it answers Cmd+C on macOS. The
+                 legacy template below stays hardcoded Ctrl+C, which is what that
+                 renderer's own key handler implements. -->
+            <MenuItem Header="Copy"
+                      InputGesture="{x:Static docking:WindowMenuBehavior.CopySelectionGesture}"
+                      Command="{x:Static docking:WindowMenuBehavior.CopySelectionCommand}"
+                      IsVisible="{Binding WindowMenu.ShowCopyAll}" />
+            <MenuItem Header="Copy All"
+                      Command="{Binding WindowMenu.CopyAllCommand}"
+                      IsVisible="{Binding WindowMenu.ShowCopyAll}" />
+            <MenuItem Header="Save As…"
+                      Command="{Binding WindowMenu.SaveAsCommand}"
+                      IsVisible="{Binding WindowMenu.ShowSaveAs}" />
+            <!-- Find really is Ctrl+F on both renderers (MainWindow's key handler),
+                 so this label is accurate everywhere and stays as-is. -->
+            <MenuItem Header="Find…"
+                      InputGesture="Ctrl+F"
+                      Command="{Binding WindowMenu.FindCommand}"
+                      IsVisible="{Binding WindowMenu.ShowFind}" />
+            <MenuItem Header="Clear"
+                      Command="{Binding WindowMenu.ClearCommand}"
+                      IsVisible="{Binding WindowMenu.ShowClear}" />
+            <MenuItem Header="Time Stamp"
+                      ToggleType="CheckBox"
+                      IsChecked="{Binding WindowMenu.IsTimestampOn, Mode=TwoWay}"
+                      IsVisible="{Binding WindowMenu.ShowTimestamp}" />
+            <MenuItem Header="Name List Only"
+                      ToggleType="CheckBox"
+                      IsChecked="{Binding WindowMenu.IsNameListOnlyOn, Mode=TwoWay}"
+                      IsVisible="{Binding WindowMenu.ShowNameListOnly}" />
+            <MenuItem Header="Word Wrap"
+                      ToggleType="CheckBox"
+                      IsChecked="{Binding WindowMenu.IsWordWrapOn, Mode=TwoWay}"
+                      IsVisible="{Binding WindowMenu.ShowWordWrap}" />
+            <MenuItem Header="Pause Scrolling"
+                      ToggleType="CheckBox"
+                      IsChecked="{Binding WindowMenu.IsScrollPaused, Mode=TwoWay}"
+                      IsVisible="{Binding WindowMenu.ShowPauseScroll}" />
+          </ContextMenu>
+        </Grid.ContextMenu>
+
+        <!-- Same MDI width/height pinning the legacy ScrollViewer needs (#124):
+             the windowed DocumentControl host measures with infinite width, so
+             word wrap never engages unless a finite width is forced. -->
+        <controls:GameTextEditor x:Name="gameEditor"
+                                 Width="{Binding $parent[Grid].Bounds.Width}"
+                                 Height="{Binding $parent[Grid].Bounds.Height}"/>
+
+        <Button HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="0,0,20,8"
+                IsVisible="{Binding #gameEditor.IsScrolledUp}"
+                Command="{Binding #gameEditor.JumpToBottomCommand}"
+                Content="↓ Bottom" FontSize="11" Padding="8,4" Opacity="0.85"/>
+
+        <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                Margin="0,4,20,0" Padding="4,2" CornerRadius="3"
+                Background="{DynamicResource Theme.ToolbarBg}"
+                BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1"
+                IsVisible="{Binding Find.IsOpen}">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBox Text="{Binding Find.FindText}" Watermark="Find…"
+                     AutomationProperties.Name="Find in window"
+                     Width="160" FontSize="11" MinHeight="0" Padding="4,2"
+                     controls:FindInWindow.BoxModel="{Binding Find}"/>
+            <TextBlock Text="{Binding Find.Status}" FontSize="10"
+                       Foreground="{DynamicResource Theme.TextMuted}"
+                       VerticalAlignment="Center"/>
+            <Button Content="▲" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find previous"
+                    AutomationProperties.HelpText="Older match (Enter)"
+                    Command="{Binding Find.OlderCommand}"
+                    ToolTip.Tip="Older match (Enter)"/>
+            <Button Content="▼" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find next"
+                    AutomationProperties.HelpText="Newer match (Shift+Enter)"
+                    Command="{Binding Find.NewerCommand}"
+                    ToolTip.Tip="Newer match (Shift+Enter)"/>
+            <Button Content="✕" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Background="Transparent" BorderThickness="0"
+                    AutomationProperties.Name="Close find bar"
+                    AutomationProperties.HelpText="Close (Esc)"
+                    Command="{Binding Find.CloseCommand}"
+                    ToolTip.Tip="Close (Esc)"/>
+          </StackPanel>
+        </Border>
+      </Grid>
+    </DataTemplate>
 
     <!-- ── Game text ──────────────────────────────────────────────────────── -->
     <DataTemplate DataType="docking:GameTextDocument">
