@@ -94,7 +94,7 @@ Listed by category. For exact semantics, read the `case` arms in [ScriptEngine.c
 | `pause N` | N seconds elapsed | yes — the gate checks roundtime before the next statement |
 | `waitpause N` | N seconds elapsed — plain alias of `pause` (default 1s), no extra roundtime coupling | same as `pause` |
 | `wait` | next `<prompt>` | yes |
-| `delay N` | N seconds elapsed | no — explicitly bypasses the RT gate (webbed/stunned sleeps) |
+| `delay N` | N seconds elapsed | no — explicitly bypasses the RT gate (webbed/stunned sleeps). Genie 4 parity: the statements after an expired `delay` keep running RT-free until the script next blocks (`pause`, `wait`, `matchwait`, …), at which point normal RT gating resumes. |
 | `move` / `nextroom` | new room arrives | n/a |
 
 ### Pattern matching

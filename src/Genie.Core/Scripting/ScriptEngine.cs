@@ -1033,7 +1033,13 @@ public sealed class ScriptEngine
                         _ => false,
                     };
                     if (unblock)
-                    { inst.Paused = false; inst.PauseMode = PauseMode.None; inst.PauseUntil = DateTime.MinValue; }
+                    {
+                        // A completed `delay` opens the RT-bypass window: the
+                        // resumed statements run regardless of roundtime until
+                        // the script next blocks (see the gate below).
+                        if (inst.PauseMode == PauseMode.Delay) inst.RtBypass = true;
+                        inst.Paused = false; inst.PauseMode = PauseMode.None; inst.PauseUntil = DateTime.MinValue;
+                    }
                     else continue;
                 }
 
@@ -1081,7 +1087,12 @@ public sealed class ScriptEngine
                 // above and progress as pure timers, so a `pause` initiated
                 // before RT still expires — but the next line of the script
                 // can't fire until RT drains. Delay is RT-independent by
-                // design and bypasses this gate.
+                // design: when its timer expires the unblock above sets
+                // RtBypass, and the instance keeps executing through this
+                // gate until it next blocks (matching G4, where the resumed
+                // RunScript burst runs without RT checks until the script
+                // hits another blocking statement). The flag is cleared
+                // after StepOne once IsBlocked turns true again.
                 //
                 // Critically, we must also schedule a wakeup. The server
                 // doesn't send a prompt when RT expires — it only prompts
@@ -1090,8 +1101,7 @@ public sealed class ScriptEngine
                 // arrives, so Tick() is never called again and the script
                 // hangs forever. ScheduleTick fires a DispatcherTimer at
                 // RT-end so the engine wakes up on its own.
-                if (inst.PauseMode != PauseMode.Delay &&
-                    (InRoundtime?.Invoke() ?? false))
+                if (!inst.RtBypass && (InRoundtime?.Invoke() ?? false))
                 {
                     ScheduleRoundTimeWakeup();
                     continue;
@@ -1112,6 +1122,12 @@ public sealed class ScriptEngine
                     inst.Running = false;
                     try { ScriptFinished?.Invoke(inst.Name); } catch { /* never rethrow from cleanup */ }
                 }
+
+                // The delay RT-bypass window closes at the next blocking
+                // statement (G4: once the state is no longer `delayed`,
+                // the next TickScript re-applies the RT early-return).
+                if (inst.RtBypass && (inst.IsBlocked || !inst.Running))
+                    inst.RtBypass = false;
             }
         }
 

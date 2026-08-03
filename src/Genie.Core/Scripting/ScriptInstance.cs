@@ -129,6 +129,15 @@ public sealed class ScriptInstance
 
     public bool IsBlocked => Paused || InMatchWait || WaitForPattern != null || WaitEvalExpr != null;
 
+    /// <summary>Set when a <c>delay</c> timer expires; lets the tick loop run
+    /// this instance through the roundtime gate until it next blocks. Genie 4
+    /// parity: TickScript's RT early-return is skipped while the state is
+    /// <c>delayed</c>, and the resumed RunScript burst executes without RT
+    /// checks until the script hits another blocking statement
+    /// (Genie4 Script.cs:1541). Cleared as soon as <see cref="IsBlocked"/>
+    /// turns true again (or the script stops).</summary>
+    public bool RtBypass;
+
     /// <summary>User-initiated pause from the script bar. While true the
     /// tick loop skips this instance entirely.</summary>
     public bool UserPaused;
