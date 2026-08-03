@@ -1,3 +1,25 @@
+# Genie 5 — v5.0.0-beta.4
+
+A new editor-backed Game window you can opt into, Open Log In Editor, and a
+scripting fix for community `-verb` send idioms.
+
+## ✨ New
+- **AvaloniaEdit-backed Game window (opt-in).** A new renderer for the main
+  Game window via `#config useeditorgamewindow on` (default off): flat memory
+  use regardless of scrollback depth and a "Pause Scrolling" that genuinely
+  holds. The classic renderer stays the default until parity is proven.
+- **File ▸ Open Log In Editor.** Opens the current session log in your
+  configured external editor — the last Genie 4 File-menu parity item.
+
+## 🐛 Fixes
+- **`send`/`#send` treat a leading `-verb` as "fire eagerly."** Community
+  scripts that prefix a command with `-` (e.g. `send -cast;-0.05 gesture`)
+  now reach the game instead of bouncing "Please rephrase." `put` is unchanged.
+
+## 💡 Notes
+- The editor-backed Game window is experimental and off by default; the stream
+  windows will follow on the same renderer in a later build.
+
 # Genie 5 — v5.0.0-beta.3
 
 Window routing that finally works, a Hide Title Bar fix, and a batch of stream,
