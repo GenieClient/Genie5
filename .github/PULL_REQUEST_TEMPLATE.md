@@ -19,7 +19,7 @@ recording is the easiest path:
 ## Checklist
 
 - [ ] `dotnet build -c Release` succeeds cleanly (warnings OK, errors not)
-- [ ] Tests / relevant test-harness modes pass for the subsystems I touched
+- [ ] `dotnet test tests/Genie.Core.Tests -c Release` passes (CI runs this on every PR), plus relevant test-harness modes for the subsystems I touched
 - [ ] **No machine-specific paths** committed (no `C:\Users\…`, no hard-coded home dirs, no local absolute paths — use `AppPaths` / config)
 - [ ] **No AI brand references** in tracked files (the public repo stays vendor-neutral)
 - [ ] Docs updated if user-visible behaviour changed (README / CONTRIBUTING / `docs/`)

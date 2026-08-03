@@ -73,6 +73,16 @@ jobs:
       - name: Build solution (Release)
         run: dotnet build Genie.slnx -c Release --no-restore
 
+      # Run the unit-test suite (tests/Genie.Core.Tests). The suite itself runs
+      # in ~1s, so it rides every matrix leg: Linux gates PRs, pushes/tags get
+      # cross-platform coverage for free via the event-tiered matrix above.
+      # No --no-build: the test project resolves Genie.Core.dll from Core's
+      # RID-specific output via a HintPath (Core is a self-contained Exe, so it
+      # can't be a ProjectReference) and its EnsureGenieCoreBuilt target keeps
+      # that DLL fresh — skipping the build risks testing a stale Core.
+      - name: Test (Release)
+        run: dotnet test tests/Genie.Core.Tests -c Release --nologo -v minimal
+
       # The Profiles/ folder was silently shadowed by an over-broad
       # .gitignore rule for five days before another clone surfaced it.
       # Belt-and-braces: assert the source folders we expect to exist
