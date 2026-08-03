@@ -37,7 +37,7 @@ Out of the box you get a three-column arrangement:
 | **Raw XML** | The unparsed server stream, for debugging and parser spelunking. |
 | **Stream tabs** | DragonRealms routes certain text to named streams. Genie surfaces **Talk**, **Whispers**, **Thoughts**, **Combat**, **Logons**, **Familiar**, **Deaths**, **Assess**, **Atmospherics**, **Log**, and **Item Log** as their own windows so they each keep a clean scrollback. (Speech and whispers also appear in the main window — DragonRealms sends them to both by design.) |
 
-Toggle any panel from the **Window** menu. Drag a panel's tab to re-dock it; drag it out to **float** it in its own window, and drag it back to re-dock.
+Toggle any panel from the **Window** menu. Drag a panel's tab to re-dock it; drag it out to **float** it in its own window, and drag it back to re-dock. For a picture-by-picture guide to the dock targets — docking **as a tab** vs. splitting off a **new section** — see [Docking Windows](Docking-Windows).
 
 ![The Experience panel shown five times, once per Density stop from Brief at the top to Full at the bottom](images/interface-experience-density.png)
 
