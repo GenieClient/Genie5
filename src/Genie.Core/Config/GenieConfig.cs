@@ -648,12 +648,29 @@ public sealed class GenieConfig
     };
 
     /// <summary>
+    /// Alternate names <see cref="SetSetting"/> accepts for existing keys,
+    /// mapped to the canonical settings.cfg key. <see cref="GetSetting"/>
+    /// resolves through this so any name that can be set can also be read
+    /// (<c>#config fe</c> ≡ <c>#config frontend</c>). Aliases stay out of
+    /// <see cref="ToConfigPairs"/> — <see cref="Save"/> writes canonical
+    /// keys only.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> SettingAliases =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fe"] = "frontend",
+        };
+
+    /// <summary>
     /// Current value of a settings.cfg key (case-insensitive), or <c>null</c>
     /// if the key isn't a recognized setting. The read counterpart of
     /// <see cref="SetSetting"/>; backs <c>#config {key}</c> get + script reads.
+    /// Accepts the same <see cref="SettingAliases"/> as the setter.
     /// </summary>
     public string? GetSetting(string key)
     {
+        if (SettingAliases.TryGetValue(key, out var canonical))
+            key = canonical;
         foreach (var (k, v) in ToConfigPairs())
             if (string.Equals(k, key, StringComparison.OrdinalIgnoreCase))
                 return v;
@@ -686,10 +703,10 @@ public sealed class GenieConfig
     /// </summary>
     public static readonly IReadOnlyList<(string Category, string[] Keys)> ConfigCategories = new (string, string[])[]
     {
-        ("Connection",       new[] { "classicconnect", "conndebug", "connectscript", "frontend", "reconnect" }),
+        ("Connection",       new[] { "classicconnect", "conndebug", "connectscript", "flagscheck", "frontend", "reconnect" }),
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow" }),
-        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety" }),
+        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "updatemapperscripts" }),
