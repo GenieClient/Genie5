@@ -2,16 +2,17 @@
 
 Genie 5 builds for Windows, macOS, and Linux from one source tree on .NET 8. The published artifact is **self-contained** — the .NET runtime and native libraries are bundled, so end users don't install anything.
 
-There are no platform build scripts checked in (no `build-mac.sh` / `build-win.sh`). Packaging is driven entirely by `dotnet publish` and the publish properties already set in [Genie.App.csproj](../src/Genie.App/Genie.App.csproj). This page documents the commands and what those properties do.
+There are no platform build scripts checked in (no `build-mac.sh` / `build-win.sh`). Local builds are driven by `dotnet publish` and the publish properties already set in [Genie.App.csproj](../src/Genie.App/Genie.App.csproj); **shipping releases are fully scripted in CI** (see [CI & releases](#ci--releases) below). This page documents the local commands, what the properties do, and how the release pipeline packages each platform.
 
 ## Projects
 
 | Project | Output | Notes |
 | --- | --- | --- |
 | [Genie.Core](../src/Genie.Core/Genie.Core.csproj) | library (`AssemblyName=Genie.Core`) | Pure engine. Marked `SelfContained` so the App can reference it from a self-contained publish (NETSDK1150). Builds as an exe only so the headless [TestHarness](../src/Genie.Core/TestHarness.cs) can run via `dotnet run`. |
-| [Genie.App](../src/Genie.App/Genie.App.csproj) | `WinExe` (`AssemblyName=Genie`) | The Avalonia GUI. References Genie.Core. |
+| [Genie.App](../src/Genie.App/Genie.App.csproj) | `WinExe` (`AssemblyName=Genie5`) | The Avalonia GUI. References Genie.Core. |
+| [Genie.Plugins.Abstractions](../src/Genie.Plugins.Abstractions/Genie.Plugins.Abstractions.csproj) | library | The public plugin contract (`IGeniePlugin` / `IPluginHost`) that plugin authors reference. |
 
-Solution file: [Genie.slnx](../Genie.slnx). Target framework: `net8.0`. UI stack: Avalonia 11.3.6 + Dock.Avalonia + ReactiveUI (with ReactiveUI.Fody).
+Solution file: [Genie.slnx](../Genie.slnx). Target framework: `net8.0`. UI stack: Avalonia + Dock.Avalonia + AvaloniaEdit + ReactiveUI (with ReactiveUI.Fody) — see the csproj for the pinned versions.
 
 ## Local development
 
@@ -21,7 +22,7 @@ dotnet build -c Release
 dotnet run --project src/Genie.App
 ```
 
-A plain `dotnet build` produces an unbundled `bin/Debug/net8.0/Genie` you can run directly. The self-contained single-file artifact is only needed for distribution.
+A plain `dotnet build` produces an unbundled `bin/Debug/net8.0/Genie5` you can run directly. The self-contained single-file artifact is only needed for distribution. Run the test suite with `dotnet test tests/Genie.Core.Tests`.
 
 To run the headless engine harness (no UI):
 
@@ -71,30 +72,30 @@ Because these live in the csproj, the `dotnet publish -r <rid>` command above is
 Version metadata is set in [Genie.App.csproj](../src/Genie.App/Genie.App.csproj):
 
 ```xml
-<Version>5.0.0-alpha.4</Version>
+<Version>5.0.0-beta.4</Version>        <!-- current tier; bump per release -->
 <AssemblyVersion>5.0.0.0</AssemblyVersion>
 <FileVersion>5.0.0.0</FileVersion>
-<InformationalVersion>5.0.0-alpha.4</InformationalVersion>
+<InformationalVersion>5.0.0-beta.4</InformationalVersion>
 ```
 
 To stamp a different version at publish time, override on the CLI:
 
 ```bash
 dotnet publish src/Genie.App -c Release -r win-x64 \
-  -p:Version=5.0.0-alpha.2 -p:FileVersion=5.0.0.2 -o publish/win-x64
+  -p:Version=<version> -p:FileVersion=<file-version> -o publish/win-x64
 ```
 
 Keep `AssemblyVersion` pinned (e.g. `5.0.0.0`) across point releases so the friendly/display version can move without breaking strong-name binding for any future plugin reference. The friendly version (`Version` / `InformationalVersion`) is what the About box and window title surface; `FileVersion` shows in the Windows file-properties dialog.
 
 ## Platform packaging notes
 
-The raw publish output is runnable as-is. To make it feel native you'll want to wrap it — these steps are **not** scripted in-repo yet:
+The raw publish output is runnable as-is. **Shipping packages are built by the tag-triggered `release.yml` workflow** — Velopack (`vpk pack`) produces the Windows `Setup.exe` + Portable zip, the macOS `.app`/`.pkg` plus a drag-install `.dmg` (two-step `hdiutil` UDRO → UDZO), and the Linux AppImage, and attaches everything to the GitHub Release with numbered filenames (`01-Windows-…`, `02-macOS-Apple-Silicon-…`, `03-macOS-Intel-…`, `04-Linux-…`). The notes below are for understanding the output and for local experiments — they are **not** the shipping path.
 
 ### macOS — `.app` bundle and Gatekeeper
 
-A bare `osx-*` publish is a Unix executable, not an app bundle. To ship a `.app`:
+CI builds the `.app`/`.pkg`/`.dmg` via `vpk pack --bundleId com.genieclient.genie5`. For a hand-rolled local bundle:
 
-1. Lay out `Genie5.app/Contents/MacOS/Genie` (the publish output), `Contents/Resources/` (an `.icns`), and a generated `Contents/Info.plist`.
+1. Lay out `Genie5.app/Contents/MacOS/Genie5` (the publish output), `Contents/Resources/` (an `.icns`), and a generated `Contents/Info.plist`.
 2. `xattr -cr Genie5.app` to strip quarantine attributes.
 3. `codesign --force --deep --sign - Genie5.app` for ad-hoc signing — without it, Apple Silicon kills the unsigned binary as "damaged."
 
@@ -106,14 +107,17 @@ Windows releases are EV code-signed (GlobalSign certificate issued to Shadow Rea
 
 ### Linux
 
-`linux-x64` publish runs directly. No packaging (AppImage/.deb/Flatpak) is set up yet.
+`linux-x64` publish runs directly. The release workflow packages it as `04-Linux-Genie5.AppImage`; `.deb` / Flatpak are not set up.
 
-## CI
+## CI & releases
 
-No CI pipeline is checked in. A reasonable starter: a GitHub Actions matrix on `windows-latest` / `macos-latest` / `ubuntu-latest` running `dotnet build -c Release`, then `dotnet publish` per RID, uploading the artifacts and cutting a release on tag push.
+Two workflows are checked in under [.github/workflows](../.github/workflows):
+
+- **`build.yml`** — continuous build with an event-tiered OS matrix: PRs build on Linux only; pushes to `main` add Windows; version tags add macOS. A publish-smoke job verifies the self-contained single-file output on pushes.
+- **`release.yml`** — the tag-triggered release pipeline: extracts the tag's section from `RELEASE_NOTES.md` (and **fails if the `# Genie 5 — <tag>` heading is missing**), publishes win-x64, signs `Genie5.exe` via SignPath (maintainer email approval), Velopack-packages all four targets, signs `Setup.exe` (second approval), and attaches the numbered artifacts plus updater feeds to the GitHub Release.
 
 ## Code references
 
-- **[Genie.App.csproj](../src/Genie.App/Genie.App.csproj)** — assembly name (`Genie`), framework, publish + version properties, package refs.
+- **[Genie.App.csproj](../src/Genie.App/Genie.App.csproj)** — assembly name (`Genie5`), framework, publish + version properties, package refs.
 - **[Genie.Core.csproj](../src/Genie.Core/Genie.Core.csproj)** — engine library, `SelfContained`, embedded `ZoneConnections.baseline.xml` resource.
 - **[Genie.slnx](../Genie.slnx)** — solution layout.

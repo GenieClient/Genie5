@@ -5,7 +5,7 @@ Drop a `.js` file in your Scripts folder and launch it exactly like a `.cmd`
 script:
 
 ```
-.myscript            # or:  #script myscript
+.myscript
 .myscript arg1 arg2
 ```
 

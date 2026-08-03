@@ -54,8 +54,8 @@ Import rules via **File → Import from Genie 4…** ([guide](Importing-Genie4-C
 
 ## Scripts
 
-**A script stops with "undefined variable."**
-By design — Genie 5 aborts rather than silently expanding an undefined `$var` to empty (a common Genie 4 bug). Guard with `if def(name)`. See [Scripting](Scripting#whats-different-from-genie-4).
+**A script misbehaves around an undefined variable.**
+Undefined `$var`s expand to empty (Genie 4-compatible), so a script never stops just because a variable is missing. If a script acts oddly around variables, check the spelling against the live list with `#var`, and guard with `if def(name)` where it matters. See [Scripting](Scripting#whats-different-from-genie-4).
 
 **A Genie 4 script doesn't behave the same.**
 Script-compat regressions are treated as bugs — please [file an issue](https://github.com/GenieClient/Genie5/issues/new) with the script (or the failing lines). A few intentional differences are listed in [Scripting Reference](Scripting-Reference#differences-from-genie-4).

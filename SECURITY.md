@@ -33,7 +33,7 @@ The following classes of bug are *especially* important to report privately rath
 
 - Path traversal in script loading (`.foo` resolving to a path outside `Scripts/`)
 - Arbitrary file write from a `.cmd` script (the `.cmd` interpreter shouldn't have file I/O primitives — if you find one, it's a bug)
-- Plugin (when shipped) escape from the sandbox to read/write user files outside the plugin's allowed scope
+- Plugin-loader bugs that would let a plugin DLL load or execute without the user having placed it in the Plugins folder
 
 ### Network / protocol
 
@@ -61,7 +61,7 @@ Genie 5 is a **desktop game client**, not a server-side service. Our threat mode
 - ✅ The DR game server is mostly trusted (it's Simutronics' production server) but we don't trust it to send safe XML — the parser must remain robust to hostile input
 - ✅ The AI vendor API endpoint is trusted for the AI pipeline (TLS, signed cert)
 - ❌ We do **not** protect against an attacker with disk access (they can decrypt `profiles.json` if they know the machine name + read the source)
-- ❌ We do **not** protect against a malicious user-installed plugin (plugin host is a roadmap item; sandboxing comes with it)
+- ❌ We do **not** protect against a malicious user-installed plugin — the plugin host is shipped and a loaded plugin DLL runs at full trust (.NET has no real in-process sandbox). Only install plugins you trust; load-time linting and a signing/consent flow are roadmap (v1.0)
 
 ## Existing security posture
 

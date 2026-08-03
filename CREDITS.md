@@ -54,7 +54,7 @@ Genie 5 is the cross-platform successor to
 Windows client for DragonRealms. Architectural decisions, the `.cmd`
 script dialect we stay backwards-compatible with, the rules-engine
 vocabulary (`#alias` / `#trigger` / `#highlight` / `#substitute` /
-`#gag` / `#macro` / `#var` / `#class`), and the `.map` zone format
+`#gag` / `#macro` / `#var` / `#class`), and the `.xml` zone-map format
 all trace back to that codebase. Without the Genie 4 community's
 decade-plus of work there would be no Genie 5 to write.
 

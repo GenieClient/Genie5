@@ -81,7 +81,7 @@ Listed by category. For exact semantics, read the `case` arms in [ScriptEngine.c
 
 | Statement | Notes |
 | --- | --- |
-| `put text` / `send text` | Send to the server. Multiple `;`-chained commands drain one per tick. |
+| `put text` / `send text` | Send to the server. Multiple `;`-chained commands drain one per tick. `send` (unlike `put`) additionally parses an optional leading numeric delay, and a leading `-` on the command is a "fire eagerly" marker (dash stripped, send-queue wait bypassed — beta.4). `put` sends its text as-is. |
 | `put #cmd` | Routed as a meta-command to [CommandEngine](../src/Genie.Core/Commanding/CommandEngine.cs) (`#var`, `#tvar`, `#echo`, …) — not sent to the server. |
 | `put .script args` | Launch `script.cmd` as a sub-script; does not consume type-ahead. |
 | `move text` | Send `text`, then block until a new room arrives (`NavEvent` / `OnRoomChanged`), or a movement-failure line unblocks it. |
@@ -92,6 +92,7 @@ Listed by category. For exact semantics, read the `case` arms in [ScriptEngine.c
 | Statement | Blocks until | RT-aware? |
 | --- | --- | --- |
 | `pause N` | N seconds elapsed | yes — the gate checks roundtime before the next statement |
+| `waitpause N` | N seconds elapsed — plain alias of `pause` (default 1s), no extra roundtime coupling | same as `pause` |
 | `wait` | next `<prompt>` | yes |
 | `delay N` | N seconds elapsed | no — explicitly bypasses the RT gate (webbed/stunned sleeps) |
 | `move` / `nextroom` | new room arrives | n/a |
@@ -112,10 +113,10 @@ Regex captures from `matchre`/`waitforre`/actions land in the current `$0..$9` f
 | --- | --- |
 | `var name value` (and `setvariable`, `setvar`, …) | Set `%name`. Value is substituted before storage. |
 | `unvar name` (and synonyms) | Remove `%name`. |
-| `math var op N` | In-place `add`/`subtract`/`multiply`/`divide`/`set`. |
+| `math var op N` | In-place `add`/`subtract`/`multiply`/`divide`/`modulus`/`set`. |
 | `eval var expr` / `evalmath var expr` | Evaluate via `ScriptExpression`; `evalmath` coerces to numeric. |
 | `random low high` | Uniform random into `%r`. |
-| `timer start`/`stop`/`clear` | Per-script timer baseline; `%timer` reads live elapsed seconds. |
+| `timer start`/`stop`/`clear`/`reset` | Per-script timer baseline; `%timer` reads live elapsed seconds. Bare `timer` = `timer start`. |
 
 ### Actions
 
@@ -131,8 +132,9 @@ Regex captures from `matchre`/`waitforre`/actions land in the current `$0..$9` f
 | --- | --- |
 | `echo text` | Print to the echo channel (main window + Scripts panel), prefixed by the engine. |
 | `debug N` | Per-instance trace verbosity (1 = goto/gosub/return … 10 = every line). |
-| `save N value` | Genie 4 `%s` storage. |
-| `js …` / `plugin …` | Parsed for Genie 4 parity; execution is limited/stubbed (JavaScript scripting is a roadmap item). |
+| `save text` | Store the entire rest of the line into `%s` (Genie 4 parity; there is no slot form). |
+| `include foo.js` / `js <expr>` / `jscall <var> <expr>` | JavaScript interop on the embedded Jint engine: `include` loads a `.js` function library for the script run, `js` calls into it, `jscall` stores the result in `%var`. Standalone `.js` scripts are also supported — see [javascript-scripts.md](javascript-scripts.md). |
+| `plugin …` | Parsed for Genie 4 parity; execution is not supported. |
 
 ## Variables and scope
 

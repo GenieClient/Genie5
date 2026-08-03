@@ -6,12 +6,7 @@ Genie 5 runs Genie 4 `.cmd` scripts. The engine is a **faithful port** of Genie 
 
 ## Where scripts live
 
-Drop `.cmd` files into your **Scripts** folder:
-
-- Per character: `Profiles/<Character>-<Account>/Scripts/`
-- Shared (before you've logged in): `Scripts/`
-
-See [Application Folders](Application-Folders) for the exact path on your OS. No restart needed — Genie picks up new files immediately.
+Drop `.cmd` files into your **Scripts** folder — one shared `Scripts/` folder at the data root, used by every character. See [Application Folders](Application-Folders) for the exact path on your OS. No restart needed — Genie picks up new files immediately.
 
 ## Hello world
 
@@ -38,7 +33,7 @@ Output: `Hello, world!` — `%1` was filled in by the argument you passed.
 # Variables:
 #   $name  reads a global / live game-state value
 #   %1, %2 are the arguments passed to the script (%0 is all of them)
-#   var foo = bar   sets a local variable; read it back as %foo
+#   var foo bar     sets a local variable (name, then value — no equals sign); read it back as %foo
 
 # Send a command to the game:
 put look
@@ -52,10 +47,10 @@ waitfor You can move again
 
 # Pause for seconds:
 pause 2.5
-waitpause            # sleep until the current roundtime expires
+waitpause 0.5        # alias of pause — a plain N-second timer
 
 # Conditionals on live game state:
-if_health < 50 then put cast 1101
+if $health < 50 then put chant heal
 if def(weapon) then echo I have a weapon set
 
 # Loops via labels + goto:
@@ -67,7 +62,7 @@ LOOP:
 
 ## Roundtime safety
 
-Scripts are **roundtime-aware**. By default, a `put` issued while you're in roundtime queues, waits, and respects the type-ahead budget — you don't have to write `waitpause; put north` everywhere. Use `waitpause` explicitly only when you need to *gate* on roundtime expiring before the script proceeds (for example, before computing a value that depends on being able to act).
+Scripts are **roundtime-aware**. A `put` issued while you're in roundtime queues, waits, and respects the type-ahead budget — the engine's roundtime gate already holds the next statement until roundtime expires, so you don't have to write pause-before-put everywhere. (`waitpause` is simply an alias of `pause` — a plain N-second timer, not a roundtime wait.)
 
 Because DragonRealms doesn't announce when roundtime ends, the engine schedules its own wake-up from the live roundtime clock — so RT-gated scripts resume correctly. The mechanics are in [Scripting Reference](Scripting-Reference#the-roundtime-gate).
 
@@ -81,11 +76,11 @@ Every live game-state field is exposed as a `$variable`, so scripts can read you
 | `$roomname`, `$roomdesc`, `$roomexits` | Current room info. |
 | `$righthand`, `$lefthand` | What you're holding. |
 | `$preparedspell` | Prepared spell (or empty). |
-| `$stance` | `off` / `adv` / `fwd` / `neu` / `grd` / `def`. |
+| `$stance` | `offensive` / `advance` / `forward` / `neutral` / `guarded` / `defensive` (full lowercase words). |
 | `$kneeling`, `$prone`, `$sitting`, `$stunned`, `$hidden`, `$webbed`, … | Status booleans. |
 | `$roundtime` | Seconds of roundtime remaining. |
 
-Type `#vars` at the command bar to see the full live list. The complete table is on [Scripting Reference](Scripting-Reference#engine-set-globals).
+Type `#var` at the command bar to see the full live list. The complete table is on [Scripting Reference](Scripting-Reference#engine-set-globals).
 
 ## Running and stopping scripts
 
@@ -130,10 +125,10 @@ A **Script Bar** above the command bar shows what's running, with stop/edit cont
 
 A few intentional divergences:
 
-- **Per-character script folders** — scripts saved while playing one character live separately from another's. The first-launch migration copies your existing Genie 4 `Scripts/` across once.
-- **Undefined `$var` aborts the script** — rather than silently expanding to empty (a classic Genie 4 bug source), Genie 5 stops with a clear reason. Use `if def(name)` to test first.
 - **Comments** — `#` is a comment only when followed by whitespace or end-of-line. `#put north` is a meta-command, not a comment.
 - **`gosub` for reusable routines** — jumping into a nested/indented block isn't reliable; use `gosub` for sub-routines.
+
+And a compatibility note: an undefined `$var` expands to empty (Genie 4-compatible) — it never aborts the script. When it matters, guard explicitly with `if def(name)`.
 
 ## Example scripts to study
 

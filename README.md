@@ -6,7 +6,7 @@
 
 **A cross-platform, modern successor to [Genie 4](https://github.com/GenieClient) — the long-running Windows client for [DragonRealms](https://www.play.net/dr), Simutronics' text-based MMO.**
 
-> ⚠️ **Alpha** — Genie 5 is in active development, several alphas in. It targets feature parity with the most-used 80% of Genie 4 while running natively on Windows, macOS, and Linux. Expect rough edges. File issues; PRs welcome.
+> ⚠️ **Beta** — Genie 5 is in active development and feature-complete for daily play. It targets feature parity with the most-used 80% of Genie 4 while running natively on Windows, macOS, and Linux. Expect rough edges. File issues; PRs welcome.
 
 ## Screenshots
 
@@ -23,7 +23,7 @@ A live DragonRealms session — game stream, Room panel, inventory, and stream t
 The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern .NET, cross-platform tooling, or the broader scripting ecosystem. Genie 5 is a clean rewrite that:
 
 - **Runs everywhere** — Windows, macOS, and Linux native, courtesy of [Avalonia UI](https://avaloniaui.net/) and .NET 8
-- **Stays compatible** — runs your existing Genie 4 `.cmd` scripts, profile files, and `.map` zone data
+- **Stays compatible** — runs your existing Genie 4 `.cmd` scripts, profile files, and `.xml` zone maps
 - **Plays well with the ecosystem** — supports direct SGE auth, [Lich 5](https://github.com/elanthia-online/lich-5) proxy, and dev-replay from recorded sessions
 - **Is built for inspection** — clean `Genie.Core` library with no UI dependencies; embed it in other clients, plugins, or test harnesses
 
@@ -55,7 +55,7 @@ The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern
 | Portrait panel — DR room/scene artwork (`#config showimages`), fetched from the play.net art CDN | ✅ Working |
 | Preset colouring — room descriptions / whispers / speech render in their palette colours (Configuration → Presets), plus MonsterBold creature highlighting | ✅ Working |
 | Sound — SFX on triggers/highlights + `#play` command (cross-platform: winmm / afplay / paplay) | ✅ Working |
-| `#config` settings system (`settings.cfg`, ~20 Genie 4 settings + Scripts tab); reserved/live `$variables` exposed and listed by `#var` | ✅ Working |
+| `#config` settings system (`settings.cfg`, 80+ settings across a dozen categories + Scripts tab); reserved/live `$variables` exposed and listed by `#var` | ✅ Working |
 | Visual trigger / flow designer | 🚧 Roadmap |
 | AI-assisted automation (advisor-only mode) | 🚧 Roadmap |
 
@@ -87,11 +87,10 @@ dotnet build -c Release
 dotnet run --project src/Genie.App
 ```
 
-On first launch Genie 5 will:
+On first launch Genie 5 asks where to keep your data — **Portable** (next to the app) or your **user folder** (`%APPDATA%\Genie5` on Windows, `~/Library/Application Support/Genie5` on macOS, `~/.local/share/Genie5` on Linux). Coming from Genie 4:
 
-1. Migrate any existing Genie 4 scripts from `%USERPROFILE%\Documents\Genie 4\Scripts\` into its own `Scripts/` folder (Windows only — no-op elsewhere)
-2. Migrate any existing Genie 4 maps from `%USERPROFILE%\Documents\Genie 4\Maps\` (Windows only)
-3. Create `{AppData}/Genie5/Config/` for `.cfg` rule files and per-character profile data
+1. **File ▸ Import from Genie 4…** auto-detects your Genie Client 4 config and imports highlights, triggers, aliases, substitutes, gags, macros, variables, and more
+2. Copy existing `.cmd` scripts into the `Scripts/` folder, and import maps via the mapper (or pull fresh ones with **Maps ▸ Update from Official Repo…**)
 
 ## Quick start
 
@@ -166,7 +165,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports, feature requests, and PRs a
 
 ## Community
 
-- **Discord** — [discord.gg/MtmzE2w](https://discord.gg/MtmzE2w) — the long-running Genie community server, shared with Genie 4. Drop in for alpha-tester chat, scripting help, mapper questions, or general DR conversation.
+- **Discord** — [discord.gg/MtmzE2w](https://discord.gg/MtmzE2w) — the long-running Genie community server, shared with Genie 4. Drop in for beta-tester chat, scripting help, mapper questions, or general DR conversation.
 - **Issues** — [GitHub Issues](https://github.com/GenieClient/Genie5/issues) for bug reports + feature requests
 - **Discussions** — [GitHub Discussions](https://github.com/GenieClient/Genie5/discussions) for Q&A, ideas, and show-and-tell
 
@@ -182,11 +181,11 @@ Each release is built from this repository's source by GitHub Actions and submit
 - **Reviewers:** [@monil2233](https://github.com/monil2233) (reviews each signing request in the SignPath UI before approval).
 - **Approvers:** [@monil2233](https://github.com/monil2233) (final approval that triggers the signing operation).
 
-For a solo-maintainer alpha-stage project, all three roles consolidate on the maintainer. As the contributor base grows and a co-maintainer takes ownership, this section will be updated to reflect a separation between Reviewer and Approver per [SignPath's two-person-rule guidance](https://about.signpath.io/documentation/projects).
+For a solo-maintainer beta-stage project, all three roles consolidate on the maintainer. As the contributor base grows and a co-maintainer takes ownership, this section will be updated to reflect a separation between Reviewer and Approver per [SignPath's two-person-rule guidance](https://about.signpath.io/documentation/projects).
 
-### Privacy policy
+## Privacy policy
 
-This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Genie 5 connects only to Simutronics' official DragonRealms authentication and game servers (`play.net` / `simutronics.net`) and, when the user configures it, to a local [Lich 5](https://github.com/elanthia-online/lich-5) proxy. Account credentials are stored locally, encrypted with AES-256-GCM, and are transmitted only to the official authentication servers. No data is collected by the Genie 5 maintainers.
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Genie 5 connects only to: Simutronics' official DragonRealms authentication and game servers (`play.net` / `simutronics.net`); a local [Lich 5](https://github.com/elanthia-online/lich-5) proxy when the user configures it; and GitHub (`api.github.com` / `raw.githubusercontent.com`) for update checks and map/plugin/script downloads — retrieval only, nothing about you or your session is sent, and update checks can be disabled in **Help ▸ Update Settings**. Account credentials are stored locally, encrypted with AES-256-GCM, and are transmitted only to the official authentication servers. No data is collected by the Genie 5 maintainers. Full details: [PRIVACY.md](PRIVACY.md).
 
 ## Credits
 

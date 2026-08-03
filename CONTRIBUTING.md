@@ -1,6 +1,6 @@
 # Contributing to Genie 5
 
-Thanks for your interest. Genie 5 is alpha-stage software with a small contributor base; clear bug reports and focused PRs are the most useful things you can offer.
+Thanks for your interest. Genie 5 is beta-stage software with a small contributor base; clear bug reports and focused PRs are the most useful things you can offer.
 
 ## Quick links
 
@@ -30,22 +30,29 @@ dotnet run --project src/Genie.App
 ```
 Genie5/
 ├── src/
-│   ├── Genie.Core/         # Pure class library — no UI deps
-│   │   ├── Connection/     # GameConnection, SgeAuthClient
-│   │   ├── Parser/         # DrXmlParser
-│   │   ├── GameState/      # Live game state engine
-│   │   ├── Scripting/      # .cmd script interpreter
+│   ├── Genie.Core/         # Core library — no UI deps (builds as exe for the TestHarness)
+│   │   │                   # DrXmlParser.cs, GameState.cs, GameConnection.cs,
+│   │   │                   # SgeAuthClient.cs, AiContextBuffer.cs live at the root
+│   │   ├── Scripting/      # .cmd script interpreter + Jint .js runtime
+│   │   ├── Commanding/     # #commands (CommandEngine)
+│   │   ├── Config/         # #config settings (GenieConfig)
 │   │   ├── Triggers/       # Trigger engine
 │   │   ├── Highlights/     # Highlight rules
 │   │   ├── Mapper/         # Zone map + pathfinding
 │   │   ├── Profiles/       # Per-character encrypted credential store
-│   │   └── AI/             # AiContextBuffer (rolling buffer + AI-vendor pipeline)
-│   └── Genie.App/          # Avalonia GUI host
-│       ├── Views/          # AXAML windows + dialogs
-│       ├── ViewModels/     # ReactiveUI MVVM
-│       ├── Controls/       # Custom Avalonia controls (MapCanvas, etc.)
-│       └── Diagnostics/    # Session recorder
+│   │   ├── Plugins/        # Plugin host (PluginManager)
+│   │   ├── Extensions/     # Built-in trackers (EXP, SpellTimer, TimeTracker, …)
+│   │   ├── Update/         # In-app updater (Core/Maps/Plugins/Scripts)
+│   │   └── …               # Aliases, Capture, Layout, Import, and more
+│   ├── Genie.App/          # Avalonia GUI host
+│   │   ├── Views/          # AXAML windows + dialogs
+│   │   ├── ViewModels/     # ReactiveUI MVVM
+│   │   ├── Controls/       # Custom Avalonia controls (MapCanvas, etc.)
+│   │   └── Diagnostics/    # Session recorder
+│   └── Genie.Plugins.Abstractions/  # Public plugin contract (IGeniePlugin, IPluginHost)
+├── tests/Genie.Core.Tests/ # Unit test suite
 ├── docs/                   # Long-form docs (ROADMAP, POLICY, etc.)
+├── wiki/                   # End-user documentation
 └── .github/workflows/      # CI / release pipelines
 ```
 
@@ -110,7 +117,7 @@ Note: anything that constrains how a player runs the client (e.g. the optional a
 3. **Write a focused PR** — one feature, one fix. Multi-feature PRs are hard to review.
 4. **Include a test plan** in the PR description — what you did, what you verified, what regressions are possible.
 5. **Update docs** if you change user-visible behaviour. README, CONTRIBUTING, and any relevant file under `docs/` should reflect the new state.
-6. **Run the build** before pushing — `dotnet build -c Release` must succeed cleanly. Warnings are fine; errors aren't.
+6. **Run the build and tests** before pushing — `dotnet build -c Release` must succeed cleanly (warnings are fine; errors aren't), and `dotnet test tests/Genie.Core.Tests` must pass for the subsystems you touched.
 
 PRs that touch parser / scripting / mapper subsystems may want a smoke-test against one or more real recordings; the test harness REPLAY mode is the easiest path.
 
@@ -217,12 +224,11 @@ Type `#vars` at the command bar to see the full list at any time.
 
 A few intentional divergences and gotchas:
 
-- **Per-character profile dirs**: scripts you save while playing Renucci
-  live separately from scripts saved while playing Naper. The migration
-  on first launch copies your existing Genie 4 `Scripts/` dir into the
-  shared root once — after that, anything you `#var save` etc. goes to
-  the active character's folder. See `pre_publish_checklist.md` for the
-  `Character-Account` path format.
+- **Per-character profile dirs**: rule files (`.cfg`) and saved variables
+  live per character under `Profiles/{Character}-{Account}/`, so two
+  characters keep separate highlights, triggers, and `#var save` state.
+  `Scripts/` is a single shared folder at the data root — scripts are not
+  per-character. See the wiki's Application Folders page for the layout.
 - **No `goto` into a deeper-indented label**: while we accept Genie 4's
   syntax, jumping into a nested block isn't reliable. Use `gosub` for
   reusable sub-routines.

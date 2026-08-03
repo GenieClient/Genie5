@@ -42,8 +42,9 @@ When a script loads, it's transformed in a few passes: `include foo` is expanded
 
 | Statement | Notes |
 | --- | --- |
-| `put text` / `send text` | Send a command to the server. `;`-chained commands drain one per tick. |
+| `put text` / `send text` | Send a command to the server. `;`-chained commands drain one per tick. `send` (unlike `put`) additionally parses an optional leading numeric delay, and a leading `-` on the command is a "fire eagerly" marker (dash stripped, send-queue wait bypassed). `put` sends its text as-is. |
 | `put #cmd` | A meta-command (`#var`, `#echo`, …) — handled by Genie, not sent to the server. |
+| `#send N cmd` / `#send clear` | Queue `cmd` to fire in N seconds; `clear` drops any pending queued sends. Works typed at the command bar or from a script via `put #send …`. |
 | `put .script args` | Launch `script.cmd` as a sub-script (doesn't consume type-ahead). |
 | `move text` | Send `text`, then block until a new room arrives (or a movement-failure line unblocks it). |
 | `nextroom` | Block for the next room change without sending anything. |
@@ -56,7 +57,7 @@ When a script loads, it's transformed in a few passes: `include foo` is expanded
 | `wait` | The next prompt | Yes |
 | `delay N` | N seconds elapse | **No** — deliberately bypasses the RT gate (e.g. webbed/stunned sleeps) |
 | `move` / `nextroom` | A new room arrives | n/a |
-| `waitpause` | The current roundtime expires | Yes (that's its purpose) |
+| `waitpause N` | N seconds elapse — plain alias of `pause` (default 1s), no extra roundtime coupling | Same as `pause` |
 
 ### Pattern matching
 
@@ -74,11 +75,11 @@ Regex captures from `matchre` / `waitforre` / actions land in the current `$0..$
 | --- | --- |
 | `var name value` | Set `%name` (value is substituted before storage). Synonyms: `setvariable`, `setvar`. |
 | `unvar name` | Remove `%name`. |
-| `math var op N` | In-place `add` / `subtract` / `multiply` / `divide` / `set`. |
+| `math var op N` | In-place `add` / `subtract` / `multiply` / `divide` / `modulus` / `set`. |
 | `eval var expr` / `evalmath var expr` | Evaluate an expression; `evalmath` coerces to numeric. |
 | `random low high` | Uniform random into `%r`. |
-| `timer start` / `stop` / `clear` | Per-script stopwatch; `%timer` reads live elapsed seconds. |
-| `save N value` | Genie 4 `%s` storage. |
+| `timer start` / `stop` / `clear` / `reset` | Per-script stopwatch; `%timer` reads live elapsed seconds. Bare `timer` = `timer start`. |
+| `save text` | Store the entire rest of the line into `%s` (Genie 4 parity; there is no slot form). |
 
 ### Actions (background reactions)
 
@@ -146,7 +147,7 @@ These live game-state globals are mirrored as events arrive (a non-exhaustive li
 | `$roomname`, `$roomdesc`, `$roomexits`, `$roomobjs`, `$roomplayers`, `$gameroomid` | room info |
 | `$charactername`, `$game`, `$connected` | session |
 
-Because globals are mirrored at event time (not on access), use `timer start` / `%timer` for wall-clock waits rather than diffing `$roundtime` between prompts. Type `#vars` at the command bar for the live list.
+Because globals are mirrored at event time (not on access), use `timer start` / `%timer` for wall-clock waits rather than diffing `$roundtime` between prompts. Type `#var` at the command bar for the live list.
 
 ## The roundtime gate
 
@@ -163,10 +164,10 @@ Commands you `put` to the game contribute to an in-flight counter that's decreme
 
 ## Differences from Genie 4
 
-- **Undefined `$var` aborts** the script with a clear reason instead of silently expanding to empty. Use `if def(name)` to guard.
-- **Per-character script folders** (see [Application Folders](Application-Folders)).
 - **`gosub` for reusable routines** — jumping into a nested/indented label isn't reliable.
 - **Comment rule** — `#` is a comment only before whitespace/end-of-line; `#put north` is a meta-command.
+
+Compatibility notes: an undefined `$var` expands to empty (Genie 4-compatible) — it never aborts the script; guard explicitly with `if def(name)` when it matters. Scripts live in one shared `Scripts/` folder at the data root, used by every character (see [Application Folders](Application-Folders)).
 
 ## Related
 
