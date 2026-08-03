@@ -48,6 +48,18 @@
     <AssemblyMetadata Include="CoreOutDir" Value="$(CoreOutDir)" />
   </ItemGroup>
 
+  <!-- Ordering only, no assembly flow (that would be NETSDK1151 — Core is a
+       self-contained Exe). Without this, a cold solution build schedules Core
+       and this project in parallel and EnsureGenieCoreBuilt's inner MSBuild
+       double-builds Core concurrently → intermittent CS2012 file locks. With
+       it, Core finishes first and the inner build is an incremental no-op. -->
+  <ItemGroup>
+    <ProjectReference Include="$(_GenieCoreProject)"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      Private="false" />
+  </ItemGroup>
+
   <!-- Build Core into the host-RID folder before HintPath resolution so a bare
        `dotnet test` does not require a separate Core build step. -->
   <Target Name="EnsureGenieCoreBuilt" BeforeTargets="ResolveAssemblyReferences">
