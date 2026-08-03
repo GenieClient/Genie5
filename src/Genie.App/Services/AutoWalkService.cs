@@ -187,6 +187,33 @@ public sealed class AutoWalkService : ReactiveObject
     private int _retreatCount;
     private const int MaxRetreatsPerStep = 4;
 
+    // Search-directive arcs (Genie 4 hidden-exit idiom): a map move of
+    // "search go trampled path" means the exit only opens after a successful
+    // in-room `search`. Genie 4's .automapper script (MOVE.SEARCH) tries the
+    // inner go FIRST — the path may already be open from a recent search — and
+    // only when DR bounces it ("I could not find what you were referring to.")
+    // searches and retries. We mirror that: _hiddenExitVerb holds the inner
+    // move ("go trampled path") while a search-directive step is in flight;
+    // when the bounce text arrives the walker sends `search` via the core
+    // command path, waits out the search's roundtime (DispatchNextStep's
+    // movability gate), and re-sends the SAME step. Searching is a skill /
+    // random check that regularly whiffs on the first try ("You find some
+    // interesting signs something is here."), so the loop retries — capped so
+    // an unfindable path can't search forever. Reset on a confirmed room
+    // change and at walk start / cancel, like the retreat counter.
+    private string? _hiddenExitVerb;
+    private int _searchAttempts;
+    private const int MaxSearchAttempts = 4;
+
+    /// <summary>
+    /// Server responses meaning "that exit isn't there (yet)" — the bounce a
+    /// hidden-exit go/climb gets before a successful search reveals the path.
+    /// Mirrors the relevant members of Genie 4 automapper.cmd's %move_FAIL.
+    /// </summary>
+    private static readonly Regex HiddenExitBlock = new(
+        @"^(?:I could not find what you were referring to\.|What were you referring to\?|You can't go there\.)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     /// <summary>
     /// Server responses that mean "you can't move — you're engaged in combat".
     /// DR exposes engagement ONLY through this move-blocked text — there is no
@@ -256,11 +283,17 @@ public sealed class AutoWalkService : ReactiveObject
 
         // Watch game text for "you're engaged, can't move" responses (#130) so a
         // #goto/.travel step bounced by combat retreats and retries instead of
-        // stalling. Posted to the UI thread like the node-change pump; the handler
-        // only acts while a move is actually in flight (watchdog armed).
+        // stalling, and for hidden-exit bounces ("I could not find what you were
+        // referring to.") so a search-directive arc searches and retries. Posted
+        // to the UI thread like the node-change pump; both handlers only act
+        // while a move is actually in flight (watchdog armed).
         _core.GameEvents
              .OfType<TextEvent>()
-             .Subscribe(te => Dispatcher.UIThread.Post(() => OnGameTextForRetreat(te.Text)));
+             .Subscribe(te => Dispatcher.UIThread.Post(() =>
+             {
+                 OnGameTextForRetreat(te.Text);
+                 OnGameTextForHiddenExit(te.Text);
+             }));
 
         // Mirror the active session's StatusMessage into the reactive CurrentStatus
         // so the walk banner reflects mid-walk changes (waiting/paused/arrived);
@@ -368,6 +401,8 @@ public sealed class AutoWalkService : ReactiveObject
         // against the origin, not against a stale id from a prior walk (#69).
         _autoStandAttempts     = 0;
         _retreatCount          = 0;
+        _searchAttempts        = 0;
+        _hiddenExitVerb        = null;
         _departureNodeId       = origin.Id;
         _departureServerRoomId = _mapEngine.CurrentServerRoomId;
 
@@ -391,6 +426,8 @@ public sealed class AutoWalkService : ReactiveObject
         Current = null;
         _autoStandAttempts = 0;
         _retreatCount = 0;
+        _searchAttempts = 0;
+        _hiddenExitVerb = null;
         _departureNodeId = null;
         _departureServerRoomId = null;
         IsCurrentPaused = false;
@@ -589,9 +626,11 @@ public sealed class AutoWalkService : ReactiveObject
                             && !string.Equals(srvUid, _departureServerRoomId, StringComparison.OrdinalIgnoreCase);
         if (nodeUnchanged && !uidChanged) return;
 
-        // Confirmed move landed — clear the per-step retreat counter (#130) so
-        // the next step gets its own fresh retreat budget.
-        _retreatCount = 0;
+        // Confirmed move landed — clear the per-step retreat counter (#130) and
+        // the hidden-exit search budget so the next step starts fresh.
+        _retreatCount   = 0;
+        _searchAttempts = 0;
+        _hiddenExitVerb = null;
 
         // Any room-change implicitly clears a pending cross-zone wait —
         // either we arrived at the target zone, or we landed somewhere
@@ -716,6 +755,28 @@ public sealed class AutoWalkService : ReactiveObject
         // the intent. Real DR verbs (go/climb/swim/dive) are left untouched.
         var verb = Genie.Core.Mapper.MoveVerb.Normalize(step.Verb);
 
+        // Search-directive arc ("search go trampled path" — hidden exit): send
+        // the inner move and remember it. G4 MOVE.SEARCH parity — the go goes
+        // first because the path may already be open; if DR bounces it, the
+        // hidden-exit handler searches and re-dispatches this same step.
+        if (Genie.Core.Mapper.MoveVerb.TryParseSearchDirective(verb, out var hiddenMove))
+        {
+            _hiddenExitVerb = hiddenMove;
+            verb = hiddenMove;
+        }
+        else
+        {
+            _hiddenExitVerb = null;
+        }
+
+        // Genie 4 quick-send chain segments — move="pull sconce;-1 go door":
+        // a '-' segment is G4 shorthand for "#send [delay] cmd" (wait, then
+        // send roundtime-gated). ProcessInput has no quick-send rewrite, so a
+        // dash segment sent verbatim bounces off DR; expand it here. The
+        // emitted #send segments ride the FIFO CommandQueue, so chain order
+        // survives the mixed immediate/queued dispatch.
+        verb = Genie.Core.Mapper.MoveVerb.ExpandQuickSends(verb, _core.Config.CommandChar);
+
         // Send through ProcessInput so the same alias / trigger / command
         // pipeline runs as if the user typed it. Movement is paced by the
         // confirmed room change above — one move per room — so it stays
@@ -763,6 +824,51 @@ public sealed class AutoWalkService : ReactiveObject
 
         // Let the retreat (and its roundtime) resolve, then re-send the held move.
         // StepsCompleted was NOT advanced, so DispatchNextStep re-issues the same verb.
+        ScheduleMovabilityRetry(TimeSpan.FromMilliseconds(750));
+    }
+
+    /// <summary>
+    /// Hidden-exit search-and-retry (Genie 4 automapper MOVE.SEARCH parity). A
+    /// search-directive arc's inner move ("go trampled path") bounces with
+    /// "I could not find what you were referring to." until an in-room
+    /// <c>search</c> reveals the path. When that bounce arrives for the step in
+    /// flight, send <c>search</c> via the core command path (not the typed path —
+    /// same guard-dodge as auto-stand/auto-retreat) and re-dispatch the SAME
+    /// step; the search's roundtime is paced by <see cref="DispatchNextStep"/>'s
+    /// movability gate. Searching is a skill/random check that can whiff, so the
+    /// loop repeats — each failed go buys one more search — capped at
+    /// <see cref="MaxSearchAttempts"/>, after which the walk fails cleanly
+    /// instead of searching forever.
+    /// </summary>
+    private void OnGameTextForHiddenExit(string line)
+    {
+        if (Current is null || Current.State != AutoWalkState.Active) return;
+        if (_stepTimer is null) return;                 // no move in flight — ignore
+        if (_hiddenExitVerb is null) return;            // current step isn't a search-directive arc
+        if (string.IsNullOrEmpty(line)) return;
+        if (!HiddenExitBlock.IsMatch(line)) return;
+
+        StopStepWatchdog();     // we're handling this bounce; the retry re-arms it
+        StopPacingTimer();
+
+        if (_searchAttempts >= MaxSearchAttempts)
+        {
+            EmitAutomapperSignal(Genie.Core.Mapper.AutomapperSignals.MovementFailed);
+            Cancel($"hidden exit not revealed after {MaxSearchAttempts} searches");
+            return;
+        }
+
+        _searchAttempts++;
+        var attemptNote = _searchAttempts > 1 ? $" (attempt {_searchAttempts})" : "";
+        Current.StatusMessage =
+            $"Walking to {Current.Destination.Title} — searching for hidden exit{attemptNote} · Esc to cancel";
+        _sessionChanges.OnNext(Current);
+
+        _core.Commands.ProcessInput("search");
+
+        // Let the search (and its roundtime) resolve, then re-send the held move.
+        // StepsCompleted was NOT advanced, so DispatchNextStep re-issues the same
+        // step; its search-directive parse sends the inner go again.
         ScheduleMovabilityRetry(TimeSpan.FromMilliseconds(750));
     }
 

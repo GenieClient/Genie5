@@ -369,8 +369,7 @@ public sealed class AutoMapperEngine
             else if (!string.IsNullOrEmpty(usedMoveCommand))
             {
                 arc = prevNode.Exits.FirstOrDefault(e =>
-                    !string.IsNullOrEmpty(e.MoveCommand) &&
-                    e.MoveCommand.Equals(usedMoveCommand, StringComparison.OrdinalIgnoreCase));
+                    MoveCommandMatches(e.MoveCommand, usedMoveCommand));
             }
 
             if (arc?.DestinationId is { } destId &&
@@ -415,8 +414,7 @@ public sealed class AutoMapperEngine
                         fwd = prevNode.GetExit(usedDir);
                     else if (!string.IsNullOrEmpty(usedMoveCommand))
                         fwd = prevNode.Exits.FirstOrDefault(e =>
-                            !string.IsNullOrEmpty(e.MoveCommand) &&
-                            e.MoveCommand.Equals(usedMoveCommand, StringComparison.OrdinalIgnoreCase));
+                            MoveCommandMatches(e.MoveCommand, usedMoveCommand));
 
                     if (fwd?.DestinationId is { } destId && candidateIds.Contains(destId)
                         && _zone.Nodes.TryGetValue(destId, out var graphHit))
@@ -633,6 +631,46 @@ public sealed class AutoMapperEngine
         CurrentNode = node;
         CurrentNodeChanged?.Invoke();
         if (zoneChanged) MapChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// True when the movement command the player actually sent matches an arc's
+    /// authored MoveCommand. Community maps author arcs in three shapes, and for
+    /// two of them the raw arc string never appears on the wire, so an exact
+    /// compare alone can't correlate the move:
+    /// <list type="bullet">
+    ///   <item>Plain move — <c>move="go small alleyway"</c>: exact
+    ///         (case-insensitive) match.</item>
+    ///   <item>Search directive — <c>move="search go trampled path"</c> (Genie 4
+    ///         hidden-exit idiom): the walker sends <c>search</c> and the inner go
+    ///         as separate commands; match the inner move.</item>
+    ///   <item>Semicolon chain — <c>move="'grek;go door"</c> (say the password,
+    ///         then go): the command pipeline splits on the separator and sends
+    ///         each segment individually; match any segment. Segments are
+    ///         compared after stripping the leading pacing prefix
+    ///         (<c>"room sear;…"</c> dispatches as <c>sear</c>) and the Genie 4
+    ///         quick-send dash (<c>"pull sconce;-1 go door"</c> puts
+    ///         <c>go door</c> on the wire via the #send queue).</item>
+    /// </list>
+    /// </summary>
+    internal static bool MoveCommandMatches(string? arcMove, string used)
+    {
+        if (string.IsNullOrEmpty(arcMove)) return false;
+        if (arcMove.Equals(used, StringComparison.OrdinalIgnoreCase)) return true;
+        var normalized = MoveVerb.Normalize(arcMove);
+        if (MoveVerb.TryParseSearchDirective(normalized, out var inner)
+            && inner.Equals(used, StringComparison.OrdinalIgnoreCase)) return true;
+        if (normalized.Contains(';'))
+            foreach (var segment in normalized.Split(';'))
+            {
+                var seg = segment.Trim();
+                if (seg.Equals(used, StringComparison.OrdinalIgnoreCase))
+                    return true;
+                if (MoveVerb.TryStripQuickSend(seg, out var bare) &&
+                    bare.Equals(used, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        return false;
     }
 
     private static void AssignCoordinates(MapNode node, MapNode? prev, Direction dir)
