@@ -125,6 +125,28 @@ public class SkillHistoryStorageTests : IDisposable
     }
 
     [Fact]
+    public void RecoverOrphanSessions_SkipsSessionsStartedAtOrAfterCutoff()
+    {
+        // Recovery runs on a background task at recorder startup, so THIS
+        // run's session can have snapshots on disk before its session row
+        // lands. Sids at/after the cutoff (the recorder's construction second)
+        // are the live session — never synthesize a summary for them.
+        var writer = new SkillHistoryWriter(_dir);
+        var cutoff = new DateTime(2026, 7, 7, 9, 0, 0, DateTimeKind.Utc);
+
+        writer.WriteSnapshot(Snap("20260706T200000Z-dead", cutoff.AddHours(-13), 30, ("X", 1, 0, 1)));  // prior run
+        writer.WriteSnapshot(Snap("20260707T090000Z-live", cutoff, 10, ("X", 2, 0, 1)));               // same second
+        writer.WriteSnapshot(Snap("dead1", cutoff.AddHours(1), 10, ("X", 3, 0, 1)));                   // unparseable id
+
+        Assert.Equal(2, writer.RecoverOrphanSessions("Tirost", "ACCT", cutoff));
+
+        var sessions = new SkillHistoryStore(Path.GetDirectoryName(_dir)!)
+            .LoadSessions(Path.GetFileName(_dir));
+        Assert.Equal(new[] { "20260706T200000Z-dead", "dead1" },
+            sessions.Select(s => s.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
     public void RanksPerHour_UsesElapsedSeconds()
     {
         Assert.Equal(2.0, SkillHistoryJson.RanksPerHour(1.0, 1800), 3);

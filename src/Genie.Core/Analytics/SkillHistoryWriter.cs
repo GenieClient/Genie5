@@ -62,8 +62,15 @@ public sealed class SkillHistoryWriter
     /// from its first/last snapshots, marked <c>"recovered":true</c>. Runs at
     /// recorder startup; cheap when there's nothing to do. Returns how many
     /// sessions were recovered.
+    ///
+    /// <para><paramref name="startedBeforeUtc"/> guards against the scan racing
+    /// the CURRENT process: recovery runs on a background task, so this run's
+    /// own session can land its first snapshot before its session row. A
+    /// session whose id-embedded start second is at/after the cutoff belongs to
+    /// this run and is never an orphan — skip it. Ids that don't parse are
+    /// treated as old so genuine orphans always recover.</para>
     /// </summary>
-    public int RecoverOrphanSessions(string character, string account)
+    public int RecoverOrphanSessions(string character, string account, DateTime? startedBeforeUtc = null)
     {
         try
         {
@@ -85,6 +92,11 @@ public sealed class SkillHistoryWriter
                 if (SkillHistoryJson.TryParse<SnapshotRecord>(line) is not { } snap
                     || snap.SessionId.Length == 0 || known.Contains(snap.SessionId))
                     continue;
+
+                if (startedBeforeUtc is { } cutoff
+                    && TryParseSessionStart(snap.SessionId) is { } started
+                    && started >= cutoff)
+                    continue;   // this run's live session, not a crash orphan
 
                 if (!orphans.TryGetValue(snap.SessionId, out var rec))
                 {
@@ -129,5 +141,17 @@ public sealed class SkillHistoryWriter
             _log?.Invoke($"[analytics] orphan-session recovery failed ({ex.Message}).");
             return 0;
         }
+    }
+
+    /// <summary>Start second embedded in a session id
+    /// (<c>yyyyMMddTHHmmssZ-…</c>, see SkillHistoryRecorder), or null.</summary>
+    private static DateTime? TryParseSessionStart(string sessionId)
+    {
+        if (sessionId.Length < 16) return null;
+        return DateTime.TryParseExact(sessionId[..16], "yyyyMMdd'T'HHmmss'Z'",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal
+                | System.Globalization.DateTimeStyles.AdjustToUniversal,
+            out var t) ? t : null;
     }
 }

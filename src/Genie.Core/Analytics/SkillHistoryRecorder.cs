@@ -88,12 +88,17 @@ public sealed class SkillHistoryRecorder : IDisposable
         // Startup housekeeping off the connect path: synthesize summaries for
         // sessions that died without a disconnect row, then fold+prune shards
         // past the retention window. Both are cheap when there's nothing to do.
+        // The cutoff (construction time, floored to the second to match the
+        // sid-embedded precision) keeps the scan from racing THIS run's own
+        // session — its snapshots can hit disk before its session row does.
+        DateTime createdUtc = DateTime.UtcNow;
+        DateTime recoveryCutoff = createdUtc.AddTicks(-(createdUtc.Ticks % TimeSpan.TicksPerSecond));
         if (Enabled())
             _ = Task.Run(() =>
             {
                 try
                 {
-                    int recovered = _writer.RecoverOrphanSessions(_character, _account);
+                    int recovered = _writer.RecoverOrphanSessions(_character, _account, recoveryCutoff);
                     if (recovered > 0)
                         _log?.Invoke($"[analytics] recovered {recovered} interrupted session(s).");
                     SkillHistoryRollup.ApplyRetention(
