@@ -23,28 +23,43 @@ not."*
 A few things this policy does **not** say, and that Genie therefore does not
 impose:
 
-- It does **not** require the client window to stay focused. Working in
-  another window while you travel, or running multiple characters, is a
-  player workflow question, not a focus requirement.
+- It does **not** require the client window to stay focused, and it does
+  **not** forbid running multiple characters. Multiplaying is a player-workflow
+  question; the scripting policy's one condition is that if scripts or triggers
+  drive multiple accounts *for benefit*, you stay responsive from each
+  character's perspective. Genie plans to build **attended** multi-character
+  support on exactly that line (see [ROADMAP.md](ROADMAP.md)); what stays off is
+  *unattended* cross-character automation, covered by the hard nevers below.
 - It is **not the client's job to enforce**. Staying within policy is the
   player's responsibility. Genie's job is to be a good frontend.
 
 So Genie holds a small set of hard nevers about *its own* behavior — the
 client should never act on its own while you're away — and keeps any feature
 that would constrain *your* workflow strictly opt-in. Four hard nevers fall
-out of "the client shouldn't play itself," plus one optional convenience:
+out of "the client shouldn't play itself," plus one optional convenience and
+one attendance-gated exception:
 
-### 1. No auto-reconnect after disconnect
+### 1. Auto-reconnect is attendance-gated
 
-If the game socket drops, Genie 5 surfaces the disconnect and stops. The
-user reconnects by hand. A `Reconnect=true` config key exists for Genie 4
-config-file compatibility but **is not wired to behavior** in Genie 5; the
-reconnect loop in `GameConnection.cs` only retries during the *initial*
-connect attempt, never after a session has been established.
+If the game socket drops unexpectedly, Genie 5 re-establishes the connection
+**only for a session the user was actually driving** — at least one command
+must have been typed since connecting. An untouched, unattended session must
+never resurrect itself. Manual disconnects and `quit` never arm it; the retry
+ladder is bounded (5 attempts — 2×8 s, then 3×30 s — then it stops and
+surfaces the failure); and reconnecting restores only the socket — scripts and
+walks never auto-resume across a reconnect.
 
-Why this matters: an auto-reconnect that resumes a multi-hour script
-after a disconnect is the classic "playing while away" pattern. We won't
-ship it.
+`Reconnect` defaults to on (Genie 4 config-file parity); `#config reconnect
+off` disables it entirely. Implementation:
+`MainWindowViewModel.MaybeArmAutoReconnect` → `ScheduleReconnect` →
+`CheckReconnect` (Genie 4 parity: `Game.cs CheckReconnect`); the attendance
+gate is the "user input since connect" check, which echoes
+"Auto-reconnect skipped — no commands were sent this session." when it holds.
+
+Why this line: an auto-reconnect that resumes a multi-hour script after a
+disconnect is the classic "playing while away" pattern. The attendance gate
+plus the never-resume rule keeps reconnect a convenience for the player at the
+keyboard, never an absence enabler.
 
 ### 2. No agentive AI control
 

@@ -1,6 +1,6 @@
 # Installation
 
-Genie 5 is in **alpha**, but you no longer have to build it yourself — **pre-built downloads ship for Windows, macOS, and Linux** on the [Releases](https://github.com/GenieClient/Genie5/releases/latest) page. Grab the one for your platform, or [build from source](#build-from-source) if you're contributing. See [Releases & Changelog](Releases) for what's in the latest build.
+Genie 5 is in **beta**, but you no longer have to build it yourself — **pre-built downloads ship for Windows, macOS, and Linux** on the [Releases](https://github.com/GenieClient/Genie5/releases/latest) page. Grab the one for your platform, or [build from source](#build-from-source) if you're contributing. See [Releases & Changelog](Releases) for what's in the latest build.
 
 > **Coming from Genie 4?** Install fresh first, then jump to [Importing from Genie 4](Importing-Genie4-Config) to bring your aliases, triggers, highlights, etc. across.
 
@@ -14,18 +14,18 @@ From the [latest release](https://github.com/GenieClient/Genie5/releases/latest)
 
 | Download | When to pick it |
 | --- | --- |
-| **`Genie5-win-Setup.exe`** *(recommended)* | Normal install. Registers the app for **in-app auto-updates**, so future releases arrive via **Help → Check for Updates**. |
-| `Genie5-win-Portable.zip` | No-install / portable. Extract anywhere and run `Genie5.exe` (point shortcuts at this one — the copy inside `current\` is replaced on every update). In-app auto-update works here too. |
+| **`01-Windows-Genie5-Setup.exe`** *(recommended)* | Normal install. Registers the app for **in-app auto-updates**, so future releases arrive via **Help → Check for Updates**. |
+| `01-Windows-Genie5-Portable.zip` | No-install / portable. Extract anywhere and run `Genie5.exe` (point shortcuts at this one — the copy inside `current\` is replaced on every update). In-app auto-update works here too. |
 
 ### 🐧 Linux
 
 | Download | When to pick it |
 | --- | --- |
-| **`Genie5.AppImage`** | A single-file executable that runs on Ubuntu / Fedora / Debian / Arch / etc. Mark it executable and run it (below). Subsequent releases can update in-app. |
+| **`04-Linux-Genie5.AppImage`** | A single-file executable that runs on Ubuntu / Fedora / Debian / Arch / etc. Mark it executable and run it (below). Subsequent releases can update in-app. |
 
 ```bash
-chmod +x Genie5.AppImage
-./Genie5.AppImage
+chmod +x 04-Linux-Genie5.AppImage
+./04-Linux-Genie5.AppImage
 ```
 
 If you hit a **"FUSE not installed"** error, install FUSE (Debian/Ubuntu: `sudo apt install libfuse2`; Fedora generally works out of the box). On very minimal distros you may also need `fontconfig` for correct text rendering. For a desktop-menu entry, see [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher).
@@ -36,10 +36,12 @@ Pick by your Mac's chip — **Apple Silicon** (M1/M2/M3 or newer) or **Intel** (
 
 | Your Mac | Download | When to pick it |
 | --- | --- | --- |
-| Apple Silicon | **`Genie5-osx-Setup.pkg`** *(recommended)* | Standard `.pkg` installer. |
-| Apple Silicon | `Genie5-osx-Portable.zip` | Drag the app into **Applications** yourself. |
-| Intel | **`Genie5-osx-x64-Setup.pkg`** *(recommended)* | Standard `.pkg` installer (x86_64). |
-| Intel | `Genie5-osx-x64-Portable.zip` | Drag-to-Applications portable bundle (x86_64). |
+| Apple Silicon | **`02-macOS-Apple-Silicon-Genie5-Setup.pkg`** *(recommended)* | Standard `.pkg` installer. |
+| Apple Silicon | `02-macOS-Apple-Silicon-Genie5.dmg` | Disk image — open it and drag the app into **Applications**. |
+| Apple Silicon | `02-macOS-Apple-Silicon-Genie5-Portable.zip` | Drag the app into **Applications** yourself. |
+| Intel | **`03-macOS-Intel-Genie5-Setup.pkg`** *(recommended)* | Standard `.pkg` installer (x86_64). |
+| Intel | `03-macOS-Intel-Genie5.dmg` | Disk image — open it and drag the app into **Applications** (x86_64). |
+| Intel | `03-macOS-Intel-Genie5-Portable.zip` | Drag-to-Applications portable bundle (x86_64). |
 
 > **Not sure which Mac you have?**  → menu → **About This Mac**. "Apple M1/M2/M3…" = Apple Silicon; "Intel Core…" = Intel.
 
@@ -71,13 +73,13 @@ The AppImage just needs execute permission (`chmod +x`); see the [Linux download
 
 ## First launch
 
-On first run Genie 5 creates its per-user data folder (`~/Library/Application Support/Genie5` on macOS, `%APPDATA%\Genie5` on Windows, `~/.local/share/Genie5` on Linux) with `Config/`, `Scripts/`, `Maps/`, and `Logs/` subfolders. See [Application Folders](Application-Folders) for the full layout.
+On first launch Genie 5 asks where to keep your data: **Portable** (next to the app) or your **user folder** (`%APPDATA%\Genie5` on Windows, `~/Library/Application Support/Genie5` on macOS, `~/.local/share/Genie5` on Linux). See [Application Folders](Application-Folders) for details.
 
 Then head to [Quick Start](Quick-Start) to connect and play.
 
 ## Staying up to date
 
-If you installed via **`Genie5-win-Setup.exe`** (Windows) or the **`.pkg`** / **AppImage** (macOS / Linux), future releases arrive through the in-app updater — **Help → Check for Updates**, which shows a badge when something's available. Portable `.zip` builds don't auto-update; re-download to upgrade. Full details: [Keeping Up to Date](Updates).
+If you installed via **`01-Windows-Genie5-Setup.exe`** (Windows) or the **`.pkg`** / **AppImage** (macOS / Linux), future releases arrive through the in-app updater — **Help → Check for Updates**, which shows a badge when something's available. Portable `.zip` builds don't auto-update; re-download to upgrade. Full details: [Keeping Up to Date](Updates).
 
 ## Build from source
 

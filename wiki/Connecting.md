@@ -22,7 +22,8 @@ Genie authenticates, receives the game host/port for your character, connects, a
 
 Genie performs the Simutronics **SGE** handshake itself: it exchanges an encryption key, sends your encrypted password, retrieves your characters, and selects the game server. Your password is sent **only** to Simutronics' official authentication servers (`play.net`), encrypted in transit by the SGE scheme.
 
-- **No auto-reconnect.** If the connection drops, Genie surfaces it and stops — you reconnect by hand. This is deliberate (see [Policy Compliance](Policy-Compliance)).
+- **Attended-only auto-reconnect.** If an established session drops unexpectedly, Genie reconnects automatically **only if you were actually driving it** (at least one command sent since connecting). An idle session never resurrects itself, a manual disconnect or `quit` never triggers it, attempts are bounded (5 tries, then it stops and tells you), and reconnecting never resumes scripts or walks. Disable entirely with `#config reconnect off`. (See [Policy Compliance](Policy-Compliance).)
+- **Typed connects.** `#connect <profile>` logs in from the command bar, `#reconnect` redials the last session, and `#lichconnect` (alias `#lc`) attaches through Lich — see [Lich 5 Integration](Lich-5-Integration).
 - **No headless login.** Connecting always happens in the visible app.
 
 The wire-level details are documented for developers in [SGE_PROTOCOL.md](https://github.com/GenieClient/Genie5/blob/main/docs/SGE_PROTOCOL.md).

@@ -49,7 +49,7 @@ What a plugin is allowed to do:
 
 .NET has no real in-process sandbox — a loaded assembly runs at full trust. Genie is honest about this: trust comes from **curation, signing, and API-surface linting**, not a hard security boundary. The roadmap adds load-time linting (flagging things like raw process/socket access or attempts to reach into host internals), a signing/consent flow for unsigned plugins, and a curated source.
 
-Crucially, the **policy gates are not negotiable** and the host API simply doesn't expose the forbidden paths: a plugin cannot enable headless mode, feed text into the command pipeline to drive the game agentively, or auto-reconnect after a drop. See [Policy Compliance](Policy-Compliance).
+Crucially, the **policy gates are not negotiable** and the host API simply doesn't expose the forbidden paths: a plugin cannot enable headless mode, feed text into the command pipeline to drive the game agentively, or trigger reconnection (reconnect is host behavior, attendance-gated, and outside the plugin API). See [Policy Compliance](Policy-Compliance).
 
 ## Porting a Genie 4 plugin
 

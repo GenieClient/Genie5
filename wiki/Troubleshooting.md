@@ -5,16 +5,16 @@ Common problems and quick fixes. If none of these help, drop into [Discord](http
 ## Installing & launching
 
 **Which download do I need?**
-Pre-built builds ship for all three platforms — see the [Installation](Installation#download-a-pre-built-build-recommended) tables. Short version: Windows → `Genie5-win-Setup.exe`; Linux → `Genie5.AppImage`; macOS → `Genie5-osx-Setup.pkg` (Apple Silicon, M1+) or `Genie5-osx-x64-Setup.pkg` (Intel, pre-2020). Check  → **About This Mac** if you're unsure which Mac you have.
+Pre-built builds ship for all three platforms — see the [Installation](Installation#download-a-pre-built-build-recommended) tables. Short version: Windows → `01-Windows-Genie5-Setup.exe`; Linux → `04-Linux-Genie5.AppImage`; macOS → `02-macOS-Apple-Silicon-Genie5-Setup.pkg` (Apple Silicon, M1+) or `03-macOS-Intel-Genie5-Setup.pkg` (Intel, pre-2020). Check  → **About This Mac** if you're unsure which Mac you have.
 
 **macOS won't open the app ("developer cannot be verified" / "damaged").**
-Alpha builds aren't notarized. Right-click the app → **Open** → **Open** (macOS remembers it). If it reports "damaged," clear the download quarantine: `xattr -d com.apple.quarantine /Applications/Genie5.app` (or `xattr -cr <path>`). Running from source with `dotnet run` avoids this entirely.
+Beta builds aren't notarized. Right-click the app → **Open** → **Open** (macOS remembers it). If it reports "damaged," clear the download quarantine: `xattr -d com.apple.quarantine /Applications/Genie5.app` (or `xattr -cr <path>`). Running from source with `dotnet run` avoids this entirely.
 
 **Windows SmartScreen blocks the exe.**
 Builds from before v5.0.0-alpha.10 are unsigned and always trigger the blue panel: **More info → Run anyway**. Since alpha.10, `Genie5.exe` is EV-signed by Shadow Realms LLC (the project's support partner); a brand-new signed build may still show the panel briefly while SmartScreen reputation accrues per file. See [Installation](Installation).
 
 **Linux: AppImage won't run / "FUSE not installed."**
-Make it executable first (`chmod +x Genie5.AppImage`), then `./Genie5.AppImage`. For the FUSE error, install it — Debian/Ubuntu: `sudo apt install libfuse2` (Fedora usually works out of the box). If text renders oddly on a minimal distro, install `fontconfig`. For a desktop-menu entry, use [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher).
+Make it executable first (`chmod +x 04-Linux-Genie5.AppImage`), then `./04-Linux-Genie5.AppImage`. For the FUSE error, install it — Debian/Ubuntu: `sudo apt install libfuse2` (Fedora usually works out of the box). If text renders oddly on a minimal distro, install `fontconfig`. For a desktop-menu entry, use [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher).
 
 **`dotnet` isn't recognized / build fails (building from source).**
 You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (the SDK, not just the runtime). Verify with `dotnet --version` (should be 8.x). See [Installation](Installation#build-from-source).
@@ -31,7 +31,7 @@ That character is still in game in another session. Quit it there, then reconnec
 The account's subscription needs attention on [play.net](https://www.play.net/dr).
 
 **Connect hangs, then fails.**
-A firewall/proxy is blocking `play.net`, or the game is down for maintenance. Genie retries the **initial** connect a few times, then stops (it never auto-reconnects after a session was established — see [Policy Compliance](Policy-Compliance)). To see *where* it stalls, turn on the connect trace: `#config conndebug true`, then reconnect — each protocol step prints into the game window with timings. If Genie auto-launched Lich, also try `#config lichdebug true` to mirror that session's Lich `temp/debug-*.log` as `[lich-debug]` lines (independent of `conndebug`; off again with `#config lichdebug false`).
+A firewall/proxy is blocking `play.net`, or the game is down for maintenance. Genie retries the **initial** connect a few times, then stops (auto-reconnect only fires for an established session you were actively using — see [Policy Compliance](Policy-Compliance)). To see *where* it stalls, turn on the connect trace: `#config conndebug true`, then reconnect — each protocol step prints into the game window with timings. If Genie auto-launched Lich, also try `#config lichdebug true` to mirror that session's Lich `temp/debug-*.log` as `[lich-debug]` lines (independent of `conndebug`; off again with `#config lichdebug false`).
 
 **The title bar shows 🔓 instead of 🔒.**
 🔒 means your login was encrypted (TLS); 🔓 means Genie couldn't reach the secure login port and fell back to the legacy plaintext path — it still connects, but the password is only obfuscated, not encrypted. If it happens every time, something on your network (firewall/filter) is blocking the secure port. Confirm with `#config conndebug true` and reconnect — the trace shows the TLS attempt and why it fell back. See [Connecting](Connecting#secure-tls-login--the-padlock).
@@ -79,7 +79,7 @@ Single-zone walking works; feeding full cross-zone routes to the walker is still
 No network, a proxy/firewall blocking the repo host, or a badly-skewed system clock (which breaks TLS). Local maps are never corrupted by a failed update — failed files are skipped; re-run later. See [Updating Maps & Scripts](Updating-Maps-and-Scripts#troubleshooting).
 
 **The app updater didn't offer an update.**
-In-app **Core** updates work on all three platforms as of v5.0.0-alpha.3.1, but only if you installed an updater-aware package: `Genie5-win-Setup.exe` (Windows), a `.pkg` (macOS), or the `Genie5.AppImage` (Linux). The plain **Portable `.zip`** builds don't register for updates — re-download from [Releases](https://github.com/GenieClient/Genie5/releases/latest) to upgrade those. See [Keeping Up to Date](Updates#core-the-app).
+In-app **Core** updates work on all three platforms, but only if you installed an updater-aware package: `01-Windows-Genie5-Setup.exe` (Windows), a `.pkg` (macOS), or the `04-Linux-Genie5.AppImage` (Linux). The plain **Portable `.zip`** builds don't register for updates — re-download from [Releases](https://github.com/GenieClient/Genie5/releases/latest) to upgrade those. See [Keeping Up to Date](Updates#core-the-app).
 
 ## Resetting to a clean state
 

@@ -14,7 +14,7 @@ The policy asks you to stay **responsive to the gaming environment**. Notably, i
 
 Genie holds these about *its own* behavior — the client should never act on its own while you're away. They will not ship, and contributions that add them are declined:
 
-1. **No auto-reconnect.** If the connection drops, Genie tells you and stops. You reconnect by hand. (An auto-reconnect that resumes a long script after a drop is the classic "playing while away" pattern.)
+1. **No unattended reconnection.** Auto-reconnect only re-establishes a session *you* were actively driving — it is skipped entirely if you sent no commands since connecting, never fires on a manual disconnect or `quit`, and gives up after a bounded handful of attempts. Reconnecting restores the *connection* only: scripts and walks never auto-resume across it. (An auto-reconnect that resumes a long script after a drop is the classic "playing while away" pattern — that is exactly what the attendance gate and never-resume rule exist to prevent.) Turn it off entirely with `#config reconnect off`.
 2. **No agentive AI.** Any AI features are **advisor-only** — they surface text you read; they never drive game commands. See [AI Advisor](AI-Advisor).
 3. **No headless / daemon mode.** Genie requires its visible window. There is no flag to run it without a UI.
 4. **No shipping other players' speech to external services.** If the optional AI ever sends context to an external service, other players' whispers/speech/thoughts/tells are stripped first, and it's opt-in behind a disclosure.
@@ -47,4 +47,4 @@ The full developer-facing compliance review is [POLICY.md](https://github.com/Ge
 
 - [AI Advisor](AI-Advisor) — the advisor-only design and its privacy gates.
 - [The Mapper](Mapper) — attended-mode walking.
-- [Connecting & Profiles](Connecting) — no auto-reconnect, encrypted credentials.
+- [Connecting & Profiles](Connecting) — attended-only auto-reconnect, encrypted credentials.

@@ -477,10 +477,3 @@ All four phases respect the `policy_compliance_review.md` hard-nevers:
 
 The visible indicator + Esc cancel + typed-command-cancel + focus-check make this the responsive auto-walker the policy permits. **Same surface as Lich's `go2`** (which Simu has tolerated for 20+ years).
 
----
-
-## Trigger phrases
-
-- **"work on the automapper auto-walk"** — pulls up this doc, starts/continues build
-- **"check the auto-walk design"** — opens this doc
-- **"phase 2 / 3 / 4 of the mapper"** — jumps to the specific phase work

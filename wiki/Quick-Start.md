@@ -10,11 +10,11 @@ If you installed a pre-built build, launch it the normal way for your OS:
 
 - **Windows** — from the Start menu (Setup install) or run `Genie5.exe` from the portable folder.
 - **macOS** — open **Genie5** from Applications (first time: **right-click → Open** to clear Gatekeeper).
-- **Linux** — `./Genie5.AppImage` (make it executable first with `chmod +x`).
+- **Linux** — `./04-Linux-Genie5.AppImage` (make it executable first with `chmod +x`).
 
 Building from source instead? Run `dotnet run --project src/Genie.App` from the repo root.
 
-On first launch Genie 5 creates its per-user data folder (`Config/`, `Scripts/`, `Maps/`, `Logs/`) — see [Application Folders](Application-Folders) for where that lives on your OS.
+On first launch Genie 5 asks where to keep your data: **Portable** (next to the app) or your **user folder** (`%APPDATA%\Genie5` on Windows, `~/Library/Application Support/Genie5` on macOS, `~/.local/share/Genie5` on Linux). See [Application Folders](Application-Folders) for details.
 
 ## 2. Connect
 

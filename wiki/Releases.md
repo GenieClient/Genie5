@@ -4,7 +4,34 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.2 — Proxy & Polish
+## Latest: v5.0.0-beta.4 — Fresh Ink
+
+A new editor-backed Game window you can opt into, Open Log In Editor, and a scripting fix for community `-verb` send idioms.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.4** as a delta from beta.3.
+
+- **AvaloniaEdit-backed Game window (opt-in)** (#200) — a new renderer for the main Game window via `#config useeditorgamewindow on` (default off): flat memory use regardless of scrollback depth and a "Pause Scrolling" that genuinely holds. The classic renderer stays the default until parity is proven; the stream windows follow on the same renderer in a later build.
+- **File ▸ Open Log In Editor** (#89) — opens the current session log in your configured external editor — the last Genie 4 File-menu parity item.
+- **`send` / `#send` treat a leading `-verb` as "fire eagerly"** — community scripts that prefix a command with `-` (e.g. `send -cast;-0.05 gesture`) now reach the game instead of bouncing "Please rephrase." `put` is unchanged.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.4)
+
+## v5.0.0-beta.3 — Crosstalk
+
+Window routing that finally works, a Hide Title Bar fix, and a batch of stream, Lich, and experience fixes — several from @simtel12.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.3** as a delta from beta.2.
+
+- **Closed stream panels honour their "If Closed" routing** (#211) — a closed panel's text can redirect to another window (Talk/Whispers consolidate into Log by default), follows the chain if that window is also closed, and is never silently dropped; the Layout-tab dropdown now round-trips.
+- **Hide a floated window's title bar** (#181) — reclaim space from the window menu or the title-bar right-click menu; restore by double-clicking the window's top edge. Hide Title Bar also no longer blanks the window — it collapses only the title strip.
+- **Per-creature combat status** (#202) — `<crtrStatus>` (hostile / disengaged / flying) is now tracked in game state, cleared on room change.
+- **CircleCalc output toggles** (#207) — `#var CircleCalc.Echo 0` hides the result and `#var CircleCalc.Parse 0` stops it feeding scripts (both default on).
+- **Fixes** — no more double-printed stream lines in Main when a stream panel is closed (#210); blank lines preserved in `INFO` / `LOOK` / `HELP` and experience output (#209); the crafting `<forging>` element is discarded instead of leaking markup (#208); the Experience window updates live under `BRIEFEXP ON` (#204); Lich debug logging resolves the temp directory from the arguments Lich actually received and keeps the mirror up until the owned Lich exits (#205, #206).
+- **DR front-end note** — DR gates `EXPBRIEF` and richer clickable-command markup to the Wrayth front end: set `#config frontend wrayth` and reconnect.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.3)
+
+## v5.0.0-beta.2 — Proxy & Polish
 
 Lich-proxy diagnostics and combat-color polish — the second beta.
 

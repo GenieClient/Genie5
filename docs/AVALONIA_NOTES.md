@@ -1,13 +1,9 @@
----
-name: feedback-avalonia-dock
-description: Hard-won lessons about Dock.Avalonia 11.3.6.4 setup and Avalonia ListBox virtualization inside Dock content areas
-metadata: 
-  node_type: memory
-  type: feedback
-  originSessionId: 0aba752d-dd44-4f08-98fa-704f54c7ec21
----
+# Avalonia + Dock notes
 
-## Dock.Avalonia 11.3.6.4 setup rules
+Hard-won lessons about Dock.Avalonia setup and Avalonia ListBox virtualization
+inside Dock content areas.
+
+## Dock.Avalonia setup rules
 
 - Package `Dock.Avalonia.Themes.Fluent` is REQUIRED — DockControl is completely invisible without `<DockFluentTheme/>` in Application.Styles. Do not use `StyleInclude` or `ResourceInclude` for it in this version.
 - Namespace split: `IRootDock` is in `Dock.Model.Controls`; `IDockable`, `IFactory`, `Orientation`, `Alignment` are in `Dock.Model.Core`; concrete classes (`Document`, `Tool`, `DocumentDock`, `ToolDock`, etc.) are in `Dock.Model.ReactiveUI.Controls`.
