@@ -957,6 +957,18 @@ public sealed class DrXmlParser : IDisposable
         // are handled explicitly; non-injuries dialog content is still
         // discarded there.
         "opendialog", "detach", "skin", "radio",
+        // ── Wrayth dialog-control vocabulary (pre-seeded, public #216) ──────
+        // Server-driven dialog controls (bank/store/spells/feats/profile-edit
+        // popups — the DynamicWindows-style vocabulary, public #156) plus the
+        // demeanor-menu <menuImage> observed live. Dropped today, but listed
+        // in _droppedDataTags below so `#audit xmlhunting` classifies them as
+        // DroppedData (a tracked coverage gap the server-dialog renderer will
+        // consume), not Unknown (which would draft a gap-report issue per
+        // tag). <progressBar>, <radio>, and <clearContainer> from the same
+        // vocabulary are already handled/skipped above.
+        "menuimage", "closedialog", "exposedialog",
+        "label", "cmdbutton", "closebutton", "checkbox",
+        "streambox", "dropdownbox", "editbox", "updowneditbox",
         // <switchQuickBar id='quick-simu'/> — Wrayth/StormFront quick-bar
         // selection, pure client UI chrome with no game data (public #188).
         "switchquickbar",
@@ -1021,6 +1033,12 @@ public sealed class DrXmlParser : IDisposable
     {
         "skin", "compdef", "opendialog",
         "radio", "detach", "playerid", "exposecontainer", "clearcontainer",
+        // Wrayth dialog-control vocabulary — pre-seeded as DroppedData so the
+        // first bank/store/spells dialog opened in Wrayth mode doesn't fire a
+        // gap-report issue per control (public #216; renderer is #156).
+        "menuimage", "closedialog", "exposedialog",
+        "label", "cmdbutton", "closebutton", "checkbox",
+        "streambox", "dropdownbox", "editbox", "updowneditbox",
     };
 
     /// <summary>How the parser treats a given element name — see the bucket
