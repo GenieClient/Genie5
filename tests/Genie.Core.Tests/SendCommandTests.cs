@@ -83,6 +83,47 @@ public class SendCommandTests : IDisposable
     }
 
     [Fact]
+    public void Tick_drains_queued_sends_in_order_and_respects_roundtime()
+    {
+        // The App's heartbeat pumps CommandEngine.Tick; a queued #send must hold
+        // through roundtime and fire once RT clears. Regression for the smoke
+        // finding where quick-send map arcs ("pull branch;#send .5 push rock;…")
+        // queued segments that nothing ever drained.
+        var (host, queue, engine) = NewEngine();
+        engine.ProcessInput("#send push rock");
+        engine.ProcessInput("#send go hole");
+        Assert.Equal(2, queue.EventList.Count);
+
+        engine.Tick(inRoundtime: true);            // RT gate holds the head item
+        Assert.Empty(host.SendToGameCalls);
+
+        engine.Tick(inRoundtime: false);           // RT cleared → head fires
+        Assert.Equal("push rock", Assert.Single(host.SendToGameCalls));
+
+        engine.Tick(inRoundtime: false);           // FIFO: second fires next
+        Assert.Equal(2, host.SendToGameCalls.Count);
+        Assert.Equal("go hole", host.SendToGameCalls[1]);
+        Assert.Empty(queue.EventList);
+    }
+
+    [Fact]
+    public void Quick_send_chain_queues_via_processinput_and_tick_fires_it()
+    {
+        // End-to-end shape of a mapper quick-send arc after MoveVerb.ExpandQuickSends:
+        // plain first segment goes straight to the game, #send segment queues.
+        var (host, queue, engine) = NewEngine();
+        engine.ProcessInput("pull branch;#send push rock");
+
+        Assert.Equal("pull branch", Assert.Single(host.SendToGameCalls));
+        var item = Assert.Single(queue.EventList);
+        Assert.Equal("push rock", item.Action);
+
+        engine.Tick();
+        Assert.Equal(2, host.SendToGameCalls.Count);
+        Assert.Equal("push rock", host.SendToGameCalls[1]);
+    }
+
+    [Fact]
     public void Send_clear_empties_the_queue()
     {
         var (_, queue, engine) = NewEngine();

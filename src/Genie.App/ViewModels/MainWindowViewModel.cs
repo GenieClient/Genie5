@@ -4884,8 +4884,23 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     }
 
     /// <summary>Heartbeat handler — pumps the script engine so time-based
-    /// unblocks (pause / delay / waitfor) resume without incoming game text (#61).</summary>
-    private void OnScriptHeartbeat(object? sender, EventArgs e) => _core?.Scripts.Tick();
+    /// unblocks (pause / delay / waitfor) resume without incoming game text (#61),
+    /// and the command/event queues so <c>#send</c>/<c>#wait</c>/<c>#event</c>
+    /// actually fire. The queues were never pumped in the App until the mapper's
+    /// quick-send arcs (<c>pull branch;-.5 push rock;…</c>) exposed it — queued
+    /// segments sat forever while the walker re-sent the first segment (smoke
+    /// 2026-08-03). Scripts never noticed because the in-script <c>send</c> verb
+    /// gates inside the script engine, not through this queue. RT/webbed/stunned
+    /// state comes live from GameState so #send keeps its Genie 4 roundtime gate.</summary>
+    private void OnScriptHeartbeat(object? sender, EventArgs e)
+    {
+        _core?.Scripts.Tick();
+        if (_core is { } c)
+            c.Commands.Tick(
+                c.State.Combat.InRoundTime,
+                c.State.ActiveStatuses.Contains(Genie.Core.Models.CharacterStatus.Webbed),
+                c.State.ActiveStatuses.Contains(Genie.Core.Models.CharacterStatus.Stunned));
+    }
 
     // ── Auto-reconnect (Genie 4 parity: Game.cs CheckReconnect) ───────────────
 
