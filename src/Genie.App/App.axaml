@@ -6,6 +6,7 @@
              xmlns:controls="using:Genie.App.Controls"
              xmlns:core="using:Dock.Model.Core"
              x:Class="Genie.App.App"
+             Name="Genie 5"
              RequestedThemeVariant="Dark">
 
   <!-- Genie 4-style skinned chrome for windowed (MDI) child windows. Overrides
