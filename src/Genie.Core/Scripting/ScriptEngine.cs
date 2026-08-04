@@ -307,6 +307,24 @@ public sealed class ScriptEngine
     public event Action<string>? ScriptFinished;
 
     /// <summary>
+    /// Fire <see cref="ScriptFinished"/> for <paramref name="inst"/> exactly once.
+    /// Every death path must notify — the App's script bar removes its chip on
+    /// this event, and several (goto/gosub to an unknown label, gosub depth
+    /// limit, return on an empty stack) used to set <c>Running = false</c>
+    /// silently; the tick loop then pruned the dead instance without the event,
+    /// leaving a stale chip after "[script] unknown label:" (smoke 2026-08-03
+    /// finding #8). The prune itself now calls this too as a structural
+    /// catch-all, and the once-guard makes the double coverage safe (listeners
+    /// like the mapper's replan-on-finish must not fire twice).
+    /// </summary>
+    private void NotifyFinished(ScriptInstance inst)
+    {
+        if (inst.FinishedNotified) return;
+        inst.FinishedNotified = true;
+        try { ScriptFinished?.Invoke(inst.Name); } catch { /* never rethrow from cleanup */ }
+    }
+
+    /// <summary>
     /// Fired when a new script begins running. Arg is the script name.
     /// Used by the Scripts panel to refresh its running-scripts list — the
     /// <see cref="Instances"/> collection is mutated directly so plain
@@ -475,11 +493,11 @@ public sealed class ScriptEngine
     {
         _js.StopAll();
         if (_instances.Count == 0) return;
-        var names = _instances.Select(i => i.Name).ToList();
-        foreach (var i in _instances) i.Running = false;
+        var stopped = _instances.ToList();
+        foreach (var i in stopped) i.Running = false;
         _instances.Clear();
         _echo("[script] all scripts stopped");
-        foreach (var n in names) ScriptFinished?.Invoke(n);
+        foreach (var i in stopped) NotifyFinished(i);
     }
 
     public void Stop(string name)
@@ -488,10 +506,11 @@ public sealed class ScriptEngine
         for (int i = _instances.Count - 1; i >= 0; i--)
         {
             if (!_instances[i].Name.Equals(name, StringComparison.OrdinalIgnoreCase)) continue;
-            _instances[i].Running = false;
+            var inst = _instances[i];
+            inst.Running = false;
             _instances.RemoveAt(i);
             _echo($"[script] {name} stopped");
-            ScriptFinished?.Invoke(name);
+            NotifyFinished(inst);
         }
     }
 
@@ -731,14 +750,14 @@ public sealed class ScriptEngine
         {
             _echo($"[script] {inst.Name}: hot reload failed at '{label}': {ex.Message}. Stopped.");
             inst.Running = false;
-            ScriptFinished?.Invoke(inst.Name);
+            NotifyFinished(inst);
             return false;
         }
         if (!fresh.Labels.ContainsKey(label))
         {
             _echo($"[script] {inst.Name}: hot reload failed at '{label}' — label not found in the new file. Stopped.");
             inst.Running = false;
-            ScriptFinished?.Invoke(inst.Name);
+            NotifyFinished(inst);
             return false;
         }
 
@@ -984,7 +1003,7 @@ public sealed class ScriptEngine
                 if (hot is not null)
                 {
                     hot.Running = false;
-                    try { ScriptFinished?.Invoke(hot.Name); } catch { /* never rethrow from cleanup */ }
+                    NotifyFinished(hot);
                 }
                 _busyRunMs = 0;
                 break;
@@ -1009,7 +1028,7 @@ public sealed class ScriptEngine
                 // calls StopAll/Stop, or a script exits). Re-check bounds.
                 if (i >= _instances.Count) continue;
                 var inst = _instances[i];
-                if (!inst.Running) { _instances.RemoveAt(i); continue; }
+                if (!inst.Running) { NotifyFinished(inst); _instances.RemoveAt(i); continue; }
                 if (inst.UserPaused) continue;
 
                 if (inst.Paused)
@@ -1120,7 +1139,7 @@ public sealed class ScriptEngine
                 {
                     _echo($"[script] {inst.Name} stopped: {ex.Message}");
                     inst.Running = false;
-                    try { ScriptFinished?.Invoke(inst.Name); } catch { /* never rethrow from cleanup */ }
+                    NotifyFinished(inst);
                 }
 
                 // The delay RT-bypass window closes at the next blocking
@@ -1314,7 +1333,7 @@ public sealed class ScriptEngine
         {
             inst.Running = false;
             _echo($"[script] {inst.Name} done");
-            ScriptFinished?.Invoke(inst.Name);
+            NotifyFinished(inst);
             return false;
         }
 
@@ -1688,7 +1707,7 @@ public sealed class ScriptEngine
                     DbgEcho(inst, 1, $"goto {gLabel} → line {TargetLineNo(inst, gi + 1)}");
                     inst.Trace.Add($"goto {gLabel}", gOrigin, lineNo);
                 }
-                else { _echo($"[script] unknown label: {rest}"); inst.Running = false; }
+                else { _echo($"[script] unknown label: {rest}"); inst.Running = false; NotifyFinished(inst); }
                 return true;
             }
 
@@ -1713,7 +1732,7 @@ public sealed class ScriptEngine
                     return true;
                 }
                 if (!inst.Labels.TryGetValue(label.Trim(), out var ss))
-                { _echo($"[script] unknown label: {label}"); inst.Running = false; return false; }
+                { _echo($"[script] unknown label: {label}"); inst.Running = false; NotifyFinished(inst); return false; }
                 // MaxGoSubDepth (Genie 4 parity): guard against runaway recursion
                 // (e.g. a missing RETURN). Stop the script when the call stack
                 // would exceed the configured depth.
@@ -1721,6 +1740,7 @@ public sealed class ScriptEngine
                 {
                     _echo($"[script] {inst.Name}: maximum GOSUB depth ({GoSubDepthLimit}) exceeded at '{label.Trim()}'. Stopped — check for a missing RETURN or runaway recursion.");
                     inst.Running = false;
+                    NotifyFinished(inst);
                     return false;
                 }
                 inst.GosubStack.Push(inst.Pc);
@@ -1764,13 +1784,13 @@ public sealed class ScriptEngine
                     inst.Trace.Add("return", inst.Lines[currentIdx].Origin, lineNo);
                     inst.Pc = retPc;
                 }
-                else inst.Running = false;
+                else { inst.Running = false; NotifyFinished(inst); }   // return on an empty stack ends the script
                 return true;
 
             case "exit":
                 inst.Trace.Add("exit", inst.Lines[currentIdx].Origin, lineNo);
                 inst.Running = false;
-                ScriptFinished?.Invoke(inst.Name);
+                NotifyFinished(inst);
                 return false;
 
             case "match":

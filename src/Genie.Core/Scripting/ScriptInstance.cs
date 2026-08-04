@@ -93,6 +93,11 @@ public sealed class ScriptInstance
     /// </summary>
     public HashSet<string> WarnedBadConditions = new(StringComparer.Ordinal);
 
+    /// <summary>True once <c>ScriptFinished</c> has been raised for this instance —
+    /// the engine's NotifyFinished once-guard, so a death path and the tick loop's
+    /// dead-instance prune can both notify without double-firing listeners.</summary>
+    public bool FinishedNotified;
+
     // Pause / sleep state
     // PauseMode distinguishes the three blocking commands:
     //   None  — not paused
