@@ -85,6 +85,14 @@ public sealed class CommandEngine
     /// <summary>Keyboard macros (F-keys, Ctrl-letter, etc.). Backs <c>#macro</c>.</summary>
     public MacroEngine?         Macros      { get; set; }
 
+    /// <summary>Client-side <c>/command</c> claim hook (extension console
+    /// commands — /track, /calc, /tt, …). Consulted at the send fall-through
+    /// for any game-bound segment starting with '/'; return true to consume it
+    /// so it never reaches the wire. Wired by GenieCore to the extensions'
+    /// slash dispatch — Genie 4 equivalent: plugins' ParseInput ran on every
+    /// outbound send at FormMain's send sink.</summary>
+    public Func<string, bool>?  ClientSlashCommand { get; set; }
+
     public CommandEngine(GenieConfig config, CommandQueue commandQueue, EventQueue eventQueue, ICommandHost host)
     {
         _config       = config;
@@ -168,6 +176,17 @@ public sealed class CommandEngine
                 else if (Aliases is not null && Aliases.TryProcess(command))
                 {
                     // Alias matched and was dispatched recursively.
+                }
+                else if (command[0] == '/' && ClientSlashCommand?.Invoke(command) == true)
+                {
+                    // Claimed client-side (extension /commands — /track, /calc,
+                    // /tt, …). Genie 4 ran every outbound send through the
+                    // plugins' ParseInput at the send sink (FormMain
+                    // ClassCommand_SendText:4122), so a queued `#send /track
+                    // clear`, an alias expansion, or a trigger action gets the
+                    // same client-side chance here as typed input and script
+                    // puts do at their own boundaries. Unclaimed slashes fall
+                    // through and go to the game verbatim.
                 }
                 else
                 {

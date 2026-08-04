@@ -510,6 +510,14 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // persistable like a typed #var).
         Scripts.UserVarLookup            = name => Variables?.Store.Get(name);
 
+        // Client-side /command claim for CommandEngine-routed sends (queued
+        // #send/#event items, alias expansions, trigger actions): same
+        // extension dispatch that typed input (ProcessInput above) and script
+        // puts (ScriptEngine.TrySlashCommand) already get. Genie 4 ran every
+        // outbound send through the plugins' ParseInput at the send sink, so
+        // e.g. `#send /track clear` was consumed there too (finding #9).
+        Commands.ClientSlashCommand      = s => Scripts.Extensions.DispatchSlashCommand(s);
+
         // Honour the settings.cfg tracker toggles, and re-sync when they change.
         SyncTrackerToggles();
         Config.ConfigChanged += field => { if (field == Genie.Core.Config.ConfigFieldUpdated.Trackers) SyncTrackerToggles(); };

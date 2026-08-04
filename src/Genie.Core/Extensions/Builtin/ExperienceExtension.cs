@@ -212,6 +212,44 @@ public sealed class ExperienceExtension : IGameExtension
     public bool OnSlashCommand(string input)
     {
         var t = input.Trim();
+
+        // /track — the Genie 4 EXPTracker plugin's command surface. Community
+        // scripts drive it blind (uber.cmd:2127 sends `put /track clear` at
+        // hunt start to zero the gain readout); in G4 the plugin consumed
+        // every /track form at the outbound-send sink, so the whole namespace
+        // is claimed here — an unrecognized subcommand gets usage instead of
+        // leaking to the game and bouncing with "Please rephrase" (smoke
+        // 2026-08-03 finding #9).
+        if (t.StartsWith("/track", StringComparison.OrdinalIgnoreCase) &&
+            (t.Length == 6 || char.IsWhiteSpace(t[6])))
+        {
+            var arg = t.Length > 6 ? t[6..].Trim() : string.Empty;
+            if (arg.Equals("clear", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("reset", StringComparison.OrdinalIgnoreCase))
+            {
+                lock (_gate)
+                {
+                    // Re-baseline to the CURRENT ranks (not just clear): every
+                    // known skill reads +0.00 from this moment, matching the
+                    // G4 plugin's "start tracking afresh" semantics. The
+                    // session clock restarts with it so "Total gained" and
+                    // "Session H:MM:SS" describe the same window.
+                    _baseline.Clear();
+                    foreach (var kv in _skills)
+                        _baseline[kv.Key] = (kv.Value.Rank, kv.Value.Percent);
+                    _sessionStart = _skills.Count > 0 ? DateTime.UtcNow : null;
+                }
+                _host.SetWindow(WindowName, Render());
+                _host.Echo("[Experience] gain tracking reset.");
+            }
+            else
+            {
+                _host.Echo("[Experience] /track clear — reset the session gain " +
+                           "baselines (Genie 4 EXPTracker command).");
+            }
+            return true;
+        }
+
         if (!t.StartsWith("/experience", StringComparison.OrdinalIgnoreCase) &&
             !t.Equals("/exp", StringComparison.OrdinalIgnoreCase))
             return false;
