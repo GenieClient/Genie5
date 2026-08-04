@@ -266,7 +266,7 @@ public class ConnectDialogViewModel : ReactiveObject
                 // the user hits Connect without Save — the dropdown reads as a
                 // profile setting, so silently discarding it would surprise.
                 PersistLayoutChoice();
-                return (ConnectResult?)new ConnectResult(BuildConfig(), SelectedProfile);
+                return (ConnectResult?)new ConnectResult(BuildConfig(), ResolveConnectProfile());
             }, canOk);
         CancelCommand = ReactiveCommand.Create(() => (ConnectResult?)null);
         SaveProfileCommand     = ReactiveCommand.Create(SaveProfile,   canSave);
@@ -518,11 +518,15 @@ public class ConnectDialogViewModel : ReactiveObject
     /// an explicit Save (SaveProfile writes it as part of the full save).</summary>
     private void PersistLayoutChoice()
     {
-        if (_store is null || SelectedProfile is null) return;
+        // Resolve, don't trust the raw dropdown: after the user retypes the
+        // fields for a different character, SelectedProfile still points at
+        // the old pick, and writing the layout there would corrupt it.
+        var target = ResolveConnectProfile();
+        if (_store is null || target is null) return;
         var chosen = SelectedLayout == KeepCurrentLayout ? "" : SelectedLayout;
-        if (string.Equals(SelectedProfile.DefaultLayoutName, chosen, StringComparison.Ordinal))
+        if (string.Equals(target.DefaultLayoutName, chosen, StringComparison.Ordinal))
             return;
-        SelectedProfile.DefaultLayoutName = chosen;
+        target.DefaultLayoutName = chosen;
         _onStoreChanged?.Invoke();
     }
 
@@ -547,6 +551,26 @@ public class ConnectDialogViewModel : ReactiveObject
         if (_store is null || string.IsNullOrWhiteSpace(ProfileName)) return null;
         return _store.Profiles.FirstOrDefault(p =>
             string.Equals(p.Name, ProfileName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// The saved profile this connect should be attributed to. The dropdown's
+    /// <see cref="SelectedProfile"/> counts only while the entered
+    /// <see cref="ProfileName"/> still agrees with it (or is blank) — selecting
+    /// a profile and then retyping the fields for a different character must
+    /// NOT scope the new session to the old profile. Once the name diverges,
+    /// resolve by the entered name instead (a profile created moments ago by
+    /// the OK-time save prompt resolves here); null means a bare-credential
+    /// connect with no profile attached.
+    /// </summary>
+    public ConnectionProfile? ResolveConnectProfile()
+    {
+        if (SelectedProfile is not null
+            && (string.IsNullOrWhiteSpace(ProfileName)
+                || string.Equals(ProfileName.Trim(), SelectedProfile.Name,
+                                 StringComparison.OrdinalIgnoreCase)))
+            return SelectedProfile;
+        return FindProfileByEnteredName();
     }
 
     /// <summary>True when an existing profile with the entered <see cref="ProfileName"/>

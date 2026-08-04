@@ -107,6 +107,11 @@ public partial class ConnectDialog : ReactiveWindow<ConnectDialogViewModel>
 
         if (choice is null) return;                  // Cancel — stay in Connect dialog
         if (choice == true) ViewModel.PersistCurrentEdits();
-        Close(result);
+        // The result was snapshotted at OK-click, BEFORE the save above — a
+        // profile it just created (or updated) isn't attached yet. Re-resolve
+        // so the session scopes to the right profile (LIVE badge, per-profile
+        // config dir, layouts) instead of connecting bare-credential — or,
+        // worse, scoped to a stale earlier dropdown pick.
+        Close(result with { Profile = ViewModel.ResolveConnectProfile() });
     }
 }
