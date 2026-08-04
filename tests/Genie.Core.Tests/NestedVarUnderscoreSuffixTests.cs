@@ -63,10 +63,16 @@ public class MmTrainExtraMessageRepro
     }
 
     [Fact]
-    public void Nested_var_underscore_suffix_undefined_inner_desc_is_empty_not_bare_percent()
+    public void Nested_var_underscore_suffix_undefined_inner_desc_stays_literal()
     {
-        // Same pattern but no matching _DESC local: extra_message must be "",
-        // NOT "%". The condition then evaluates cleanly (no bad-condition error).
+        // Same pattern but no matching _DESC local. Genie 4 parity: the shrink
+        // resolves $selection → "WARDING_SPELL", forming %WARDING_SPELL_DESC,
+        // and THAT name being undefined stays LITERAL (G4 `return Line;`) — so
+        // extra_message holds the literal token, the != "" check is true (it IS
+        // non-empty text), and mm_train would display the raw %WARDING_SPELL_DESC
+        // in its menu, exactly as Genie 4 does for a missing _DESC entry. The
+        // one thing that must never come back is the bare-% parse error from
+        // the first cut of the #171 boundary rule.
         const string body =
             "var extra_message %$selection_DESC\n" +
             "echo GOT=[%extra_message]\n" +
@@ -76,8 +82,8 @@ public class MmTrainExtraMessageRepro
         var o = Run(body, new Dictionary<string, string> { ["selection"] = "WARDING_SPELL" });
         foreach (var l in o) _out.WriteLine(l);
 
-        Assert.Contains("GOT=[]", o);
-        Assert.DoesNotContain("HASMSG", o);
+        Assert.Contains("GOT=[%WARDING_SPELL_DESC]", o);
+        Assert.Contains("HASMSG", o);
         Assert.DoesNotContain(o, l => l.Contains("bad condition"));
     }
 }

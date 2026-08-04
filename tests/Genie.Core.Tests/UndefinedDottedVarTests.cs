@@ -118,11 +118,17 @@ public class UndefinedDottedVarTests
     }
 
     [Fact]
-    public void Undefined_dotted_var_in_echo_substitutes_empty()
+    public void Undefined_dotted_var_in_echo_stays_literal()
     {
-        // Outside conditions the mangled remainder used to leak into output
-        // ("R=0doorsmanship.Ranks"); the undefined name now goes to "".
+        // Genie 4 parity: an undefined variable survives substitution as
+        // LITERAL text (G4 ParseVariable ends `return Line;` — Script.cs:2469 /
+        // Globals.cs:306). The #171 word-boundary rule still stops the mid-word
+        // shrink mangle ("R=0doorsmanship.Ranks"); what remains is the intact
+        // token, exactly as G4 would echo it. (An earlier cut of the #171 fix
+        // substituted "" here — that empty-substitution turned uber.cmd's
+        // `\b(?i)%superjump\b` into a match-anything regex; see the
+        // undefined-var parity fix.)
         var o = RunFixture("echo R=[$Outdoorsmanship.Ranks]\n", CompassGlobals());
-        Assert.Contains("R=[]", o);
+        Assert.Contains("R=[$Outdoorsmanship.Ranks]", o);
     }
 }

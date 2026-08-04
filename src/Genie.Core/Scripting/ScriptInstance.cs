@@ -93,16 +93,6 @@ public sealed class ScriptInstance
     /// </summary>
     public HashSet<string> WarnedBadConditions = new(StringComparer.Ordinal);
 
-    /// <summary>
-    /// Set by <c>SubstituteVars</c> when it encounters an undefined <c>$var</c>
-    /// during line execution. The runner checks this after substituting the
-    /// current line and aborts the script with a clear "stopped at line N:
-    /// undefined variable $X" message instead of silently sending malformed
-    /// commands like <c>put open my</c> (where the trailing var resolved to
-    /// empty). Cleared between substitution attempts on different lines.
-    /// </summary>
-    public string? AbortReason;
-
     // Pause / sleep state
     // PauseMode distinguishes the three blocking commands:
     //   None  — not paused

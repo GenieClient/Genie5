@@ -1378,23 +1378,12 @@ public sealed class ScriptEngine
                         t.StartsWith("jscall ", StringComparison.OrdinalIgnoreCase) ||
                         t.StartsWith("__jsinclude ", StringComparison.OrdinalIgnoreCase);
 
-        // Clear stale AbortReason before substituting this line. The flag
-        // is set by SubstituteVars when an undefined $var is encountered and
-        // is checked again after the call.
-        inst.AbortReason = null;
+        // Undefined vars never abort a line: Genie 4 leaves them literal in
+        // the substituted text and the dispatch/eval layers treat the remnant
+        // as inert string data. (An earlier design reserved an AbortReason
+        // flag here for undefined-$var aborts; it was never set and the
+        // mechanism is gone — G4 has no such stop.)
         var substituted = (isActionStmt || isJsStmt) ? t : SubstituteVars(t, inst);
-
-        // Undefined $var encountered during substitution — stop now with a
-        // clear reason rather than dispatching a malformed line. Patterns
-        // (waitforre, matchre) substitute via separate code paths that do
-        // NOT trip this guard, so a regex anchor like ^You doesn't trigger.
-        if (inst.AbortReason is not null)
-        {
-            _echo($"[script] {inst.Name} stopped at line {line.LineNumber}: {inst.AbortReason}");
-            inst.Running = false;
-            ScriptFinished?.Invoke(inst.Name);
-            return false;
-        }
 
         // Level 10: trace every executed line. Suppress repeats when a
         // statement backed off and re-attempted (the put-throttle, RT gate,
@@ -2134,6 +2123,15 @@ public sealed class ScriptEngine
             if (inner.Length == 0) return false;
         }
 
+        // Genie 4 debug aid (Script.cs Eval:1379): at debuglevel > 0, a
+        // substituted condition that still carries a sigil is almost always an
+        // unassigned variable left literal — hint at it, then evaluate anyway
+        // (the remnant is a plain string atom; ordering compares false).
+        if (condText.IndexOf('%') >= 0)
+            DbgEcho(inst, 1, $"Eval ({condText}) contains variable character '%'. Did you use an unassigned variable?");
+        else if (condText.IndexOf('$') >= 0)
+            DbgEcho(inst, 1, $"Eval ({condText}) contains variable character '$'. Did you use an unassigned variable?");
+
         try { return ScriptExpression.EvalBool(condText, inst, Globals, UserVarLookup); }
         catch (Exception ex)
         {
@@ -2722,7 +2720,10 @@ public sealed class ScriptEngine
             char c = s[p];
             if (c != '%' && c != '$') continue;
             var (value, end) = ResolveTokenAt(s, p, c, inst);
-            if (end != p + 1 || value != c.ToString())
+            // Skip the splice when nothing changed — a bare sigil, or an
+            // undefined name returned literally (G4 keeps it as-is).
+            if ((end != p + 1 || value != c.ToString()) &&
+                !(end - p == value.Length && string.CompareOrdinal(s, p, value, 0, value.Length) == 0))
                 s = s.Substring(0, p) + value + s.Substring(end);
         }
         return s;
@@ -2732,8 +2733,9 @@ public sealed class ScriptEngine
     /// Resolve the single <c>%</c>/<c>$</c> variable token that begins at
     /// <paramref name="p"/> in <paramref name="s"/>. Returns the substituted
     /// value and the index just past the consumed token (name plus any array
-    /// index). An unresolved name yields an empty value (this engine's Genie 4
-    /// undefined-var policy) while still consuming the full name so it isn't
+    /// index). An unresolved name is returned LITERALLY, sigil included —
+    /// Genie 4's undefined-var policy (both shrink loops end `return Line;`
+    /// unchanged) — while still consuming the full name so it isn't
     /// reconsidered. A bare sigil with no name returns the sigil unchanged.
     /// Called by the right-to-left driver in <see cref="SubstituteVars"/>.
     /// </summary>
@@ -2795,7 +2797,20 @@ public sealed class ScriptEngine
             }
             nameEnd--;
         }
-        if (!resolved) { value = string.Empty; nameEnd = j; }
+        if (!resolved)
+        {
+            // Genie 4 parity: an UNDEFINED variable stays LITERAL — both sigils.
+            // G4's shrink loops end `return Line;` unchanged (local %vars:
+            // Script.cs ParseVariable:2469; $globals: Globals.cs
+            // ParseVariable:306). Substituting empty instead turned uber.cmd's
+            // never-defined %superjump inside a matchre pattern
+            // (`\b(?i)%superjump\b`, uber.cmd:4130) into the degenerate
+            // match-anything `\b(?i)\b`, firing a goto with no label and
+            // killing the script (smoke 2026-08-03). Literal text is inert in
+            // regexes and evaluates G4-false in conditions (the expression
+            // evaluator reads a sigil token as a plain string atom).
+            return (s[p..j], j);
+        }
 
         // Array indexing: %Bags(0) splits the pipe-delimited value and returns
         // the element at that index (0-based). The index may itself hold vars

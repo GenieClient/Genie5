@@ -86,8 +86,10 @@ public class ConditionParseWarningTests
     [Fact]
     public void Empty_substitution_stays_silent()
     {
-        // The designed-for benign case: an unset %var substitutes to "" and
-        // `if (%unset)` becomes "()" — false, and NOT a warning.
+        // The designed-for benign case: an unset %var stays LITERAL (G4
+        // parity), and a bare string section is never true in G4's evaluator
+        // (Eval.cs GetBooleanResult only counts NumberType sections) — so
+        // `if (%unsetvar)` is false, and NOT a warning.
         var o = RunFixture(
             "if (%unsetvar) then echo Y\n" +
             "echo after\n");

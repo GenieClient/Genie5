@@ -64,7 +64,7 @@ internal sealed class ScriptExpression
                     && !s.Equals("false", StringComparison.OrdinalIgnoreCase)
                     && s != "0",
         null     => false,
-        _        => false,
+        _        => false,   // incl. VarRemnant — G4: bare string sections are never true
     };
 
     public static double ToNum(object? v) => v switch
@@ -315,7 +315,48 @@ internal sealed class ScriptExpression
         if (c == '"')                              return ParseString();
         if (char.IsDigit(c) || c == '.')           return ParseNumber();
         if (char.IsLetter(c) || c == '_')          return ParseIdentOrCall();
+        // Literal %/$ remnants: an UNDEFINED variable survives substitution as
+        // literal text (Genie 4 parity — see ScriptEngine.ResolveTokenAt), so
+        // `($Outdoorsmanship.Ranks >= 1750)` can reach the evaluator with the
+        // sigil token intact. G4's Eval tokenizes it as a plain string, making
+        // ordering comparisons silently false (Eval.cs:744) and equality a
+        // string compare — read it as a string atom so we land in the same
+        // Compare paths instead of throwing "bad condition". Operand position
+        // only: modulo's '%' binds in ParseMul before ParseAtom ever sees it.
+        if (c == '$' || c == '%')                  return ParseSigilLiteral();
         throw new Exception($"expression: unexpected '{c}'");
+    }
+
+    /// <summary>Consume a literal variable remnant: a run of leading sigils
+    /// (`$$name` survives substitution whole) plus the same name charset the
+    /// engine's substituter scans (letters, digits, '_', '.', '-'). A bare
+    /// sigil with no name yields just the sigil — G4 treats a lone '%'/'$' as
+    /// ordinary string text.</summary>
+    private object ParseSigilLiteral()
+    {
+        int s = _pos;
+        while (_pos < _src.Length && (_src[_pos] == '$' || _src[_pos] == '%')) _pos++;
+        while (_pos < _src.Length &&
+               (char.IsLetterOrDigit(_src[_pos]) || _src[_pos] == '_' ||
+                _src[_pos] == '.' || _src[_pos] == '-'))
+            _pos++;
+        return new VarRemnant(_src[s.._pos]);
+    }
+
+    /// <summary>
+    /// The literal remnant of an UNDEFINED variable. Comparisons and string
+    /// functions see the literal text (via <see cref="ToStr"/>), but as a bare
+    /// truth value it is FALSE: G4's evaluator only counts NumberType sections
+    /// in GetBooleanResult (Eval.cs:423) — a lone string section contributes
+    /// nothing — so `if (%unsetvar)` is false in Genie 4 even though the
+    /// remnant is non-empty text. A plain .NET string atom keeps this
+    /// engine's existing truthiness; only remnants get the G4 rule.
+    /// </summary>
+    private sealed class VarRemnant
+    {
+        public readonly string Text;
+        public VarRemnant(string text) => Text = text;
+        public override string ToString() => Text;
     }
 
     private string ParseString()

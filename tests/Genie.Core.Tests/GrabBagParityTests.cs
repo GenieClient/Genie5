@@ -88,9 +88,11 @@ public class GrabBagParityTests : IDisposable
     [Fact]
     public void IgnoreScriptWarnings_suppresses_the_condition_warnings()
     {
-        // Unbalanced parens — auto-balanced (G4 compat) to ("" = "") = true, so
+        // Unbalanced parens — auto-balanced (G4 compat) to a true comparison, so
         // the then-branch runs either way; only the advisory is gated by #151.
-        const string body = "if ((\"%a\" = \"%b\") then echo M\nelse echo N\n";
+        // (%a/%b are DEFINED so this fixture tests warning gating alone — an
+        // undefined var now stays literal per G4, which would compare false.)
+        const string body = "var a x\nvar b x\nif ((\"%a\" = \"%b\") then echo M\nelse echo N\n";
 
         var suppressed = RunScript(body, e => e.WarningsSuppressed = () => true);
         Assert.DoesNotContain(suppressed, l => l.Contains("unbalanced parentheses"));
