@@ -22,7 +22,7 @@ public class DialogControlCoverageTests
     public static IEnumerable<object[]> DialogControlTags() =>
         new[]
         {
-            "menuimage", "closedialog", "exposedialog",
+            "menuimage", "closedialog", "exposedialog", "menulink",
             "label", "cmdbutton", "closebutton", "checkbox",
             "streambox", "dropdownbox", "editbox", "updowneditbox",
         }.Select(t => new object[] { t });
@@ -52,6 +52,27 @@ public class DialogControlCoverageTests
         var texts = events.OfType<TextEvent>().Select(t => t.Text).ToList();
         Assert.Contains("before", texts);
         Assert.Contains("after", texts);
+    }
+
+    [Fact]
+    public void Menulink_live_sample_is_silently_discarded_between_game_lines()
+    {
+        // beta.4: <menulink> (the in-menu sibling of <link>) arrived live and
+        // classified Unknown, firing the "unrecognized game element" warning.
+        // Same treatment as its vocabulary siblings — dropped, no leaked text.
+        var parser = new DrXmlParser(NullLogger<DrXmlParser>.Instance);
+        var events = new List<GameEvent>();
+        using var _ = parser.GameEvents.Subscribe(new Collector(events));
+
+        parser.Feed("before\n<menuLink id=\"1\" value=\"Look\" cmd=\"look\" " +
+                    "noun=\"someone\" exist=\"-10000001\"/>after\n");
+
+        Assert.DoesNotContain(events, e => e is UnknownTagEvent);
+        var texts = events.OfType<TextEvent>().Select(t => t.Text).ToList();
+        Assert.Contains("before", texts);
+        Assert.Contains("after", texts);
+        // Its value/cmd attributes must not leak into the visible text stream.
+        Assert.DoesNotContain(texts, t => t.Contains("Look"));
     }
 
     [Fact]

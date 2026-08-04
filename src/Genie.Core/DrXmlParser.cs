@@ -977,6 +977,11 @@ public sealed class DrXmlParser : IDisposable
         // Self-closing UI chrome, no game-state data; distinct from the in-text
         // clickable <a>/<d> links, which ARE handled (public #198).
         "link",
+        // <menulink .../> — the in-menu sibling of <link>: server-driven menu
+        // entries (demeanor/context menus). Chrome, no game-state text; observed
+        // live in beta.4. Listed in _droppedDataTags so it classifies as a tracked
+        // coverage gap (server-dialog renderer #156), not a per-tag Unknown report.
+        "menulink",
         // <forging outfitting engineering alchemy enchanting custom={set}> —
         // Wrayth's crafting-UI config from the settings dump (value-less flag
         // attributes + a {set} preset placeholder), not live crafting state.
@@ -1036,7 +1041,7 @@ public sealed class DrXmlParser : IDisposable
         // Wrayth dialog-control vocabulary — pre-seeded as DroppedData so the
         // first bank/store/spells dialog opened in Wrayth mode doesn't fire a
         // gap-report issue per control (public #216; renderer is #156).
-        "menuimage", "closedialog", "exposedialog",
+        "menuimage", "closedialog", "exposedialog", "menulink",
         "label", "cmdbutton", "closebutton", "checkbox",
         "streambox", "dropdownbox", "editbox", "updowneditbox",
     };
