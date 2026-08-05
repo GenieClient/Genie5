@@ -220,10 +220,17 @@ public sealed class ExperienceExtension : IGameExtension
         // is claimed here — an unrecognized subcommand gets usage instead of
         // leaking to the game and bouncing with "Please rephrase" (smoke
         // 2026-08-03 finding #9).
-        if (t.StartsWith("/track", StringComparison.OrdinalIgnoreCase) &&
-            (t.Length == 6 || char.IsWhiteSpace(t[6])))
+        // /trackreset — the one-word reset variant (typed from muscle memory in
+        // the 2026-08-04 smoke: it leaked to DR and bounced). Same action as
+        // /track clear.
+        var isTrackReset = t.Equals("/trackreset", StringComparison.OrdinalIgnoreCase);
+
+        if (isTrackReset ||
+            (t.StartsWith("/track", StringComparison.OrdinalIgnoreCase) &&
+             (t.Length == 6 || char.IsWhiteSpace(t[6]))))
         {
-            var arg = t.Length > 6 ? t[6..].Trim() : string.Empty;
+            var arg = isTrackReset ? "reset"
+                    : t.Length > 6 ? t[6..].Trim() : string.Empty;
             if (arg.Equals("clear", StringComparison.OrdinalIgnoreCase) ||
                 arg.Equals("reset", StringComparison.OrdinalIgnoreCase))
             {

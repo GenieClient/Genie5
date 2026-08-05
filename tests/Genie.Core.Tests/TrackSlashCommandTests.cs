@@ -63,6 +63,17 @@ public class TrackSlashCommandTests
     }
 
     [Fact]
+    public void Trackreset_one_word_variant_is_claimed_and_resets()
+    {
+        // Typed from G4 muscle memory during the 2026-08-04 live smoke —
+        // "/trackreset" (no space) bounced off DR with "Please rephrase".
+        var (sent, echoed) = RunScript("put /trackreset\necho done\n");
+
+        Assert.DoesNotContain(sent, c => c.Contains("/trackreset"));
+        Assert.Contains(echoed, l => l.Contains("gain tracking reset"));
+    }
+
+    [Fact]
     public void Similar_but_different_command_is_not_claimed()
     {
         // "/tracker" must not be swallowed by the /track prefix check — it's
