@@ -2425,10 +2425,17 @@ public sealed class ScriptEngine
             // Pattern is matched against the registered (substituted) pattern,
             // so substitute here too — `action remove %move_OK` removes the
             // action whose stored pattern is the resolved %move_OK regex.
+            // A miss is a SILENT no-op (Genie 4: Script.cs:3121 just calls
+            // m_oActions.Remove and returns) — community scripts remove-then-
+            // re-register defensively all the time, so uber startups printed
+            // "[script] action: no trigger matched '…'" three-plus times per
+            // run and it read as an error (smoke 2026-08-03 finding #10). The
+            // diagnostic survives at debuglevel ≥3 for authors chasing a
+            // remove that genuinely should have matched.
             var pat = SubstituteVars(trimmed[7..].Trim(), inst);
             int n = inst.Actions.RemoveAll(a =>
                 string.Equals(a.Pattern, pat, StringComparison.OrdinalIgnoreCase));
-            if (n == 0) _echo($"[script] action: no trigger matched '{pat}'");
+            if (n == 0) DbgEcho(inst, 3, $"action remove: no trigger matched '{pat}'");
             return;
         }
 

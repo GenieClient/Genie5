@@ -41,6 +41,35 @@ public class ScriptDiagnosticsTests
     }
 
     [Fact]
+    public void Action_remove_miss_is_silent_at_default_debug_level()
+    {
+        // Genie 4 parity (Script.cs:3121): `action remove <pat>` with no
+        // matching registration is a silent no-op. Community scripts
+        // remove-then-re-register defensively, so uber startups printed
+        // "[script] action: no trigger matched" repeatedly and it read as an
+        // error (smoke 2026-08-03 finding #10). The note survives only at
+        // debuglevel ≥3.
+        var (o, _) = RunFixture(
+            "action remove Guild\\: (\\S+)\n" +
+            "echo after\n");
+
+        Assert.Contains("after", o);
+        Assert.DoesNotContain(o, l => l.Contains("no trigger matched"));
+    }
+
+    [Fact]
+    public void Action_remove_miss_still_traces_at_debug_three()
+    {
+        var (o, _) = RunFixture(
+            "debug 3\n" +
+            "action remove Guild\\: (\\S+)\n" +
+            "echo after\n");
+
+        Assert.Contains("after", o);
+        Assert.Contains(o, l => l.Contains("no trigger matched"));
+    }
+
+    [Fact]
     public void Start_line_names_the_resolved_file()
     {
         var (o, dir) = RunFixture("echo hi\n");
