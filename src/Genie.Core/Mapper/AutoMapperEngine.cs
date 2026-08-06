@@ -77,6 +77,20 @@ public sealed class AutoMapperEngine
     public bool      IsEnabled    { get; set; } = false;
 
     /// <summary>
+    /// Display-layer flag: the UI is BROWSING a zone the character isn't
+    /// placed in (mapper browse-hold), so <see cref="ActiveZone"/> currently
+    /// describes what's on screen, NOT where the character is. Consumers that
+    /// feed CHARACTER-scoped state from the active zone — GenieCore's
+    /// SyncMapperGlobals ($zoneid/$zonename/$roomid/$roomnote) — must freeze
+    /// their last-known values while this is set, or a user browsing the map
+    /// mid-travel rewrites $zoneid under a running $zoneid-driven script
+    /// (travel.cmd dispatch; found live 2026-08-06 — `#echo $zoneid` printed
+    /// the browsed Transports id 998 while the character stood in Dirge).
+    /// Set by the App's MapperViewModel alongside its BrowsingZone state.
+    /// </summary>
+    public bool      ViewIsBrowsing { get; set; }
+
+    /// <summary>
     /// Genie 4 "Allow Duplicate" parity. When true AND <see cref="IsEnabled"/>
     /// (record mode), the fuzzy fingerprint/title match tiers (c)/(e)/(f) are
     /// skipped so a freshly-entered room that merely shares a title+exit
@@ -878,6 +892,23 @@ public sealed class AutoMapperEngine
     /// <summary>Athletics rank at/above which swim &amp; climb effort decays to zero —
     /// a well-trained character floods little to no roundtime on those moves.</summary>
     internal const int AthleticsEffortFloorRank = 600;
+
+    /// <summary>
+    /// True when a zone file is the community "Transports" map (zone id 998):
+    /// transient transport rooms — ferries, gondolas, barges — that exist in no
+    /// real zone. Genie 4's automapper never auto-switched into it (it has no
+    /// global cross-map room search), so <c>$zoneid</c> stayed on the real bank
+    /// zone while aboard and a <c>$zoneid</c>-driven travel script (travel.cmd's
+    /// ferry dispatch, keyed on bank zone-ids) kept working. Genie 5's global
+    /// auto-load must skip this map for the same reason, or a script is stranded
+    /// mid-crossing. Matched by the conventional name/id so a differently-named
+    /// transports map is still covered; an <i>explicit</i> boundary-note link into
+    /// it is unaffected (that path is authored map data, not a fuzzy search).
+    /// </summary>
+    public static bool IsTransientTransportZone(string? zoneFile) =>
+        !string.IsNullOrEmpty(zoneFile) &&
+        (zoneFile.Contains("Transports", StringComparison.OrdinalIgnoreCase) ||
+         zoneFile.StartsWith("Map998", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Heuristic extra cost (baseline-hop units) for a move verb that implies a

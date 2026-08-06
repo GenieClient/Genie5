@@ -265,6 +265,29 @@ public class MapperViewModel : ReactiveObject
     /// <summary>Re-scan <see cref="MapsDirectory"/> for *.json zone files.</summary>
     public ReactiveCommand<Unit, Unit> RefreshZonesCommand { get; }
 
+    // ── Zone-list sort order ──────────────────────────────────────────────
+    // Display labels + persisted keys, index-aligned. display.json stores the
+    // KEY ("name"/"recent"/"number") so the UI wording can change freely.
+    private static readonly string[] ZoneSortLabels = { "Name", "Recently Changed", "Map Number" };
+    private static readonly string[] ZoneSortKeys   = { "name", "recent", "number" };
+
+    /// <summary>Choices for the sort dropdown next to the zone selector.</summary>
+    public IReadOnlyList<string> ZoneSortModes => ZoneSortLabels;
+
+    /// <summary>Selected sort label (two-way from the dropdown). Changing it
+    /// re-sorts <see cref="AvailableZones"/> and persists to display.json.</summary>
+    [Reactive] public string ZoneSortMode { get; set; } = "Name";
+
+    /// <summary>
+    /// True when <paramref name="zoneFile"/> does NOT follow the standard
+    /// <c>Map&lt;number&gt;…</c> naming scheme — i.e. it's a "special" map
+    /// (event zones like Hollow_Eve or Droughtman's_Maze). Drives the SPECIAL
+    /// badge in the zone dropdown and the bottom-group placement in Map Number
+    /// sort mode.
+    /// </summary>
+    public static bool IsSpecialMapName(string zoneFile)
+        => !MapNumberRx.IsMatch(zoneFile);
+
     // ── Map update (GenieClient/Maps repo) ────────────────────────────────
     /// <summary>True while <see cref="UpdateMapsCommand"/> is running.</summary>
     [Reactive] public bool   IsUpdating       { get; private set; }
@@ -319,6 +342,74 @@ public class MapperViewModel : ReactiveObject
     /// still apply. No-op when there's no current node or no path.
     /// </summary>
     public ReactiveCommand<MapNode, Unit> GotoNodeCommand { get; }
+
+    /// <summary>Left-click on a cross-zone (blue-border) room: switch the mapper
+    /// to the connecting map named in the room's note, selecting the reciprocal
+    /// border room there. Bound to <see cref="Controls.MapCanvas"/>'s
+    /// CrossZoneClickedCommand.</summary>
+    public ReactiveCommand<MapNode?, Unit> OpenCrossZoneCommand { get; }
+
+    /// <summary>
+    /// True while the user is BROWSING a zone their character isn't placed in
+    /// (a manual dropdown pick or a cross-zone click that lands away from the
+    /// character). While set, the auto-follow reload paths are suspended so
+    /// live room events can't yank the view back — a running travel script
+    /// generates a room change every few seconds, which made cross-zone clicks
+    /// on Map998_Transports look completely dead (2026-08-04 live smoke: the
+    /// click DID load the target map; auto-follow re-loaded Transports in the
+    /// same beat). Cleared the moment the engine places the character in the
+    /// browsed zone (walked into it, or the user re-picked the character's
+    /// actual map and the room resolved).
+    /// </summary>
+    [Reactive] public bool BrowsingZone { get; private set; }
+
+    // True while an ENGINE-driven zone switch (boundary-note follow /
+    // room-search auto-load) is assigning SelectedZoneFile — distinguishes
+    // those from USER picks so LoadSelectedZone knows which loads may enter
+    // browse mode. Scoped set/finally around the assignment; the WhenAnyValue
+    // subscription runs synchronously on the same thread.
+    private bool _autoZoneSwitch;
+
+    /// <summary>Toolbar "⌖ Return to Current Zone" — only visible while
+    /// <see cref="BrowsingZone"/>. Releases the browse-hold and jumps the view
+    /// back to the character's zone.</summary>
+    public ReactiveCommand<Unit, Unit> ReturnToCurrentZoneCommand { get; }
+
+    private void ReturnToCurrentZone()
+    {
+        if (_engine is null) return;
+        BrowsingZone = false;
+        LoadStatus = "Returning to your character's zone…";
+
+        // Primary: jump straight back to the zone the character last MATCHED
+        // in (tracked on every CurrentNodeChanged). Re-deriving the zone from
+        // the live room can't handle exits-less rooms, and the auto-load
+        // dedupe would swallow the retry anyway.
+        if (!string.IsNullOrEmpty(_lastMatchedZoneFile) &&
+            !string.Equals(_lastMatchedZoneFile, SelectedZoneFile, StringComparison.OrdinalIgnoreCase) &&
+            AvailableZones.Contains(_lastMatchedZoneFile))
+        {
+            _autoZoneSwitch = true;   // returning-to-follow, not browsing
+            try { SelectedZoneFile = _lastMatchedZoneFile; }
+            finally { _autoZoneSwitch = false; }
+            _engine.Recalculate();
+            return;
+        }
+
+        // Fallback (character never matched this session, or we're already on
+        // their zone): re-arm the auto-load dedupe and re-evaluate the live
+        // room — a miss fires RoomNotFoundInZone whose auto-load (no longer
+        // suspended) tries the server-id / fingerprint tiers, and reports
+        // "No local zone contains …" when the room genuinely can't be placed.
+        _lastAutoLoadAttempt = null;
+        _engine.Recalculate();
+    }
+
+    // The zone file the character most recently MATCHED a room in — the
+    // "home" that ⌖ Return to Current Zone restores. Distinct from
+    // SelectedZoneFile, which follows whatever map is DISPLAYED (browsing
+    // included) — conflating the two was the original return-button bug.
+    private string? _lastMatchedZoneFile;
 
     /// <summary>
     /// Send a non-compass move command (e.g. "go small alleyway", "climb
@@ -610,6 +701,22 @@ public class MapperViewModel : ReactiveObject
         GotoNodeCommand.ThrownExceptions.Subscribe(ex =>
             LoadStatus = $"Goto failed: {ex.Message}");
 
+        OpenCrossZoneCommand = ReactiveCommand.Create<MapNode?>(OpenCrossZone);
+        OpenCrossZoneCommand.ThrownExceptions.Subscribe(ex =>
+            LoadStatus = $"Zone switch failed: {ex.Message}");
+
+        ReturnToCurrentZoneCommand = ReactiveCommand.Create(ReturnToCurrentZone);
+        ReturnToCurrentZoneCommand.ThrownExceptions.Subscribe(ex =>
+            LoadStatus = $"Return failed: {ex.Message}");
+
+        // Mirror the browse-hold into the engine so Core consumers freeze
+        // character-scoped globals ($zoneid/$roomid/…) while the view shows a
+        // map the character isn't in — browsing must never rewrite script
+        // state (2026-08-06: `#echo $zoneid` read 998 from the browsed
+        // Transports map while the character stood in Dirge).
+        this.WhenAnyValue(x => x.BrowsingZone)
+            .Subscribe(b => { if (_engine is not null) _engine.ViewIsBrowsing = b; });
+
         // CanExecute: only when there's a current room AND a loaded zone
         // file. The button stays disabled when the user can't possibly
         // have anything useful to save.
@@ -683,6 +790,19 @@ public class MapperViewModel : ReactiveObject
             .Skip(1)
             .Subscribe(LoadSelectedZone);
 
+        // Re-sort the zone list when the user changes the sort dropdown, and
+        // persist the choice. Skip(1) ignores the construction-time emission —
+        // Attach() does the first RefreshAvailableZones, and AttachDisplay may
+        // set this again from the stored value. RefreshAvailableZones preserves
+        // the current selection, so re-sorting never unloads the active zone.
+        this.WhenAnyValue(x => x.ZoneSortMode)
+            .Skip(1)
+            .Subscribe(_ =>
+            {
+                PersistZoneSort();
+                RefreshAvailableZones();
+            });
+
         // The status-bar location line OAPH (#66) is wired in AttachDisplay,
         // where the DisplaySettings are available — its Zone-name-vs-number mode
         // is a user setting (Display.ZoneRoomShowNumber).
@@ -747,6 +867,13 @@ public class MapperViewModel : ReactiveObject
         _display     = display;
         _displayPath = displayPath;
         this.RaisePropertyChanged(nameof(ShowMapLegend));   // reflect the stored value (#157)
+
+        // Restore the zone-list sort order. Setting the property (when it
+        // differs from the default) triggers the ctor subscription, which
+        // re-sorts the list; PersistZoneSort is a no-op since the stored key
+        // already matches.
+        var sortIdx = Array.IndexOf(ZoneSortKeys, display.MapZoneSort);
+        if (sortIdx >= 0) ZoneSortMode = ZoneSortLabels[sortIdx];
 
         // One-time migration: the old default canvas was dark (#1A1A1A). Genie 4's
         // AutoMapper uses a PaleGoldenrod (tan) canvas, which the map palette
@@ -849,11 +976,36 @@ public class MapperViewModel : ReactiveObject
             var n = _engine?.CurrentNode;
             _audit?.Note("ROOM",
                 $"node={(n is null ? "LOST" : n.Id.ToString())} zone='{_engine?.ActiveZone?.Name}' title='{n?.Title}'");
+            // Character resolved inside the browsed zone (walked into it, or
+            // the user re-picked their actual map) — resume normal following.
+            if (BrowsingZone && n is not null)
+            {
+                BrowsingZone = false;
+                _audit?.Note("ROOM", "browse-hold released — character placed in the loaded zone");
+            }
+            // Remember the zone the character last MATCHED in — this is what
+            // "⌖ Return to Current Zone" jumps back to. Derivation-by-rematch
+            // alone can't do it: an exits-less room ("Obvious exits: none",
+            // e.g. Dirge's Temple Courtyard) has a fingerprint too weak for
+            // the auto-load index (2026-08-06 smoke).
+            if (n is not null) _lastMatchedZoneFile = SelectedZoneFile;
             MaybeFollowZoneNote(n);
         });
         _engine.MapChanged         += () => Dispatcher.UIThread.Post(Refresh);
         _engine.RoomNotFoundInZone += (serverId, title, exits) =>
         {
+            // Browse-hold: the user is deliberately looking at a different map.
+            // Every live room event fires this handler while the loaded zone
+            // doesn't contain the character (a moving ferry fires one every few
+            // seconds), and the auto-load below would instantly yank the view
+            // back — which made cross-zone clicks look dead during travel
+            // (2026-08-04 smoke). Suspend following until the character shows
+            // up in the browsed zone or the user returns to their map.
+            if (BrowsingZone)
+            {
+                _audit?.Note("MISS", $"\"{title}\" not in browsed zone '{_engine?.ActiveZone?.Name}' — auto-load suspended (browsing)");
+                return;
+            }
             _audit?.Note("MISS", $"engine can't place \"{title}\" in '{_engine?.ActiveZone?.Name}' → trying auto-load");
             // First: a boundary stub in THIS zone with this title may name the
             // destination zone (the map's own cross-zone link) — definitive, no
@@ -895,7 +1047,18 @@ public class MapperViewModel : ReactiveObject
     /// the map data itself names the destination zone, removing the ambiguity
     /// that title/fingerprint matching can't resolve.
     /// </summary>
-    private void MaybeFollowZoneNote(MapNode? node) => FollowZoneNote(node);
+    private void MaybeFollowZoneNote(MapNode? node)
+    {
+        // Engine-driven follow (the character walked onto a boundary node):
+        // flag it so FollowZoneNote's zone switch doesn't read as browsing.
+        _followingEngine = true;
+        try { FollowZoneNote(node); }
+        finally { _followingEngine = false; }
+    }
+
+    // True while FollowZoneNote runs on behalf of the ENGINE (character
+    // movement) rather than a user action — see BrowsingZone.
+    private bool _followingEngine;
 
     /// <summary>Switch zones if <paramref name="node"/>'s note names an adjacent
     /// zone file (and we're not already on it). Returns true when the note was
@@ -924,10 +1087,53 @@ public class MapperViewModel : ReactiveObject
             // LoadZone + Recalculate, which re-resolves the current room in the
             // new zone. The re-resolved node is the room's home node and won't
             // carry a .xml note, so this fires once, not in a loop.
-            SelectedZoneFile = basename;
+            // NOTE: the cross-zone CLICK reuses this path, so the auto flag is
+            // only held when the ENGINE drove the switch (see MaybeFollowZoneNote
+            // caller); OpenCrossZone is a user action and must be allowed to
+            // enter browse mode via LoadSelectedZone's detection.
+            _autoZoneSwitch = _followingEngine;
+            try { SelectedZoneFile = basename; }
+            finally { _autoZoneSwitch = false; }
             return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Left-click on a cross-zone room (blue border) in the map view: open the
+    /// connecting map (smoke 2026-08-03, task #2). Reuses
+    /// <see cref="FollowZoneNote"/>'s note-parse/availability/switch, then
+    /// selects the reciprocal border room in the freshly-loaded zone — the node
+    /// whose note points back at the zone we came from — so the eye lands on
+    /// the connection point instead of an unanchored map. No reciprocal note
+    /// (one-way annotation) just leaves the selection cleared by the load.
+    /// </summary>
+    private void OpenCrossZone(MapNode? node)
+    {
+        if (node is null) return;
+        var from = SelectedZoneFile;
+        if (!FollowZoneNote(node))
+        {
+            // Say WHY nothing happened — the availability miss inside
+            // FollowZoneNote is audit-only, which made a failed click read as
+            // a dead feature (2026-08-04 live smoke on Map998_Transports).
+            var target = node.Notes?.Split('|')
+                .Select(t => t.Trim())
+                .FirstOrDefault(t => t.EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
+            LoadStatus = target is null
+                ? $"Room {node.Id} carries no linked-map note."
+                : $"Linked map '{Path.GetFileNameWithoutExtension(target)}' isn't in the zone list.";
+            return;
+        }
+        if (string.IsNullOrEmpty(from) || _engine?.ActiveZone?.Nodes is null)
+            return;
+        var back = from + ".xml";
+        foreach (var n in _engine.ActiveZone.Nodes.Values)
+            if (n.Notes.Contains(back, StringComparison.OrdinalIgnoreCase))
+            {
+                SelectedNode = n;
+                break;
+            }
     }
 
     /// <summary>MISS path: the engine couldn't place the live room in the active
@@ -938,9 +1144,14 @@ public class MapperViewModel : ReactiveObject
     private bool TryFollowZoneNoteByTitle(string title)
     {
         if (_engine?.ActiveZone?.Nodes is null || string.IsNullOrWhiteSpace(title)) return false;
-        foreach (var node in _engine.ActiveZone.Nodes.Values)
-            if (string.Equals(node.Title, title, StringComparison.OrdinalIgnoreCase) && FollowZoneNote(node))
-                return true;
+        _followingEngine = true;
+        try
+        {
+            foreach (var node in _engine.ActiveZone.Nodes.Values)
+                if (string.Equals(node.Title, title, StringComparison.OrdinalIgnoreCase) && FollowZoneNote(node))
+                    return true;
+        }
+        finally { _followingEngine = false; }
         return false;
     }
 
@@ -1012,6 +1223,20 @@ public class MapperViewModel : ReactiveObject
             return;
         }
 
+        // Genie 4 parity: never AUTO-jump into a transient-transport map (id 998,
+        // the community "Transports" — ferries/gondolas/barges). Those rooms exist
+        // only there, so the global room search above would snap $zoneid to 998
+        // mid-crossing; G4 has no such search and keeps $zoneid on the real bank
+        // zone, which a $zoneid-driven travel script (travel.cmd's ferry dispatch)
+        // relies on. The explicit boundary-note path (FollowZoneNote) is unaffected —
+        // an authored cross-zone link into a transport still switches.
+        if (AutoMapperEngine.IsTransientTransportZone(zoneFile))
+        {
+            Dispatcher.UIThread.Post(() =>
+                LoadStatus = $"Aboard a transport ('{zoneFile}') — keeping zone '{SelectedZoneFile}' (Genie 4 parity).");
+            return;
+        }
+
         // Already loaded the right zone but the engine still doesn't match? Don't
         // re-trigger LoadZone (would wipe CurrentNode and loop). Surface this as
         // a diagnostic instead — the room is supposedly in this zone but the
@@ -1031,7 +1256,11 @@ public class MapperViewModel : ReactiveObject
             LoadStatus = $"Auto-detected zone '{pickedZone}' from {pickedReason}.";
             // Setting this triggers WhenAnyValue → LoadSelectedZone → engine.LoadZone,
             // which calls Recalculate() so the player's current room matches.
-            SelectedZoneFile = pickedZone;
+            // Auto flag: this is the ENGINE following the character, never a
+            // browse (see BrowsingZone).
+            _autoZoneSwitch = true;
+            try { SelectedZoneFile = pickedZone; }
+            finally { _autoZoneSwitch = false; }
         });
     }
 
@@ -1351,11 +1580,7 @@ public class MapperViewModel : ReactiveObject
 
         // XML is the canonical format — matches the upstream GenieClient/Maps
         // repo so users can manage their Maps directory as a git clone.
-        var files = Directory.GetFiles(MapsDirectory, "*.xml")
-            .Select(Path.GetFileNameWithoutExtension)
-            .Where(s => !string.IsNullOrEmpty(s))
-            .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var files = SortZoneFiles(Directory.GetFiles(MapsDirectory, "*.xml"), ZoneSortMode);
 
         // Preserve the user's selection across rescans when possible.
         var prev = SelectedZoneFile;
@@ -1363,13 +1588,90 @@ public class MapperViewModel : ReactiveObject
         try
         {
             AvailableZones.Clear();
-            foreach (var f in files) AvailableZones.Add(f!);
-            SelectedZoneFile = files.Contains(prev) ? prev : null;
+            foreach (var f in files) AvailableZones.Add(f);
+            SelectedZoneFile = prev is not null && files.Contains(prev) ? prev : null;
         }
         finally
         {
             _suppressAutoLoad = false;
         }
+    }
+
+    /// <summary>Matches the standard zone naming scheme: <c>Map</c> + number +
+    /// optional letter suffix (Map10, Map107a, Map118e). Case-insensitive.</summary>
+    private static readonly System.Text.RegularExpressions.Regex MapNumberRx =
+        new(@"^map(\d+)([a-z]*)", System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                                  System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// Order the zone file paths per the user's sort mode and return bare
+    /// filenames (no extension) for the dropdown.
+    /// <list type="bullet">
+    /// <item>Name — plain A–Z (the historic order). Note this is a STRING sort,
+    ///   so Map10 lands between Map108 and Map112.</item>
+    /// <item>Recently Changed — file last-write time, newest first; handy for
+    ///   "which zone was I just editing".</item>
+    /// <item>Map Number — numeric MapNN order (Map10 before Map105), letter
+    ///   variants after their base number (Map107 &lt; Map107a); special maps
+    ///   (no MapNN prefix) sink to the bottom, A–Z.</item>
+    /// </list>
+    /// </summary>
+    private static List<string> SortZoneFiles(string[] paths, string sortMode)
+    {
+        var key = ZoneSortKeyFor(sortMode);
+
+        IEnumerable<string> ordered = key switch
+        {
+            "recent" => paths
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .Select(Path.GetFileNameWithoutExtension)
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Select(s => s!),
+
+            "number" => paths
+                .Select(Path.GetFileNameWithoutExtension)
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Select(s =>
+                {
+                    var m = MapNumberRx.Match(s!);
+                    // Special maps (no MapNN prefix) group AFTER all numbered
+                    // maps. long-parse is defensive against absurd digit runs.
+                    return m.Success && long.TryParse(m.Groups[1].Value, out var n)
+                        ? (Name: s!, Special: 0, Number: n, Suffix: m.Groups[2].Value)
+                        : (Name: s!, Special: 1, Number: 0L, Suffix: "");
+                })
+                .OrderBy(t => t.Special)
+                .ThenBy(t => t.Number)
+                .ThenBy(t => t.Suffix, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(t => t.Name,   StringComparer.OrdinalIgnoreCase)
+                .Select(t => t.Name),
+
+            _ => paths
+                .Select(Path.GetFileNameWithoutExtension)
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Select(s => s!)
+                .OrderBy(s => s, StringComparer.OrdinalIgnoreCase),
+        };
+
+        return ordered.ToList();
+    }
+
+    private static string ZoneSortKeyFor(string label)
+    {
+        var i = Array.IndexOf(ZoneSortLabels, label);
+        return i >= 0 ? ZoneSortKeys[i] : "name";
+    }
+
+    /// <summary>Write the current sort choice to display.json (best-effort,
+    /// same pattern as <see cref="ShowMapLegend"/>). No-op before AttachDisplay
+    /// or when the stored key already matches.</summary>
+    private void PersistZoneSort()
+    {
+        if (_display is null) return;
+        var key = ZoneSortKeyFor(ZoneSortMode);
+        if (_display.MapZoneSort == key) return;
+        _display.MapZoneSort = key;
+        try { if (!string.IsNullOrEmpty(_displayPath)) _display.Save(_displayPath); } catch { /* best effort */ }
     }
 
     private void LoadSelectedZone(string? filename)
@@ -1402,7 +1704,22 @@ public class MapperViewModel : ReactiveObject
         }
 
         _engine.LoadZone(zone);
-        LoadStatus = $"Loaded {zone.Name} ({zone.Nodes.Count} rooms).";
+
+        // Browse-hold detection: a USER-initiated load (dropdown pick, cross-
+        // zone click, #mapper zone) that does NOT contain the character — while
+        // a live room is known — is browsing; suspend auto-follow so room
+        // events can't immediately re-load the character's zone (2026-08-04
+        // smoke: cross-zone clicks during a ferry ride looked dead because the
+        // travel tracking yanked the view back within the same beat). Engine-
+        // driven switches (_autoZoneSwitch) and pre-connect loads (no server
+        // room id yet) never enter browse mode. LoadZone → Recalculate runs
+        // synchronously, so CurrentNode is already resolved here.
+        BrowsingZone = !_autoZoneSwitch
+                       && _engine.CurrentNode is null
+                       && !string.IsNullOrEmpty(_engine.CurrentServerRoomId);
+        LoadStatus = BrowsingZone
+            ? $"Loaded {zone.Name} ({zone.Nodes.Count} rooms) — browsing (tracking paused; returns when your character enters this map or you re-select theirs)."
+            : $"Loaded {zone.Name} ({zone.Nodes.Count} rooms).";
     }
 
     // ── Goto ──────────────────────────────────────────────────────────────
@@ -1673,4 +1990,19 @@ public class MapperViewModel : ReactiveObject
             UpdateStatus = "";
         }
     }
+}
+
+/// <summary>
+/// XAML-static converters for the Mapper's zone dropdown. Items stay plain
+/// filename strings (the SelectedItem ↔ SelectedZoneFile binding depends on
+/// that), so the "special map" distinction is derived per-item at render time
+/// instead of being baked into a wrapper object.
+/// </summary>
+public static class ZoneNameConverters
+{
+    /// <summary>String zone filename → true when it's a special (non-MapNN)
+    /// map, e.g. Hollow_Eve. Shows the SPECIAL badge in the dropdown.</summary>
+    public static readonly Avalonia.Data.Converters.IValueConverter IsSpecial =
+        new Avalonia.Data.Converters.FuncValueConverter<string?, bool>(
+            s => !string.IsNullOrEmpty(s) && MapperViewModel.IsSpecialMapName(s));
 }

@@ -66,6 +66,15 @@ public sealed class DisplaySettings : ReactiveObject
     [Reactive] public bool   ShowMapLegend { get; set; } = true;
 
     /// <summary>
+    /// Sort order for the Mapper's zone dropdown: <c>"name"</c> (A–Z, default),
+    /// <c>"recent"</c> (file last-write time, newest first), or <c>"number"</c>
+    /// (numeric <c>MapNN</c> order — files not named <c>Map&lt;number&gt;…</c>,
+    /// e.g. event maps like Hollow_Eve, sink to the bottom alphabetically).
+    /// Stored as a stable key, not the UI label, so labels can be reworded.
+    /// </summary>
+    [Reactive] public string MapZoneSort { get; set; } = "name";
+
+    /// <summary>
     /// Whether the Wrayth-style horizontal status bar (health/mana/stamina/spirit/
     /// concentration) is shown below the command bar. Independent of the dockable
     /// <c>VitalsTool</c>, so you can have both, either, or neither.

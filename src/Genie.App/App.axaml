@@ -705,44 +705,81 @@
         <!-- by accident while intending a zoom action.                    -->
         <Border Grid.Row="0" Background="{DynamicResource Theme.ToolbarBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,0,0,1" Padding="4,3">
           <StackPanel Spacing="3">
-          <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4">
             <!-- Pop out (window-level action, separated from data-level cluster) -->
             <Button Grid.Column="0" Content="⬈" Padding="6,1" FontSize="11"
                     AutomationProperties.Name="Pop out mapper"
                     AutomationProperties.HelpText="Pop out to a separate window"
                     Command="{Binding ViewModel.FloatCommand}"
                     ToolTip.Tip="Pop out to a separate window"/>
-            <!-- Zone selector — takes available width -->
+            <!-- Zone selector — takes available width. Items are plain filename
+                 strings; the template derives a SPECIAL badge for maps that
+                 don't follow the MapNN naming scheme (event maps). -->
             <ComboBox Grid.Column="1"
                       HorizontalAlignment="Stretch"
                       ItemsSource="{Binding ViewModel.AvailableZones}"
                       SelectedItem="{Binding ViewModel.SelectedZoneFile}"
                       PlaceholderText="(pick a zone)"
                       MinHeight="24"
-                      ToolTip.Tip="Pick a zone XML from the Maps directory. Auto-detect normally handles this for you when you connect and walk."/>
+                      ToolTip.Tip="Pick a zone XML from the Maps directory. Auto-detect normally handles this for you when you connect and walk.">
+              <ComboBox.ItemTemplate>
+                <DataTemplate DataType="x:String">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                    <Border Background="{DynamicResource Theme.Warning}" CornerRadius="3" Padding="4,0"
+                            VerticalAlignment="Center"
+                            IsVisible="{Binding Converter={x:Static vm:ZoneNameConverters.IsSpecial}}"
+                            ToolTip.Tip="Special map — event / quest area, not part of the numbered MapNN world set.">
+                      <TextBlock Text="SPECIAL" FontSize="9" FontWeight="Bold" Foreground="Black"/>
+                    </Border>
+                  </StackPanel>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <!-- Zone-list sort order -->
+            <ComboBox Grid.Column="2" MinHeight="24" FontSize="11"
+                      ItemsSource="{Binding ViewModel.ZoneSortModes}"
+                      SelectedItem="{Binding ViewModel.ZoneSortMode}"
+                      AutomationProperties.Name="Zone list sort order"
+                      ToolTip.Tip="Zone list order: Name (A–Z), Recently Changed (newest first), or Map Number (numeric MapNN order — special maps at the bottom)."/>
             <!-- Level -->
-            <TextBlock Grid.Column="2" Text="{Binding ViewModel.Level, StringFormat='L{0}'}"
+            <TextBlock Grid.Column="3" Text="{Binding ViewModel.Level, StringFormat='L{0}'}"
                        Foreground="{DynamicResource Theme.TextPrimary}" VerticalAlignment="Center" FontSize="11"/>
-            <Button Grid.Column="3" Content="▲" Padding="6,1" FontSize="10"
+            <Button Grid.Column="4" Content="▲" Padding="6,1" FontSize="10"
                     AutomationProperties.Name="Z-level up"
                     Command="{Binding ViewModel.LevelUpCommand}"
                     ToolTip.Tip="Z-level up"/>
-            <Button Grid.Column="4" Content="▼" Padding="6,1" FontSize="10"
+            <Button Grid.Column="5" Content="▼" Padding="6,1" FontSize="10"
                     AutomationProperties.Name="Z-level down"
                     Command="{Binding ViewModel.LevelDownCommand}"
                     ToolTip.Tip="Z-level down"/>
             <!-- Zoom -->
-            <Button Grid.Column="5" Content="−" Padding="8,1" FontSize="11"
+            <Button Grid.Column="6" Content="−" Padding="8,1" FontSize="11"
                     AutomationProperties.Name="Zoom out"
                     AutomationProperties.HelpText="Zoom out (or mouse-wheel down over the map)"
                     Command="{Binding ViewModel.ZoomOutCommand}"
                     ToolTip.Tip="Zoom out (or mouse-wheel down over the map)"/>
-            <Button Grid.Column="6" Content="+" Padding="8,1" FontSize="11"
+            <Button Grid.Column="7" Content="+" Padding="8,1" FontSize="11"
                     AutomationProperties.Name="Zoom in"
                     AutomationProperties.HelpText="Zoom in (or mouse-wheel up over the map)"
                     Command="{Binding ViewModel.ZoomInCommand}"
                     ToolTip.Tip="Zoom in (or mouse-wheel up over the map)"/>
           </Grid>
+
+          <!-- Return to Current Zone — only visible while BROWSING a map the
+               character isn't in (BrowsingZone browse-hold). Full-width accent
+               bar so it's obvious tracking is paused and one click brings the
+               view (and following) home. -->
+          <Button Content="⌖  Return to Current Zone"
+                  IsVisible="{Binding ViewModel.BrowsingZone}"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                  FontSize="11" Padding="4,2"
+                  Background="{DynamicResource Theme.SuccessBg}"
+                  Foreground="{DynamicResource Theme.TextPrimary}"
+                  Command="{Binding ViewModel.ReturnToCurrentZoneCommand}"
+                  AutomationProperties.Name="Return to current zone"
+                  AutomationProperties.HelpText="Jump back to the zone your character is in and resume tracking"
+                  ToolTip.Tip="You're browsing a map your character isn't in — tracking is paused. Click to jump back to their zone and resume following."/>
 
           <!-- Editor toolbar (Genie 4 AutoMapper edit tools). Edit + Record + -->
           <!-- New + Save are always available; the node-edit cluster (Remove / -->
@@ -923,6 +960,7 @@
                                     AutoMapperAlpha="{Binding ViewModel.AutoMapperAlpha}"
                                     ShowLegend="{Binding ViewModel.ShowMapLegend}"
                                     NodeClickedCommand="{Binding ViewModel.GotoNodeCommand}"
+                                    CrossZoneClickedCommand="{Binding ViewModel.OpenCrossZoneCommand}"
                                     EditExitCommand="{Binding ViewModel.EditExitCommand}"
                                     EditMode="{Binding ViewModel.EditMode}"
                                     SnapToGrid="{Binding ViewModel.SnapToGrid}"

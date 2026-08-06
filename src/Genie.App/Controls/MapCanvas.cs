@@ -114,6 +114,15 @@ public class MapCanvas : Control
         AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(NodeClickedCommand));
 
     /// <summary>
+    /// Fired with the clicked <see cref="MapNode"/> when a plain left-click (navigate
+    /// mode) lands on a cross-zone room — the blue-bordered connector whose note
+    /// names the adjacent map file. The Mapper VM switches to that map (task #2).
+    /// Null (unbound) leaves the click as an ordinary pan start.
+    /// </summary>
+    public static readonly StyledProperty<ICommand?> CrossZoneClickedCommandProperty =
+        AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(CrossZoneClickedCommand));
+
+    /// <summary>
     /// Scale factor for the whole map render. 1.0 = native size, clamped to
     /// [0.4, 4.0]. Mouse wheel and toolbar buttons drive this. AffectsMeasure
     /// so the ScrollViewer's scrollbars resize with the content.
@@ -232,6 +241,7 @@ public class MapCanvas : Control
     public int       Level              { get => GetValue(LevelProperty);              set => SetValue(LevelProperty, value); }
     public int       RenderTick         { get => GetValue(RenderTickProperty);         set => SetValue(RenderTickProperty, value); }
     public ICommand? NodeClickedCommand { get => GetValue(NodeClickedCommandProperty); set => SetValue(NodeClickedCommandProperty, value); }
+    public ICommand? CrossZoneClickedCommand { get => GetValue(CrossZoneClickedCommandProperty); set => SetValue(CrossZoneClickedCommandProperty, value); }
     public double    Zoom               { get => GetValue(ZoomProperty);               set => SetValue(ZoomProperty, value); }
     public IBrush?   CurrentRoomBrush   { get => GetValue(CurrentRoomBrushProperty);   set => SetValue(CurrentRoomBrushProperty, value); }
     public IBrush?   MapBackgroundBrush { get => GetValue(MapBackgroundBrushProperty); set => SetValue(MapBackgroundBrushProperty, value); }
@@ -716,8 +726,21 @@ public class MapCanvas : Control
         }
         else if (props.IsLeftButtonPressed)
         {
-            // Navigate mode: left-drag grab-scrolls the map. (Go Here stays on
-            // the right-click menu, so a plain left-drag is free to pan.)
+            // Navigate mode: a plain left-click on a CROSS-ZONE room (blue
+            // border) opens the connecting map — the room's note names the
+            // adjacent zone file, and Genie 4's mapper followed it on click.
+            // Ordinary rooms and empty space keep the grab-scroll pan (Go Here
+            // stays on the right-click menu / Ctrl+Click, so a plain left-drag
+            // is free to pan; a press ON a connector trades that pan start for
+            // the switch, which is what the blue border advertises).
+            var node = HitTest(e.GetPosition(this));
+            if (node is { IsCrossZone: true } &&
+                CrossZoneClickedCommand?.CanExecute(node) == true)
+            {
+                CrossZoneClickedCommand.Execute(node);
+                e.Handled = true;
+                return;
+            }
             BeginPan(e);
             e.Handled = true;
         }

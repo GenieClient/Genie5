@@ -1875,6 +1875,14 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// </summary>
     private void SyncMapperGlobals()
     {
+        // Mapper browse-hold: the DISPLAYED zone isn't where the character is.
+        // Freeze the character-scoped globals at their last-known values —
+        // overwriting them from the browsed map rewrote $zoneid under running
+        // $zoneid-driven scripts (travel.cmd) and printed the browsed map's id
+        // for `#echo $zoneid` (2026-08-06). The #45 off-map "0" semantics are
+        // unaffected: genuine can't-place-you (not browsing) still writes 0s.
+        if (AutoMapper.ViewIsBrowsing) return;
+
         var node = AutoMapper.CurrentNode;
         var zone = AutoMapper.ActiveZone;
         Scripts.Globals["roomid"]   = node?.Id.ToString() ?? "0";
