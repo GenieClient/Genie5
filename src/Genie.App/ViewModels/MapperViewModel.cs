@@ -416,6 +416,10 @@ public class MapperViewModel : ReactiveObject
     // RoomNotFoundInZone handler).
     private string? _browseHoldRoomId;
 
+    // True while LoadSelectedZone runs a USER-initiated load — mutes the
+    // RoomNotFoundInZone artifact the load itself fires (see the handler).
+    private bool _loadingZone;
+
     /// <summary>
     /// Send a non-compass move command (e.g. "go small alleyway", "climb
     /// trellis") via the command pipeline. Invoked when the user clicks a
@@ -999,6 +1003,13 @@ public class MapperViewModel : ReactiveObject
         _engine.MapChanged         += () => Dispatcher.UIThread.Post(Refresh);
         _engine.RoomNotFoundInZone += (serverId, title, exits) =>
         {
+            // A user-initiated zone load is IN PROGRESS: this miss is an
+            // artifact of loading a map the character isn't in, not of the
+            // character moving. Acting on it here (the by-title boundary-stub
+            // follow especially) snapped a fresh browse straight back to the
+            // character's map before the browse-hold even engaged.
+            if (_loadingZone) return;
+
             // Browse-hold: the user is deliberately looking at a different map.
             // Every live room event fires this handler while the loaded zone
             // doesn't contain the character (a moving ferry fires one every few
@@ -1716,6 +1727,23 @@ public class MapperViewModel : ReactiveObject
             return;
         }
 
+        // USER-initiated load with a live character: engage the browse intent
+        // BEFORE the engine loads. LoadZone fires CurrentNodeChanged
+        // synchronously, and GenieCore's SyncMapperGlobals runs on it — setting
+        // the freeze only AFTER the load let that sync clobber $zoneid/$roomid
+        // with the browsed map's values and 0 (`#echo $zoneid $roomid` read
+        // "8 0" instead of the character's "1 236", 2026-08-06). Likewise the
+        // load's own artifact room-miss fired RoomNotFoundInZone before the
+        // hold existed, and the by-title boundary-stub path snapped the view
+        // straight back (clicking Hodierna's Grace on Map1 loaded Map998 and
+        // bounced back to Map1 in the same beat, via 998's own "Alfren's
+        // Ferry" stub). _loadingZone mutes that artifact miss; the provisional
+        // ViewIsBrowsing freeze is finalized (or lifted) right after the load.
+        var userLoad = !_autoZoneSwitch &&
+                       !string.IsNullOrEmpty(_engine.CurrentServerRoomId);
+        if (userLoad) _engine.ViewIsBrowsing = true;   // provisional freeze
+        _loadingZone = userLoad;
+
         // Capture the file's last-write time so the Details panel can show
         // "Last updated: X ago" and flag stale zones. Wrapped in try/catch
         // because the file may have been deleted between Load() and now.
@@ -1731,7 +1759,8 @@ public class MapperViewModel : ReactiveObject
             IsZoneStale       = false;
         }
 
-        _engine.LoadZone(zone);
+        try { _engine.LoadZone(zone); }
+        finally { _loadingZone = false; }
 
         // Browse-hold detection: a USER-initiated load (dropdown pick, cross-
         // zone click, #mapper zone) that does NOT contain the character — while
@@ -1742,13 +1771,21 @@ public class MapperViewModel : ReactiveObject
         // driven switches (_autoZoneSwitch) and pre-connect loads (no server
         // room id yet) never enter browse mode. LoadZone → Recalculate runs
         // synchronously, so CurrentNode is already resolved here.
-        BrowsingZone = !_autoZoneSwitch
-                       && _engine.CurrentNode is null
-                       && !string.IsNullOrEmpty(_engine.CurrentServerRoomId);
+        BrowsingZone = userLoad && _engine.CurrentNode is null;
         // Anchor the hold to the room the character occupied when browsing
         // began — the RoomNotFoundInZone handler releases the hold as soon as
         // a DIFFERENT server room fires (character moved; tracking must win).
-        if (BrowsingZone) _browseHoldRoomId = _engine.CurrentServerRoomId;
+        _browseHoldRoomId = BrowsingZone ? _engine.CurrentServerRoomId : null;
+        if (!BrowsingZone)
+        {
+            // Not browsing after all (engine-driven load, or the user picked
+            // the character's own zone and the room matched). Lift the
+            // provisional freeze and re-resolve so SyncMapperGlobals rewrites
+            // the globals with the character's actual values — the sync that
+            // fired during LoadZone ran under the freeze and was skipped.
+            _engine.ViewIsBrowsing = false;
+            if (userLoad) _engine.Recalculate();
+        }
         LoadStatus = BrowsingZone
             ? $"Loaded {zone.Name} ({zone.Nodes.Count} rooms) — browsing (tracking paused; returns when your character enters this map or you re-select theirs)."
             : $"Loaded {zone.Name} ({zone.Nodes.Count} rooms).";
