@@ -1445,48 +1445,22 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     IReadOnlyDictionary<string, string> ICommandHost.GetGlobalVariables() => Scripts.Globals;
 
     /// <summary>
-    /// Simple <c>$name</c> expansion against <see cref="ScriptEngine.Globals"/>
-    /// and the user variable store. Walks the text once, replaces each
-    /// <c>$identifier</c> with the value found in (1) <c>Scripts.Globals</c>
-    /// (live game state), or (2) <c>Variables.Store</c> (<c>#var</c> values).
-    /// Unknown vars are left as the literal <c>$name</c> — matches Genie 4's
-    /// <c>ParseGlobalVars</c> behavior. Identifier chars are letters, digits,
-    /// <c>_</c>, <c>.</c>, <c>-</c> — same set the script-side
-    /// <c>SubstituteVars</c> recognises.
+    /// <c>$name</c> expansion for the command pipeline (typed input, trigger
+    /// actions, script-forwarded <c>#</c> commands — everything that flows
+    /// through <c>CommandEngine.ProcessInput</c>). Delegates to
+    /// <see cref="ScriptEngine.ExpandGlobalVars"/> so command text resolves
+    /// with the SAME Genie 4-parity rules as script text: globals then user
+    /// <c>#var</c> values, the reserved clock vars ($date/$time/…), and the
+    /// shrink-search with the word-boundary rule. The previous hand-rolled
+    /// single-pass expander here parsed greedily and never shrank, so a
+    /// dotted filename arg like <c>#log &gt;Ranklog-$charactername.txt</c>
+    /// looked up the undefined "charactername.txt" and stayed literal —
+    /// creating a file literally named with the <c>$var</c>. Unknown names
+    /// still stay literal (Genie 4 <c>ParseGlobalVars</c>); <c>%locals</c>
+    /// are untouched at this level.
     /// </summary>
     string ICommandHost.ExpandVariables(string text)
-    {
-        if (string.IsNullOrEmpty(text) || text.IndexOf('$') < 0) return text;
-        var sb = new System.Text.StringBuilder(text.Length);
-        for (int i = 0; i < text.Length; i++)
-        {
-            var c = text[i];
-            if (c != '$') { sb.Append(c); continue; }
-            int j = i + 1;
-            while (j < text.Length &&
-                   (char.IsLetterOrDigit(text[j]) || text[j] == '_' || text[j] == '.' || text[j] == '-'))
-                j++;
-            if (j == i + 1) { sb.Append(c); continue; }  // bare $ with no identifier
-            var name = text[(i + 1)..j];
-            if (name.Equals("spelltime", StringComparison.OrdinalIgnoreCase))
-            {
-                // Live countup (Genie 4) — not a stored global.
-                sb.Append(((int)State.Combat.SpellTimeSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture));
-            }
-            else if (Scripts.Globals.TryGetValue(name, out var liveVal))
-            {
-                sb.Append(liveVal ?? string.Empty);
-            }
-            else
-            {
-                var userVal = Variables?.Store.Get(name);
-                if (userVal is not null) sb.Append(userVal);
-                else sb.Append('$').Append(name);        // unknown → leave literal
-            }
-            i = j - 1;
-        }
-        return sb.ToString();
-    }
+        => Scripts.ExpandGlobalVars(text);
 
     void ICommandHost.EditScript(string name)
     {

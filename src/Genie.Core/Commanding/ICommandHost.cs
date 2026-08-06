@@ -218,11 +218,16 @@ public interface ICommandHost
     /// <summary>
     /// Expand <c>$name</c> references to their current global value (from
     /// the script engine's Globals — populated by <c>#var</c>/<c>#tvar</c>
-    /// and the live-game-state mirror). Matches Genie 4's
-    /// <c>ParseGlobalVars</c>: called at the command-bar entry point so a
-    /// user typing <c>#echo $health</c> sees the substituted number.
+    /// and the live-game-state mirror — plus user <c>#var</c> values and the
+    /// reserved clock vars). Matches Genie 4's <c>ParseGlobalVars</c>,
+    /// including the shrink-search with the word-boundary rule, so a dotted
+    /// arg like <c>&gt;Ranklog-$charactername.txt</c> resolves
+    /// <c>$charactername</c> + ".txt". Called at the command-bar entry point
+    /// so a user typing <c>#echo $health</c> sees the substituted number.
     /// Unknown vars are left as the literal <c>$name</c> text (Genie 4
     /// parity); use an empty fallback for read-or-empty intent.
+    /// GenieCore implements this via
+    /// <c>ScriptEngine.ExpandGlobalVars</c>.
     /// </summary>
     string ExpandVariables(string text);
 

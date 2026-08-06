@@ -2727,7 +2727,43 @@ public sealed class ScriptEngine
     private string SubstituteVars(string text, ScriptInstance inst)
     {
         if (text.IndexOf('%') < 0 && text.IndexOf('$') < 0) return text;
+        return ReplaceSigils(text, inst, includeLocals: true);
+    }
 
+    /// <summary>
+    /// Host-level <c>$variable</c> expansion for the command pipeline —
+    /// <c>ICommandHost.ExpandVariables</c> delegates here, so typed input,
+    /// trigger actions, and script-forwarded <c>#</c> commands all resolve
+    /// <c>$vars</c> with the SAME rules as script text: the Genie 4-parity
+    /// shrink-search with the word-boundary rule (so <c>#log
+    /// &gt;Ranklog-$charactername.txt</c> shrinks past the greedy
+    /// "charactername.txt" candidate to <c>$charactername</c> + ".txt"),
+    /// the reserved clock vars ($date/$time/$datetime/…), $scriptlist /
+    /// $argcount / $spelltime, and undefined-name-stays-literal. Before this
+    /// existed the host had its own single-pass greedy expander: the dotted
+    /// filename above parsed as one undefined name and was left literal —
+    /// Jason's live Logs dir holds a file literally named
+    /// "Ranklog-$charactername.txt" from exactly that trigger action.
+    /// Only <c>'$'</c> sigils are touched: <c>%locals</c> have no meaning
+    /// outside a running script and are left as-is (matching both the old
+    /// host expander and Genie 4's command-level ParseGlobalVars). $0..$9
+    /// carry no frame at this level and resolve as ordinary names (almost
+    /// always literal), so trigger capture slots — already expanded by
+    /// TriggerEngineFinal — are never mangled here.
+    /// </summary>
+    public string ExpandGlobalVars(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text.IndexOf('$') < 0) return text;
+        return ReplaceSigils(text, _hostScope, includeLocals: false);
+    }
+
+    /// <summary>Empty variable scope backing <see cref="ExpandGlobalVars"/>:
+    /// no %locals, no $0..$9 frame. Read-only during resolution, so a single
+    /// shared instance is safe.</summary>
+    private readonly ScriptInstance _hostScope = new();
+
+    private string ReplaceSigils(string text, ScriptInstance inst, bool includeLocals)
+    {
         // Genie 4 parity (Script.cs ParseVariables): scan RIGHT-TO-LEFT so nested
         // / stacked variables resolve inside-out (#128). A trailing var becomes
         // part of the name to its left before that outer sigil is looked up:
@@ -2745,7 +2781,7 @@ public sealed class ScriptEngine
         for (int p = s.Length - 1; p >= 0; p--)
         {
             char c = s[p];
-            if (c != '%' && c != '$') continue;
+            if (c != '$' && (c != '%' || !includeLocals)) continue;
             var (value, end) = ResolveTokenAt(s, p, c, inst);
             // Skip the splice when nothing changed — a bare sigil, or an
             // undefined name returned literally (G4 keeps it as-is).
@@ -2780,12 +2816,17 @@ public sealed class ScriptEngine
         // $0..$9 numeric slots: Genie 4 replaces these as a flat text pass
         // BEFORE the variable loop (Script.cs ParseVariables), so `$1s`
         // is arg1 + literal "s" — the slot consumes exactly ONE digit and
-        // never participates in the name shrink-search below.
-        if (c == '$' && char.IsDigit(s[nameStart]))
+        // never participates in the name shrink-search below. Only when a
+        // frame exists: running scripts always carry one (pushed at TryStart),
+        // so an empty stack means a frameless scope — host-level
+        // ExpandGlobalVars or a trigger-eval instance — where Genie 4's
+        // command-level parser treats "$1" as an ordinary (usually undefined
+        // → literal) name. Consuming it as an empty slot there would eat the
+        // "$3" a trigger action legitimately leaves literal when its pattern
+        // has fewer captures.
+        if (c == '$' && char.IsDigit(s[nameStart]) && inst.DollarStack.Count > 0)
         {
-            var slot = inst.DollarStack.Count > 0
-                ? inst.DollarStack.Peek()[s[nameStart] - '0'] ?? string.Empty
-                : string.Empty;
+            var slot = inst.DollarStack.Peek()[s[nameStart] - '0'] ?? string.Empty;
             return (slot, nameStart + 1);
         }
 
