@@ -48,23 +48,33 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                    RoutingStrategies.Tunnel);
 
         // Suppress BARE-Alt menu arming (smoke 2026-08-04/06 finding #11). A
-        // lone Alt tap — or the stray Alt key-up Windows delivers when
-        // Alt+Tab-ing back into the window — arms the menu bar, which makes
-        // menu ACCESS KEYS live: the next typed 'f' opens File and a following
-        // 'r' fires Record Session, so ordinary game commands ("forage …")
-        // silently toggled the raw-XML recorder five times across one evening
-        // (recording coverage went random). Swallow the naked Alt key-up at
-        // the tunnel phase so the menu never arms from it; held combos
-        // (Alt+F4, Alt+letter menu shortcuts while Alt is DOWN) ride KeyDown
-        // with the modifier present and are unaffected, and the menus stay
-        // fully mouse-accessible. Genie 4 (WinForms) had no Alt-arming either,
-        // so this is also muscle-memory parity for a text-heavy client.
-        AddHandler(InputElement.KeyUpEvent, static (_, e) =>
+        // lone Alt tap arms the menu bar, which makes menu ACCESS KEYS live:
+        // the next typed 'f' opens File and a following 'r' fires Record
+        // Session, so ordinary game commands ("forage …") silently toggled
+        // the raw-XML recorder five times across one evening (recording
+        // coverage went random). Two dead ends first: swallowing the Alt
+        // key-up in a tunnel handler loses the ordering race (Avalonia's
+        // AccessKeyHandler registers its own tunnel hooks at window
+        // construction, before any ctor AddHandler here), and the
+        // IInputRoot.AccessKeyHandler seam that would let us detach the menu
+        // is internal in 11.3. Public-API counter instead: keyboard arming
+        // manifests as the main Menu OPENING with the pointer somewhere else
+        // entirely — close it the instant that happens. Real mouse use always
+        // has the pointer over the menu bar when it opens, so click
+        // navigation is untouched. The cost is Alt/Alt+letter menu
+        // accelerators, which a text-first game client gladly trades away (a
+        // typed line must never detour into the menu bar); Genie 4's WinForms
+        // menu never armed on bare Alt either. Wired on Opened so the Menu
+        // exists in the visual tree.
+        Opened += (_, _) =>
         {
-            if (e.Key is Key.LeftAlt or Key.RightAlt &&
-                e.KeyModifiers == KeyModifiers.None)
-                e.Handled = true;
-        }, RoutingStrategies.Tunnel);
+            var menu = this.GetVisualDescendants().OfType<Menu>().FirstOrDefault();
+            if (menu is null) return;
+            menu.Opened += (_, _) =>
+            {
+                if (!menu.IsPointerOver) menu.Close();
+            };
+        };
 
         // Keyboard macros — F-keys + modifier+letter/digit. Bubble phase
         // (the default) so any inner control that wants to capture the
