@@ -47,6 +47,25 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         AddHandler(InputElement.KeyDownEvent, OnPageScrollKeyDown,
                    RoutingStrategies.Tunnel);
 
+        // Suppress BARE-Alt menu arming (smoke 2026-08-04/06 finding #11). A
+        // lone Alt tap — or the stray Alt key-up Windows delivers when
+        // Alt+Tab-ing back into the window — arms the menu bar, which makes
+        // menu ACCESS KEYS live: the next typed 'f' opens File and a following
+        // 'r' fires Record Session, so ordinary game commands ("forage …")
+        // silently toggled the raw-XML recorder five times across one evening
+        // (recording coverage went random). Swallow the naked Alt key-up at
+        // the tunnel phase so the menu never arms from it; held combos
+        // (Alt+F4, Alt+letter menu shortcuts while Alt is DOWN) ride KeyDown
+        // with the modifier present and are unaffected, and the menus stay
+        // fully mouse-accessible. Genie 4 (WinForms) had no Alt-arming either,
+        // so this is also muscle-memory parity for a text-heavy client.
+        AddHandler(InputElement.KeyUpEvent, static (_, e) =>
+        {
+            if (e.Key is Key.LeftAlt or Key.RightAlt &&
+                e.KeyModifiers == KeyModifiers.None)
+                e.Handled = true;
+        }, RoutingStrategies.Tunnel);
+
         // Keyboard macros — F-keys + modifier+letter/digit. Bubble phase
         // (the default) so any inner control that wants to capture the
         // keystroke first (e.g. the MacrosPanel KeyBox capture mode) can
