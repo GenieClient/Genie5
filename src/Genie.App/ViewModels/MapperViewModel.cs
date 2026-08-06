@@ -411,6 +411,11 @@ public class MapperViewModel : ReactiveObject
     // included) — conflating the two was the original return-button bug.
     private string? _lastMatchedZoneFile;
 
+    // Server room id at the moment the browse-hold engaged; a room-change past
+    // it releases the hold (browsing is stationary-only — see the
+    // RoomNotFoundInZone handler).
+    private string? _browseHoldRoomId;
+
     /// <summary>
     /// Send a non-compass move command (e.g. "go small alleyway", "climb
     /// trellis") via the command pipeline. Invoked when the user clicks a
@@ -1003,8 +1008,25 @@ public class MapperViewModel : ReactiveObject
             // up in the browsed zone or the user returns to their map.
             if (BrowsingZone)
             {
-                _audit?.Note("MISS", $"\"{title}\" not in browsed zone '{_engine?.ActiveZone?.Name}' — auto-load suspended (browsing)");
-                return;
+                // Release the hold the moment the CHARACTER MOVES: the engine
+                // can only match rooms in the loaded zone, so keeping the
+                // suppression up while the character travels starves tracking
+                // completely — no auto-load, no match, $zoneid frozen stale,
+                // and travel.cmd's $roomid=0 branch starts MOVERANDOM
+                // (2026-08-06 ferry ping-pong). Browsing is a STATIONARY
+                // inspection mode; a new server room id means the character is
+                // going places, so follow them again.
+                if (!string.Equals(serverId, _browseHoldRoomId, StringComparison.OrdinalIgnoreCase))
+                {
+                    BrowsingZone = false;
+                    _audit?.Note("MISS", "browse-hold released — character moved; resuming auto-follow");
+                    // fall through to the normal auto-load below
+                }
+                else
+                {
+                    _audit?.Note("MISS", $"\"{title}\" not in browsed zone '{_engine?.ActiveZone?.Name}' — auto-load suspended (browsing)");
+                    return;
+                }
             }
             _audit?.Note("MISS", $"engine can't place \"{title}\" in '{_engine?.ActiveZone?.Name}' → trying auto-load");
             // First: a boundary stub in THIS zone with this title may name the
@@ -1723,6 +1745,10 @@ public class MapperViewModel : ReactiveObject
         BrowsingZone = !_autoZoneSwitch
                        && _engine.CurrentNode is null
                        && !string.IsNullOrEmpty(_engine.CurrentServerRoomId);
+        // Anchor the hold to the room the character occupied when browsing
+        // began — the RoomNotFoundInZone handler releases the hold as soon as
+        // a DIFFERENT server room fires (character moved; tracking must win).
+        if (BrowsingZone) _browseHoldRoomId = _engine.CurrentServerRoomId;
         LoadStatus = BrowsingZone
             ? $"Loaded {zone.Name} ({zone.Nodes.Count} rooms) — browsing (tracking paused; returns when your character enters this map or you re-select theirs)."
             : $"Loaded {zone.Name} ({zone.Nodes.Count} rooms).";
