@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
 
@@ -20,9 +21,28 @@ public sealed class StatusSlotsViewModel : ReactiveObject
     public IReadOnlyList<StatusSlot> Slots { get; } =
         Enumerable.Range(1, 10).Select(n => new StatusSlot(n)).ToArray();
 
-    /// <summary>True when any slot has text. Gates the row's visibility so it
-    /// costs zero height until a script (or the user) writes a status.</summary>
+    /// <summary>True while the row should be visible: any slot has text, or
+    /// every slot cleared less than <see cref="CollapseLinger"/> ago. The
+    /// linger stops scripts that clear-then-rewrite in a tight loop from
+    /// collapsing and re-expanding the row every few milliseconds, which
+    /// shifted the whole layout above it.</summary>
     [Reactive] public bool HasAny { get; private set; }
+
+    /// <summary>How long the emptied row stays visible before collapsing.
+    /// Measured from the write that cleared the last non-empty slot.</summary>
+    public static readonly TimeSpan CollapseLinger = TimeSpan.FromSeconds(5);
+
+    private readonly DispatcherTimer _collapseTimer;
+
+    public StatusSlotsViewModel()
+    {
+        _collapseTimer = new DispatcherTimer { Interval = CollapseLinger };
+        _collapseTimer.Tick += (_, _) =>
+        {
+            _collapseTimer.Stop();
+            HasAny = Slots.Any(s => s.Text.Length > 0);
+        };
+    }
 
     /// <summary>
     /// Apply a <c>#statusbar</c> write (Genie 4 <c>#statusbar [N] {text}</c>),
@@ -35,7 +55,19 @@ public sealed class StatusSlotsViewModel : ReactiveObject
     {
         var slot = index is >= 1 and <= 10 ? index - 1 : 0;
         Slots[slot].Text = text ?? "";
-        HasAny = Slots.Any(s => s.Text.Length > 0);
+        if (Slots.Any(s => s.Text.Length > 0))
+        {
+            _collapseTimer.Stop();
+            HasAny = true;
+        }
+        else if (HasAny && !_collapseTimer.IsEnabled)
+        {
+            // Just went empty: hold the row open for the linger window. A
+            // repopulating write cancels the timer above; further clears while
+            // pending don't restart it, so an abandoned bar still collapses
+            // CollapseLinger after it first emptied.
+            _collapseTimer.Start();
+        }
     }
 }
 

@@ -1094,8 +1094,9 @@
     <!-- the slots as columns keep their columns (Genie 4 semantics). Text    -->
     <!-- persists until overwritten or cleared (bare #statusbar N); it is NOT -->
     <!-- dropped when scripts finish. Declared AFTER the Icon Bar and BEFORE  -->
-    <!-- the vitals grid so DockPanel stacks it between them. Collapses when  -->
-    <!-- every slot is empty; part of the Status Bar toggle.                  -->
+    <!-- the vitals grid so DockPanel stacks it between them. Collapses 5s    -->
+    <!-- after every slot empties (immediate collapse made clear-then-rewrite -->
+    <!-- script loops shift the layout); part of the Status Bar toggle.       -->
     <Border DockPanel.Dock="Bottom"
             Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
             ToolTip.Tip="Script status slots — written with #statusbar [N] text; a bare #statusbar N clears slot N, #statusbar clearall empties all ten.">
