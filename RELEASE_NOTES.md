@@ -1,3 +1,58 @@
+# Genie 5 — v5.0.0-beta.4.b
+
+Silent-disconnect detection, config edits that finally stick on Genie 4-import
+profiles, a mapper zone-browsing suite, and a wide batch of scripting and
+parity fixes — the external-testing bundle.
+
+## ✨ New
+- **Silent-disconnect watchdog.** DragonRealms can end a session without
+  closing the connection — the client used to sit "Connected" (and
+  `$connected` stayed `1`) indefinitely. A server-activity watchdog now
+  declares the link dead after 5 minutes of total silence (a healthy link is
+  never quiet for more than ~30 seconds), triggering the normal
+  disconnect handling. Tune or disable with `#config activitytimeout`
+  (seconds, 60–3600, `0` = off).
+- **Mapper zone browsing.** Picking a map you're not in pauses tracking with
+  a "Return to Current Zone" bar instead of confusing the walker; clicking a
+  blue cross-zone room opens the connecting map (Genie 4 parity); the zone
+  dropdown gains Name / Recently Changed / Map Number sort orders and a
+  SPECIAL badge for event maps.
+- **`/track` and `/trackreset`** are claimed client-side, so the Genie 4
+  EXPTracker muscle-memory commands work (and never leak to the game).
+
+## 🐛 Fixes
+- **Configuration edits survive reconnect on Genie 4-import profiles.** For
+  profiles carrying `.cfg` files, panel edits (macros, highlights, triggers,
+  aliases, substitutes, gags, variables, classes) were silently reverted at
+  the next connect by the stale `.cfg` replay. Panel saves now keep the
+  `.cfg` in lockstep, and the offline dialog shows cfg-only rules.
+- **`#send`, `#wait`, and `#event` queues actually pump** in the app —
+  queued sends no longer sit forever.
+- **Connect dialog attributes the session to the right profile** — retyping
+  credentials for a different character no longer scopes the session (LIVE
+  badge, rules, layout, config dir) to the previously selected profile.
+- **Automapper follows Genie 4 hidden-exit arcs** (`search go X` directives
+  and quick-send chains) during `#goto`.
+- **Undefined `$variables` stay literal** in scripts (Genie 4 parity)
+  instead of collapsing to empty text.
+- **Every script death raises `ScriptFinished` exactly once** — no more
+  missed or doubled notifications for `#action` / plugin listeners.
+- **`#action remove` on a pattern that isn't registered** is a silent no-op
+  (Genie 4 parity) instead of an error.
+- **`#config fe`** resolves as an alias of `frontend`, and four stranded
+  config keys are reachable from `#config list` categories again.
+- **Phantom "Record Session" toggles fixed** — a bare Alt press no longer
+  arms the menu bar so the next keystroke can't trigger a menu item.
+- **Status bar slots collapse promptly** — a cleared status row lingered
+  5 seconds before giving the space back.
+- **macOS menu bar reads "Genie 5"** instead of "Avalonia Application"
+  (#215 — thanks @simtel12).
+
+## 💡 Notes
+- The watchdog is on by default at 300 seconds. If you play through a
+  connection that legitimately goes quiet for longer (an unusual proxy
+  setup), raise it with `#config activitytimeout 600` or disable with `0`.
+
 # Genie 5 — v5.0.0-beta.4
 
 A new editor-backed Game window you can opt into, Open Log In Editor, and a
