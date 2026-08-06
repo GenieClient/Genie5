@@ -107,13 +107,15 @@ public sealed record ConnectionConfig
     public int    MaxReconnectAttempts { get; init; } = 10;
 
     /// <summary>
-    /// Optional application-level dead-link backstop. When &gt; 0, a watchdog
-    /// declares the connection dead if no byte arrives from the server for this
-    /// many milliseconds. <b>Default 0 (off)</b> because it cannot tell a healthy
-    /// idle session from a dead one — TCP keepalive (always on) is the primary,
-    /// false-positive-free detector. Enable only if you also want to catch the
-    /// rare "peer ACKs keepalive but the game stream has wedged" case, and set it
-    /// comfortably longer than the longest silence you ever see while idle.
+    /// Application-level dead-link backstop. When &gt; 0, a watchdog declares the
+    /// connection dead if no byte arrives from the server for this many
+    /// milliseconds. The record default is 0 (unset) so explicit callers keep
+    /// full control, but <c>GenieCore.BuildConnection</c> fills an unset value
+    /// from <c>#config activitytimeout</c> (default 300s) — this is NOT rare in
+    /// the field: DR ends sessions without closing the TCP socket, and the peer
+    /// keeps ACKing keepalive probes while the game stream is dead, so TCP
+    /// keepalive alone never notices. A healthy DR link is never silent for more
+    /// than ~30s (prompt/vitals heartbeats), so minutes of silence means dead.
     /// </summary>
     public int    ServerActivityTimeoutMs { get; init; } = 0;
 

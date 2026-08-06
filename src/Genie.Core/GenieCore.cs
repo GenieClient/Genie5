@@ -649,6 +649,18 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             cfg = cfg with { FrontEndId = Config.FrontEndIdentifier };
         }
 
+        // Server-activity watchdog default (`#config activitytimeout`, seconds).
+        // DR can end a session without closing the TCP socket — the peer keeps
+        // ACKing keepalive probes while the game stream is dead, so nothing ever
+        // fires: no Disconnected, no "disconnected" line, $connected stuck at 1
+        // (observed live 2026-08-04/06: sessions the server logged off sat
+        // "Connected" for 40+ min / all night). The server never goes quiet for
+        // more than ~30s on a healthy link, so a minutes-scale silence watchdog
+        // is a safe default. Callers that set their own timeout (TestHarness
+        // DROP) keep it; Config 0 turns the watchdog off.
+        if (cfg.ServerActivityTimeoutMs == 0 && Config.ActivityTimeout > 0)
+            cfg = cfg with { ServerActivityTimeoutMs = Config.ActivityTimeout * 1000 };
+
         // ── Network stack (per connection) ───────────────────────────────────────
         var connection = new GameConnection(cfg,
             new SgeAuthClient(lf.CreateLogger<SgeAuthClient>()),
@@ -1771,7 +1783,6 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _parserFeed?.Dispose();      _parserFeed      = null;
         _settingsInfoSub?.Dispose(); _settingsInfoSub = null;
         _gameHostSub?.Dispose();     _gameHostSub     = null;
-        _connectedVarSub?.Dispose(); _connectedVarSub = null;
         _globalsSync?.Dispose();     _globalsSync     = null;
         _skillHistory?.Dispose();    _skillHistory    = null;
         _mapperAdapter?.Dispose();   _mapperAdapter   = null;
@@ -1783,6 +1794,14 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _connection = null;
         if (conn is not null)
             await conn.DisposeAsync();
+
+        // $connected must survive teardown ordering: when a still-live connection
+        // is torn down (a #connect over an open session, app shutdown), the read
+        // loop's finally emits Disconnected only DURING conn.DisposeAsync() above
+        // — so this subscription is disposed after the connection, not with the
+        // other subs, or that final event would land in an unsubscribed subject
+        // and leave $connected stuck at "1" for scripts still running offline.
+        _connectedVarSub?.Dispose(); _connectedVarSub = null;
     }
 
     /// <summary>

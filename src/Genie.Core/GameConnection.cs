@@ -172,13 +172,15 @@ public sealed class GameConnection : IAsyncDisposable
                 }
                 _stateSubject.OnNext(new ConnectionEvent(ConnectionEventKind.Connected, 0, _authTransport));
                 _readLoop = ReadLoopAsync(ct);
-                // Server-activity watchdog (off unless ServerActivityTimeoutMs > 0).
-                // TCP keepalive (configured in EstablishConnectionAsync) is the
-                // primary dead-link detector — it can tell a dead peer from a
-                // merely-idle one. This app-level timer is an optional backstop
-                // for the pathological "peer ACKs keepalive but the game app has
-                // wedged" case; it CANNOT distinguish idle from dead, so it stays
-                // opt-in to avoid dropping a healthy but quiet session.
+                // Server-activity watchdog (runs when ServerActivityTimeoutMs > 0;
+                // GenieCore defaults it from `#config activitytimeout`). TCP
+                // keepalive (configured in EstablishConnectionAsync) catches a
+                // dead PEER, but not a dead SESSION: DR can log a character off
+                // without closing the socket, and the peer's TCP stack keeps
+                // ACKing probes while the game stream is dead — no event ever
+                // fires and the client shows Connected forever. DR's server
+                // heartbeats at least every ~30s on a healthy link, so a
+                // minutes-scale silence window tells idle from dead safely.
                 if (_cfg.ServerActivityTimeoutMs > 0)
                     _watchdogLoop = WatchdogLoopAsync(ct);
                 return;
@@ -439,14 +441,16 @@ public sealed class GameConnection : IAsyncDisposable
     }
 
     /// <summary>
-    /// Optional backstop watchdog (enabled only when
-    /// <see cref="ConnectionConfig.ServerActivityTimeoutMs"/> &gt; 0). If no byte
-    /// arrives for the configured window, declares the link dead: raises an Error
-    /// event with the reason, then cancels the connection so the blocked
-    /// <c>ReadAsync</c> unwinds and the read loop's <c>finally</c> publishes
-    /// Disconnected. TCP keepalive normally beats this to the punch; this only
-    /// matters when the peer keeps ACKing keepalive probes while the game stream
-    /// itself has gone silent.
+    /// Backstop watchdog (runs when
+    /// <see cref="ConnectionConfig.ServerActivityTimeoutMs"/> &gt; 0 — on by
+    /// default via <c>#config activitytimeout</c>). If no byte arrives for the
+    /// configured window, declares the link dead: raises an Error event with the
+    /// reason, then cancels the connection so the blocked <c>ReadAsync</c>
+    /// unwinds and the read loop's <c>finally</c> publishes Disconnected. TCP
+    /// keepalive beats this to the punch for a dead peer; this is the ONLY
+    /// detector when the peer keeps ACKing keepalive probes while the game
+    /// stream itself has gone silent (DR ending a session without closing the
+    /// socket — the shape seen live 2026-08-04/06).
     /// </summary>
     private async Task WatchdogLoopAsync(CancellationToken ct)
     {

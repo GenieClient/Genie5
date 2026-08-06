@@ -16,6 +16,7 @@ setting; only `frontend` appears in `settings.cfg` and `#config list`).
 
 | Key | Default | What it does |
 | --- | --- | --- |
+| `activitytimeout` | `300` | Seconds of total server silence before the connection is declared dead (Connection lost → disconnect handling, `$connected` → 0). Catches sessions the server ends without closing the socket, which TCP keepalive can never detect. The server heartbeats at least every ~30s on a healthy link, so the default 5 min is safely conservative. Clamped 60–3600; `0` disables the watchdog. |
 | `classicconnect` | `True` | Use the classic connect dialog flow. |
 | `conndebug` | `False` | Emit granular per-step SGE connection trace marks (TCP/TLS timings, `→K sent`, `→auth`, …) into the game window while connecting. |
 | `connectscript` | *(empty)* | Script to run automatically after connecting. |

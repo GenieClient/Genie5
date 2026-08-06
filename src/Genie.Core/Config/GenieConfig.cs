@@ -159,6 +159,17 @@ public sealed class GenieConfig
     /// <see cref="LichDebug"/> for Lich-proxy diagnosis.</summary>
     public bool ConnDebug { get; set; }
 
+    /// <summary>Seconds of total server silence before the connection is declared
+    /// dead (the app-level activity watchdog in <c>GameConnection</c>). DR's
+    /// server never goes quiet for more than ~30s on a healthy link (prompt/vitals
+    /// heartbeats), but it can end a session WITHOUT closing the TCP socket — the
+    /// peer keeps ACKing keepalive probes while the game stream is dead, so TCP
+    /// keepalive never fires and the client shows Connected (and <c>$connected</c>
+    /// stays 1) indefinitely. Default 300 (5 min, &gt;10× the observed worst-case
+    /// gap); clamped to 60–3600; <c>0</c> disables the watchdog entirely.
+    /// <c>#config activitytimeout</c>.</summary>
+    public int ActivityTimeout { get; set; } = 300;
+
     /// <summary>
     /// Optional safeguard for click-to-walk / <c>#goto</c> traversal: when
     /// <c>true</c>, an in-progress auto-walk pauses itself after the window
@@ -587,6 +598,7 @@ public sealed class GenieConfig
         ("automapper", AutoMapper.ToString()),
         ("automapperalpha", AutoMapperAlpha.ToString()),
         ("conndebug", ConnDebug.ToString()),
+        ("activitytimeout", ActivityTimeout.ToString()),
         ("editor", Editor),
         ("prompt", Prompt),
         ("promptbreak", PromptBreak.ToString()),
@@ -703,7 +715,7 @@ public sealed class GenieConfig
     /// </summary>
     public static readonly IReadOnlyList<(string Category, string[] Keys)> ConfigCategories = new (string, string[])[]
     {
-        ("Connection",       new[] { "classicconnect", "conndebug", "connectscript", "flagscheck", "frontend", "reconnect" }),
+        ("Connection",       new[] { "activitytimeout", "classicconnect", "conndebug", "connectscript", "flagscheck", "frontend", "reconnect" }),
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
@@ -822,6 +834,13 @@ public sealed class GenieConfig
                 case "automapper": AutoMapper = ToBool(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "automapperalpha": AutoMapperAlpha = ClampAlpha(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "conndebug": ConnDebug = ToBool(value); break;
+                case "activitytimeout":
+                    // 0 = watchdog off; anything else clamps to 60s–1h so a typo
+                    // can't declare a healthy-but-quiet link dead (server heartbeat
+                    // gaps up to ~30s are normal) or park detection out past useful.
+                    var at = (int)UtilityCore.StringToDouble(value);
+                    if (at >= 0) ActivityTimeout = at == 0 ? 0 : Math.Clamp(at, 60, 3600);
+                    break;
                 case "showlinks": ShowLinks = ToBool(value); break;
                 case "monsterbold": MonsterBold = ToBool(value); break;
                 case "showimages": ShowImages = ToBool(value); Notify(ConfigFieldUpdated.ImagesEnabled); break;
