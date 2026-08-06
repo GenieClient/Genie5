@@ -15,6 +15,7 @@ using Genie.Core.Macros;
 using Genie.Core.Persistence;
 using Genie.Core.Presets;
 using Genie.Core.Profiles;
+using Genie.Core.Runtime;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
 using Genie.Core.Variables;
@@ -180,6 +181,7 @@ public class ConfigurationViewModel : ReactiveObject
         var engine = HighlightEngine;
         if (engine is null) return;
         TrySave(() => _persistence.SaveHighlights(PathFor("highlights.json"), engine.Rules));
+        SyncCfg("highlights.cfg", () => CfgFormat.HighlightLines(engine.Rules));
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
     }
 
@@ -204,6 +206,7 @@ public class ConfigurationViewModel : ReactiveObject
         var engine = TriggerEngine;
         if (engine is null) return;
         TrySave(() => _persistence.SaveTriggers(PathFor("triggers.json"), engine.Triggers));
+        SyncCfg("triggers.cfg", () => CfgFormat.TriggerLines(engine.Triggers));
     }
 
     public void OnSubstitutesChanged()
@@ -211,6 +214,7 @@ public class ConfigurationViewModel : ReactiveObject
         var engine = SubstituteEngine;
         if (engine is null) return;
         TrySave(() => _persistence.SaveSubstitutes(PathFor("substitutes.json"), engine.Rules));
+        SyncCfg("substitutes.cfg", () => CfgFormat.SubstituteLines(engine.Rules));
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
     }
 
@@ -219,6 +223,7 @@ public class ConfigurationViewModel : ReactiveObject
         var engine = GagEngine;
         if (engine is null) return;
         TrySave(() => _persistence.SaveGags(PathFor("gags.json"), engine.Rules));
+        SyncCfg("gags.cfg", () => CfgFormat.GagLines(engine.Rules));
     }
 
     public void OnAliasesChanged()
@@ -226,6 +231,7 @@ public class ConfigurationViewModel : ReactiveObject
         var engine = AliasEngine;
         if (engine is null) return;
         TrySave(() => _persistence.SaveAliases(PathFor("aliases.json"), engine.Aliases));
+        SyncCfg("aliases.cfg", () => CfgFormat.AliasLines(engine.Aliases));
     }
 
     public void OnMacrosChanged()
@@ -233,6 +239,7 @@ public class ConfigurationViewModel : ReactiveObject
         var engine = MacroEngine;
         if (engine is null) return;
         TrySave(() => _persistence.SaveMacros(PathFor("macros.json"), engine.Rules));
+        SyncCfg("macros.cfg", () => CfgFormat.MacroLines(engine.Rules));
     }
 
     public void OnVariablesChanged()
@@ -240,11 +247,18 @@ public class ConfigurationViewModel : ReactiveObject
         var store = VariableStore;
         if (store is null) return;
         TrySave(() => _persistence.SaveVariables(PathFor("variables.json"), store));
+        SyncCfg("variables.cfg", () => CfgFormat.VariableLines(store));
     }
 
     public void OnClassesChanged()
     {
-        // ClassEngine has no PersistenceService writer yet — see follow-ups.
+        // ClassEngine still has no PersistenceService (.json) writer — see
+        // follow-ups — but when the profile carries a classes.cfg (Genie 4
+        // import / #class save) the connect-time replay makes that file the
+        // effective truth, so keep it current with panel edits.
+        var engine = ClassEngine;
+        if (engine is null) return;
+        SyncCfg("classes.cfg", () => CfgFormat.ClassLines(engine.GetAll()));
     }
 
     public void OnWindowSettingsChanged()
@@ -282,6 +296,50 @@ public class ConfigurationViewModel : ReactiveObject
     private static void TrySave(Action save)
     {
         try { save(); } catch { /* non-fatal */ }
+    }
+
+    /// <summary>
+    /// Keep a coexisting Genie 4-style .cfg in lockstep with the .json we just
+    /// wrote. The connect sequence replays .cfg files AFTER the host's .json
+    /// load, and each .cfg loader clears its engine first — so when both
+    /// stores exist the .cfg wins, and before this sync a stale .cfg (written
+    /// by the Genie 4 import or a "#x save") silently reverted every panel
+    /// edit at the next connect. Only rewrites a file that already exists:
+    /// json-only profiles never get a .cfg forked for them.
+    /// </summary>
+    private void SyncCfg(string fileName, Func<IEnumerable<string>> lines)
+    {
+        var path = PathFor(fileName);
+        if (!File.Exists(path)) return;
+        TrySave(() => ConfigPersistence.WriteLines(path, lines()));
+    }
+
+    /// <summary>
+    /// Replay the selected profile's .cfg files over freshly built draft
+    /// engines — the same thing the connect sequence does after the .json
+    /// load, via the same CommandEngine loaders (<see cref="CfgReplay"/>).
+    /// Without this the draft shows a json-only view that hides every
+    /// cfg-only rule — and a <see cref="SyncCfg"/> from such a draft would
+    /// drop those rules from the .cfg. Best-effort: on any failure the json
+    /// view remains usable.
+    /// </summary>
+    private void OverlayDraftCfg(
+        ClassEngine?        classes     = null,
+        AliasEngine?        aliases     = null,
+        VariableStore?      variables   = null,
+        HighlightEngine?    highlights  = null,
+        TriggerEngineFinal? triggers    = null,
+        SubstituteEngine?   substitutes = null,
+        GagEngine?          gags        = null,
+        MacroEngine?        macros      = null)
+    {
+        try
+        {
+            CfgReplay.LoadInto(_profileDirResolver(SelectedProfile),
+                classes, aliases, variables, highlights,
+                triggers, substitutes, gags, macros);
+        }
+        catch { /* draft overlay is best-effort */ }
     }
 
     /// <summary>Path inside the currently-selected profile's config directory,
@@ -354,16 +412,19 @@ public class ConfigurationViewModel : ReactiveObject
         if (_draftHighlights is not null) return _draftHighlights;
         _draftHighlights = new HighlightEngine();
         var path = ReadPathFor("highlights.json");
-        if (!File.Exists(path)) return _draftHighlights;
-        try
+        if (File.Exists(path))
         {
-            foreach (var m in _persistence.LoadHighlights(path))
-                _draftHighlights.AddRule(
-                    m.Pattern, m.ForegroundColor, m.BackgroundColor,
-                    Enum.TryParse<HighlightMatchType>(m.MatchType, out var mt) ? mt : HighlightMatchType.String,
-                    m.CaseSensitive, m.IsEnabled, m.ClassName, m.SoundFile, m.Speak, m.Windows);
+            try
+            {
+                foreach (var m in _persistence.LoadHighlights(path))
+                    _draftHighlights.AddRule(
+                        m.Pattern, m.ForegroundColor, m.BackgroundColor,
+                        Enum.TryParse<HighlightMatchType>(m.MatchType, out var mt) ? mt : HighlightMatchType.String,
+                        m.CaseSensitive, m.IsEnabled, m.ClassName, m.SoundFile, m.Speak, m.Windows);
+            }
+            catch { }
         }
-        catch { }
+        OverlayDraftCfg(highlights: _draftHighlights);
         return _draftHighlights;
     }
 
@@ -375,14 +436,17 @@ public class ConfigurationViewModel : ReactiveObject
         if (_draftTriggers is not null) return _draftTriggers;
         _draftTriggers = new TriggerEngineFinal();
         var path = ReadPathFor("triggers.json");
-        if (!File.Exists(path)) return _draftTriggers;
-        try
+        if (File.Exists(path))
         {
-            foreach (var m in _persistence.LoadTriggers(path))
-                _draftTriggers.AddTrigger(m.Pattern, m.Action, m.CaseSensitive, m.IsEnabled, m.ClassName,
-                                          m.SoundFile, m.Speak, m.Eval, m.MatchAll);
+            try
+            {
+                foreach (var m in _persistence.LoadTriggers(path))
+                    _draftTriggers.AddTrigger(m.Pattern, m.Action, m.CaseSensitive, m.IsEnabled, m.ClassName,
+                                              m.SoundFile, m.Speak, m.Eval, m.MatchAll);
+            }
+            catch { }
         }
-        catch { }
+        OverlayDraftCfg(triggers: _draftTriggers);
         return _draftTriggers;
     }
 
@@ -391,13 +455,16 @@ public class ConfigurationViewModel : ReactiveObject
         if (_draftSubstitutes is not null) return _draftSubstitutes;
         _draftSubstitutes = new SubstituteEngine();
         var path = ReadPathFor("substitutes.json");
-        if (!File.Exists(path)) return _draftSubstitutes;
-        try
+        if (File.Exists(path))
         {
-            foreach (var m in _persistence.LoadSubstitutes(path))
-                _draftSubstitutes.AddRule(m.Pattern, m.Replacement, m.CaseSensitive, m.IsEnabled, m.ClassName);
+            try
+            {
+                foreach (var m in _persistence.LoadSubstitutes(path))
+                    _draftSubstitutes.AddRule(m.Pattern, m.Replacement, m.CaseSensitive, m.IsEnabled, m.ClassName);
+            }
+            catch { }
         }
-        catch { }
+        OverlayDraftCfg(substitutes: _draftSubstitutes);
         return _draftSubstitutes;
     }
 
@@ -406,13 +473,16 @@ public class ConfigurationViewModel : ReactiveObject
         if (_draftGags is not null) return _draftGags;
         _draftGags = new GagEngine();
         var path = ReadPathFor("gags.json");
-        if (!File.Exists(path)) return _draftGags;
-        try
+        if (File.Exists(path))
         {
-            foreach (var m in _persistence.LoadGags(path))
-                _draftGags.AddRule(m.Pattern, m.CaseSensitive, m.IsEnabled, m.ClassName);
+            try
+            {
+                foreach (var m in _persistence.LoadGags(path))
+                    _draftGags.AddRule(m.Pattern, m.CaseSensitive, m.IsEnabled, m.ClassName);
+            }
+            catch { }
         }
-        catch { }
+        OverlayDraftCfg(gags: _draftGags);
         return _draftGags;
     }
 
@@ -421,13 +491,16 @@ public class ConfigurationViewModel : ReactiveObject
         if (_draftAliases is not null) return _draftAliases;
         _draftAliases = new AliasEngine();
         var path = ReadPathFor("aliases.json");
-        if (!File.Exists(path)) return _draftAliases;
-        try
+        if (File.Exists(path))
         {
-            foreach (var m in _persistence.LoadAliases(path))
-                _draftAliases.AddAlias(m.Name, m.Expansion, m.IsEnabled);
+            try
+            {
+                foreach (var m in _persistence.LoadAliases(path))
+                    _draftAliases.AddAlias(m.Name, m.Expansion, m.IsEnabled);
+            }
+            catch { }
         }
-        catch { }
+        OverlayDraftCfg(aliases: _draftAliases);
         return _draftAliases;
     }
 
@@ -436,13 +509,16 @@ public class ConfigurationViewModel : ReactiveObject
         if (_draftMacros is not null) return _draftMacros;
         _draftMacros = new MacroEngine();
         var path = ReadPathFor("macros.json");
-        if (!File.Exists(path)) return _draftMacros;
-        try
+        if (File.Exists(path))
         {
-            foreach (var m in _persistence.LoadMacros(path))
-                _draftMacros.Add(m.Key, m.Action);
+            try
+            {
+                foreach (var m in _persistence.LoadMacros(path))
+                    _draftMacros.Add(m.Key, m.Action);
+            }
+            catch { }
         }
-        catch { }
+        OverlayDraftCfg(macros: _draftMacros);
         return _draftMacros;
     }
 
@@ -451,13 +527,16 @@ public class ConfigurationViewModel : ReactiveObject
         if (_draftClasses is not null) return _draftClasses;
         _draftClasses = new ClassEngine();
         var path = ReadPathFor("classes.json");
-        if (!File.Exists(path)) return _draftClasses;
-        try
+        if (File.Exists(path))
         {
-            foreach (var m in _persistence.LoadClasses(path))
-                _draftClasses.Set(m.Name, m.IsActive);
+            try
+            {
+                foreach (var m in _persistence.LoadClasses(path))
+                    _draftClasses.Set(m.Name, m.IsActive);
+            }
+            catch { }
         }
-        catch { }
+        OverlayDraftCfg(classes: _draftClasses);
         return _draftClasses;
     }
 
@@ -466,13 +545,16 @@ public class ConfigurationViewModel : ReactiveObject
         if (_draftVariables is not null) return _draftVariables;
         _draftVariables = new VariableStore();
         var path = ReadPathFor("variables.json");
-        if (!File.Exists(path)) return _draftVariables;
-        try
+        if (File.Exists(path))
         {
-            foreach (var m in _persistence.LoadVariables(path))
-                _draftVariables.Set(m.Name, m.Value);
+            try
+            {
+                foreach (var m in _persistence.LoadVariables(path))
+                    _draftVariables.Set(m.Name, m.Value);
+            }
+            catch { }
         }
-        catch { }
+        OverlayDraftCfg(variables: _draftVariables);
         return _draftVariables;
     }
 }
