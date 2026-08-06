@@ -73,8 +73,8 @@ For the full per-release history see [RELEASE_NOTES.md](../RELEASE_NOTES.md).
 
 ## Horizon 1 — Road to stable 5.0.0 🎯
 
-The honest short list. Three parallel tracks; none strictly blocks the others,
-but all three should land before we cut a stable `5.0.0` off the beta channel.
+The honest short list. Several parallel tracks; none strictly blocks the
+others, but all should land before we cut a stable `5.0.0` off the beta channel.
 
 ### Track A — Security-hardening backlog 🔒
 
@@ -127,6 +127,19 @@ Burn down real-user reports on the beta builds before we call it stable:
   ([#203](https://github.com/GenieClient/Genie5/issues/203)).
 - Nested-variable resolution edge case
   ([#180](https://github.com/GenieClient/Genie5/issues/180)).
+
+### Track E — In-app script editor
+
+Editing is still delegated to an external editor (`#edit` opens the OS default;
+the App's editor-host seam — `ICommandHost.EditScript` /
+`GenieCore.EditScriptRequested` — is otherwise unwired). An in-app editor with
+`.cmd` / `.js` syntax highlighting, wired into the existing Script Manager
+panel, brings editing inside the client so users aren't round-tripping to
+Notepad to touch a script. The pieces are already in place: AvaloniaEdit is a
+dependency (it backs the opt-in editor Game window), the `#edit` command and
+edit-request seam exist, and the Script Manager panel is shipped. Scope for 1.0
+is the **editor**; breakpoints and the live `$variable` / script-state
+**debugger** stay a post-1.0 differentiator (Horizon 3).
 
 ---
 
@@ -262,12 +275,12 @@ scripts + triggers + highlights + map edits, with one-click import/export. The
 plugin-trust model is the substrate; this is the distribution layer that grows
 the ecosystem.
 
-### In-app script editor + debugger
+### Script debugger — breakpoints + live state inspector
 
-Editing is currently delegated to an external editor. An integrated editor with
-syntax highlighting, breakpoints, and a live `$variable` / script-state
-inspector for both `.cmd` and `.js` would be a step beyond Genie 4. Much of the
-runtime introspection already exists.
+The in-app **editor** graduated to a 1.0 item (Horizon 1, Track E). The step
+beyond Genie 4 that stays post-1.0 is the **debugger** layered on top of it:
+breakpoints and a live `$variable` / script-state inspector for both `.cmd` and
+`.js`. Much of the runtime introspection already exists.
 
 ### Full-text search across archived sessions
 
