@@ -896,14 +896,19 @@ public sealed class AutoMapperEngine
     /// <summary>
     /// True when a zone file is the community "Transports" map (zone id 998):
     /// transient transport rooms — ferries, gondolas, barges — that exist in no
-    /// real zone. Genie 4's automapper never auto-switched into it (it has no
-    /// global cross-map room search), so <c>$zoneid</c> stayed on the real bank
-    /// zone while aboard and a <c>$zoneid</c>-driven travel script (travel.cmd's
-    /// ferry dispatch, keyed on bank zone-ids) kept working. Genie 5's global
-    /// auto-load must skip this map for the same reason, or a script is stranded
-    /// mid-crossing. Matched by the conventional name/id so a differently-named
-    /// transports map is still covered; an <i>explicit</i> boundary-note link into
-    /// it is unaffected (that path is authored map data, not a fuzzy search).
+    /// real zone. IMPORTANT (verified against Genie 4 source, 2026-08-06): Genie 4
+    /// DOES enter this map aboard a ferry. A bank-zone deck room carries an
+    /// authored <c>.xml</c> boundary note, and G4 follows it — any noted node has
+    /// <c>IsLabelFile = Note.Contains(".xml")</c> (MapForm.cs:570) and is followed
+    /// via <c>LoadXML</c> (AutoMapper.cs:874) — settling on <c>$zoneid=998</c> for
+    /// the crossing. Genie 5's <c>FollowZoneNote</c> matches that and is
+    /// intentionally NOT guarded by this predicate. What G4 lacks is a GLOBAL
+    /// cross-map room search; Genie 5 has one (MapperViewModel.TryAutoLoadZoneFor),
+    /// and on a room-match miss it could snap the active zone to Map998 (or a wrong
+    /// 998 room) in cases G4's note-only mechanism never would. This predicate lets
+    /// that global auto-load skip the Transports map, keeping Genie 5's 998-entry
+    /// authored-note-driven like Genie 4's. Matched by the conventional name/id so
+    /// a differently-named transports map is still covered.
     /// </summary>
     public static bool IsTransientTransportZone(string? zoneFile) =>
         !string.IsNullOrEmpty(zoneFile) &&

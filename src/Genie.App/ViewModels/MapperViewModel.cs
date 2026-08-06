@@ -1223,13 +1223,19 @@ public class MapperViewModel : ReactiveObject
             return;
         }
 
-        // Genie 4 parity: never AUTO-jump into a transient-transport map (id 998,
-        // the community "Transports" — ferries/gondolas/barges). Those rooms exist
-        // only there, so the global room search above would snap $zoneid to 998
-        // mid-crossing; G4 has no such search and keeps $zoneid on the real bank
-        // zone, which a $zoneid-driven travel script (travel.cmd's ferry dispatch)
-        // relies on. The explicit boundary-note path (FollowZoneNote) is unaffected —
-        // an authored cross-zone link into a transport still switches.
+        // Genie 4 parity: keep the GLOBAL room search (above) from selecting the
+        // transient-transport map (id 998, the community "Transports" —
+        // ferries/gondolas/barges). Correction (verified vs G4 source, 2026-08-06):
+        // G4 DOES enter Transports aboard a ferry — a bank-zone deck room carries an
+        // authored .xml boundary note and G4 follows it (IsLabelFile =
+        // Note.Contains(".xml")), sitting on $zoneid=998 for the crossing; G5's
+        // FollowZoneNote matches that and is intentionally NOT guarded. What G4
+        // lacks is THIS global cross-map search, which on a match miss could snap
+        // the active zone to Map998 (or a wrong 998 room) in cases G4 never would.
+        // Skipping it here keeps G5's 998-entry authored-note-driven, like G4. It
+        // does NOT keep $zoneid on the bank zone (the earlier belief that it did was
+        // wrong); whether this guard is what travel.cmd actually needs is still open
+        // pending a `#script debug travel` trace.
         if (AutoMapperEngine.IsTransientTransportZone(zoneFile))
         {
             Dispatcher.UIThread.Post(() =>
