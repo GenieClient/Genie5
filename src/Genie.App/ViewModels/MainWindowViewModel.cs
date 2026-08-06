@@ -2886,7 +2886,45 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             "experience", "analytics", "active spells", "time tracker", "inventory view", "main", "game", "game-text", "room", "vitals",
             "backpack", "mapper", "scripts", "scene",
             "logons", "talk", "whispers", "thoughts", "combat",
+            "familiar", "death", "assess", "atmospherics",
+            "mobs", "players", "injuries", "raw-xml",
             "log", "itemlog",
+        };
+
+    /// <summary>Dock-tool id for a reserved built-in window name, so
+    /// <c>#window show Assess</c> operates on the real Assess stream panel
+    /// instead of no-opping. Returns null for main/game — a script may not
+    /// hide the game window.</summary>
+    private static string? BuiltInWindowToolId(string name)
+        => name.Trim().ToLowerInvariant() switch
+        {
+            "experience"     => "experience",
+            "analytics"      => "analytics",
+            "active spells" or "active-spells"   => "active-spells",
+            "time tracker"  or "time-tracker"    => "time-tracker",
+            "inventory view" or "inventory-view" => "inventory-view",
+            "room"           => "room",
+            "vitals"         => "vitals",
+            "backpack"       => "backpack",
+            "mapper"         => "mapper",
+            "scripts"        => "scripts",
+            "scene"          => "scene",
+            "logons"         => "logons",
+            "talk"           => "talk",
+            "whispers"       => "whispers",
+            "thoughts"       => "thoughts",
+            "combat"         => "combat",
+            "familiar"       => "familiar",
+            "death"          => "death",
+            "assess"         => "assess",
+            "atmospherics"   => "atmospherics",
+            "mobs"           => "mobs",
+            "players"        => "players",
+            "injuries"       => "injuries",
+            "raw-xml"        => "raw-xml",
+            "log"            => "log",
+            "itemlog"        => "itemlog",
+            _                => null,
         };
 
     private static bool IsReservedWindow(string? name)
@@ -3005,15 +3043,42 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // #window <add|open|show|close|hide|remove|clear> "name" → named-window
         // lifecycle for menu scripts (mm_train adds+opens a window, writes to it,
         // then removes it). add/open/show create + reveal the panel; close/hide/
-        // remove hide it; clear empties it. Reserved built-in windows are left
-        // alone so a stray #window can't disturb Game/Room/Combat/etc.
+        // remove hide it; clear empties it. A reserved built-in name operates on
+        // the real panel via its dock-tool id — `#window show Assess` (uber.cmd)
+        // must reveal the Assess stream window, not spawn an empty duplicate
+        // plugin panel (and must still work to REopen one the user closed).
+        // Only main/game stays untouchable (BuiltInWindowToolId → null).
         core.WindowCommandRequested += (sub, window) =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 var w = window?.Trim();
-                if (string.IsNullOrEmpty(w) || IsReservedWindow(w) ||
-                    DockFactory is not GenieDockFactory f)
+                if (string.IsNullOrEmpty(w) || DockFactory is not GenieDockFactory f)
                     return;
+                if (IsReservedWindow(w))
+                {
+                    if (BuiltInWindowToolId(w) is not string toolId) return;
+                    switch (sub.Trim().ToLowerInvariant())
+                    {
+                        case "add":
+                        case "open":
+                        case "show":
+                            f.SetToolVisibility(toolId, true);
+                            break;
+                        case "close":
+                        case "hide":
+                        case "remove":
+                            f.SetToolVisibility(toolId, false);
+                            break;
+                        case "clear":
+                            switch (toolId)
+                            {
+                                case "log":     StreamTabs.Log.Lines.Clear();     break;
+                                case "itemlog": StreamTabs.ItemLog.Lines.Clear(); break;
+                            }
+                            break;
+                    }
+                    return;
+                }
                 switch (sub.Trim().ToLowerInvariant())
                 {
                     case "add":
