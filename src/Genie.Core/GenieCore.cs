@@ -320,8 +320,42 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     private void RaiseEchoToWindow(string text, string? window, string? color)
     {
+        if (IsPhantomVarWindow(window, "#echo")) window = null;   // → main, not a phantom panel
         var t = Plugins is null ? text : Plugins.DispatchEcho(text, string.IsNullOrEmpty(window) ? "main" : window!);
         if (t is not null) EchoToWindow?.Invoke(t, window, color);
+    }
+
+    // ── Phantom-window guard (directed-echo to an unresolved variable) ────────
+    // A resolved #echo/#link/#clear/#window target that still contains '$' is an
+    // unresolved script variable: Genie substitutes every DEFINED $var, so a
+    // surviving '$' means the name was undefined or mistyped (e.g. '>$Log' for
+    // '>Log'). Genie 4 dropped such directed echoes silently — an unknown window
+    // fell through both AddText branches in FormMain.ClassCommand_EchoText, so the
+    // text was discarded. Genie 5's dock factory would instead manufacture a
+    // phantom '$Log' window (GetOrCreatePluginWindow). We route the text to the
+    // main window (never eat it, per the App's directed-echo contract) and warn
+    // ONCE per bad name so the typo is visible and fixable, without breaking the
+    // legitimate custom-window feature (real names like ExpMods/Data still work).
+    private readonly HashSet<string> _warnedVarWindows = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>True when a resolved window target still holds an unresolved
+    /// variable (contains '$'). No legitimate window is named with a '$'; a
+    /// surviving one means variable substitution found no such <c>$var</c>.</summary>
+    public static bool IsUnresolvedVarWindow(string? window)
+        => !string.IsNullOrEmpty(window) && window.IndexOf('$') >= 0;
+
+    /// <summary>If <paramref name="window"/> is an unresolved-variable target,
+    /// warn once (naming the likely intended <c>&gt;name</c>) and return true so
+    /// the caller drops the phantom target. False for normal windows.</summary>
+    private bool IsPhantomVarWindow(string? window, string context)
+    {
+        if (!IsUnresolvedVarWindow(window)) return false;
+        var name = window!.Trim();
+        if (_warnedVarWindows.Add(name))
+            RaiseEchoLine(
+                $"[genie] {context} >{name}: '{name}' is an unresolved variable " +
+                $"(did you mean '>{name.TrimStart('$')}'?). Declare custom windows with '#window add'.");
+        return true;
     }
 
     private void RaiseEchoStyled(string text, string? color, bool mono)
@@ -947,13 +981,19 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         => RaiseEchoStyled(text, color, mono);
 
     void ICommandHost.EchoLink(string text, string command, string? window)
-        => EchoLinkLine?.Invoke(text, command, window);
+        => EchoLinkLine?.Invoke(text, command, IsPhantomVarWindow(window, "#link") ? null : window);
 
     void ICommandHost.EchoClear(string? window)
-        => ClearWindow?.Invoke(window);
+    {
+        if (IsPhantomVarWindow(window, "#clear")) return;   // don't clear Main for a typo'd target
+        ClearWindow?.Invoke(window);
+    }
 
     void ICommandHost.WindowCommand(string sub, string window)
-        => WindowCommandRequested?.Invoke(sub, window);
+    {
+        if (IsPhantomVarWindow(window, "#window " + sub)) return;   // refuse to create a $-named window
+        WindowCommandRequested?.Invoke(sub, window);
+    }
 
     void ICommandHost.SetWindowComment(string window, string comment)
         => WindowCommentRequested?.Invoke(window, comment);
