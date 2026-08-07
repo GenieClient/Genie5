@@ -1,3 +1,43 @@
+# Genie 5 — v5.0.0-beta.4.c
+
+A fast-follow fix bundle for the external-testing round: script-set timer
+variables compute correctly again (the combat-script escape-timer bug),
+typed commands expand `$variables` with full Genie 4 parity, `#window show`
+reaches the real built-in panels, and the mapper's zone browsing gets three
+follow-up fixes.
+
+## 🐛 Fixes
+- **Script `put #tvar` with a braced eval stores the result.** The combat-
+  script idiom `put #tvar Combat.Last {#evalmath ($gametime - $Combat.Time)}`
+  stored the literal `{#evalmath (…)}` text instead of the number, so a later
+  `if ($Combat.Last > $MaxTrain)` hit a parse error and always read false —
+  escape/back-training timers built on it never fired. Script-issued `#tvar`
+  now runs the same value pipeline as a typed one (Genie 4 parity) and
+  registers the name for `#tvar save`.
+- **Typed commands expand `$variables` with full Genie 4 parity.** The
+  command bar and forwarded `#` commands resolve `$vars` through the same
+  rules as script text — including the shrink-search for dotted names and
+  the reserved clock variables (`$date`, `$time`, …) — so rank-gain echoes
+  and other `$var`-bearing commands display real values.
+- **`#window show` on a built-in panel operates on the real tool.**
+  `#window show Assess` used to spawn an empty duplicate panel while the
+  game text went to the real one — and reserved names (Log, Familiar,
+  Death…) could never be reopened by a script at all. add/open/show now
+  reveal the built-in panel, close/hide/remove hide it, and clear empties
+  the log buffers. Only Main stays script-untouchable.
+- **Echo to a window named by an unresolved `$variable` routes to Main** —
+  a typo like `#echo >$Log text` no longer manufactures a phantom panel
+  named after the raw `$var` text.
+- **Mapper zone-browsing follow-ups.** Browsing is now decided by zone
+  identity instead of room-match probing, so clicking a neighbouring map
+  that carries a boundary stub of your current room no longer bounces the
+  view through three maps; the browse hold engages *before* the zone loads
+  (no more stale `$zoneid`/`$roomid` snapshot on the first click); and the
+  hold releases the moment your character actually moves.
+- **Bare-Alt menu arming countered at the menu itself** — a follow-up to
+  the beta.4.b fix, covering Alt-combination keybinds that could still arm
+  the menu bar and swallow the next keystroke.
+
 # Genie 5 — v5.0.0-beta.4.b
 
 Silent-disconnect detection, config edits that finally stick on Genie 4-import

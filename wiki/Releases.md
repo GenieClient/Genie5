@@ -4,7 +4,36 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.4 — Fresh Ink
+## Latest: v5.0.0-beta.4.c — Clean Escape
+
+A fast-follow fix bundle for the external-testing round: script-set timer variables compute correctly again, typed commands expand `$variables` with full Genie 4 parity, `#window show` reaches the real built-in panels, and three mapper zone-browsing follow-ups.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.4.c** as a delta from beta.4.b.
+
+- **Script `put #tvar` with a braced eval stores the result** — the combat-script idiom `put #tvar X {#evalmath (…)}` stored literal text instead of the number, so escape/back-training timers built on the comparison never fired. Script-issued `#tvar` now runs the same value pipeline as a typed one (Genie 4 parity).
+- **Typed commands expand `$variables` with full Genie 4 parity** — shrink-search for dotted names plus the reserved clock variables, matching script-text rules.
+- **`#window show` on a built-in panel operates on the real tool** — no more empty duplicate "Assess" panels; scripts can reopen closed built-ins (Log, Familiar, Death…). Only Main stays script-untouchable.
+- **Echo to a window named by an unresolved `$variable` routes to Main** instead of manufacturing a phantom panel.
+- **Mapper zone-browsing follow-ups** — browsing decided by zone identity (no more three-map bounce off boundary stubs), the browse hold engages before the zone loads, and it releases the moment your character moves.
+- **Bare-Alt menu arming countered at the menu itself** — Alt-combination keybinds can no longer arm the menu bar and swallow the next keystroke.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.4.c)
+
+## v5.0.0-beta.4.b — Night Watch
+
+Silent-disconnect detection, config edits that stick on Genie 4-import profiles, a mapper zone-browsing suite, and a wide batch of scripting and parity fixes — the external-testing bundle.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.4.b** as a delta from beta.4.
+
+- **Silent-disconnect watchdog** — the client no longer sits "Connected" forever after DragonRealms drops a session without closing the socket; tune or disable with `#config activitytimeout`.
+- **Mapper zone browsing** — picking a map you're not in pauses tracking with a "Return to Current Zone" bar; blue cross-zone rooms open the connecting map (Genie 4 parity); zone dropdown sort orders + SPECIAL badge.
+- **Configuration edits survive reconnect on Genie 4-import profiles** — panel saves keep the `.cfg` files in lockstep so the next connect's replay can't revert them.
+- **`/track` and `/trackreset`** are claimed client-side for EXPTracker muscle memory.
+- **Fixes** — `#send`/`#wait`/`#event` queues pump in the app; connect dialog attributes the session to the right profile; automapper follows Genie 4 hidden-exit arcs during `#goto`; undefined `$variables` stay literal in scripts; `ScriptFinished` fires exactly once per script death; `#action remove` on an unknown pattern is a silent no-op; `#config fe` aliases `frontend`; bare-Alt no longer arms the menu bar; status-bar slots collapse promptly; macOS menu bar reads "Genie 5" (#215 — thanks @simtel12).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.4.b)
+
+## v5.0.0-beta.4 — Fresh Ink
 
 A new editor-backed Game window you can opt into, Open Log In Editor, and a scripting fix for community `-verb` send idioms.
 
