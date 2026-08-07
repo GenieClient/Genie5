@@ -2280,8 +2280,24 @@ public sealed class ScriptEngine
         {
             case "#tvar":
             {
-                // #tvar Name Value
+                // #tvar Name Value — forward to the host command engine so a
+                // script-issued `put #tvar` runs the SAME value pipeline as a
+                // typed one: ArgumentParser brace grouping + ResolveValueCommand
+                // + the #tvar-save name set. The uber-combat idiom
+                //   put #tvar UC_Combat.Last {#evalmath ($gametime - $UC_Combat.Time)}
+                // must store the numeric RESULT; the old local first-space split
+                // stored the literal "{#evalmath (…)}" text, which then poisoned
+                //   if ($UC_Combat.Last > $UC_MaxTrain)
+                // with a '{' expression parse error (always false → the escape
+                // timer never fired). Both paths write the same Globals store.
+                if (_handleHashCmd is not null) { _handleHashCmd(text); return; }
+
+                // Core-only fallback (no host wired, e.g. bare-engine tests):
+                // best-effort — strip one outer {…} pair; embedded #eval /
+                // #evalmath can't run without the command engine.
                 var (name, value) = SplitCmd(rest);
+                if (value.Length > 1 && value[0] == '{' && value[^1] == '}')
+                    value = value[1..^1];
                 if (name.Length > 0) Globals[name] = value;
                 return;
             }
