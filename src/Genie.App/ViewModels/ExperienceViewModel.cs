@@ -26,6 +26,7 @@ public class ExperienceViewModel : ReactiveObject
     private int _appliedLevel = -1;
     private bool _trackGain;
     private bool _g4Layout;
+    private bool _showConfigBar = true;
 
     /// <summary>Stop names for the 0–4 density slider, indexed by level.</summary>
     private static readonly string[] LevelNames =
@@ -98,6 +99,24 @@ public class ExperienceViewModel : ReactiveObject
         }
     }
 
+    /// <summary>Config-bar (Density / Track gain / G4 layout strip) visibility.
+    /// Toggled from the window right-click menu ("Show Config Bar"); writes
+    /// <c>experienceconfigbar</c> quietly like the strip's own controls. Pure
+    /// UI — hiding the bar reclaims the row, the settings behind it still apply.</summary>
+    public bool ShowConfigBar
+    {
+        get => _showConfigBar;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _showConfigBar, value);
+            if (_core is not null && _core.Config.ExperienceConfigBar != value)
+            {
+                _core.Config.SetSetting("experienceconfigbar", value.ToString(), showException: false);
+                _core.Config.Save();
+            }
+        }
+    }
+
     public void Attach(GenieCore core)
     {
         _core = core;
@@ -108,6 +127,8 @@ public class ExperienceViewModel : ReactiveObject
         this.RaisePropertyChanged(nameof(TrackGain));
         _g4Layout     = core.Config.ExperienceG4Layout;
         this.RaisePropertyChanged(nameof(G4Layout));
+        _showConfigBar = core.Config.ExperienceConfigBar;
+        this.RaisePropertyChanged(nameof(ShowConfigBar));
 
         core.SetPluginWindow += (window, content) =>
         {

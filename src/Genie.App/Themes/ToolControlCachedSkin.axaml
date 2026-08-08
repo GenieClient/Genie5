@@ -163,6 +163,10 @@
                                     ToggleType="CheckBox"
                                     IsChecked="{Binding WindowMenu.IsWordWrapOn, Mode=TwoWay}"
                                     IsVisible="{Binding WindowMenu.ShowWordWrap}" />
+                          <MenuItem Header="Show Config Bar"
+                                    ToggleType="CheckBox"
+                                    IsChecked="{Binding WindowMenu.IsConfigBarOn, Mode=TwoWay}"
+                                    IsVisible="{Binding WindowMenu.ShowConfigBar}" />
                           <MenuItem Header="Pause Scrolling"
                                     ToggleType="CheckBox"
                                     IsChecked="{Binding WindowMenu.IsScrollPaused, Mode=TwoWay}"

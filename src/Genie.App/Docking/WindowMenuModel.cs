@@ -30,12 +30,14 @@ public sealed class WindowMenuModel : ReactiveObject
     private bool _isEchoToMainOn;
     private bool _isScrollPaused;
     private bool _isWordWrapOn;
+    private bool _isConfigBarOn;
     private bool _isFloating;
     private readonly Action<bool>? _onTimestampToggled;
     private readonly Action<bool>? _onNameListOnlyToggled;
     private readonly Action<bool>? _onEchoToMainToggled;
     private readonly Action<bool>? _onScrollPauseToggled;
     private readonly Action<bool>? _onWordWrapToggled;
+    private readonly Action<bool>? _onConfigBarToggled;
     private readonly Func<bool>?   _floatStateProbe;
     private readonly Action?       _onToggleTitleBar;
     private readonly Func<bool>?   _titleBarHiddenProbe;
@@ -59,7 +61,9 @@ public sealed class WindowMenuModel : ReactiveObject
         bool          echoToMainOn          = true,
         Action<bool>? onEchoToMainToggled   = null,
         Action?       onToggleTitleBar      = null,
-        Func<bool>?   titleBarHiddenProbe   = null)
+        Func<bool>?   titleBarHiddenProbe   = null,
+        bool          configBarOn           = true,
+        Action<bool>? onConfigBarToggled    = null)
     {
         ClearCommand           = clear;
         CloseCommand           = close;
@@ -76,6 +80,8 @@ public sealed class WindowMenuModel : ReactiveObject
         _onScrollPauseToggled  = onScrollPauseToggled;
         _isWordWrapOn          = wordWrapOn;
         _onWordWrapToggled     = onWordWrapToggled;
+        _isConfigBarOn         = configBarOn;
+        _onConfigBarToggled    = onConfigBarToggled;
         _floatStateProbe       = floatStateProbe;
         _onToggleTitleBar      = onToggleTitleBar;
         _titleBarHiddenProbe   = titleBarHiddenProbe;
@@ -125,6 +131,9 @@ public sealed class WindowMenuModel : ReactiveObject
     public bool ShowEchoToMain   => _onEchoToMainToggled  is not null;
     public bool ShowPauseScroll  => _onScrollPauseToggled is not null;
     public bool ShowWordWrap     => _onWordWrapToggled    is not null;
+    /// <summary>"Show Config Bar" — panels with a settings strip across the top
+    /// (currently the Experience window's Density / Track gain / G4 layout row).</summary>
+    public bool ShowConfigBar    => _onConfigBarToggled   is not null;
     public bool ShowFloat        => ToggleFloatCommand    is not null;
 
     /// <summary>#181: "Hide/Show Title Bar" applies only to a window that's floating
@@ -144,7 +153,8 @@ public sealed class WindowMenuModel : ReactiveObject
     public bool ShowCloseSeparator =>
         ShowClose && (ShowCopyAll || ShowClear || ShowSaveAs || ShowFind
                       || ShowTimestamp || ShowNameListOnly || ShowEchoToMain
-                      || ShowPauseScroll || ShowWordWrap || ShowFloat || ShowHideTitleBar);
+                      || ShowPauseScroll || ShowWordWrap || ShowConfigBar
+                      || ShowFloat || ShowHideTitleBar);
 
     /// <summary>Time Stamp checkbox state. Set by the TwoWay menu binding —
     /// flipping it runs the toggle handler (which updates the window's
@@ -216,6 +226,20 @@ public sealed class WindowMenuModel : ReactiveObject
         }
     }
 
+    /// <summary>"Show Config Bar" checkbox state — mirrors the panel's config-bar
+    /// visibility (Experience: <c>experienceconfigbar</c>). Flipping it runs the
+    /// toggle handler, which updates the view-model + persists.</summary>
+    public bool IsConfigBarOn
+    {
+        get => _isConfigBarOn;
+        set
+        {
+            if (_isConfigBarOn == value) return;
+            this.RaiseAndSetIfChanged(ref _isConfigBarOn, value);
+            _onConfigBarToggled?.Invoke(value);
+        }
+    }
+
     /// <summary>"Float" when the window is docked, "Re-dock" when it's already
     /// floating in its own top-level window. Refreshed by
     /// <see cref="RefreshFloatState"/> when the menu opens (the user can drag a
@@ -258,4 +282,10 @@ public sealed class WindowMenuModel : ReactiveObject
     /// <summary>Mirror an external Word Wrap change into the checkmark.</summary>
     public void SyncWordWrap(bool value) =>
         this.RaiseAndSetIfChanged(ref _isWordWrapOn, value, nameof(IsWordWrapOn));
+
+    /// <summary>Mirror an external config-bar visibility change (e.g. the value
+    /// seeded from settings.cfg on connect) into the checkmark without
+    /// re-invoking the toggle handler.</summary>
+    public void SyncConfigBar(bool value) =>
+        this.RaiseAndSetIfChanged(ref _isConfigBarOn, value, nameof(IsConfigBarOn));
 }

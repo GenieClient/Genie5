@@ -970,11 +970,23 @@ public class GenieDockFactory : Factory
             };
         }
 
+        // Show Config Bar — panels with a settings strip across the top; today
+        // just the Experience window's Density / Track gain / G4 layout row.
+        // The toggle drives the view-model, which persists experienceconfigbar.
+        bool          configBarInit   = true;
+        Action<bool>? configBarToggle = null;
+        if (dockable is ExperienceTool expTool)
+        {
+            configBarInit   = expTool.ViewModel.ShowConfigBar;
+            configBarToggle = on => expTool.ViewModel.ShowConfigBar = on;
+        }
+
         // Time Stamp + Name List Only + Pause Scrolling only make sense for the
         // per-line text feeds; everything else gets Copy All / Save As (where
         // it has a buffer) + Find + Clear + Float + Close.
         if (dockable is not (StreamTool or GameTextDocument))
-            return new WindowMenuModel(
+        {
+            var toolMenu = new WindowMenuModel(
                 clear:             clear,
                 close:             close,
                 copyAll:           copyAll,
@@ -985,7 +997,18 @@ public class GenieDockFactory : Factory
                 onToggleFloat:     toggleFloat,
                 floatStateProbe:   floatProbe,
                 onToggleTitleBar:  toggleTitleBar,
-                titleBarHiddenProbe: titleBarHidden);
+                titleBarHiddenProbe: titleBarHidden,
+                configBarOn:        configBarInit,
+                onConfigBarToggled: configBarToggle);
+
+            // Keep the checkmark honest when the visibility changes outside the
+            // menu — the value seeded from settings.cfg on connect (Attach).
+            if (dockable is ExperienceTool exSync)
+                exSync.ViewModel.WhenAnyValue(v => v.ShowConfigBar)
+                    .Subscribe(v => toolMenu.SyncConfigBar(v));
+
+            return toolMenu;
+        }
 
         var settings = _vm.WindowSettings.Get(id);
 

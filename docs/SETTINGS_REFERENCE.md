@@ -54,6 +54,7 @@ setting; only `frontend` appears in `settings.cfg` and `#config list`).
 | `experiencedensity` | `0` | Experience-window line density, 0–4 (0 = Full … 4 = Brief; higher = shorter line). |
 | `experiencetrackgain` | `False` | Experience window shows ranks gained this session per skill plus a session total. |
 | `experienceg4layout` | `False` | Move the Experience summary to a footer beneath the skill list (classic Genie 4 EXPTracker look). |
+| `experienceconfigbar` | `True` | Show the config bar (Density slider / Track gain / G4 layout) across the top of the Experience window. Also toggled from the window's right-click menu ("Show Config Bar"). |
 | `showtimetracker` | `True` | Enable the built-in Time Tracker (Elanthian time / sky dock panel). |
 | `prompt` | `> ` | Prompt text shown in the game window; `on`/`off` toggle between `> ` and empty. |
 | `promptbreak` | `True` | Break the line at a prompt. |

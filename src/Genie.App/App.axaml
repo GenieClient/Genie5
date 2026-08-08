@@ -1357,8 +1357,10 @@
       <DockPanel>
         <!-- Per-panel density slider (public #125) + Track-gain toggle (#144).   -->
         <!-- Each writes its #config value directly, so the controls, the command -->
-        <!-- line, and settings.cfg stay in sync.                                 -->
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,2" Spacing="6">
+        <!-- line, and settings.cfg stay in sync. The whole bar hides via the     -->
+        <!-- window right-click menu ("Show Config Bar" → experienceconfigbar).   -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,2" Spacing="6"
+                    IsVisible="{Binding ViewModel.ShowConfigBar}">
           <TextBlock Text="Density" VerticalAlignment="Center"
                      FontSize="11" Opacity="0.7"/>
           <Slider Width="140" Minimum="0" Maximum="4"

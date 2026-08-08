@@ -82,6 +82,11 @@ public sealed class GenieConfig
     /// Default off (keep the current G5 layout). Read by
     /// <see cref="Extensions.Builtin.ExperienceExtension"/> on render.</summary>
     public bool ExperienceG4Layout { get; set; }
+    /// <summary>Experience-window config bar (the Density slider / Track gain /
+    /// G4 layout strip across the top of the panel). Default on. Pure UI —
+    /// hides the controls to reclaim the row, the settings behind them still
+    /// apply. Toggled from the Experience window's right-click menu.</summary>
+    public bool ExperienceConfigBar { get; set; } = true;
     /// <summary>Built-in Time Tracker (Elanthian time / sky "Time Tracker" dock panel).
     /// Default on. Was the external Plugin_TimeTrackerV5, now in Core.</summary>
     public bool ShowTimeTracker { get; set; } = true;
@@ -602,6 +607,7 @@ public sealed class GenieConfig
         ("experiencedensity", ExperienceDensity.ToString()),
         ("experiencetrackgain", ExperienceTrackGain.ToString()),
         ("experienceg4layout", ExperienceG4Layout.ToString()),
+        ("experienceconfigbar", ExperienceConfigBar.ToString()),
         ("showtimetracker", ShowTimeTracker.ToString()),
         ("autolog", AutoLog.ToString()),
         ("automapper", AutoMapper.ToString()),
@@ -727,7 +733,7 @@ public sealed class GenieConfig
         ("Connection",       new[] { "activitytimeout", "classicconnect", "conndebug", "connectscript", "flagscheck", "frontend", "reconnect" }),
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow" }),
-        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
+        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "updatemapperscripts" }),
@@ -777,6 +783,7 @@ public sealed class GenieConfig
                 case "experiencedensity": ExperienceDensity = Math.Clamp(UtilityCore.StringToInteger(value), 0, 4); Notify(ConfigFieldUpdated.Trackers); break;
                 case "experiencetrackgain": ExperienceTrackGain = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "experienceg4layout": ExperienceG4Layout = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
+                case "experienceconfigbar": ExperienceConfigBar = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "showtimetracker": ShowTimeTracker = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "autolog": AutoLog = ToBool(value); Notify(ConfigFieldUpdated.Autolog); break;
                 case "classicconnect": ClassicConnect = ToBool(value); Notify(ConfigFieldUpdated.ClassicConnect); break;
