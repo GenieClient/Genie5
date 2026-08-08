@@ -1015,6 +1015,32 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// </summary>
     public event Action<string, int>? StatusBarRequested;
 
+    // ── Unexpanded-variable-in-outgoing-command guard ────────────────────────
+    // Sibling of the phantom-window echo guard (IsUnresolvedVarWindow): there a
+    // '$'-var leaked into an #echo TARGET; here a %var/$var leaks into a game
+    // COMMAND. A command reaching SendToGame that still holds a %name/$name token
+    // is an UNDEFINED variable substitution left literal — e.g. a script's
+    // `put go %offtransport` sent verbatim because `%offtransport` was never set,
+    // which DR answers with the unhelpful "What were you referring to?". We warn
+    // once per distinct bad command so the cause is explicit instead of silent.
+    private readonly HashSet<string> _warnedRawVarCommands = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>True when <paramref name="command"/> still contains a
+    /// <c>%name</c>/<c>$name</c> token — an unexpanded (undefined) variable about
+    /// to be sent to the game literally. Detects a <c>%</c>/<c>$</c> immediately
+    /// followed by a variable-name char (letter or underscore); a bare
+    /// <c>%</c>/<c>$</c> or one before a digit is left alone to avoid
+    /// false-positives on literal text. Outputs the first offending token.</summary>
+    public static bool ContainsUnexpandedVar(string? command, out string token)
+    {
+        token = "";
+        if (string.IsNullOrEmpty(command)) return false;
+        var m = System.Text.RegularExpressions.Regex.Match(command, @"[%$][A-Za-z_][A-Za-z0-9_.]*");
+        if (!m.Success) return false;
+        token = m.Value;
+        return true;
+    }
+
     void ICommandHost.SendToGame(string text, bool userInput, string origin, string? echoOverride)
     {
         // Local echo of user-typed commands so the player can see what they sent.
@@ -1045,6 +1071,17 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             Scripts.Globals["lastcommand"] = text;
 
             _typeAhead.NotifySent();
+
+            // Diagnostic: a command going to the game with a surviving %var/$var
+            // is an undefined variable sent literally. Warn once per distinct bad
+            // command (default on; #config warnrawvars false to silence).
+            if ((Config?.WarnRawVars ?? true) && ContainsUnexpandedVar(text, out var rawVar)
+                && _warnedRawVarCommands.Add(text.Trim()))
+                RaiseEchoLine(
+                    $"[genie] sent '{text.Trim()}' with an unexpanded variable '{rawVar}' — " +
+                    $"it is undefined, so the game got it literally (that's the \"What were you " +
+                    $"referring to?\" cause). Silence with #config warnrawvars false.");
+
             // Offline (no live connection) the send is dropped — user input is
             // still echoed and observed by the mapper above, so the command bar
             // stays usable while disconnected (issue #88).

@@ -20,6 +20,14 @@ public sealed class GenieConfig
     public char CommandChar { get; set; } = '#';
     public bool TriggerOnInput { get; set; } = true;
 
+    /// <summary>Warn when a command sent to the game still contains an unexpanded
+    /// <c>%var</c>/<c>$var</c> — an undefined variable that leaked through
+    /// substitution and is going out literally (e.g. a script's
+    /// <c>put go %offtransport</c> sent verbatim because <c>%offtransport</c> was
+    /// never set, which DR answers with "What were you referring to?"). Default
+    /// on; <c>#config warnrawvars false</c> silences it.</summary>
+    public bool WarnRawVars { get; set; } = true;
+
     /// <summary>Genie 4 <c>mycommandchar</c> (Config.cs:17, default '/'):
     /// input starting with this char is echoed and run through the
     /// trigger/action pipeline (see <see cref="TriggerOnInput"/>) but NEVER
@@ -581,6 +589,7 @@ public sealed class GenieConfig
         ("commandchar", CommandChar.ToString()),
         ("mycommandchar", MyCommandChar.ToString()),
         ("triggeroninput", TriggerOnInput.ToString()),
+        ("warnrawvars", WarnRawVars.ToString()),
         ("highlights", EnableHighlights.ToString()),
         ("triggers", EnableTriggers.ToString()),
         ("substitutes", EnableSubstitutes.ToString()),
@@ -720,7 +729,7 @@ public sealed class GenieConfig
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
-        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
+        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "updatemapperscripts" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
         ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsstreampriority", "ttsrate", "ttsvolume" }),
@@ -755,6 +764,7 @@ public sealed class GenieConfig
                 case "commandchar": CommandChar = FirstCharOrDefault(value, CommandChar); break;
                 case "mycommandchar": MyCommandChar = FirstCharOrDefault(value, MyCommandChar); break;
                 case "triggeroninput": TriggerOnInput = ToBool(value); break;
+                case "warnrawvars": WarnRawVars = ToBool(value); break;
                 case "highlights": EnableHighlights = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
                 case "triggers": EnableTriggers = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
                 case "substitutes": EnableSubstitutes = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
