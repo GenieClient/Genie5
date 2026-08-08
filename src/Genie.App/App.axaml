@@ -24,6 +24,11 @@
              view instead of all showing the first-built one. Full writeup lives in
              the file header. -->
         <ResourceInclude Source="avares://Genie5/Themes/ToolControlCachedSkin.axaml" />
+        <!-- #219: overrides the stock ProportionalDockControl theme so an EMPTY
+             column collapses to zero pixels even though its model node stays
+             IsCollapsable=false for TryRestoreHomeDock. Full writeup lives in
+             the file header. -->
+        <ResourceInclude Source="avares://Genie5/Themes/ProportionalDockCollapseSkin.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

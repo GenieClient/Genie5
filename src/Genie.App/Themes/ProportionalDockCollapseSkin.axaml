@@ -1,0 +1,82 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:dmc="using:Dock.Model.Controls"
+                    x:DataType="dmc:IProportionalDock"
+                    x:CompileBindings="True">
+
+  <!-- =========================================================== #219 =====
+       Collapse EMPTY proportional columns even when IsCollapsable=false.
+
+       THE BUG (emptied left column leaves a permanent ~79px gutter):
+       left-col / center-col / root-layout are deliberately IsCollapsable=false
+       (GenieDockFactory invariant: the grandparents must always survive so
+       TryRestoreHomeDock can rebuild a pruned ToolDock inside them when its
+       window is re-opened). Dock 11.3.11's stock ProportionalDockControl theme
+       only visually collapses a child when IsCollapsable AND IsEmpty — so when
+       the user closes Room and every stream tab, the ToolDocks inside left-col
+       are pruned but left-col itself keeps rendering at its Proportion (0.22),
+       and the splitter's 75px MinimumProportionSize floor stops the Game
+       window from ever being dragged into it. Result: dead space that nothing
+       can reclaim.
+
+       THE FIX:
+       A copy of the stock ProportionalDockControl theme (Dock.Avalonia.Themes.
+       Fluent 11.3.11.22, Controls/ProportionalDockControl.axaml at the
+       package's pinned commit 74a743dc) with ONE change: the
+       ProportionalStackPanel.IsCollapsed setter binds IsEmpty ALONE, dropping
+       the IsCollapsable leg of the stock MultiBinding. The model node stays
+       alive (the rebuild invariant is untouched), but an empty column is
+       measured/arranged at zero size, its adjacent splitter is skipped, and
+       ProportionManager renormalizes the remaining proportions — so the Game
+       column genuinely absorbs the space. Re-opening a window flips IsEmpty
+       back (FactoryBase updates it on every add/insert/remove) and the column
+       returns at its remembered CollapsedProportion share.
+
+       Splitter children bind-fail on IsEmpty exactly as they bind-failed the
+       stock MultiBinding (they're not IProportionalDock), leaving IsCollapsed
+       at its default false — same as stock.
+       ===================================================================== -->
+  <ControlTheme x:Key="{x:Type ProportionalDockControl}" TargetType="ProportionalDockControl">
+
+    <Setter Property="(AutomationProperties.AutomationId)" Value="{Binding Id}" />
+    <Setter Property="(AutomationProperties.Name)" Value="{Binding Title}" />
+
+    <Setter Property="(DockProperties.IsDragEnabled)" Value="{Binding CanDrag}" />
+    <Setter Property="(DockProperties.IsDropEnabled)" Value="{Binding CanDrop}" />
+    <Setter Property="(DockProperties.DockGroup)" Value="{Binding DockGroup}" />
+
+    <Setter Property="Template">
+      <ControlTemplate>
+        <DockableControl TrackingMode="Visible">
+          <ItemsControl ItemsSource="{Binding VisibleDockables}"
+                        Name="PART_ItemsControl"
+                        Classes="ProportionalStackPanel">
+            <ItemsControl.Styles>
+              <Style Selector="ItemsControl.ProportionalStackPanel > ContentPresenter">
+                <Setter Property="(ProportionalStackPanel.CollapsedProportion)"
+                        Value="{Binding CollapsedProportion}" />
+                <!-- ── THE ONLY CHANGE vs stock (#219): IsEmpty alone; stock
+                     wraps this in And(IsCollapsable, IsEmpty). ── -->
+                <Setter Property="(ProportionalStackPanel.IsCollapsed)"
+                        Value="{Binding IsEmpty}" />
+                <Setter Property="MinWidth" Value="{Binding MinWidth}" />
+                <Setter Property="MaxWidth" Value="{Binding MaxWidth}" />
+                <Setter Property="MinHeight" Value="{Binding MinHeight}" />
+                <Setter Property="MaxHeight" Value="{Binding MaxHeight}" />
+              </Style>
+            </ItemsControl.Styles>
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <ProportionalStackPanel DockProperties.IsDropArea="True"
+                                        Background="Transparent"
+                                        Orientation="{Binding Orientation, Converter={x:Static OrientationConverter.Instance}}" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
+        </DockableControl>
+      </ControlTemplate>
+    </Setter>
+
+  </ControlTheme>
+
+</ResourceDictionary>

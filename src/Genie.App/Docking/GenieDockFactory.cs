@@ -766,6 +766,7 @@ public class GenieDockFactory : Factory
                     Orientation      = ParseOrientation(n.Orientation),
                     Proportion       = n.Proportion,
                     IsCollapsable    = false,
+                    IsEmpty          = ComputeIsEmpty(kids),
                     VisibleDockables = CreateList(kids.ToArray()),
                 };
             }
@@ -777,6 +778,7 @@ public class GenieDockFactory : Factory
                     Id               = n.Id ?? "docs",
                     IsCollapsable    = false,
                     Proportion       = n.Proportion,
+                    IsEmpty          = ComputeIsEmpty(kids),
                     VisibleDockables = CreateList(kids.ToArray()),
                     ActiveDockable   = FindById(kids, n.ActiveId),
                 };
@@ -789,6 +791,7 @@ public class GenieDockFactory : Factory
                     Id               = n.Id ?? "",
                     Alignment        = ParseAlignment(n.Alignment),
                     Proportion       = n.Proportion,
+                    IsEmpty          = ComputeIsEmpty(kids),
                     VisibleDockables = CreateList(kids.ToArray()),
                     ActiveDockable   = FindById(kids, n.ActiveId),
                 };
@@ -824,6 +827,17 @@ public class GenieDockFactory : Factory
                 return null;
         }
     }
+
+    /// <summary>
+    /// Mirror of FactoryBase.UpdateIsEmpty for the snapshot-restore path (#219):
+    /// docks built here bypass the factory's add/remove bookkeeping, so IsEmpty
+    /// (default false) would stay stale for a column that was saved empty — and
+    /// the ProportionalDockCollapseSkin keys the visual collapse on IsEmpty.
+    /// Children are built bottom-up, so nested docks' IsEmpty is already set.
+    /// </summary>
+    private static bool ComputeIsEmpty(List<IDockable> kids) =>
+        kids.Count == 0 || kids.All(k =>
+            k is ISplitter || k is IDock { IsEmpty: true, IsCollapsable: true });
 
     private List<IDockable> BuildChildren(List<DockNodeSnapshot> children)
     {
