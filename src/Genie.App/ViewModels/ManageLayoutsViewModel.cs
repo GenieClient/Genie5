@@ -15,7 +15,12 @@ public sealed class LayoutEntry
     public required LayoutScope Scope     { get; init; }
     public          bool        IsDefault { get; set; }
 
-    public string ScopeText => Scope == LayoutScope.Global ? "Global" : "Profile";
+    /// <summary>Shipped with the app and not shadowed by a user save —
+    /// read-only (can be copied and set as default, not renamed/deleted).</summary>
+    public bool IsBuiltIn { get; init; }
+
+    public string ScopeText => IsBuiltIn ? "Built-in"
+        : Scope == LayoutScope.Global ? "Global" : "Profile";
     public string Display   => $"{(IsDefault ? "★ " : "")}{Name}   ·   {ScopeText}";
 }
 
@@ -130,6 +135,7 @@ public sealed class ManageLayoutsViewModel : ReactiveObject
                 Name      = name,
                 Scope     = LayoutScope.Global,
                 IsDefault = string.Equals(name, _display.GlobalDefaultLayout, StringComparison.OrdinalIgnoreCase),
+                IsBuiltIn = _global.IsBuiltIn(name) && !_global.HasUserCopy(name),
             });
 
         Selected = Entries.FirstOrDefault(e =>
@@ -187,6 +193,15 @@ public sealed class ManageLayoutsViewModel : ReactiveObject
         var store = StoreFor(Selected.Scope);
         if (store is null) return;
 
+        // Shipped built-ins are read-only — the file sits in the install dir.
+        // (A user save shadowing one lists as a normal Global entry; deleting
+        // that reverts to the shipped version, handled by the store.)
+        if (Selected.IsBuiltIn)
+        {
+            Status = $"'{Selected.Name}' ships with Genie and can't be deleted — copy it instead.";
+            return;
+        }
+
         // Clear a default that pointed at the deleted layout so connect doesn't
         // try to apply a missing preset.
         if (Selected.Scope == LayoutScope.Profile && _connectedProfile is not null
@@ -212,6 +227,15 @@ public sealed class ManageLayoutsViewModel : ReactiveObject
     public void Rename(string newName)
     {
         if (Selected is null || string.IsNullOrWhiteSpace(newName)) return;
+
+        // Shipped built-ins keep their name — renaming would just re-save a
+        // copy and leave the shipped original listed beside it.
+        if (Selected.IsBuiltIn)
+        {
+            Status = $"'{Selected.Name}' ships with Genie and can't be renamed — copy it instead.";
+            return;
+        }
+
         newName = newName.Trim();
         if (string.Equals(newName, Selected.Name, StringComparison.Ordinal)) return;
 

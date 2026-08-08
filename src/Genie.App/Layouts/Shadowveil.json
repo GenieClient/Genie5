@@ -1,0 +1,552 @@
+{
+  "Name": "Shadowveil",
+  "Description": "Shipped with Genie 5 — room and story columns around the game text, chatter and experience at right, floating Vitals and Mapper.",
+  "SavedAt": "2026-08-08T00:00:00.0000000-07:00",
+  "WindowWidth": 1920,
+  "WindowHeight": 1080,
+  "WindowX": 0,
+  "WindowY": 0,
+  "WindowMaximized": true,
+  "HasWindowGeometry": false,
+  "VisibleTools": [
+    "game-text",
+    "vitals",
+    "room",
+    "backpack",
+    "mapper",
+    "talk",
+    "whispers",
+    "thoughts",
+    "combat",
+    "familiar",
+    "death",
+    "assess",
+    "log",
+    "itemlog",
+    "experience",
+    "analytics",
+    "active-spells",
+    "inventory-view",
+    "pluginwin:expmods"
+  ],
+  "DockTree": {
+    "Kind": "proportional",
+    "Id": "auto-c9448187e417",
+    "Orientation": "Horizontal",
+    "Alignment": null,
+    "Proportion": "NaN",
+    "ActiveId": null,
+    "Title": null,
+    "Children": [
+      {
+        "Kind": "proportional",
+        "Id": "auto-b0e7b3c2b629",
+        "Orientation": "Vertical",
+        "Alignment": null,
+        "Proportion": 0.8158894145932586,
+        "ActiveId": null,
+        "Title": null,
+        "Children": [
+          {
+            "Kind": "proportional",
+            "Id": "auto-942d80982925",
+            "Orientation": "Horizontal",
+            "Alignment": null,
+            "Proportion": 0.24303254950509756,
+            "ActiveId": null,
+            "Title": null,
+            "Children": [
+              {
+                "Kind": "proportional",
+                "Id": "auto-a1e440b44227",
+                "Orientation": "Vertical",
+                "Alignment": null,
+                "Proportion": 1,
+                "ActiveId": null,
+                "Title": null,
+                "Children": [
+                  {
+                    "Kind": "proportional",
+                    "Id": "auto-242641f75cbc",
+                    "Orientation": "Horizontal",
+                    "Alignment": null,
+                    "Proportion": 1,
+                    "ActiveId": null,
+                    "Title": null,
+                    "Children": [
+                      {
+                        "Kind": "proportional",
+                        "Id": "root-layout",
+                        "Orientation": "Horizontal",
+                        "Alignment": null,
+                        "Proportion": 1,
+                        "ActiveId": null,
+                        "Title": null,
+                        "Children": [
+                          {
+                            "Kind": "proportional",
+                            "Id": "left-col",
+                            "Orientation": "Vertical",
+                            "Alignment": null,
+                            "Proportion": 0.15602268571063227,
+                            "ActiveId": null,
+                            "Title": null,
+                            "Children": []
+                          },
+                          {
+                            "Kind": "splitter",
+                            "Id": null,
+                            "Orientation": null,
+                            "Alignment": null,
+                            "Proportion": "NaN",
+                            "ActiveId": null,
+                            "Title": null,
+                            "Children": []
+                          },
+                          {
+                            "Kind": "proportional",
+                            "Id": "center-col",
+                            "Orientation": "Vertical",
+                            "Alignment": null,
+                            "Proportion": 0.8439773142893683,
+                            "ActiveId": null,
+                            "Title": null,
+                            "Children": [
+                              {
+                                "Kind": "proportional",
+                                "Id": "auto-97dca7c03e76",
+                                "Orientation": "Horizontal",
+                                "Alignment": null,
+                                "Proportion": 1,
+                                "ActiveId": null,
+                                "Title": null,
+                                "Children": [
+                                  {
+                                    "Kind": "tooldock",
+                                    "Id": "auto-4e0c746e90ff",
+                                    "Orientation": null,
+                                    "Alignment": "Left",
+                                    "Proportion": 0.35572724099151853,
+                                    "ActiveId": "room",
+                                    "Title": null,
+                                    "Children": [
+                                      {
+                                        "Kind": "leaf",
+                                        "Id": "room",
+                                        "Orientation": null,
+                                        "Alignment": null,
+                                        "Proportion": "NaN",
+                                        "ActiveId": null,
+                                        "Title": null,
+                                        "Children": []
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "Kind": "splitter",
+                                    "Id": null,
+                                    "Orientation": null,
+                                    "Alignment": null,
+                                    "Proportion": "NaN",
+                                    "ActiveId": null,
+                                    "Title": null,
+                                    "Children": []
+                                  },
+                                  {
+                                    "Kind": "documentdock",
+                                    "Id": "docs",
+                                    "Orientation": null,
+                                    "Alignment": null,
+                                    "Proportion": 0.2602220984001789,
+                                    "ActiveId": "assess",
+                                    "Title": null,
+                                    "Children": [
+                                      {
+                                        "Kind": "leaf",
+                                        "Id": "assess",
+                                        "Orientation": null,
+                                        "Alignment": null,
+                                        "Proportion": "NaN",
+                                        "ActiveId": null,
+                                        "Title": null,
+                                        "Children": []
+                                      },
+                                      {
+                                        "Kind": "leaf",
+                                        "Id": "familiar",
+                                        "Orientation": null,
+                                        "Alignment": null,
+                                        "Proportion": "NaN",
+                                        "ActiveId": null,
+                                        "Title": null,
+                                        "Children": []
+                                      },
+                                      {
+                                        "Kind": "leaf",
+                                        "Id": "talk",
+                                        "Orientation": null,
+                                        "Alignment": null,
+                                        "Proportion": "NaN",
+                                        "ActiveId": null,
+                                        "Title": null,
+                                        "Children": []
+                                      },
+                                      {
+                                        "Kind": "leaf",
+                                        "Id": "whispers",
+                                        "Orientation": null,
+                                        "Alignment": null,
+                                        "Proportion": "NaN",
+                                        "ActiveId": null,
+                                        "Title": null,
+                                        "Children": []
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "Kind": "splitter",
+                                    "Id": null,
+                                    "Orientation": null,
+                                    "Alignment": null,
+                                    "Proportion": "NaN",
+                                    "ActiveId": null,
+                                    "Title": null,
+                                    "Children": []
+                                  },
+                                  {
+                                    "Kind": "tooldock",
+                                    "Id": "auto-a618d344b0bd",
+                                    "Orientation": null,
+                                    "Alignment": "Left",
+                                    "Proportion": 0.38405066060830256,
+                                    "ActiveId": "log",
+                                    "Title": null,
+                                    "Children": [
+                                      {
+                                        "Kind": "leaf",
+                                        "Id": "log",
+                                        "Orientation": null,
+                                        "Alignment": null,
+                                        "Proportion": "NaN",
+                                        "ActiveId": null,
+                                        "Title": null,
+                                        "Children": []
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Kind": "splitter",
+            "Id": null,
+            "Orientation": null,
+            "Alignment": null,
+            "Proportion": "NaN",
+            "ActiveId": null,
+            "Title": null,
+            "Children": []
+          },
+          {
+            "Kind": "proportional",
+            "Id": "auto-7f3fe88387ee",
+            "Orientation": "Horizontal",
+            "Alignment": null,
+            "Proportion": 0.7569674504949035,
+            "ActiveId": null,
+            "Title": null,
+            "Children": [
+              {
+                "Kind": "documentdock",
+                "Id": "docs",
+                "Orientation": null,
+                "Alignment": null,
+                "Proportion": 0.8465030587150286,
+                "ActiveId": "game-text",
+                "Title": null,
+                "Children": [
+                  {
+                    "Kind": "leaf",
+                    "Id": "game-text",
+                    "Orientation": null,
+                    "Alignment": null,
+                    "Proportion": "NaN",
+                    "ActiveId": null,
+                    "Title": null,
+                    "Children": []
+                  }
+                ]
+              },
+              {
+                "Kind": "splitter",
+                "Id": null,
+                "Orientation": null,
+                "Alignment": null,
+                "Proportion": "NaN",
+                "ActiveId": null,
+                "Title": null,
+                "Children": []
+              },
+              {
+                "Kind": "proportional",
+                "Id": "auto-ac6cd1ecb264",
+                "Orientation": "Vertical",
+                "Alignment": null,
+                "Proportion": 0.15349694128497157,
+                "ActiveId": null,
+                "Title": null,
+                "Children": [
+                  {
+                    "Kind": "tooldock",
+                    "Id": "auto-85d6fd895a0f",
+                    "Orientation": null,
+                    "Alignment": "Right",
+                    "Proportion": 0.34135285913528385,
+                    "ActiveId": "active-spells",
+                    "Title": null,
+                    "Children": [
+                      {
+                        "Kind": "leaf",
+                        "Id": "active-spells",
+                        "Orientation": null,
+                        "Alignment": null,
+                        "Proportion": "NaN",
+                        "ActiveId": null,
+                        "Title": null,
+                        "Children": []
+                      }
+                    ]
+                  },
+                  {
+                    "Kind": "splitter",
+                    "Id": null,
+                    "Orientation": null,
+                    "Alignment": null,
+                    "Proportion": "NaN",
+                    "ActiveId": null,
+                    "Title": null,
+                    "Children": []
+                  },
+                  {
+                    "Kind": "tooldock",
+                    "Id": "auto-0a064578db4d",
+                    "Orientation": null,
+                    "Alignment": "Bottom",
+                    "Proportion": 0.34135285913528385,
+                    "ActiveId": "itemlog",
+                    "Title": null,
+                    "Children": [
+                      {
+                        "Kind": "leaf",
+                        "Id": "itemlog",
+                        "Orientation": null,
+                        "Alignment": null,
+                        "Proportion": "NaN",
+                        "ActiveId": null,
+                        "Title": null,
+                        "Children": []
+                      },
+                      {
+                        "Kind": "leaf",
+                        "Id": "death",
+                        "Orientation": null,
+                        "Alignment": null,
+                        "Proportion": "NaN",
+                        "ActiveId": null,
+                        "Title": null,
+                        "Children": []
+                      }
+                    ]
+                  },
+                  {
+                    "Kind": "splitter",
+                    "Id": null,
+                    "Orientation": null,
+                    "Alignment": null,
+                    "Proportion": "NaN",
+                    "ActiveId": null,
+                    "Title": null,
+                    "Children": []
+                  },
+                  {
+                    "Kind": "tooldock",
+                    "Id": "auto-507e3f12f08a",
+                    "Orientation": null,
+                    "Alignment": "Bottom",
+                    "Proportion": 0.31729428172942764,
+                    "ActiveId": "pluginwin:expmods",
+                    "Title": null,
+                    "Children": [
+                      {
+                        "Kind": "leaf",
+                        "Id": "pluginwin:expmods",
+                        "Orientation": null,
+                        "Alignment": null,
+                        "Proportion": "NaN",
+                        "ActiveId": null,
+                        "Title": "ExpMods",
+                        "Children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "Kind": "splitter",
+        "Id": null,
+        "Orientation": null,
+        "Alignment": null,
+        "Proportion": "NaN",
+        "ActiveId": null,
+        "Title": null,
+        "Children": []
+      },
+      {
+        "Kind": "proportional",
+        "Id": "auto-31554756e5f7",
+        "Orientation": "Vertical",
+        "Alignment": null,
+        "Proportion": 0.18411058540674097,
+        "ActiveId": null,
+        "Title": null,
+        "Children": [
+          {
+            "Kind": "tooldock",
+            "Id": "auto-618b9e8718c9",
+            "Orientation": null,
+            "Alignment": "Top",
+            "Proportion": 0.24322207214264363,
+            "ActiveId": "thoughts",
+            "Title": null,
+            "Children": [
+              {
+                "Kind": "leaf",
+                "Id": "thoughts",
+                "Orientation": null,
+                "Alignment": null,
+                "Proportion": "NaN",
+                "ActiveId": null,
+                "Title": null,
+                "Children": []
+              }
+            ]
+          },
+          {
+            "Kind": "splitter",
+            "Id": null,
+            "Orientation": null,
+            "Alignment": null,
+            "Proportion": "NaN",
+            "ActiveId": null,
+            "Title": null,
+            "Children": []
+          },
+          {
+            "Kind": "tooldock",
+            "Id": "auto-6598eb925f4d",
+            "Orientation": null,
+            "Alignment": "Right",
+            "Proportion": 0.7567779278573549,
+            "ActiveId": "experience",
+            "Title": null,
+            "Children": [
+              {
+                "Kind": "leaf",
+                "Id": "experience",
+                "Orientation": null,
+                "Alignment": null,
+                "Proportion": "NaN",
+                "ActiveId": null,
+                "Title": null,
+                "Children": []
+              },
+              {
+                "Kind": "leaf",
+                "Id": "combat",
+                "Orientation": null,
+                "Alignment": null,
+                "Proportion": "NaN",
+                "ActiveId": null,
+                "Title": null,
+                "Children": []
+              },
+              {
+                "Kind": "leaf",
+                "Id": "backpack",
+                "Orientation": null,
+                "Alignment": null,
+                "Proportion": "NaN",
+                "ActiveId": null,
+                "Title": null,
+                "Children": []
+              },
+              {
+                "Kind": "leaf",
+                "Id": "inventory-view",
+                "Orientation": null,
+                "Alignment": null,
+                "Proportion": "NaN",
+                "ActiveId": null,
+                "Title": null,
+                "Children": []
+              },
+              {
+                "Kind": "leaf",
+                "Id": "analytics",
+                "Orientation": null,
+                "Alignment": null,
+                "Proportion": "NaN",
+                "ActiveId": null,
+                "Title": null,
+                "Children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "FloatingWindows": [
+    {
+      "ToolIds": [
+        "vitals"
+      ],
+      "X": 40,
+      "Y": 140,
+      "Width": 245,
+      "Height": 226
+    },
+    {
+      "ToolIds": [
+        "mapper"
+      ],
+      "X": 760,
+      "Y": 120,
+      "Width": 820,
+      "Height": 700
+    }
+  ],
+  "WindowedMode": false,
+  "MdiBounds": null,
+  "HandsStripVisible": true,
+  "HandsStripAtBottom": false,
+  "ShowStatusBar": true,
+  "RoundTimeOnHandsStrip": true,
+  "ShowGameText": true,
+  "ShowEchoText": true,
+  "ShowScriptText": true,
+  "MapBackgroundHex": "#EEE8AA"
+}

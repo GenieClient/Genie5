@@ -137,8 +137,12 @@ public sealed class DisplaySettings : ReactiveObject
     /// connected profile has no <c>DefaultLayoutName</c> of its own (and for
     /// bare-credential connections). Empty means no global default — fall back
     /// to the built-in layout.
+    /// <para>Defaults to "Strongbox", the shipped built-in that mirrors the
+    /// classic out-of-box arrangement — so fresh installs carry a ★ default
+    /// out of the box. Existing installs are untouched: their display.json
+    /// already persists this key (usually ""), which wins over the default.</para>
     /// </summary>
-    [Reactive] public string GlobalDefaultLayout { get; set; } = string.Empty;
+    [Reactive] public string GlobalDefaultLayout { get; set; } = LayoutStore.ShippedDefaultLayoutName;
 
     /// <summary>
     /// Keep the main window above all other applications (binds

@@ -1065,8 +1065,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         // Global layout presets — one JSON per layout, at {AppData}/Genie5/Layouts/.
         // Per-profile presets attach on connect (see SetProfileLayoutScope).
+        // Built-in presets ("Strongbox", "Shadowveil") ship beside the exe under
+        // Layouts/ (csproj copies them) and overlay read-only under user saves.
         var layoutsDir = Path.Combine(Path.GetDirectoryName(_configDir)!, "Layouts");
-        _globalLayouts = new Settings.LayoutStore(layoutsDir);
+        _globalLayouts = new Settings.LayoutStore(
+            layoutsDir, Path.Combine(AppContext.BaseDirectory, "Layouts"));
 
         ErrorLog.Initialize(_configDir);
 
@@ -5285,7 +5288,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// default on purpose.)
     /// </summary>
     private bool HasUserDefinedDefaultLayout()
-        => !string.IsNullOrWhiteSpace(Display.GlobalDefaultLayout)
+        => (!string.IsNullOrWhiteSpace(Display.GlobalDefaultLayout)
+            // The factory value ("Strongbox", the shipped classic default) is
+            // not a *user* choice — it mirrors the built-in arrangement and
+            // floats the Mapper itself, so the startup auto-float must keep
+            // running for fresh installs exactly as before.
+            && !string.Equals(Display.GlobalDefaultLayout,
+                   Settings.LayoutStore.ShippedDefaultLayoutName,
+                   StringComparison.OrdinalIgnoreCase))
            || Profiles.Profiles.Any(p => !string.IsNullOrWhiteSpace(p.DefaultLayoutName));
 
     /// <summary>
@@ -5346,7 +5356,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 SavedLayouts.Add(new LayoutMenuItem(name, name, LayoutScope.Profile, LoadLayoutCommand));
 
         foreach (var name in _globalLayouts.List())
-            SavedLayouts.Add(new LayoutMenuItem($"{name} (Global)", name, LayoutScope.Global, LoadLayoutCommand));
+        {
+            // Shipped presets read "(Built-in)" until a user save shadows them —
+            // then they're the user's copy and label as any other global.
+            var suffix = _globalLayouts.IsBuiltIn(name) && !_globalLayouts.HasUserCopy(name)
+                ? "(Built-in)" : "(Global)";
+            SavedLayouts.Add(new LayoutMenuItem($"{name} {suffix}", name, LayoutScope.Global, LoadLayoutCommand));
+        }
     }
 
     /// <summary>Rebuild <see cref="ThemeMenuItems"/> for the Edit → Theme
@@ -5752,6 +5768,22 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     {
         if (string.IsNullOrWhiteSpace(name)) { GameText.AddSystemLine("[layout] usage: #layout delete <name>"); return; }
         if (ResolveLayout(name) is not { } hit) { GameText.AddSystemLine($"[layout] not found: '{name}'"); return; }
+
+        // Shipped built-ins: only a user save that shadows one can be deleted
+        // (which reverts to the shipped version); the shipped file itself stays.
+        if (hit.Scope == LayoutScope.Global
+            && _globalLayouts.IsBuiltIn(name) && !_globalLayouts.HasUserCopy(name))
+        {
+            GameText.AddSystemLine($"[layout] '{name}' is a built-in layout that ships with Genie — it can't be deleted.");
+            return;
+        }
+        if (hit.Scope == LayoutScope.Global && _globalLayouts.IsBuiltIn(name))
+        {
+            _globalLayouts.Delete(name);
+            RefreshSavedLayoutList();
+            GameText.AddSystemLine($"[layout] reverted '{name}' to the shipped version.");
+            return;
+        }
 
         // Clear a default pointing at the deleted layout.
         if (hit.Scope == LayoutScope.Profile && ConnectedProfile is not null

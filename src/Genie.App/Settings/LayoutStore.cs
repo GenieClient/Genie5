@@ -12,35 +12,60 @@ namespace Genie.App.Settings;
 /// Empath wants different defaults from a Barbarian), point this at
 /// the per-profile config dir instead.
 /// </para>
+///
+/// <para>
+/// Built-in overlay: the global store can additionally be pointed at a
+/// read-only directory of layouts shipped beside the executable
+/// (<c>{app}/Layouts/</c> — "Shadowveil" lives there). Built-ins appear
+/// in <see cref="List"/> alongside user saves; saving under a built-in's
+/// name writes a user copy that shadows it, and deleting that copy
+/// reverts to the shipped version. The shipped files themselves are
+/// never written or deleted (they typically sit under Program Files).
+/// </para>
 /// </summary>
 public sealed class LayoutStore
 {
-    private readonly string _dir;
+    /// <summary>Name of the shipped built-in that mirrors the classic
+    /// out-of-box arrangement — the factory value of
+    /// <see cref="DisplaySettings.GlobalDefaultLayout"/>.</summary>
+    public const string ShippedDefaultLayoutName = "Strongbox";
 
-    public LayoutStore(string layoutsDir)
+    private readonly string  _dir;
+    private readonly string? _builtinDir;
+
+    public LayoutStore(string layoutsDir, string? builtinDir = null)
     {
-        _dir = layoutsDir;
+        _dir        = layoutsDir;
+        _builtinDir = builtinDir;
         Directory.CreateDirectory(_dir);
     }
 
-    /// <summary>List all saved layouts (file basename without `.json`).
+    /// <summary>List all saved layouts (file basename without `.json`),
+    /// including shipped built-ins not shadowed by a user save.
     /// Sorted alphabetically for stable menu order.</summary>
     public IReadOnlyList<string> List()
     {
-        if (!Directory.Exists(_dir)) return Array.Empty<string>();
-        return Directory.EnumerateFiles(_dir, "*.json")
-            .Select(p => Path.GetFileNameWithoutExtension(p) ?? "")
-            .Where(n => !string.IsNullOrEmpty(n))
-            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var names = new List<string>();
+        if (Directory.Exists(_dir))
+            names.AddRange(Directory.EnumerateFiles(_dir, "*.json")
+                .Select(p => Path.GetFileNameWithoutExtension(p) ?? "")
+                .Where(n => !string.IsNullOrEmpty(n)));
+        if (_builtinDir is not null && Directory.Exists(_builtinDir))
+            names.AddRange(Directory.EnumerateFiles(_builtinDir, "*.json")
+                .Select(p => Path.GetFileNameWithoutExtension(p) ?? "")
+                .Where(n => !string.IsNullOrEmpty(n)
+                         && !names.Contains(n, StringComparer.OrdinalIgnoreCase)));
+        return names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    /// <summary>Load a saved layout by name. Returns null if not found
+    /// <summary>Load a saved layout by name — the user's save wins over a
+    /// shipped built-in with the same name. Returns null if not found
     /// or the file is unreadable / malformed.</summary>
     public SavedLayout? Load(string name)
     {
         var path = ResolvePath(name);
-        if (!File.Exists(path)) return null;
+        if (!File.Exists(path)) path = ResolveBuiltinPath(name);
+        if (path is null || !File.Exists(path)) return null;
         try
         {
             var json = File.ReadAllText(path);
@@ -72,7 +97,10 @@ public sealed class LayoutStore
         File.WriteAllText(path, layout.ToJson());
     }
 
-    /// <summary>Delete the named layout. No-op if it doesn't exist.</summary>
+    /// <summary>Delete the named layout's USER file. Shipped built-ins are
+    /// never touched — deleting a user save that shadowed one reverts to the
+    /// shipped version. Returns false when there was no user file to delete
+    /// (including a built-in with no user copy).</summary>
     public bool Delete(string name)
     {
         var path = ResolvePath(name);
@@ -82,13 +110,34 @@ public sealed class LayoutStore
     }
 
     /// <summary>Returns true if a layout with this (sanitised) name already
-    /// exists on disk — used by Save As to confirm overwrite.</summary>
-    public bool Exists(string name) => File.Exists(ResolvePath(name));
+    /// exists — as a user save or a shipped built-in. Used by Save As to
+    /// confirm overwrite and by name resolution.</summary>
+    public bool Exists(string name)
+        => File.Exists(ResolvePath(name)) || IsBuiltIn(name);
+
+    /// <summary>True when a layout with this name ships with the app
+    /// (whether or not a user save currently shadows it).</summary>
+    public bool IsBuiltIn(string name)
+    {
+        var p = ResolveBuiltinPath(name);
+        return p is not null && File.Exists(p);
+    }
+
+    /// <summary>True when the user has their own saved file for this name
+    /// (as opposed to only the shipped built-in).</summary>
+    public bool HasUserCopy(string name) => File.Exists(ResolvePath(name));
 
     private string ResolvePath(string name)
     {
         var safe = Sanitize(name);
         return Path.Combine(_dir, safe + ".json");
+    }
+
+    private string? ResolveBuiltinPath(string name)
+    {
+        if (_builtinDir is null) return null;
+        var safe = Sanitize(name);
+        return Path.Combine(_builtinDir, safe + ".json");
     }
 
     /// <summary>Sanitise a user-supplied name to a filesystem-safe

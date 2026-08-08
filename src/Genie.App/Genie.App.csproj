@@ -160,4 +160,15 @@
              CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- ── Built-in layout presets ──────────────────────────────────────────── -->
+  <!-- Workspace layouts shipped with the app ("Strongbox" — the classic
+       default — and "Shadowveil"). Copied beside the executable under
+       Layouts/ where the global LayoutStore overlays them read-only under
+       the user's own saves ({AppData}/Genie5/Layouts/). Saving under a
+       built-in's name shadows it; deleting the shadow reverts. -->
+  <ItemGroup>
+    <Content Include="Layouts\**\*.json"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
