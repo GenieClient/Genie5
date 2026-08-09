@@ -63,6 +63,7 @@ public partial class ScriptsPanel : UserControl
         TriggerOnInputCheck.IsChecked = c.TriggerOnInput;
 
         ScriptDirBox.Text        = c.ScriptDirRaw;
+        RepoScriptDirBox.Text    = c.RepoScriptDirRaw;
     }
 
     private void OnApply(object? sender, RoutedEventArgs e)
@@ -102,6 +103,11 @@ public partial class ScriptsPanel : UserControl
 
         var dir = ScriptDirBox.Text?.Trim();
         _config.ScriptDirRaw    = string.IsNullOrWhiteSpace(dir) ? "Scripts" : dir;
+
+        // Blank is a valid value here — it means "pull repo scripts into the
+        // script directory" (the pre-#221 behavior), so no default fallback.
+        var repoDir = RepoScriptDirBox.Text?.Trim();
+        _config.RepoScriptDirRaw = string.IsNullOrWhiteSpace(repoDir) ? "" : repoDir;
 
         // Reflect any normalization (blank → default) back into the form.
         LoadForm(_config);

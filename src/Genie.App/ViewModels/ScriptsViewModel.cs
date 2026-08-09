@@ -33,8 +33,15 @@ public class ScriptsViewModel : ReactiveObject
 
     private GenieCore? _core;
     private DispatcherTimer? _poll;
-    private FileSystemWatcher? _watcher;
+    private readonly List<FileSystemWatcher> _watchers = [];
     private DispatcherTimer? _watchDebounce;
+
+    /// <summary>Display name of the synthetic library folder holding the
+    /// repo-scripts dir when <c>reposcriptdir</c> is configured (issue #221).
+    /// Parenthesized so it can't collide with a real script subfolder (Windows
+    /// file names can contain parens, but the leading one sorts it apart and
+    /// the node's FullPath is the repo root, not a ScriptsDir child).</summary>
+    private const string RepoFolderName = "(Repo Scripts)";
 
     // ── library (left pane) ──────────────────────────────────────────────────
 
@@ -237,7 +244,7 @@ public class ScriptsViewModel : ReactiveObject
                                     (_, _) => RefreshStatuses());
         _poll.Start();
 
-        SetupWatcher(core.Scripts.ScriptsDir);
+        SetupWatchers(core.Scripts.ScriptsDir, core.Scripts.RepoScriptsDir);
         RefreshEditorDisplay();
     }
 
@@ -277,18 +284,19 @@ public class ScriptsViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// Auto-refresh the library when the scripts folder changes on disk (new
-    /// files from an editor's Save As, git pulls, the Scripts updater, our own
-    /// New/Delete). Watcher events arrive on a threadpool thread and come in
+    /// Auto-refresh the library when a watched scripts folder changes on disk
+    /// (new files from an editor's Save As, git pulls, the Scripts updater, our
+    /// own New/Delete). One watcher per root — the scripts dir plus the repo
+    /// scripts dir when configured (issue #221); null/missing roots are
+    /// skipped. Watcher events arrive on a threadpool thread and come in
     /// bursts, so they only poke a 400 ms UI-thread debounce timer that does
     /// one rescan per burst. Content writes (Changed) are ignored — they don't
     /// alter the tree and editors fire them constantly while a file is open.
     /// </summary>
-    private void SetupWatcher(string dir)
+    private void SetupWatchers(params string?[] dirs)
     {
-        _watcher?.Dispose();
-        _watcher = null;
-        if (!Directory.Exists(dir)) return;
+        foreach (var w in _watchers) w.Dispose();
+        _watchers.Clear();
 
         _watchDebounce?.Stop();
         _watchDebounce = new DispatcherTimer(TimeSpan.FromMilliseconds(400),
@@ -299,30 +307,34 @@ public class ScriptsViewModel : ReactiveObject
             RefreshLibrary();
         });
 
-        try
+        foreach (var dir in dirs)
         {
-            _watcher = new FileSystemWatcher(dir)
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+            try
             {
-                IncludeSubdirectories = true,
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName,
-            };
-            void Poke(object? s, FileSystemEventArgs e) =>
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                var watcher = new FileSystemWatcher(dir)
                 {
-                    _watchDebounce!.Stop();
-                    _watchDebounce.Start();
-                });
-            _watcher.Created += Poke;
-            _watcher.Deleted += Poke;
-            _watcher.Renamed += Poke;
-            _watcher.EnableRaisingEvents = true;
-        }
-        catch (Exception ex)
-        {
-            // A watch failure (exotic mounts, permissions) just means manual
-            // Refresh — never let it take the panel down.
-            _watcher = null;
-            Output.Add(new TextLine($"[scripts] folder watch unavailable: {ex.Message}", StreamColor.System));
+                    IncludeSubdirectories = true,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName,
+                };
+                void Poke(object? s, FileSystemEventArgs e) =>
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        _watchDebounce!.Stop();
+                        _watchDebounce.Start();
+                    });
+                watcher.Created += Poke;
+                watcher.Deleted += Poke;
+                watcher.Renamed += Poke;
+                watcher.EnableRaisingEvents = true;
+                _watchers.Add(watcher);
+            }
+            catch (Exception ex)
+            {
+                // A watch failure (exotic mounts, permissions) just means manual
+                // Refresh — never let it take the panel down.
+                Output.Add(new TextLine($"[scripts] folder watch unavailable ({dir}): {ex.Message}", StreamColor.System));
+            }
         }
     }
 
@@ -385,6 +397,16 @@ public class ScriptsViewModel : ReactiveObject
 
     private void Process(string command) => _core?.Commands.ProcessInput(command);
 
+    /// <summary>True when <paramref name="fullPath"/> lives under the active
+    /// repo-scripts dir (#221) — null (feature off) always returns false.</summary>
+    private bool IsUnderRepoRoot(string fullPath)
+    {
+        if (_core?.Scripts.RepoScriptsDir is not { } repoRoot) return false;
+        var root = Path.GetFullPath(repoRoot)
+                       .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return Path.GetFullPath(fullPath).StartsWith(root, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── library actions ──────────────────────────────────────────────────────
 
     private void RunSelected()
@@ -401,7 +423,11 @@ public class ScriptsViewModel : ReactiveObject
         bool ambiguous = ScriptExtensions.Count(
             ext => File.Exists(Path.Combine(dir, baseName + ext))) > 1;
         var args = RunArgs.Trim();
-        if (f.RelativeName.Contains('/') || f.RelativeName.Contains(' ') || ambiguous)
+        // Repo-dir files also start by exact path: a `.name` start resolves
+        // the user's ScriptDir first (that shadowing is the point of #221),
+        // which would silently run the OTHER copy of the file just clicked.
+        if (f.RelativeName.Contains('/') || f.RelativeName.Contains(' ') || ambiguous ||
+            IsUnderRepoRoot(f.FullPath))
             _core.Scripts.TryStartFile(f.FullPath,
                 args.Length > 0 ? Genie.Core.Parsing.ArgumentParser.ParseArgs(args) : null);
         else
@@ -413,8 +439,10 @@ public class ScriptsViewModel : ReactiveObject
     {
         if (SelectedFile is not { IsFolder: false } f) return;
         // The host's name-based editor path only accepts bare basenames; the
-        // filename keeps its extension so the exact clicked file opens.
-        if (f.RelativeName.Contains('/'))
+        // filename keeps its extension so the exact clicked file opens. Repo-
+        // dir files go by path too — the name-based path probes ScriptDir and
+        // would open (or create!) the shadowing copy instead of the one clicked.
+        if (f.RelativeName.Contains('/') || IsUnderRepoRoot(f.FullPath))
             EditFileRequested?.Invoke(f.FullPath);
         else
             EditScriptRequested?.Invoke(f.Name);
@@ -431,13 +459,16 @@ public class ScriptsViewModel : ReactiveObject
         ConfirmingDelete = false;
         try
         {
-            // Only ever delete inside the scripts folder — the tree is built
-            // from it, but re-check in case of symlinks/renames since the scan.
-            var root = Path.GetFullPath(_core.Scripts.ScriptsDir);
+            // Only ever delete inside a scripts root (the user's dir or the
+            // repo-scripts dir, #221) — the tree is built from them, but
+            // re-check in case of symlinks/renames since the scan.
+            var roots = new List<string> { Path.GetFullPath(_core.Scripts.ScriptsDir) };
+            if (_core.Scripts.RepoScriptsDir is { } repoRoot)
+                roots.Add(Path.GetFullPath(repoRoot));
             var full = Path.GetFullPath(f.FullPath);
-            if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            if (!roots.Any(r => full.StartsWith(r, StringComparison.OrdinalIgnoreCase)))
             {
-                Output.Add(new TextLine($"[scripts] not deleting {full} — outside the scripts folder.", StreamColor.System));
+                Output.Add(new TextLine($"[scripts] not deleting {full} — outside the scripts folders.", StreamColor.System));
                 return;
             }
             File.Delete(full);
@@ -505,10 +536,25 @@ public class ScriptsViewModel : ReactiveObject
         Library.Clear();
         if (_core is null) return;
         var root = _core.Scripts.ScriptsDir;
-        if (!Directory.Exists(root)) return;
         var filter = Filter.Trim();
-        foreach (var node in ScanFolder(root, root, filter))
-            Library.Add(node);
+        if (Directory.Exists(root))
+            foreach (var node in ScanFolder(root, root, filter))
+                Library.Add(node);
+
+        // Repo-scripts dir (issue #221): shown as one synthetic top-level
+        // folder so pulled scripts are browsable/runnable without mixing them
+        // into the user's own tree. Hidden while filtering with no hits, same
+        // as real folders.
+        if (_core.Scripts.RepoScriptsDir is { } repoRoot && Directory.Exists(repoRoot))
+        {
+            var repoChildren = ScanFolder(repoRoot, repoRoot, filter);
+            if (repoChildren.Count > 0 || filter.Length == 0)
+                Library.Add(new ScriptFileNode(RepoFolderName, repoRoot, RepoFolderName,
+                                               isFolder: true, repoChildren)
+                {
+                    IsExpanded = filter.Length > 0,
+                });
+        }
 
         ReapplyExpansion(Library, expanded);
         if (selectedRel is not null && FindNode(Library, selectedRel) is { } again)

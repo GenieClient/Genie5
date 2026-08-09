@@ -301,6 +301,14 @@ public sealed class GenieConfig
     public bool LichDebug { get; set; }
 
     public string ScriptDirRaw { get; set; } = "Scripts";
+
+    /// <summary>Where the Scripts updater pulls repo scripts to (issue #221).
+    /// Empty (the default) = pull straight into <see cref="ScriptDir"/>, the
+    /// pre-#221 behavior. When set, repo pulls land here instead and the script
+    /// engine resolves names from <see cref="ScriptDir"/> first, then falls
+    /// back to this folder — so a locally-edited copy in ScriptDir shadows the
+    /// repo copy and survives updates. <c>#config reposcriptdir</c>.</summary>
+    public string RepoScriptDirRaw { get; set; } = "";
     public string SoundDirRaw { get; set; } = "Sounds";
     public string TtsVoiceDirRaw { get; set; } = "Voices";
     public string ArtDirRaw { get; set; } = "Art";
@@ -311,6 +319,13 @@ public sealed class GenieConfig
     public string LogDirRaw { get; set; } = "Logs";
 
     public string ScriptDir => _localDirectory.Current.ResolvePath(ScriptDirRaw);
+
+    /// <summary>Resolved repo-scripts pull target — <see cref="ScriptDir"/>
+    /// when <see cref="RepoScriptDirRaw"/> is blank (feature off), else the
+    /// configured folder resolved the same way ScriptDir is.</summary>
+    public string RepoScriptDir => string.IsNullOrWhiteSpace(RepoScriptDirRaw)
+        ? ScriptDir
+        : _localDirectory.Current.ResolvePath(RepoScriptDirRaw);
     public string SoundDir => _localDirectory.Current.ResolvePath(SoundDirRaw);
     /// <summary>Local dir holding sherpa-onnx Piper voice models for TTS
     /// (one subfolder per voice: <c>.onnx</c> + <c>tokens.txt</c> +
@@ -626,6 +641,7 @@ public sealed class GenieConfig
         ("injuriespoll", InjuriesPollSeconds.ToString()),
         ("injurieslayout", InjuriesFigureLayout ? "figure" : "grid"),
         ("scriptdir", ScriptDirRaw),
+        ("reposcriptdir", RepoScriptDirRaw),
         ("sounddir", SoundDirRaw),
         ("ttsvoicedir", TtsVoiceDirRaw),
         ("ttsvoice", TtsVoice),
@@ -742,7 +758,7 @@ public sealed class GenieConfig
         ("Logging",          new[] { "autolog" }),
         ("Analytics",        new[] { "analytics", "analyticsinterval", "analyticsretentiondays", "analyticsreplay", "analyticsnoticeshown", "analyticsdir" }),
         ("Updates",          new[] { "autoupdate", "checkforupdates" }),
-        ("Directories",      new[] { "scriptdir", "sounddir", "artdir", "mapdir", "plugindir", "configdir", "logdir" }),
+        ("Directories",      new[] { "scriptdir", "reposcriptdir", "sounddir", "artdir", "mapdir", "plugindir", "configdir", "logdir" }),
     };
 
     public bool Load(string fileName = "settings.cfg")
@@ -807,6 +823,10 @@ public sealed class GenieConfig
                     InjuriesFigureLayout = value.Trim().Equals("figure", StringComparison.OrdinalIgnoreCase);
                     break;
                 case "scriptdir": ScriptDirRaw = SetDir(value); break;
+                // Blank is meaningful here (= pull into scriptdir, feature
+                // off), so don't run it through SetDir's create-the-folder
+                // validation like the always-set directory keys.
+                case "reposcriptdir": RepoScriptDirRaw = string.IsNullOrWhiteSpace(value) ? "" : SetDir(value); break;
                 case "sounddir": SoundDirRaw = SetDir(value); break;
                 case "ttsvoicedir": TtsVoiceDirRaw = SetDir(value); break;
                 case "ttsvoice": TtsVoice = value.Trim(); break;

@@ -268,6 +268,11 @@ public sealed class ScriptEngine
     }
 
     public string ScriptsDir => _scriptsDir;
+
+    /// <summary>The repo-scripts fallback dir when one is configured and
+    /// distinct from <see cref="ScriptsDir"/>, else null — the single
+    /// authority the Scripts panel and resolution share (issue #221).</summary>
+    public string? RepoScriptsDir => RepoScriptsDirOrNull();
     public IReadOnlyList<ScriptInstance> Instances => _instances;
     public bool AnyRunning => _instances.Any(i => i.Running) || _js.AnyRunning;
 
@@ -346,10 +351,10 @@ public sealed class ScriptEngine
         var path = ResolveScriptPath(name);
         if (path is null)
         {
-            // Diagnostic: include the directory we searched so misconfigured
+            // Diagnostic: include the directories we searched so misconfigured
             // path resolution (portable mode triggering accidentally, etc.)
             // is obvious from the echo rather than requiring a debugger.
-            _echo($"[script] not found: {name}  (searched in: {_scriptsDir})");
+            _echo($"[script] not found: {name}  (searched in: {string.Join("; ", SearchDirs())})");
             return false;
         }
 
@@ -467,12 +472,42 @@ public sealed class ScriptEngine
         var exts = new List<string> { "", "." + DefaultScriptExt };
         foreach (var e in new[] { ".cmd", ".inc", ".js" })
             if (!exts.Contains(e, StringComparer.OrdinalIgnoreCase)) exts.Add(e);
-        foreach (var ext in exts)
-        {
-            var p = Path.Combine(_scriptsDir, name + ext);
-            if (File.Exists(p)) return p;
-        }
+        // Directory-major: every extension is tried in the user's Scripts dir
+        // before the repo dir is consulted at all, so a local copy shadows the
+        // repo copy regardless of extension (issue #221).
+        foreach (var dir in SearchDirs())
+            foreach (var ext in exts)
+            {
+                var p = Path.Combine(dir, name + ext);
+                if (File.Exists(p)) return p;
+            }
         return null;
+    }
+
+    /// <summary>
+    /// Script search path, in precedence order: the user's Scripts dir, then —
+    /// when <c>reposcriptdir</c> is configured to a distinct folder — the
+    /// repo-scripts pull target (issue #221). A locally-edited script in the
+    /// primary dir therefore always wins over the updater-managed repo copy.
+    /// </summary>
+    private IEnumerable<string> SearchDirs()
+    {
+        yield return _scriptsDir;
+        var repo = RepoScriptsDirOrNull();
+        if (repo is not null) yield return repo;
+    }
+
+    /// <summary>The configured repo-scripts dir, or null when the feature is
+    /// off (blank setting, headless test without a config, or the setting
+    /// pointing back at the primary dir).</summary>
+    private string? RepoScriptsDirOrNull()
+    {
+        if (string.IsNullOrWhiteSpace(Config?.RepoScriptDirRaw)) return null;
+        var repo = Config!.RepoScriptDir;
+        return string.Equals(Path.GetFullPath(repo), Path.GetFullPath(_scriptsDir),
+                             StringComparison.OrdinalIgnoreCase)
+            ? null
+            : repo;
     }
 
     /// <summary>

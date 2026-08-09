@@ -1560,11 +1560,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                                  : Path.Combine(Path.GetDirectoryName(_configDir)!, "Maps");
             var zoneRepo   = _core?.ZoneRepository ?? new Genie.Core.Mapper.MapZoneRepository();
             var pluginMgr  = _core?.Plugins;
-            // Scripts pull into the SAME folder the script engine loads from
-            // (Core's resolved ScriptDir when connected — see issue #37's
-            // OpenScriptsFolder rationale); pre-connect, the shared root.
+            // Scripts pull into the repo-scripts target: ScriptDir unless the
+            // user set a separate reposcriptdir (issue #221) — the engine
+            // resolves from ScriptDir first and falls back to the repo dir, so
+            // pulled scripts stay runnable while local edits survive updates.
+            // Pre-connect, the shared root.
             var scriptsDir = _core is not null
-                                 ? _core.Config.ScriptDir
+                                 ? _core.Config.RepoScriptDir
                                  : Path.Combine(Path.GetDirectoryName(_configDir)!, "Scripts");
             var vm = new UpdatesDialogViewModel(store, mapsDir, _pluginsDir, scriptsDir, zoneRepo, pluginMgr);
             await ShowUpdatesDialog.Handle(vm);
@@ -2229,8 +2231,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     catch { /* silent — see method header */ }
                 }
 
+            // Same repo-scripts pull target the Updates dialog uses (issue
+            // #221): ScriptDir unless a separate reposcriptdir is configured.
             var scriptsDir = _core is not null
-                                 ? _core.Config.ScriptDir
+                                 ? _core.Config.RepoScriptDir
                                  : Path.Combine(Path.GetDirectoryName(_configDir)!, "Scripts");
             if (cfg.ScriptsPolicy.CheckOnStartup)
                 foreach (var feed in cfg.Scripts.Where(f => f.Enabled))

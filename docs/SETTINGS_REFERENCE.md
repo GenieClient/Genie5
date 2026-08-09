@@ -154,6 +154,7 @@ across all profiles).
 | Key | Default | What it does |
 | --- | --- | --- |
 | `scriptdir` | `Scripts` | Scripts folder. |
+| `reposcriptdir` | *(blank)* | Optional separate folder the Scripts updater pulls repo scripts into. Scripts resolve from `scriptdir` first, then fall back here, so a locally-edited copy in `scriptdir` survives updates. Blank = pull into `scriptdir`. |
 | `sounddir` | `Sounds` | Sound files folder. |
 | `artdir` | `Art` | Local cache dir for DR room/scene art. |
 | `mapdir` | `Maps` | Map data folder (shared across profiles). |

@@ -230,8 +230,8 @@
           </ItemsControl>
 
           <TextBlock Grid.Row="2"
-                     Text="Tip: there is no merge — a locally-edited script with the same name as a repo file is overwritten on Update. Rename scripts you customize."
-                     Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" Margin="0,8,0,0"/>
+                     Text="Tip: there is no merge — a locally-edited script with the same name as a repo file is overwritten on Update. To protect local edits, set a separate repo folder (Config ▸ Scripts ▸ Repo scripts directory): updates pull there, and a copy in your script directory always wins."
+                     Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" Margin="0,8,0,0" TextWrapping="Wrap"/>
         </Grid>
       </TabItem>
 

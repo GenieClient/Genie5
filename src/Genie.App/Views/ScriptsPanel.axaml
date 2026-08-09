@@ -79,6 +79,11 @@
       <TextBox   Grid.Row="14" Grid.Column="1" Name="ScriptDirBox" Margin="0,0,0,4"
                  ToolTip.Tip="Folder scripts are loaded from, relative to the Genie data root (default: Scripts)."/>
 
+      <TextBlock Grid.Row="15" Grid.Column="0" Text="Repo scripts directory:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+      <TextBox   Grid.Row="15" Grid.Column="1" Name="RepoScriptDirBox" Margin="0,0,0,4"
+                 Watermark="(same as script directory)"
+                 ToolTip.Tip="Optional separate folder the Scripts updater pulls repo scripts into. Scripts run from the script directory first, then fall back here — so a locally-edited copy in the script directory is never overwritten by an update. Blank = pull into the script directory."/>
+
       <!-- Buttons + status -->
       <StackPanel Grid.Row="16" Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="0,8,0,0">
         <Button Content="Apply" Click="OnApply"/>

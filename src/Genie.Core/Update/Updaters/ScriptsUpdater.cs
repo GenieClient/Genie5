@@ -13,8 +13,11 @@ namespace Genie.Core.Update.Updaters;
 ///
 /// Note the overwrite caveat: there is no merge. A locally-edited script that
 /// shares a name with an upstream file is replaced on Apply — users who
-/// customize a repo script should rename their copy. The Updates dialog's
-/// Scripts tab says this in its tip line.
+/// customize a repo script should rename their copy, or set a separate
+/// <c>reposcriptdir</c> (issue #221): the callers then pass that folder as
+/// <c>scriptsDir</c> here, the script engine resolves the user's ScriptDir
+/// first, and a local copy shadows the repo copy instead of being clobbered.
+/// The Updates dialog's Scripts tab says this in its tip line.
 ///
 /// Implements <see cref="IUpdater"/> so the Updates dialog can treat Scripts
 /// the same way it treats Maps / Plugins / the core app.
