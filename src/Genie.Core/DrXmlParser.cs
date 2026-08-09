@@ -1023,7 +1023,7 @@ public sealed class DrXmlParser : IDisposable
     // Keep <see cref="_handledTags"/> in sync with the HandleElement switch.
     private static readonly HashSet<string> _handledTags = new(StringComparer.OrdinalIgnoreCase)
     {
-        "a", "app", "b", "casttime", "clearstream", "compass", "component", "container",
+        "a", "app", "b", "casttime", "cleardynastream", "clearstream", "compass", "component", "container",
         "crtrstatus", "d", "dialogdata", "dir", "endsetup", "image", "indicator", "inv",
         "left", "nav", "openwindow", "output", "popbold", "popstream",
         "preset", "progressbar", "prompt", "pushbold", "pushstream",
@@ -1601,7 +1601,10 @@ public sealed class DrXmlParser : IDisposable
                 break;
 
             // ── Clear window ─────────────────────────────────────────────
+            // <clearDynaStream id='spellInfo'/> is the dynamic-stream variant
+            // of <clearStream> (public #220) — same clear-this-window meaning.
             case "clearstream":
+            case "cleardynastream":
                 _events.OnNext(new ClearStreamEvent(r["id"] ?? ""));
                 break;
 
