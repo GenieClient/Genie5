@@ -1196,9 +1196,21 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // ParseGameOnly (Genie 4 parity): when on, fire triggers only on
         // the main game stream, not secondary stream-windows (thoughts,
         // logons, combat, …). Default off → triggers see every stream.
+        //
+        // DR double-sends a talk/whispers line — once on its own stream,
+        // once again as a bare `main` copy tagged ev.DuplicateEcho (see
+        // TextEvent). Left ungated that's a double trigger pass with
+        // ParseGameOnly off (both copies satisfy "every stream"), so the
+        // duplicate is skipped there — the stream-tagged original already
+        // covered it. With ParseGameOnly on, the duplicate is instead the
+        // ONLY copy on "main", so it's exactly the Main-targeted line Genie 4
+        // fires TriggerParse on for a talk line — skipping it there would
+        // silently drop speech triggers. Either mode nets exactly one pass.
         Metrics.Time(PipelineStage.Triggers, () =>
         {
-            if (!(Config?.ParseGameOnly ?? false) || ev.Stream == "main")
+            var parseGameOnly = Config?.ParseGameOnly ?? false;
+            var fires = parseGameOnly ? ev.Stream == "main" : !ev.DuplicateEcho;
+            if (fires)
                 Triggers.ProcessLine(ev.Text);                                     // user-defined triggers
         });
         _gameEventsRelay.OnNext(ev);                        // UI consumers see the approved text

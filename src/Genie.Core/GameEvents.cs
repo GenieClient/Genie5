@@ -36,13 +36,26 @@ public abstract record GameEvent;
 /// monospace font while normal prose uses the configured game font (public
 /// #178), so a proportional normal font doesn't break table alignment.
 /// </param>
+/// <param name="DuplicateEcho">
+/// True when this <c>main</c>-stream line is DR's bare re-send of a line it
+/// already sent wrapped in a social stream — e.g. a talk/whispers line
+/// arrives once inside <c>&lt;pushStream id="talk"&gt;…&lt;popStream/&gt;</c>,
+/// then immediately again as plain <c>main</c> text right after the pop
+/// (confirmed via a live capture; presumably for clients that don't
+/// understand streams). The event is still emitted in full — Core consumers
+/// (triggers under <c>ParseGameOnly</c>, scripts, plugins) need it exactly
+/// as DR sent it — this flag only tells a <i>display</i> sink it would be
+/// showing the same content a second time if it renders this line too.
+/// Always false for the stream-tagged original and for ordinary main text.
+/// </param>
 public sealed record TextEvent(
     string Stream,
     string Text,
     IReadOnlyList<LinkSpan>? Links       = null,
     IReadOnlyList<BoldSpan>? BoldSpans   = null,
     IReadOnlyList<PresetSpan>? PresetSpans = null,
-    bool Mono = false
+    bool Mono = false,
+    bool DuplicateEcho = false
 ) : GameEvent;
 
 /// <summary>

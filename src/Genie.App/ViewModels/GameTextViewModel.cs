@@ -119,6 +119,11 @@ public class GameTextViewModel : ReactiveObject
             .Subscribe(e =>
             {
                 if (DisplaySettings?.ShowGameText == false) return;
+                // DR's bare re-send of a talk/whispers line already shown via
+                // its own stream (DrXmlParser.TextEvent.DuplicateEcho) — Core
+                // consumers (triggers/scripts) still need the event, but a
+                // display sink would just be showing the same line twice.
+                if (e.DuplicateEcho) return;
                 // Name List Only: drop game lines that don't mention a tracked
                 // name. Guarded on a non-empty Names list so the toggle never
                 // blanks the window when no names are configured (see StreamBuffer).

@@ -186,6 +186,14 @@ public class StreamTabsViewModel : ReactiveObject
             case IfClosedSinkKind.Drop:
                 return;
             case IfClosedSinkKind.Stream when TryGetBuffer(decision.StreamId!) is { } sink:
+                // talk/whispers are already unconditionally mirrored into Log
+                // above (the "Log window" consolidated-feed behaviour) — their
+                // default IfClosed target is also "log" (WindowSettingsStore),
+                // so without this guard a closed Talk/Whispers panel with
+                // EchoToMain off double-added every line into Log.
+                if (decision.StreamId!.Equals("log", StringComparison.OrdinalIgnoreCase) &&
+                    e.Stream is "talk" or "whispers")
+                    return;
                 sink.Add(e.Text, e.BoldSpans, e.Links, e.PresetSpans);
                 return;
             default:

@@ -40,6 +40,19 @@ public sealed class DrXmlParser : IDisposable
     private string _activeStream = "main";
     private readonly Stack<string> _streamStack = new();
 
+    // Duplicate-echo tracking: DR sends a talk/whispers line twice — once
+    // inside <pushStream id="...">…<popStream/>, then immediately again as
+    // bare `main` text right after the pop, presumably for clients that
+    // don't understand streams (confirmed via a live capture). See
+    // EmitLine's DuplicateEcho check. Scoped to the confirmed double-send
+    // set (talk/whispers) rather than "any non-main stream" — combat,
+    // atmospherics, etc. haven't shown this pattern, and a wider net risks
+    // flagging a coincidentally-identical unrelated main line.
+    private static readonly HashSet<string> DuplicateEchoStreams =
+        new(StringComparer.OrdinalIgnoreCase) { "talk", "whispers" };
+    private string? _lastEmittedStream;
+    private string  _lastEmittedText = "";
+
     // ── Multi-chunk accumulation ─────────────────────────────────────────────
     // DR sends <component id='...'>inner text or child tags</component> and
     // <spell>Name</spell> and <compass><dir.../></compass> across separate chunks.
@@ -562,6 +575,22 @@ public sealed class DrXmlParser : IDisposable
             return;
         }
 
+        // DR's bare-echo duplicate: this main-stream line is byte-identical to
+        // — and the immediate next emission after — a just-closed talk/
+        // whispers line (e.g. talk's <pushStream>…<popStream/> followed at
+        // once by the same "You say, ..." text as plain main). Scoped tight:
+        // only the IMMEDIATE next emission qualifies (any other line in
+        // between updates _lastEmittedStream and clears the match), so two
+        // genuinely identical main-stream lines elsewhere are unaffected.
+        //
+        // Tag, don't drop: Core consumers (Triggers/Scripts/Plugins — see
+        // GenieCore.ProcessGameTextEvent) need this event exactly as DR sent
+        // it, most notably ParseGameOnly triggers, which under Genie 4
+        // parity fire on the Main-targeted copy of a line — for talk, that
+        // IS this bare duplicate. Only a display sink should skip it.
+        var isDuplicateEcho = _activeStream == "main" && _lastEmittedStream is not null &&
+            DuplicateEchoStreams.Contains(_lastEmittedStream) && stripped == _lastEmittedText;
+
         // Rebase every span offset from raw-buffer space into decoded-text
         // space (public #199). The offsets were taken against _textLineBuffer,
         // whose entities/tags `stripped` has since collapsed — so replay the
@@ -671,8 +700,11 @@ public sealed class DrXmlParser : IDisposable
         if (newsLink is not null)
             links = links is null ? new[] { newsLink } : links.Append(newsLink).ToArray();
 
-        _events.OnNext(new TextEvent(_activeStream, stripped, links, boldSpans, presetSpans, Mono: _inMono));
+        _events.OnNext(new TextEvent(_activeStream, stripped, links, boldSpans, presetSpans,
+            Mono: _inMono, DuplicateEcho: isDuplicateEcho));
         _emittedTextLine = true;   // a real blank line may now follow (#176)
+        _lastEmittedStream = _activeStream;
+        _lastEmittedText   = stripped;
     }
 
     // Map a span list from raw-buffer offsets into decoded-text offsets using
