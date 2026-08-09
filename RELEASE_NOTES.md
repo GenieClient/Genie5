@@ -1,3 +1,40 @@
+# Genie 5 — v5.0.0-beta.4.d
+
+Window-management polish, headlined by built-in layout presets: **Strongbox**
+(the new default) and **Shadowveil** ship with every install, the docking
+engine collapses emptied columns so the Game window can reclaim the full
+width, and the `#statusbar` slot row matches Genie 4's StatusStrip geometry.
+Plus a command-line safety net and an XML-coverage fix.
+
+## ✨ New
+- **Built-in layout presets — Strongbox & Shadowveil.** Two curated layouts
+  now ship with every install and appear in the Layout menu (marked
+  built-in). **Strongbox** is the default for fresh profiles; **Shadowveil**
+  is the darker alternative. Built-ins can't be destroyed — saving over one
+  creates your own editable copy.
+- **Experience window — right-click "Show Config Bar."** Toggle the settings
+  strip on the Experience window from its right-click menu (persisted as
+  `#config experienceconfigbar`).
+- **Warning on unexpanded variables in outgoing commands.** A command about
+  to reach the game with a raw `$var`/`%var` still in it (the classic
+  "What were you referring to?" cause) now draws a warning first. The
+  command still goes out — silence the warning with
+  `#config warnrawvars false`.
+
+## 🐛 Fixes
+- **Docking: emptied columns collapse.** Closing or moving the last panel
+  out of a side column lets the Game window expand all the way into that
+  space (#219 — thanks @digitalnyc1 for the report).
+- **`#statusbar` slot row uses Genie 4 StatusStrip geometry.** Slot 1
+  springs to fill the row and slots 2–10 autosize (hiding when empty), so
+  an un-numbered `#statusbar` line is no longer clipped to a tenth of the
+  bar.
+- **`<clearDynaStream>` is consumed.** The dynamic-stream variant of
+  `<clearStream>` now clears its window (e.g. spellInfo) instead of
+  registering as an unhandled element (#220 — thanks @simtel12).
+
+---
+
 # Genie 5 — v5.0.0-beta.4.c
 
 A fast-follow fix bundle for the external-testing round: script-set timer

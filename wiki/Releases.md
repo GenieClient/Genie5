@@ -4,7 +4,22 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.4.c — Clean Escape
+## Latest: v5.0.0-beta.4.d — Strongbox
+
+Window-management polish: built-in layout presets (**Strongbox**, the new default, and **Shadowveil**) ship with every install, emptied dock columns collapse so the Game window can reclaim the full width, and the `#statusbar` slot row matches Genie 4's StatusStrip geometry.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.4.d** as a delta from beta.4.c.
+
+- **Built-in layout presets — Strongbox & Shadowveil** — two curated layouts in the Layout menu on every install (marked built-in); Strongbox is the default for fresh profiles. Built-ins can't be destroyed — saving over one creates your own editable copy.
+- **Experience window "Show Config Bar"** — toggle the settings strip from the window's right-click menu (`#config experienceconfigbar`).
+- **Warning on unexpanded variables in outgoing commands** — a command about to reach the game with a raw `$var`/`%var` still in it draws a warning first (`#config warnrawvars false` to silence).
+- **Docking: emptied columns collapse** — the Game window expands into a side column once its last panel closes or moves away (#219 — thanks @digitalnyc1).
+- **`#statusbar` slot row uses Genie 4 StatusStrip geometry** — slot 1 springs, slots 2–10 autosize and hide when empty; un-numbered `#statusbar` lines are no longer clipped.
+- **`<clearDynaStream>` is consumed** — dynamic stream windows (e.g. spellInfo) clear properly (#220 — thanks @simtel12).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.4.d)
+
+## v5.0.0-beta.4.c — Clean Escape
 
 A fast-follow fix bundle for the external-testing round: script-set timer variables compute correctly again, typed commands expand `$variables` with full Genie 4 parity, `#window show` reaches the real built-in panels, and three mapper zone-browsing follow-ups.
 
