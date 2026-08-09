@@ -1198,8 +1198,14 @@ public sealed class ScriptEngine
             string[]? captures = null;
             if (act.IsEval)
             {
+                // Substitute at every evaluation, same as `wait eval` — the
+                // expression is registered raw precisely so $/% vars read
+                // their CURRENT values here (Genie 4 re-parses variables on
+                // each action pass). Without this the evaluator sees the
+                // sigils as literal remnants and the condition is silently
+                // false forever (public #224's root cause).
                 bool cur;
-                try { cur = ScriptExpression.EvalBool(act.Pattern, inst, Globals, UserVarLookup); }
+                try { cur = ScriptExpression.EvalBool(SubstituteVars(act.Pattern, inst), inst, Globals, UserVarLookup); }
                 catch { cur = false; }
                 fire = cur && !act.LastEvalResult;
                 act.LastEvalResult = cur;
