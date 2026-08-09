@@ -1,3 +1,43 @@
+# Genie 5 — v5.0.0-beta.4.e
+
+The community batch: everything in this release came straight from player
+reports, pull requests, and DM'd field findings — most of it filed and fixed
+the same day.
+
+## ✨ New
+- **Repo scripts get their own directory (#221).** "Update Scripts" now
+  pulls the community script repo into a separate directory
+  (`#config reposcriptdir`, also on the Scripts panel) instead of writing
+  into your script folder. Your locally edited scripts always win — the
+  script engine searches your primary directory first and falls back to the
+  repo copy, so an update can never clobber a script you've customized.
+  Thanks @Azothy for the report and the design conversation.
+
+## 🐛 Fixes
+- **Talk and whisper lines no longer double in Main and Log.** DR sends
+  every say/whisper twice on the wire — once on its own stream, once as a
+  bare main-window copy. The parser now tags the duplicate instead of
+  dropping it, so windows show each line exactly once while scripts,
+  triggers, and plugins still see the wire exactly as DR sent it — including
+  ParseGameOnly trigger parity in both modes. PR #222 by @simtel12, with a
+  new Genie.App test harness following in #223. 🙏
+- **`action … when eval` conditions evaluate for real (#224).** Variables
+  inside a `when eval` expression were never substituted, so the condition
+  was silently false forever and the action never fired. The expression now
+  runs through full variable substitution at fire time. Thanks @SaragosDR —
+  the report exposed it.
+
+## 🙏 Today's community
+Five releases into the external-testing round, today was the community's
+day: @simtel12 (PR #222, the #223 test harness, and the XML coverage
+reports behind this morning's parser fix), @SaragosDR (#224 and more sharp
+reports in the queue), @Azothy (#221 and the automapper field reports),
+@digitalnyc1 (#219, shipped this morning), and everyone testing the betas,
+DMing traces, and talking through designs in Discord. Filed-to-fixed in a
+day only happens because the reports are this good.
+
+---
+
 # Genie 5 — v5.0.0-beta.4.d
 
 Window-management polish, headlined by built-in layout presets: **Strongbox**

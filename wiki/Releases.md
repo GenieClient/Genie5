@@ -4,7 +4,19 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.4.d — Strongbox
+## Latest: v5.0.0-beta.4.e — Community Day
+
+The community batch: a separate repo-scripts directory so script updates can't clobber local edits, talk/whisper lines no longer double in Main and Log, and `action … when eval` conditions evaluate for real. Everything in this build came from player reports, PRs, and DM'd findings — most filed and fixed the same day.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.4.e** as a delta from beta.4.d.
+
+- **Repo scripts get their own directory** — "Update Scripts" pulls into `#config reposcriptdir` instead of your script folder; locally edited scripts always win (#221 — thanks @Azothy).
+- **Talk/whisper lines no longer double in Main and Log** — the parser tags DR's duplicate wire copy instead of dropping it; windows dedupe, scripts/triggers still see the full wire, ParseGameOnly parity in both modes (PR #222 — thanks @simtel12).
+- **`action … when eval` evaluates for real** — variables in the expression now substitute at fire time; the condition was silently false forever (#224 — thanks @SaragosDR).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.4.e)
+
+## v5.0.0-beta.4.d — Strongbox
 
 Window-management polish: built-in layout presets (**Strongbox**, the new default, and **Shadowveil**) ship with every install, emptied dock columns collapse so the Game window can reclaim the full width, and the `#statusbar` slot row matches Genie 4's StatusStrip geometry.
 
