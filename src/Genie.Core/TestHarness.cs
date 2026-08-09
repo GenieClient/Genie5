@@ -199,7 +199,9 @@ switch (mode)
             Mode                 = ConnectionMode.DevReplay,
             LichProxyHost        = "127.0.0.1",
             LichProxyPort        = 8000,
-            MaxReconnectAttempts = 0
+            MaxReconnectAttempts = 0,
+            // Keep smoke runs out of the real %APPDATA% profile when asked.
+            DataDirectoryOverride = Environment.GetEnvironmentVariable("GENIE_DATA_DIR") ?? string.Empty
         };
         break;
     }
@@ -783,6 +785,40 @@ if (verifyVars)
     core.Scripts.TryStart("vartest", Array.Empty<string>());
 }
 
+// ── Script smoke hook (opt-in: GENIE_RUN_SCRIPT="name [args...]") ─────────────
+// Starts a real .cmd through the fully-wired engine so a REPLAY run can
+// inventory what a community script trips on (automapper.cmd smoke).
+// GENIE_RUN_SCRIPT_COPY=<path> copies the script into ScriptsDir first;
+// GENIE_RUN_SCRIPT_PRE="cmd;cmd" runs setup commands (e.g. presetting vars).
+var runScript = Environment.GetEnvironmentVariable("GENIE_RUN_SCRIPT");
+if (!string.IsNullOrWhiteSpace(runScript))
+{
+    core.ScriptOutputLine += line => Console.WriteLine($"[SCRIPT] {line}");
+    core.EchoLine         += line => Console.WriteLine($"[ECHO] {line}");
+    core.EchoStyledLine   += (line, color, mono) => Console.WriteLine($"[ECHO:{color ?? "-"}{(mono ? ":mono" : "")}] {line}");
+    core.EchoToWindow     += (line, win, color) => Console.WriteLine($"[ECHO>{win ?? "main"}] {line}");
+    var copySrc = Environment.GetEnvironmentVariable("GENIE_RUN_SCRIPT_COPY");
+    if (!string.IsNullOrWhiteSpace(copySrc))
+        File.Copy(copySrc, Path.Combine(core.Scripts.ScriptsDir, Path.GetFileName(copySrc)), overwrite: true);
+    var preCmds = Environment.GetEnvironmentVariable("GENIE_RUN_SCRIPT_PRE");
+    if (!string.IsNullOrWhiteSpace(preCmds))
+        foreach (var c in preCmds.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            core.Commands.ProcessInput(c);
+    if (runScript.StartsWith('.'))
+    {
+        // Full user-typed path (quote-aware arg parsing, CommandEngine routing) —
+        // what a G4-style ".automapper <path>" delegation would exercise.
+        Console.WriteLine($"[SMOKE] ProcessInput: {runScript}  (ScriptsDir: {core.Scripts.ScriptsDir})");
+        core.Commands.ProcessInput(runScript);
+    }
+    else
+    {
+        var rsParts = runScript.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        Console.WriteLine($"[SMOKE] starting .{rsParts[0]} {string.Join(' ', rsParts.Skip(1))}  (ScriptsDir: {core.Scripts.ScriptsDir})");
+        core.Scripts.TryStart(rsParts[0], rsParts.Skip(1).ToArray());
+    }
+}
+
 // ── Replay mode: wait for server to close the connection ─────────────────────
 if (mode == "REPLAY")
 {
@@ -794,6 +830,16 @@ if (mode == "REPLAY")
     });
     await Task.WhenAny(replayDone.Task, Task.Delay(60_000, cts.Token));
     Console.WriteLine("-- Replay complete.");
+
+    // Script smoke: give the script time to run after the replay stream ends
+    // (speed-0 replays disconnect almost instantly). Capped, then report state.
+    if (!string.IsNullOrWhiteSpace(runScript))
+    {
+        for (int i = 0; i < 300 && core.Scripts.AnyRunning; i++) await Task.Delay(100);
+        Console.WriteLine(core.Scripts.AnyRunning
+            ? "[SMOKE] script still running after 30s cap (expected for walk loops with no live game) — stopping."
+            : "[SMOKE] script finished on its own.");
+    }
 
     if (verifyTrackers)
     {
