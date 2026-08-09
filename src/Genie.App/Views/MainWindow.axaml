@@ -1097,12 +1097,15 @@
     <!-- the vitals grid so DockPanel stacks it between them. Collapses 5s    -->
     <!-- after every slot empties (immediate collapse made clear-then-rewrite -->
     <!-- script loops shift the layout); part of the Status Bar toggle.       -->
-    <!-- Geometry matches Genie 4's StatusStrip, NOT ten equal columns:       -->
-    <!-- label 1 is Spring=true (fills the whole strip) and labels 2-10       -->
-    <!-- auto-size to content and stay hidden until first written. Scripts    -->
-    <!-- like uber.cmd write ONE giant un-numbered line (→ slot 1) and rely   -->
-    <!-- on it spanning the full width — a fixed 1/10 cell clipped it to      -->
-    <!-- nothing.                                                             -->
+    <!-- Geometry: every populated cell sizes to its content and packs left   -->
+    <!-- (StatusSlotPanel) — a refinement over Genie 4's StatusStrip, where   -->
+    <!-- slot 1 was Spring=true (always the whole strip) and slots 2-10 sat   -->
+    <!-- pinned to the right edge. Slot 1 may still grow into all the width   -->
+    <!-- left after the other slots (scripts like uber.cmd write ONE giant    -->
+    <!-- un-numbered line → slot 1 and rely on the full width — a fixed 1/10  -->
+    <!-- cell clipped it to nothing) and ellipsizes at that cap, so a huge    -->
+    <!-- line can never push slots 2-10 off screen. Empty slots — slot 1     -->
+    <!-- included — take no space at all.                                     -->
     <Border DockPanel.Dock="Bottom"
             Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
             ToolTip.Tip="Script status slots — written with #statusbar [N] text; a bare #statusbar N clears slot N, #statusbar clearall empties all ten.">
@@ -1112,8 +1115,8 @@
           <Binding Path="StatusSlots.HasAny"/>
         </MultiBinding>
       </Border.IsVisible>
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
-        <Grid.Styles>
+      <controls:StatusSlotPanel>
+        <controls:StatusSlotPanel.Styles>
           <Style Selector="Border.statusSlot">
             <Setter Property="BorderBrush" Value="#2f363d"/>
             <Setter Property="BorderThickness" Value="0,0,1,0"/>
@@ -1124,48 +1127,49 @@
             <Setter Property="Foreground" Value="{DynamicResource Theme.TextPrimary}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
           </Style>
-        </Grid.Styles>
-        <!-- Slot 1: the spring cell — always present while the row shows. -->
-        <Border Classes="statusSlot" Grid.Column="0" ToolTip.Tip="#statusbar slot 1">
+        </controls:StatusSlotPanel.Styles>
+        <!-- Slot 1: child 0 = the growable cell (see StatusSlotPanel). -->
+        <Border Classes="statusSlot" ToolTip.Tip="#statusbar slot 1"
+                IsVisible="{Binding StatusSlots.Slots[0].Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Text="{Binding StatusSlots.Slots[0].Text}" TextTrimming="CharacterEllipsis"/>
         </Border>
-        <Border Classes="statusSlot" Grid.Column="1" ToolTip.Tip="#statusbar slot 2"
+        <Border Classes="statusSlot" ToolTip.Tip="#statusbar slot 2"
                 IsVisible="{Binding StatusSlots.Slots[1].Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Text="{Binding StatusSlots.Slots[1].Text}"/>
         </Border>
-        <Border Classes="statusSlot" Grid.Column="2" ToolTip.Tip="#statusbar slot 3"
+        <Border Classes="statusSlot" ToolTip.Tip="#statusbar slot 3"
                 IsVisible="{Binding StatusSlots.Slots[2].Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Text="{Binding StatusSlots.Slots[2].Text}"/>
         </Border>
-        <Border Classes="statusSlot" Grid.Column="3" ToolTip.Tip="#statusbar slot 4"
+        <Border Classes="statusSlot" ToolTip.Tip="#statusbar slot 4"
                 IsVisible="{Binding StatusSlots.Slots[3].Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Text="{Binding StatusSlots.Slots[3].Text}"/>
         </Border>
-        <Border Classes="statusSlot" Grid.Column="4" ToolTip.Tip="#statusbar slot 5"
+        <Border Classes="statusSlot" ToolTip.Tip="#statusbar slot 5"
                 IsVisible="{Binding StatusSlots.Slots[4].Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Text="{Binding StatusSlots.Slots[4].Text}"/>
         </Border>
-        <Border Classes="statusSlot" Grid.Column="5" ToolTip.Tip="#statusbar slot 6"
+        <Border Classes="statusSlot" ToolTip.Tip="#statusbar slot 6"
                 IsVisible="{Binding StatusSlots.Slots[5].Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Text="{Binding StatusSlots.Slots[5].Text}"/>
         </Border>
-        <Border Classes="statusSlot" Grid.Column="6" ToolTip.Tip="#statusbar slot 7"
+        <Border Classes="statusSlot" ToolTip.Tip="#statusbar slot 7"
                 IsVisible="{Binding StatusSlots.Slots[6].Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Text="{Binding StatusSlots.Slots[6].Text}"/>
         </Border>
-        <Border Classes="statusSlot" Grid.Column="7" ToolTip.Tip="#statusbar slot 8"
+        <Border Classes="statusSlot" ToolTip.Tip="#statusbar slot 8"
                 IsVisible="{Binding StatusSlots.Slots[7].Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Text="{Binding StatusSlots.Slots[7].Text}"/>
         </Border>
-        <Border Classes="statusSlot" Grid.Column="8" ToolTip.Tip="#statusbar slot 9"
+        <Border Classes="statusSlot" ToolTip.Tip="#statusbar slot 9"
                 IsVisible="{Binding StatusSlots.Slots[8].Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Text="{Binding StatusSlots.Slots[8].Text}"/>
         </Border>
-        <Border Classes="statusSlot" Grid.Column="9" ToolTip.Tip="#statusbar slot 10"
+        <Border Classes="statusSlot" ToolTip.Tip="#statusbar slot 10"
                 IsVisible="{Binding StatusSlots.Slots[9].Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Text="{Binding StatusSlots.Slots[9].Text}"/>
         </Border>
-      </Grid>
+      </controls:StatusSlotPanel>
     </Border>
 
     <!-- ── Status bar (Wrayth-style, docks below the command bar) ───────── -->

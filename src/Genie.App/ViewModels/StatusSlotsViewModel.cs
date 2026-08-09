@@ -17,7 +17,8 @@ namespace Genie.App.ViewModels;
 public sealed class StatusSlotsViewModel : ReactiveObject
 {
     /// <summary>The ten slot cells, index 0 = slot 1. Fixed size — the XAML
-    /// UniformGrid lays them out as equal columns.</summary>
+    /// StatusSlotPanel packs the populated cells left, each sized to its
+    /// content; empty cells take no space.</summary>
     public IReadOnlyList<StatusSlot> Slots { get; } =
         Enumerable.Range(1, 10).Select(n => new StatusSlot(n)).ToArray();
 
