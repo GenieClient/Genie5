@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Genie.App is OutputType=WinExe (the shipping desktop app), referenced
+         here read-only as a library for its view-models. That output type
+         only governs how Genie.App's own build launches; it does not stop
+         another project from consuming its compiled types via a normal
+         ProjectReference. -->
+    <ProjectReference Include="..\..\src\Genie.App\Genie.App.csproj" />
+  </ItemGroup>
+
+</Project>
