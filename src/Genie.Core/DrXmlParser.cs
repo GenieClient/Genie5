@@ -40,6 +40,13 @@ public sealed class DrXmlParser : IDisposable
     private string _activeStream = "main";
     private readonly Stack<string> _streamStack = new();
 
+    // Duplicate-echo tracking (talk/whispers/…): DR sends a social stream's
+    // line twice — once inside <pushStream id="...">…<popStream/>, then
+    // immediately again as bare `main` text right after the pop, presumably
+    // for clients that don't understand streams. See EmitLine's dup check.
+    private string? _lastEmittedStream;
+    private string  _lastEmittedText = "";
+
     // ── Multi-chunk accumulation ─────────────────────────────────────────────
     // DR sends <component id='...'>inner text or child tags</component> and
     // <spell>Name</spell> and <compass><dir.../></compass> across separate chunks.
@@ -562,6 +569,20 @@ public sealed class DrXmlParser : IDisposable
             return;
         }
 
+        // DR's bare-echo duplicate: this main-stream line is byte-identical to
+        // — and the immediate next emission after — a just-closed non-main
+        // stream's line (e.g. talk's <pushStream>…<popStream/> followed at
+        // once by the same "You say, ..." text as plain main). Scoped tight:
+        // only the IMMEDIATE next emission qualifies (any other line in
+        // between updates _lastEmittedStream and clears the match), so two
+        // genuinely identical main-stream lines elsewhere are unaffected.
+        if (_activeStream == "main" && _lastEmittedStream is not null &&
+            _lastEmittedStream != "main" && stripped == _lastEmittedText)
+        {
+            _lastEmittedStream = null;
+            return;
+        }
+
         // Rebase every span offset from raw-buffer space into decoded-text
         // space (public #199). The offsets were taken against _textLineBuffer,
         // whose entities/tags `stripped` has since collapsed — so replay the
@@ -673,6 +694,8 @@ public sealed class DrXmlParser : IDisposable
 
         _events.OnNext(new TextEvent(_activeStream, stripped, links, boldSpans, presetSpans, Mono: _inMono));
         _emittedTextLine = true;   // a real blank line may now follow (#176)
+        _lastEmittedStream = _activeStream;
+        _lastEmittedText   = stripped;
     }
 
     // Map a span list from raw-buffer offsets into decoded-text offsets using
