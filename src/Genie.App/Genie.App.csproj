@@ -23,7 +23,7 @@
     <!-- ── Windows app icon ── -->
     <!-- Used for the .exe icon in Windows Explorer + the taskbar entry +
          the installer. macOS uses Assets/app.icns inside the .app bundle
-         (handled by vpk pack --icon in release.yml, not MSBuild); Linux uses
+         (handled by the vpk pack icon flag in release.yml, not MSBuild); Linux uses
          Assets/app.png. Avalonia's Window.Icon binding in MainWindow.axaml
          is what drives the in-app title-bar icon on all three platforms. -->
     <ApplicationIcon>Assets/app.ico</ApplicationIcon>
