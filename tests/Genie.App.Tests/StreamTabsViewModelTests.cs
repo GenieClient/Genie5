@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reactive.Subjects;
-using System.Reflection;
 using System.Threading.Tasks;
 using Genie.App.ViewModels;
 using Genie.Core;
@@ -25,15 +23,13 @@ namespace Genie.App.Tests;
 /// <para>
 /// Tests drive the REAL <see cref="StreamTabsViewModel.Attach"/> Rx
 /// subscription (not a reflection call into the private method itself) by
-/// publishing <see cref="TextEvent"/>s directly onto <see cref="GenieCore"/>'s
-/// internal event relay via reflection — the relay is private (by design;
-/// <c>GameEvents</c> only exposes it as <c>IObservable&lt;GameEvent&gt;</c>),
-/// and driving it this way exercises the exact subscribe callback that ships,
-/// including the Log-mirror line that sits beside <c>RouteToMain</c> in
-/// <c>Attach</c> (not inside it) — a full reimplementation via a fake
-/// <c>IObservable</c> would still need the same reflection to reach the
-/// relay, so this is the direct, low-friction path once you've read
-/// <c>Attach</c>.
+/// publishing <see cref="TextEvent"/>s via <see cref="GenieCore.PublishGameEventForTests"/>
+/// — an <c>internal</c> test seam exposed to this assembly through
+/// <c>InternalsVisibleTo</c> (see Genie.Core's AssemblyInfo.cs / csproj)
+/// rather than reflection into the private relay field. Driving it this way
+/// exercises the exact subscribe callback that ships, including the
+/// Log-mirror line that sits beside <c>RouteToMain</c> in <c>Attach</c> (not
+/// inside it).
 /// </para>
 ///
 /// <para>
@@ -69,7 +65,6 @@ public class StreamTabsViewModelTests
 
         private readonly HashSet<string> _open = new(StringComparer.OrdinalIgnoreCase);
         private readonly string _dir;
-        private readonly Subject<GameEvent> _relay;
 
         private static readonly string[] StreamIds =
         {
@@ -104,12 +99,6 @@ public class StreamTabsViewModelTests
             Tabs.ItemLog.Settings      = Store.Get("itemlog");
 
             Tabs.Attach(Core, Main, id => _open.Contains(id), Store);
-
-            var field = typeof(GenieCore).GetField(
-                            "_gameEventsRelay", BindingFlags.NonPublic | BindingFlags.Instance)
-                        ?? throw new InvalidOperationException(
-                               "GenieCore._gameEventsRelay not found by reflection — internal layout changed.");
-            _relay = (Subject<GameEvent>)field.GetValue(Core)!;
         }
 
         /// <summary>Mark a stream's dock panel open (visible). Everything
@@ -117,7 +106,7 @@ public class StreamTabsViewModelTests
         /// premise is visible in its own body.</summary>
         public void Open(string id) => _open.Add(id);
 
-        public void Publish(GameEvent e) => _relay.OnNext(e);
+        public void Publish(GameEvent e) => Core.PublishGameEventForTests(e);
 
         public async ValueTask DisposeAsync()
         {
@@ -273,18 +262,10 @@ public class StreamTabsViewModelTests
         Assert.Single(h.Main.Lines); // EchoToMain route, plain (no prefix)
     }
 
-    // NOTE: as of this branch's base (remote/main @ 670086f), PR #222's guard
-    // (`decision.StreamId == "log" && e.Stream is "talk" or "whispers"` → skip
-    // the redundant add) is NOT yet merged — that PR is still open. Confirmed
-    // by actually running this test unskipped against current RouteToMain: it
-    // fails with Log.Lines.Count == 2, which is the exact bug PR #222 fixes.
-    // This branch is deliberately scoped to test infrastructure only (kept
-    // separate from PR #222's routing fix per the task), so rather than fail
-    // the suite or carry the source fix here too, the test is written for
-    // real and left in place, skipped with the reason on record. Drop the
-    // Skip once PR #222 merges (or rebase this branch onto it) and it should
-    // go green with no other changes.
-    [Fact(Skip = "Requires PR #222's RouteToMain Log-guard, not yet merged into remote/main — see comment above.")]
+    // PR #222's Log-guard (`decision.StreamId == "log" && e.Stream is "talk" or
+    // "whispers"` → skip the redundant add) is merged into main as of this
+    // branch's rebase, so these run unskipped.
+    [Fact]
     public async Task Talk_closed_with_echoToMain_off_lands_in_log_exactly_once_not_twice()
     {
         await using var h = new Harness();
@@ -299,8 +280,8 @@ public class StreamTabsViewModelTests
         Assert.Empty(h.Main.Lines);                   // guarded fallback: no second route fires
     }
 
-    // Same PR #222 dependency as the talk case above.
-    [Fact(Skip = "Requires PR #222's RouteToMain Log-guard, not yet merged into remote/main — see comment above.")]
+    // Same PR #222 guard as the talk case above.
+    [Fact]
     public async Task Whispers_closed_with_echoToMain_off_lands_in_log_exactly_once_not_twice()
     {
         await using var h = new Harness();
