@@ -452,7 +452,7 @@ public static class ScriptParser
         for (int j = openIdx + 1; j < inst.Lines.Count; j++)
         {
             var t = inst.Lines[j].Trimmed;
-            if (t == "{") depth++;
+            if (t == "{" || OpensInlineBrace(t)) depth++;
             else if (t == "}")
             {
                 depth--;
@@ -460,6 +460,33 @@ public static class ScriptParser
             }
         }
         return -1;
+    }
+
+    /// <summary>
+    /// True when a line's own header opens a brace block — `if … then {`,
+    /// `elseif … then {`, `while … then {`, `if_N … then {`, or `else {`.
+    /// FindMatchingBrace must count these as openers; a bare-"{" check pairs
+    /// a nested `if … then {` block's '}' with the OUTER opener, so the outer
+    /// if's false-jump lands inside its own body (#228).
+    /// </summary>
+    private static bool OpensInlineBrace(string t)
+    {
+        if (t.Length < 2 || t[^1] != '{') return false;
+        if (IsElseLine(t) && !IsElseIfLine(t))
+            return t[4..].Trim() == "{";
+        int sp = t.IndexOf(' ');
+        if (sp < 0) return false;
+        var first = t[..sp];
+        bool header = first.Equals("if",     StringComparison.OrdinalIgnoreCase)
+                   || first.Equals("elseif", StringComparison.OrdinalIgnoreCase)
+                   || first.Equals("while",  StringComparison.OrdinalIgnoreCase)
+                   || (first.Length == 4
+                       && first.StartsWith("if_", StringComparison.OrdinalIgnoreCase)
+                       && char.IsDigit(first[3]));
+        if (!header) return false;
+        int thenIdx = FindThenKeyword(t[(sp + 1)..]);
+        if (thenIdx < 0) return false;
+        return t[(sp + 1 + thenIdx + 4)..].Trim() == "{";
     }
 
     private static bool IsElseLine(string t)
