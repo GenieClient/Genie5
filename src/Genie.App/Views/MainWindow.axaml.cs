@@ -9,6 +9,7 @@ using Avalonia.VisualTree;
 using Genie.App.Controls;
 using Genie.App.ViewModels;
 using ReactiveUI;
+using System.Windows.Input;
 
 namespace Genie.App.Views;
 
@@ -567,6 +568,23 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                                        reverse: e.KeyModifiers.HasFlag(KeyModifiers.Shift)))
                     e.Handled = true;
                 break;
+            case Key.Enter:
+                // Submit is normally wired via the XAML <KeyBinding
+                // Gesture="Return">, which Avalonia matches against the
+                // focused element and marks handled BEFORE the routed
+                // KeyDown dispatch even reaches here — so on a real,
+                // physically-typed Enter this case never runs. It only
+                // fires for a KeyDown synthesized by ForwardKeyToBar
+                // (OnGlobalKeyDown's forward-to-bar fallback), which raises
+                // the event directly and so skips the KeyBindings pass.
+                // Same CanExecute guard the KeyBinding itself uses, so the
+                // two paths behave identically.
+                if (((ICommand)cmd.SubmitCommand).CanExecute(null))
+                {
+                    ((ICommand)cmd.SubmitCommand).Execute(null);
+                    e.Handled = true;
+                }
+                break;
             default:
                 _tabMatches = null;       // any other key resets the cycle
                 break;
@@ -658,6 +676,31 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         Avalonia.Threading.Dispatcher.UIThread.Post(
             () => tb.CaretIndex = tb.Text?.Length ?? 0);
     }
+
+    /// <summary>
+    /// Re-raises a KeyDown for <paramref name="key"/> directly on <paramref
+    /// name="bar"/> (used by <see cref="OnGlobalKeyDown"/> to forward
+    /// navigation/editing keys once no other control claimed them). This is
+    /// a normal routed KeyDownEvent, so it drives the bar's own <c>OnKeyDown</c>
+    /// override (TextBox's built-in Backspace/Delete/caret-move editing) and
+    /// its instance handler <see cref="CommandInput_KeyDown"/> (Up/Down
+    /// history recall, and Enter's submit fallback) exactly as if the key
+    /// had been pressed with the bar already focused. It deliberately does
+    /// NOT go through <c>KeyBindings</c> matching — those are resolved by
+    /// Avalonia's <c>KeyboardDevice</c> against the focused element BEFORE
+    /// routed dispatch even starts (so CommandInput's own <c>&lt;KeyBinding
+    /// Gesture="Return"&gt;</c> only ever fires for a real, physically-typed
+    /// Enter) — which is exactly why <c>CommandInput_KeyDown</c> carries its
+    /// own manual Enter case: it's the fallback for this forwarded path.
+    /// </summary>
+    private static void ForwardKeyToBar(TextBox bar, Key key, KeyModifiers mods) =>
+        bar.RaiseEvent(new KeyEventArgs
+        {
+            RoutedEvent = InputElement.KeyDownEvent,
+            Source = bar,
+            Key = key,
+            KeyModifiers = mods,
+        });
 
     /// <summary>
     /// Handles Ctrl+Right-Click anywhere in the window. If the click landed
@@ -768,23 +811,40 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             }
         }
 
-        // #141: Backspace while no text control has focus → edit the command
-        // bar, same as the TextInput redirect below (Backspace produces no
-        // TextInput, so it needs its own hook). A focused TextBox handles its
-        // own Backspace and marks it handled before this bubble handler runs;
-        // the guard is belt-and-braces.
-        if (e.Key == Key.Back && e.KeyModifiers == KeyModifiers.None &&
+        // #141: Backspace/Delete/Enter/arrows while no text control has focus →
+        // forward to the command bar, same idea as the TextInput redirect
+        // below (these keys produce no TextInput, so they need their own
+        // hook). Only bare keypresses are forwarded — modified combos are
+        // left alone in case they're macro-bound. A focused TextBox handles
+        // its own copy of these keys and marks the event handled before this
+        // bubble handler runs; the guard is belt-and-braces. The `e.Source`
+        // check stops the re-raised KeyDown below (see ForwardKeyToBar) from
+        // looping back into this same block once it bubbles back up here.
+        if (e.KeyModifiers == KeyModifiers.None &&
+            !ReferenceEquals(e.Source, CommandInput) &&
             FocusManager?.GetFocusedElement() is not TextBox &&
             CommandInput is { } bar)
         {
-            bar.Focus();
-            if (!string.IsNullOrEmpty(bar.Text))
+            switch (e.Key)
             {
-                bar.Text = bar.Text[..^1];
-                bar.CaretIndex = bar.Text.Length;
+                // TextBox's own OnKeyDown implements Backspace/Delete/caret
+                // movement against whatever CaretIndex/selection it already
+                // has, and CommandInput_KeyDown implements Up/Down history
+                // and (for Enter) a manual submit fallback — so re-raising
+                // the KeyDown directly on the bar after focusing gives all
+                // of that for free, no hand-rolled logic needed here.
+                case Key.Back:
+                case Key.Delete:
+                case Key.Left:
+                case Key.Right:
+                case Key.Up:
+                case Key.Down:
+                case Key.Enter:
+                    bar.Focus();
+                    ForwardKeyToBar(bar, e.Key, e.KeyModifiers);
+                    e.Handled = true;
+                    return;
             }
-            e.Handled = true;
-            return;
         }
 
         // #120: Ctrl+F opens the Find bar on the selected game/stream window —
