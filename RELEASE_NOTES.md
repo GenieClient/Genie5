@@ -1,3 +1,47 @@
+# Genie 5 — v5.0.0-beta.4.f
+
+Script-engine parity weekend: both of Saturday's script bug reports fixed —
+nested `if` blocks and mid-name variable composition — plus type-anywhere
+grows up: editing and history keys now reach the command bar from anywhere,
+straight from a community PR.
+
+## ✨ New
+- **Backspace, Delete, Enter, and the arrow keys reach the command bar from
+  anywhere.** The #141 type-anywhere redirect was Backspace-only; now the
+  full editing/history set forwards to the command bar when no text control
+  has focus — Up/Down recall history and Enter submits with the Game window
+  focused, exactly like Genie 4. Along the way this fixes two silent
+  AvaloniaEdit quirks that were eating Delete and the arrows in the Game
+  window. PR #227 by @simtel12. 🙏
+
+## 🐛 Fixes
+- **Nested `if … then {` blocks skip correctly (#228).** The brace matcher
+  only counted a `{` sitting alone on its line, so a nested `if … then {`
+  block's closing brace was paired with the *outer* if — a false outer
+  condition jumped straight into its own body and ran the tail lines (the
+  reported "get my mallet" firing while already holding the mallet). Headers
+  that open a block inline now count as openers, so depth tracking survives
+  arbitrary nesting — covered by eight new engine tests including the exact
+  reported script. Thanks @digitalnyc1 — the debug trace in the report made
+  this a same-day find.
+- **Variables mid-name compose again (#225).** A July guard against
+  undefined names being eaten mid-word (`$Outdoorsmanship.Ranks` matching
+  the compass `$out`) also outlawed Genie 4's numbered-variable idiom:
+  `%spell%countermana` must resolve `%counter` mid-name to form
+  `%spell1mana`. The rule now mirrors what Genie 4's case-sensitive lookup
+  would do — an exact-case match may break mid-word, a case-insensitive-only
+  match may not — so both behaviors hold at once. The reporter's
+  three-position loop script runs verbatim in the test suite, asserting the
+  exact Genie 4 output. Thanks @SaragosDR for the surgical repro.
+
+## 🔧 Under the hood
+- **Genie.App gets its own test project (#223).** First App-layer harness,
+  covering the full stream-routing matrix (`EchoToMain` × panel visibility ×
+  `IfClosed`) that PR #222 fixed — the double-add regression now has a
+  permanent net. PR by @simtel12, and it runs in CI on every push. 🙏
+
+---
+
 # Genie 5 — v5.0.0-beta.4.e
 
 The community batch: everything in this release came straight from player

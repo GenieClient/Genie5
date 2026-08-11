@@ -4,7 +4,20 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.4.e — Community Day
+## Latest: v5.0.0-beta.4.f — Nested & Composed
+
+Script-engine parity weekend: nested `if … then {` blocks skip correctly, variables compose mid-name again (`%spell%countermana` → `%spell1mana`), and type-anywhere now forwards Backspace/Delete/Enter/arrows to the command bar — history recall and submit work with the Game window focused, like Genie 4.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.4.f** as a delta from beta.4.e.
+
+- **Nested `if … then {` blocks skip correctly** — a false outer condition no longer executes the lines after a nested block; brace depth now survives arbitrary nesting (#228 — thanks @digitalnyc1).
+- **Mid-name variable composition restored** — `%spell%countermana` resolves `%counter` mid-name like Genie 4; the mid-word guard now keys on exact-case matches so the #171 protection stays intact (#225 — thanks @SaragosDR).
+- **Editing & history keys reach the command bar from anywhere** — Backspace/Delete/Enter/arrows forward to the bar when no text control has focus; fixes two AvaloniaEdit quirks that ate Delete and the arrows (PR #227 — thanks @simtel12).
+- **First Genie.App test project** — the stream-routing matrix behind PR #222 now has permanent CI coverage (PR #223 — thanks @simtel12).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.4.f)
+
+## v5.0.0-beta.4.e — Community Day
 
 The community batch: a separate repo-scripts directory so script updates can't clobber local edits, talk/whisper lines no longer double in Main and Log, and `action … when eval` conditions evaluate for real. Everything in this build came from player reports, PRs, and DM'd findings — most filed and fixed the same day.
 

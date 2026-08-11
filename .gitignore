@@ -1,6 +1,7 @@
 # ─── Per-machine dev-tool scratch files ──────────────────────────────────
 # Editor + AI-assistant scratch state. Per-developer; never tracked.
 CLAUDE.md
+AGENTS.md
 .claude/
 .cursor/
 .cursorrules
@@ -93,6 +94,11 @@ _refs/
 .aider*
 CLAUDE.local.md
 
+# ─── Personal gameplay scripts (per-machine, not for the repo) ────────────
+# Local .cmd scripts written for actual DR play (e.g. getFavor.cmd). User
+# content, not product source — keep them out of both repos.
+src/Genie.Core/Scripts/
+
 # ─── Old sandbox + replay-test artefacts ──────────────────────────────────
 # Older sandbox outputs from before TestHarness + the new src/ layout were
 # in place. Kept locally for reference but not for the public repo.
@@ -122,3 +128,4 @@ appsettings.*.local.json
 # live in the dev repo. Mirrors the dev repo's rule so a stray `git add -A`
 # on a public checkout can't stage them.
 docs/internal/private/
+.gstack/
