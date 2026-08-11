@@ -83,6 +83,12 @@ jobs:
       - name: Test (Release)
         run: dotnet test tests/Genie.Core.Tests -c Release --nologo -v minimal
 
+      # Genie.App.Tests (StreamTabsViewModel.RouteToMain coverage). References
+      # Genie.App as a library (see that project's csproj comment) so no
+      # extra build step is needed beyond the solution build above.
+      - name: Test (Genie.App.Tests)
+        run: dotnet test tests/Genie.App.Tests -c Release --nologo -v minimal
+
       # The Profiles/ folder was silently shadowed by an over-broad
       # .gitignore rule for five days before another clone surfaced it.
       # Belt-and-braces: assert the source folders we expect to exist

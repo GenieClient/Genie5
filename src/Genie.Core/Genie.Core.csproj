@@ -24,6 +24,8 @@
          splitter and has its own regression tests; it stays internal so it
          isn't part of Core's public surface. -->
     <InternalsVisibleTo Include="Genie.Core.Tests" />
+    <!-- GenieCore.PublishGameEventForTests test hook (see AssemblyInfo.cs). -->
+    <InternalsVisibleTo Include="Genie.App.Tests" />
   </ItemGroup>
 
   <ItemGroup>

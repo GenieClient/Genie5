@@ -204,6 +204,13 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// <summary>Typed game events (TextEvent, ProgressBarEvent, RoundTimeEvent, …).</summary>
     public IObservable<GameEvent>       GameEvents      => _gameEventsRelay;
 
+    /// <summary>Test-only seam: pushes an event onto <see cref="GameEvents"/>
+    /// without a live connection. Internal — visible to Genie.Core.Tests and
+    /// Genie.App.Tests via <see cref="System.Runtime.CompilerServices.InternalsVisibleToAttribute"/>
+    /// (see AssemblyInfo.cs / Genie.Core.csproj) so VM Attach() tests can drive
+    /// the real subscribe callback instead of reflecting into the private relay.</summary>
+    internal void PublishGameEventForTests(GameEvent e) => _gameEventsRelay.OnNext(e);
+
     /// <summary>Raw XML stream — subscribe for logging, recording, or custom processing.</summary>
     public IObservable<string>          RawXmlStream    => _rawXmlRelay;
 
