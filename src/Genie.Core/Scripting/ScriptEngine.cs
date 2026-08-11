@@ -2893,32 +2893,46 @@ public sealed class ScriptEngine
         // "-1" when only `count` is defined. If nothing resolves, the full
         // candidate is consumed and substituted as empty.
         //
-        // A shrunk candidate may only break where the remainder does NOT start
-        // with a letter — i.e. never in the middle of a word (public #171).
-        // Without this, an UNDEFINED name gets eaten mid-word by a shorter
-        // defined var: `$Outdoorsmanship.Ranks` matched the compass boolean
-        // `$out` → "0doorsmanship.Ranks" (remainder "doorsmanship…" starts with
-        // a letter), and `$SpellTimer.X.active` matched `$spelltime` →
-        // "0r.X.active". (Genie 4 dodges this only via its case-sensitive
-        // VariableList; our globals are case-insensitive.)
+        // A shrunk candidate may break mid-word (remainder starts with a
+        // letter) ONLY when the matched var is stored with EXACT case — that
+        // is precisely the match Genie 4's case-sensitive VariableList would
+        // have made. This is load-bearing for mid-name composition (public
+        // #225): with `counter` defined, `%spell%countermana` must resolve the
+        // inner `%countermana` as `%counter` + "mana" → "%spell1mana" — G4's
+        // documented loop-over-numbered-vars idiom.
         //
-        // But '.', '-', digits AND '_' are all legitimate suffix boundaries —
-        // Genie 4 breaks at any of them. `_` in particular is load-bearing:
-        // `%$selection_DESC` (mm_train #1071) must shrink `$selection_DESC` →
-        // `$selection` + "_DESC", forming `%<value>_DESC`. An earlier version
-        // of this rule wrongly rejected the '_' boundary too, so the inner
-        // global collapsed to "" and the leading `%` survived as a bare sigil
-        // → `!(% = "")` (regression, Jason's live mm_train run). The
-        // documented shrinks `%count-1` and `%%spell.Prep` still work.
+        // A case-INsensitive-only hit stays rejected at mid-word breaks
+        // (public #171): our globals are case-insensitive, so without the
+        // exact-case gate an UNDEFINED name gets eaten by a shorter engine
+        // global G4 would never match — `$Outdoorsmanship.Ranks` matched the
+        // compass boolean `$out` → "0doorsmanship.Ranks", and
+        // `$SpellTimer.X.active` matched `$spelltime` → "0r.X.active".
+        // (An earlier cut of the #171 rule rejected ALL mid-word breaks, which
+        // broke the #225 composition above — the gate reconciles the two.)
+        // Computed pseudo-vars ($spelltime, clock vars) and #var-store hits
+        // have no inspectable stored key, so they remain boundary-only.
+        //
+        // '.', '-', digits AND '_' are all legitimate suffix boundaries —
+        // Genie 4 breaks at any of them, exact case or not. `_` in particular
+        // is load-bearing: `%$selection_DESC` (mm_train #1071) must shrink
+        // `$selection_DESC` → `$selection` + "_DESC", forming `%<value>_DESC`.
+        // An earlier version of the rule wrongly rejected the '_' boundary
+        // too, so the inner global collapsed to "" and the leading `%`
+        // survived as a bare sigil → `!(% = "")` (regression, Jason's live
+        // mm_train run). The documented shrinks `%count-1` and `%%spell.Prep`
+        // still work.
         int nameEnd = j;
         string value = string.Empty;
         bool resolved = false;
         while (nameEnd > nameStart)
         {
-            if (nameEnd == j || !char.IsLetter(s[nameEnd]))
+            var name = s[nameStart..nameEnd];
+            if (TryResolveVar(name, c, inst, out value))
             {
-                var name = s[nameStart..nameEnd];
-                if (TryResolveVar(name, c, inst, out value)) { resolved = true; break; }
+                bool wordBoundary = nameEnd == j || !char.IsLetter(s[nameEnd]);
+                if (wordBoundary || StoredWithExactCase(name, c, inst)) { resolved = true; break; }
+                // Insensitive-only hit mid-word: G4's case-sensitive lookup
+                // would have missed it — keep shrinking.
             }
             nameEnd--;
         }
@@ -2957,6 +2971,30 @@ public sealed class ScriptEngine
             }
         }
         return (value, nameEnd);
+    }
+
+    /// <summary>
+    /// True when <paramref name="name"/> exists in the relevant store with
+    /// EXACTLY this casing — the match Genie 4's case-sensitive VariableList
+    /// would make. Gates mid-word shrink breaks (see ResolveTokenAt): only
+    /// stored vars count (locals for <c>%</c>, globals for <c>$</c>); computed
+    /// pseudo-vars and the #var store can't be case-verified and stay
+    /// boundary-only. Enumerates rather than TryGetValue because the
+    /// case-insensitive dictionaries can't return their canonical key; only
+    /// reached on a case-insensitive HIT at a mid-word position, which is
+    /// rare (a genuine collision), so the scan cost doesn't matter.
+    /// </summary>
+    private bool StoredWithExactCase(string name, char prefix, ScriptInstance inst)
+    {
+        if (prefix == '%')
+        {
+            foreach (var k in inst.Vars.Keys)
+                if (string.Equals(k, name, StringComparison.Ordinal)) return true;
+            return false;
+        }
+        foreach (var kv in Globals)
+            if (string.Equals(kv.Key, name, StringComparison.Ordinal)) return true;
+        return false;
     }
 
     /// <summary>
