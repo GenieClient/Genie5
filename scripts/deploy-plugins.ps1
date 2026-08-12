@@ -77,7 +77,7 @@ Write-Host "Plugins folder : $PluginsDir"
 $AbstractionsProj = Join-Path $RepoRoot 'src/Genie.Plugins.Abstractions/Genie.Plugins.Abstractions.csproj'
 Write-Host "Building plugin contract (Genie.Plugins.Abstractions)..."
 dotnet build $AbstractionsProj -c Release --nologo -v quiet
-$AbstractionsDll = Join-Path $RepoRoot 'src/Genie.Plugins.Abstractions/bin/Release/net8.0/Genie.Plugins.Abstractions.dll'
+$AbstractionsDll = Join-Path $RepoRoot 'src/Genie.Plugins.Abstractions/bin/Release/net10.0/Genie.Plugins.Abstractions.dll'
 if (-not (Test-Path $AbstractionsDll)) { throw "Contract DLL not found: $AbstractionsDll" }
 
 # ── Build + deploy each gold plugin ──────────────────────────────────────────

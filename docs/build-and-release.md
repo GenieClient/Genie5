@@ -1,6 +1,6 @@
 # Build & Release
 
-Genie 5 builds for Windows, macOS, and Linux from one source tree on .NET 8. The published artifact is **self-contained** — the .NET runtime and native libraries are bundled, so end users don't install anything.
+Genie 5 builds for Windows, macOS, and Linux from one source tree on .NET 10. The published artifact is **self-contained** — the .NET runtime and native libraries are bundled, so end users don't install anything.
 
 There are no platform build scripts checked in (no `build-mac.sh` / `build-win.sh`). Local builds are driven by `dotnet publish` and the publish properties already set in [Genie.App.csproj](../src/Genie.App/Genie.App.csproj); **shipping releases are fully scripted in CI** (see [CI & releases](#ci--releases) below). This page documents the local commands, what the properties do, and how the release pipeline packages each platform.
 
@@ -12,7 +12,7 @@ There are no platform build scripts checked in (no `build-mac.sh` / `build-win.s
 | [Genie.App](../src/Genie.App/Genie.App.csproj) | `WinExe` (`AssemblyName=Genie5`) | The Avalonia GUI. References Genie.Core. |
 | [Genie.Plugins.Abstractions](../src/Genie.Plugins.Abstractions/Genie.Plugins.Abstractions.csproj) | library | The public plugin contract (`IGeniePlugin` / `IPluginHost`) that plugin authors reference. |
 
-Solution file: [Genie.slnx](../Genie.slnx). Target framework: `net8.0`. UI stack: Avalonia + Dock.Avalonia + AvaloniaEdit + ReactiveUI (with ReactiveUI.Fody) — see the csproj for the pinned versions.
+Solution file: [Genie.slnx](../Genie.slnx). Target framework: `net10.0`. UI stack: Avalonia + Dock.Avalonia + AvaloniaEdit + ReactiveUI (with ReactiveUI.Fody) — see the csproj for the pinned versions.
 
 ## Local development
 
@@ -22,7 +22,7 @@ dotnet build -c Release
 dotnet run --project src/Genie.App
 ```
 
-A plain `dotnet build` produces an unbundled `bin/Debug/net8.0/Genie5` you can run directly. The self-contained single-file artifact is only needed for distribution. Run the test suite with `dotnet test tests/Genie.Core.Tests`.
+A plain `dotnet build` produces an unbundled `bin/Debug/net10.0/Genie5` you can run directly. The self-contained single-file artifact is only needed for distribution. Run the test suite with `dotnet test tests/Genie.Core.Tests`.
 
 To run the headless engine harness (no UI):
 

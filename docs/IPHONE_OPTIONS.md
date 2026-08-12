@@ -13,7 +13,7 @@ built or replaced, and whether it fits the project's
 
 Two facts about the codebase shape every option below:
 
-1. **`Genie.Core` is already portable.** It's a pure .NET 8 class library
+1. **`Genie.Core` is already portable.** It's a pure .NET 10 class library
    with **zero UI dependencies** (see [README architecture](../README.md) and
    `src/Genie.Core/Genie.Core.csproj`). Its package deps — `Jint`,
    `System.Reactive`, `Anthropic.SDK`, `Microsoft.Extensions.Logging` — are
@@ -23,7 +23,7 @@ Two facts about the codebase shape every option below:
    biggest asset for any mobile effort.
 
 2. **`Genie.App` is desktop-bound in several concrete ways.** It targets
-   `net8.0` / `WinExe` and leans on pieces that don't exist or don't fit on
+   `net10.0` / `WinExe` and leans on pieces that don't exist or don't fit on
    iPhone:
    - **Dock.Avalonia** — the dockable multi-panel MDI layout. A dense,
      drag-to-dock desktop paradigm; wrong model for a 6-inch touch screen.

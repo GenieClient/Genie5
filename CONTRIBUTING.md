@@ -13,7 +13,7 @@ Thanks for your interest. Genie 5 is beta-stage software with a small contributo
 
 ### Prerequisites
 
-- **.NET 8 SDK** — [download](https://dotnet.microsoft.com/download/dotnet/8.0)
+- **.NET 10 SDK** — [download](https://dotnet.microsoft.com/download/dotnet/10.0)
 - A DragonRealms account if you want to test against a live server (free trial accounts work for most testing)
 
 ### Clone + build
