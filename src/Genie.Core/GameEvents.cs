@@ -132,6 +132,13 @@ public sealed record RoundTimeEvent(DateTimeOffset ExpiresAt) : GameEvent;
 /// <summary>&lt;castTime value="unix_timestamp"/&gt; — spell casting lock expiry.</summary>
 public sealed record CastTimeEvent(DateTimeOffset ExpiresAt) : GameEvent;
 
+/// <summary>&lt;spelltime value="unix_timestamp"/&gt; — server-authoritative epoch of
+/// when the currently prepared spell's prep began (Genie 4 Core/Game.cs:2131 sets
+/// $spellstarttime from it). Not observed in normal prep sequences — the usual
+/// source of prep-start is the &lt;spell&gt; tag arrival — but honored when sent
+/// (e.g. logging in with a spell already held).</summary>
+public sealed record SpellTimeEvent(DateTimeOffset StartsAt) : GameEvent;
+
 // ── Named components ─────────────────────────────────────────────────────────
 
 /// <summary>

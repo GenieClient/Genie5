@@ -139,7 +139,10 @@ These live game-state globals are mirrored as events arrive (a non-exhaustive li
 | Global | Source |
 | --- | --- |
 | `$health`, `$mana`, `$spirit`, `$stamina`/`$fatigue`, `$concentration`, `$encumbrance` | progress bars |
-| `$roundtime`, `$casttime` | live seconds remaining |
+| `$roundtime` | seconds remaining at event time |
+| `$casttime` | raw epoch of when the cast is fully prepped (Genie 4 parity — compose `$casttime - $spellstarttime`) |
+| `$spellpreptime` | full prep length in seconds (constant per spell) |
+| `$spelltime`, `$spellstarttime`, `$casttimeremaining` | computed live on every read: elapsed count-up, prep-start epoch, countdown-to-prepped |
 | `$righthand` / `$righthandnoun` / `$righthandid` (and `left*`) | held items |
 | `$preparedspell`, `$stance` | prepared spell, stance |
 | `$standing`, `$kneeling`, `$prone`, `$sitting`, `$stunned`, `$hidden`, `$invisible`, `$dead`, `$webbed`, `$joined`, `$bleeding`, `$poisoned`, `$diseased` | status indicators (`1`/`0`) |

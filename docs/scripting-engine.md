@@ -155,7 +155,10 @@ These are mirrored by [ScriptGlobalsSync](../src/Genie.Core/Scripting/ScriptGlob
 | Global | Source |
 | --- | --- |
 | `$health`, `$mana`, `$spirit`, `$stamina`/`$fatigue`, `$concentration`, `$encumbrance` | `<progressBar>` |
-| `$roundtime`, `$casttime` | `<roundTime>`/`<castTime>` (live seconds remaining) |
+| `$roundtime` | `<roundTime>` (seconds remaining at event time) |
+| `$casttime` | `<castTime>` raw epoch of when the cast is fully prepped (Genie 4 parity — compose `$casttime - $spellstarttime`) |
+| `$spellpreptime` | full prep length in seconds (`$casttime − $spellstarttime`, constant per spell) |
+| `$spelltime`, `$spellstarttime`, `$casttimeremaining` | computed live on every read: elapsed count-up, prep-start epoch, countdown-to-prepped |
 | `$righthand`/`$righthandnoun`/`$righthandid` (and `left*`) | `<right>`/`<left>` |
 | `$preparedspell`, `$stance` | `<spell>`, `pc stance` |
 | `$standing`, `$kneeling`, `$prone`, `$sitting`, `$stunned`, `$hidden`, `$invisible`, `$dead`, `$webbed`, `$joined`, `$bleeding`, `$poisoned`, `$diseased` | `<indicator>` (`"1"`/`"0"`) |

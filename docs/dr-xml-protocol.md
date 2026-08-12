@@ -79,7 +79,8 @@ Each recognised tag emits one or more `GameEvent`s. Tags in the `_settingsTags` 
 | Tag | Event | Notes |
 | --- | --- | --- |
 | `<roundTime value='N'/>` | `RoundTimeEvent(expiresAt)` | `value` is the absolute Unix epoch when RT expires. Stored as `Combat.RoundTimeEnd`. |
-| `<castTime value='N'/>` | `CastTimeEvent(expiresAt)` | Same shape, for spell prep. |
+| `<castTime value='N'/>` | `CastTimeEvent(expiresAt)` | Same shape, for spell prep. Also mirrored raw into `$casttime` (Genie 4 keeps the epoch verbatim so scripts can compose `$casttime - $spellstarttime`). |
+| `<spelltime value='N'/>` | `SpellTimeEvent(startsAt)` | Server-authoritative epoch of when the current spell's prep began (Genie 4 `Game.cs:2131`). Rare — the normal prep sequence carries no such tag (prep start is stamped at `<spell>` arrival); honored when sent, but only while a spell is actually held. `value='0'` is inert. |
 | `<prompt time='N'>…</prompt>` | `PromptEvent(ServerTime, Indicator)` | The timestamp is captured at the **open** tag; the event fires at the **close** tag carrying the decoded body — the indicator string (`>`, `R>`, `HR>`, …). Also flushes any partial text line first, and — as a stream-routing backstop — resets the active stream to `main` and clears the stream stack. |
 
 ### Room and navigation

@@ -537,6 +537,19 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Scripts.SpellTimeSeconds          = () => (int)_state.Combat.SpellTimeSeconds;
         // $spellstarttime — epoch seconds of when the spell was prepared, 0 if none (#151).
         Scripts.SpellStartTimeEpoch       = () => _state.Combat.SpellTimeStart?.ToUnixTimeSeconds() ?? 0;
+        // $casttimeremaining — live countdown to fully-prepped (G4 Globals.cs:215:
+        // spellpreptime − elapsed, clamped at 0; 0 with no spell held). Same
+        // integer-epoch prepLen arithmetic as $spellpreptime (see
+        // ScriptGlobalsSync.OnPrompt) so the two variables always agree.
+        Scripts.CastTimeRemainingSeconds  = () =>
+        {
+            if (_state.Combat.SpellTimeStart is not { } prepStart) return 0;
+            var end = _state.Combat.CastTimeEnd;
+            if (end <= prepStart) return 0;
+            var prepLen  = end.ToUnixTimeSeconds() - prepStart.ToUnixTimeSeconds();
+            var elapsed  = (long)_state.Combat.SpellTimeSeconds;
+            return (int)Math.Max(0L, prepLen - elapsed);
+        };
         // #config ignorescriptwarnings — suppress non-fatal script parse advisories (#151).
         Scripts.WarningsSuppressed        = () => Config.IgnoreScriptWarnings;
         Scripts.EchoTo                   = (msg, win, color) => RaiseEchoToWindow(msg, win, color);

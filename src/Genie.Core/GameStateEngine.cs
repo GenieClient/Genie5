@@ -122,6 +122,18 @@ public sealed class GameStateEngine : IDisposable
                 break;
             }
 
+            // <spelltime value='epoch'/> — server-authoritative prep start.
+            // Overrides the local UtcNow stamp above (Genie 4 Game.cs:2131 sets
+            // $spellstarttime from it), but only while a spell is actually held:
+            // with nothing prepared G4 forces the var to 0, i.e. ignores the tag.
+            case SpellTimeEvent st:
+            {
+                var held = _state.Combat.PreparedSpell.Trim().Length > 0
+                           && !_state.Combat.PreparedSpell.Equals("None", StringComparison.OrdinalIgnoreCase);
+                if (held) _state.Combat.SpellTimeStart = st.StartsAt;
+                break;
+            }
+
             // ── Navigation ────────────────────────────────────────────────
             case NavEvent nav:
                 if (int.TryParse(nav.RoomId, out var rid) && rid != _state.Room.RoomId)

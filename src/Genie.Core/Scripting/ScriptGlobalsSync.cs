@@ -103,14 +103,15 @@ public sealed class ScriptGlobalsSync : IDisposable
         Set("encumbrance",   _state.Vitals.Encumbrance.ToString(CultureInfo.InvariantCulture));
         Set("fatigue",       _state.Vitals.StaminaFatigue.ToString(CultureInfo.InvariantCulture));   // alias
 
-        // Combat / casting. The *remaining aliases mirror Genie 4's
-        // $casttimeremaining (the live countdown SaragosDR called out in #45);
-        // our values are already computed as seconds-remaining, so the alias
-        // tracks the base var.
+        // Combat / casting. $casttime is the RAW epoch from <castTime value=…>
+        // (Genie 4 Game.cs:2122 — scripts compose it: $casttime − $spellstarttime),
+        // seeded "0" like G4 (Globals.cs:899). $casttimeremaining is NOT stored
+        // here — it's a live-computed reserved var in ScriptEngine.TryResolveVar
+        // (G4 recomputes @casttimeremaining@ at every substitution; a stored
+        // snapshot froze at the full prep length, public #224 follow-up).
         Set("roundtime",          "0");
         Set("roundtimeremaining", "0");
         Set("casttime",           "0");
-        Set("casttimeremaining",  "0");
         Set("spellpreptime",      "0");
         Set("preparedspell", _state.Combat.PreparedSpell);
         Set("stance",        _state.Combat.Stance.ToString().ToLowerInvariant());
@@ -162,7 +163,9 @@ public sealed class ScriptGlobalsSync : IDisposable
             case CompassEvent comp:    OnCompass(comp);    break;
             case NavEvent nav:         Set("gameroomid", nav.RoomId ?? string.Empty); break;
             case RoundTimeEvent rt:    { var s = SecondsRemaining(rt.ExpiresAt); Set("roundtime", s); Set("roundtimeremaining", s); break; }
-            case CastTimeEvent ct:     { var s = SecondsRemaining(ct.ExpiresAt); Set("casttime",  s); Set("casttimeremaining",  s); break; }
+            // $casttime = the tag's raw epoch (G4 Game.cs:2122), not a countdown —
+            // the live countdown is $casttimeremaining (computed in ScriptEngine).
+            case CastTimeEvent ct:     Set("casttime", ct.ExpiresAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)); break;
             case SpellEvent sp:        Set("preparedspell", sp.SpellName ?? string.Empty); break;
             case PromptEvent p:        OnPrompt(p);                                           break;
             case AppEvent app:         OnApp(app);                                            break;
@@ -208,10 +211,18 @@ public sealed class ScriptGlobalsSync : IDisposable
         // minus the epoch prep began — a constant per spell, NOT the elapsed
         // count-up (that's $spelltime). 0 when nothing is being prepared or
         // the server sent no castTime.
+        //
+        // Integer-epoch arithmetic, deliberately: CastTimeEnd is a whole-second
+        // server epoch but SpellTimeStart is a local UtcNow stamp with fractional
+        // ms, so a TimeSpan difference is almost always prepLen−0.x and a plain
+        // (int) cast truncated it down — 19 for a 20s prep (public #224
+        // follow-up). G4 floors the START epoch then subtracts whole integers
+        // (FormMain.cs:6392 ToUnixTimeSeconds → Globals.cs:213); matching that
+        // truncation direction restores the exact figure.
         var prepLen = _state.Combat.SpellTimeStart is { } prepStart
                       && _state.Combat.CastTimeEnd > prepStart
-            ? (int)Math.Max(0, (_state.Combat.CastTimeEnd - prepStart).TotalSeconds)
-            : 0;
+            ? Math.Max(0L, _state.Combat.CastTimeEnd.ToUnixTimeSeconds() - prepStart.ToUnixTimeSeconds())
+            : 0L;
         Set("spellpreptime", prepLen.ToString(CultureInfo.InvariantCulture));
     }
 

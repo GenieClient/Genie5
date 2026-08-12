@@ -1059,7 +1059,7 @@ public sealed class DrXmlParser : IDisposable
         "crtrstatus", "d", "dialogdata", "dir", "endsetup", "image", "indicator", "inv",
         "left", "nav", "openwindow", "output", "popbold", "popstream",
         "preset", "progressbar", "prompt", "pushbold", "pushstream",
-        "resource", "right", "roundtime", "settingsinfo", "spell",
+        "resource", "right", "roundtime", "settingsinfo", "spell", "spelltime",
         "streamwindow", "style",
     };
 
@@ -1157,6 +1157,15 @@ public sealed class DrXmlParser : IDisposable
                 var expiry = long.TryParse(r["value"], out var ts) ? ts : 0L;
                 var expires = DateTimeOffset.FromUnixTimeSeconds(expiry);
                 _events.OnNext(new CastTimeEvent(expires));
+                break;
+            }
+
+            // <spelltime value='epoch'/> — server-authoritative prep-start
+            // (Genie 4 Game.cs:2131). Rare; see SpellTimeEvent.
+            case "spelltime":
+            {
+                if (long.TryParse(r["value"], out var st) && st > 0)
+                    _events.OnNext(new SpellTimeEvent(DateTimeOffset.FromUnixTimeSeconds(st)));
                 break;
             }
 

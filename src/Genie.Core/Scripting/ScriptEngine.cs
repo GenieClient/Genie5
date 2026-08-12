@@ -89,6 +89,13 @@ public sealed class ScriptEngine
     /// <c>$spellstarttime</c>). Set by the host; 0 when no spell is prepared.</summary>
     public Func<long>? SpellStartTimeEpoch { get; set; }
 
+    /// <summary>Seconds until the prepared spell is fully prepped (Genie 4
+    /// <c>$casttimeremaining</c> = spellpreptime − spelltime, clamped at 0;
+    /// 0 when no spell is prepared). Set by the host; computed live on every
+    /// substitution so it counts down — a stored snapshot froze at the full
+    /// prep length (public #224 follow-up).</summary>
+    public Func<int>? CastTimeRemainingSeconds { get; set; }
+
     /// <summary>Live read of <c>#config ignorescriptwarnings</c> (#151). When it
     /// returns true, non-fatal parse advisories (bad-condition / malformed-if) are
     /// suppressed. Read on each warning so a mid-session toggle takes effect at
@@ -3048,6 +3055,12 @@ public sealed class ScriptEngine
             // "0" when none (Genie 4). Computed live from the host, before globals.
             if (name.Equals("spellstarttime", StringComparison.OrdinalIgnoreCase))
             { value = (SpellStartTimeEpoch?.Invoke() ?? 0).ToString(CultureInfo.InvariantCulture); return true; }
+            // $casttimeremaining — live countdown until the prepared spell is
+            // fully prepped (Genie 4 Globals.cs:215 recomputes it per
+            // substitution). Resolved before globals so no stored snapshot can
+            // shadow it with a frozen value.
+            if (name.Equals("casttimeremaining", StringComparison.OrdinalIgnoreCase))
+            { value = (CastTimeRemainingSeconds?.Invoke() ?? 0).ToString(CultureInfo.InvariantCulture); return true; }
             // $name: global session variables (set by #tvar, events, or host code).
             // Do NOT check inst.Vars here — that's for local %variables only.
             // $ prefix explicitly means "global", not "local with fallback to global".
