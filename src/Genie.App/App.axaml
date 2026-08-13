@@ -608,14 +608,17 @@
           <Viewbox MaxWidth="260" MaxHeight="330" Stretch="Uniform" HorizontalAlignment="Left"
                    IsVisible="{Binding ViewModel.FigureLayout}">
             <Canvas Width="920" Height="1125">
-              <Image Canvas.Left="194" Canvas.Top="645" Width="127" Height="365" Stretch="Uniform"
+              <!-- legs + feet ride 34px up from the sheet's own spacing so the
+                   thighs meet the abdomen's hip line instead of floating below
+                   it; the pair moves together to keep the ankle join intact -->
+              <Image Canvas.Left="194" Canvas.Top="611" Width="127" Height="365" Stretch="Uniform"
                      Source="{Binding ViewModel.RightLeg.FigureSprite}" Opacity="{Binding ViewModel.RightLeg.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.RightLeg.Tip}"/>
-              <Image Canvas.Left="318" Canvas.Top="645" Width="127" Height="365" Stretch="Uniform"
+              <Image Canvas.Left="318" Canvas.Top="611" Width="127" Height="365" Stretch="Uniform"
                      Source="{Binding ViewModel.LeftLeg.FigureSprite}" Opacity="{Binding ViewModel.LeftLeg.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.LeftLeg.Tip}"/>
               <!-- ankle cuffs sit over the legs' crop line -->
-              <Image Canvas.Left="141" Canvas.Top="972" Width="134" Height="145" Stretch="Uniform"
+              <Image Canvas.Left="141" Canvas.Top="938" Width="134" Height="145" Stretch="Uniform"
                      Source="{Binding ViewModel.RightFoot.FigureSprite}" Opacity="{Binding ViewModel.RightFoot.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.RightFoot.Tip}"/>
-              <Image Canvas.Left="365" Canvas.Top="972" Width="131" Height="145" Stretch="Uniform"
+              <Image Canvas.Left="365" Canvas.Top="938" Width="131" Height="145" Stretch="Uniform"
                      Source="{Binding ViewModel.LeftFoot.FigureSprite}" Opacity="{Binding ViewModel.LeftFoot.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.LeftFoot.Tip}"/>
               <Image Canvas.Left="226" Canvas.Top="455" Width="189" Height="220" Stretch="Uniform"
                      Source="{Binding ViewModel.Abdomen.FigureSprite}" Opacity="{Binding ViewModel.Abdomen.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.Abdomen.Tip}"/>
@@ -639,14 +642,16 @@
                      Source="{Binding ViewModel.RightEye.FigureSprite}" Opacity="{Binding ViewModel.RightEye.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.RightEye.Tip}"/>
               <Image Canvas.Left="322" Canvas.Top="131" Width="48" Height="34" Stretch="Uniform"
                      Source="{Binding ViewModel.LeftEye.FigureSprite}" Opacity="{Binding ViewModel.LeftEye.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.LeftEye.Tip}"/>
-              <!-- rear / internal views beside the figure -->
-              <Image Canvas.Left="650" Canvas.Top="120" Width="260" Height="280" Stretch="Uniform"
+              <!-- rear / internal views beside the figure — the column sits a
+                   third of its old gap off the left arm, and nerves tuck up
+                   under the Back label with a hair of clearance -->
+              <Image Canvas.Left="548" Canvas.Top="120" Width="260" Height="280" Stretch="Uniform"
                      Source="{Binding ViewModel.Back.FigureSprite}" Opacity="{Binding ViewModel.Back.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.Back.Tip}"/>
-              <TextBlock Canvas.Left="748" Canvas.Top="408" Text="Back" FontSize="30"
+              <TextBlock Canvas.Left="646" Canvas.Top="408" Text="Back" FontSize="30"
                          Foreground="{Binding ViewModel.Back.Foreground}"/>
-              <Image Canvas.Left="685" Canvas.Top="520" Width="190" Height="300" Stretch="Uniform"
+              <Image Canvas.Left="583" Canvas.Top="470" Width="190" Height="300" Stretch="Uniform"
                      Source="{Binding ViewModel.Nsys.FigureSprite}" Opacity="{Binding ViewModel.Nsys.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.Nsys.Tip}"/>
-              <TextBlock Canvas.Left="730" Canvas.Top="828" Text="Nerves" FontSize="30"
+              <TextBlock Canvas.Left="628" Canvas.Top="778" Text="Nerves" FontSize="30"
                          Foreground="{Binding ViewModel.Nsys.Foreground}"/>
             </Canvas>
           </Viewbox>
