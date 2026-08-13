@@ -21,7 +21,7 @@
       <TextBlock Grid.Row="0" Grid.Column="1" x:Name="VersionText"
                  FontFamily="Consolas,Menlo,monospace" FontSize="13" Foreground="{DynamicResource Theme.TextPrimary}"/>
       <TextBlock Grid.Row="1" Grid.Column="0" Text="Runtime" FontSize="12" Foreground="{DynamicResource Theme.TextMuted}" Margin="0,3,0,0"/>
-      <TextBlock Grid.Row="1" Grid.Column="1" Text=".NET 8 · Avalonia · Windows / macOS / Linux"
+      <TextBlock Grid.Row="1" Grid.Column="1" Text=".NET 10 · Avalonia · Windows / macOS / Linux"
                  FontSize="13" Foreground="{DynamicResource Theme.TextSecondary}" Margin="0,3,0,0"/>
     </Grid>
 

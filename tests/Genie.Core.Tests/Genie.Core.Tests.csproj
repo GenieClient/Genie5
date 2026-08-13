@@ -23,7 +23,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <!-- Compile-time access to ILogger / NullLogger for parser tests; the
          runtime copy is resolved from Core's output dir via ModuleInit.cs. -->
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0">
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10">
       <Private>false</Private>
     </PackageReference>
     <PackageReference Include="xunit" Version="2.9.2" />

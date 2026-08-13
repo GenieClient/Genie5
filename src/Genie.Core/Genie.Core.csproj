@@ -30,8 +30,8 @@
 
   <ItemGroup>
     <!-- Reactive event streams (no WinForms dependency) -->
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.10" />
     <PackageReference Include="System.Reactive" Version="6.0.1" />
     <!-- Anthropic .NET SDK for AI pipe -->
     <PackageReference Include="Anthropic.SDK" Version="4.0.0" />
@@ -39,7 +39,7 @@
          native binaries — fits Genie 5's self-contained packaging). -->
     <PackageReference Include="Jint" Version="4.3.0" />
     <!-- Structured logging -->
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>

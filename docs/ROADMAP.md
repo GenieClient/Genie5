@@ -181,6 +181,19 @@ fit (GemStone's scripting culture differs from DR's). Reference:
 Low-risk items that can ship during the soak. Scoped well enough to pick up
 without a deep architecture discussion.
 
+### .NET 10 runtime retarget *(landing — community PR)*
+
+Move the whole solution from .NET 8 to .NET 10 **during the beta line**.
+.NET 8 support ends **November 10, 2026**, and Genie 5 ships self-contained —
+so staying put would mean bundling an unpatched runtime into every release
+after that date. .NET 10 is the current LTS (supported to November 2028);
+.NET 9 dies the same day as 8 and .NET 11 is short-term, so neither is a
+target. Scope is deliberately a retarget, not a rewrite: TFMs, logging
+packages, CI, and an Avalonia patch bump within the 11.3 line — the Avalonia
+12 migration is explicitly out of scope (it drags a ReactiveUI major upgrade
+with it and gets its own Horizon 3 entry). Full reasoning and contributor
+impact: [NET10_UPGRADE.md](NET10_UPGRADE.md).
+
 ### Multi-line regex matching (per-rule opt-in)
 
 All four pattern engines (trigger / highlight / substitute / gag) match one line
@@ -253,6 +266,18 @@ Avalonia automation-peer support and labelling of the game window, vitals, and
 hands strips so assistive tech (NVDA, Narrator, VoiceOver) can navigate the
 client itself. Inclusive, compliance-free, and a clear differentiator. A
 strong first pick for Horizon 3.
+
+### Avalonia 12 migration
+
+The UI-framework major upgrade, decoupled from the .NET 10 runtime retarget
+(Horizon 2) that lands first. Avalonia 12 targets .NET 10 and its headline
+wins map directly onto this roadmap: a native Linux screen-reader backend
+(AT-SPI2 — feeds the accessibility item above), Wayland groundwork, and
+rendering performance. It's bigger than a version bump: the
+`Avalonia.ReactiveUI` integration package is discontinued in 12, so the move
+carries a swap to `ReactiveUI.Avalonia` plus a major ReactiveUI upgrade (and
+retiring the Fody weaver for source generators). No deadline pressure — the
+Avalonia 11.3 line still receives patch releases in parallel with 12.x.
 
 ### Plugin marketplace + signing / trust
 

@@ -44,16 +44,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Avalonia core pinned to 11.3.11 (Dock 11.3.11.x requires >= 11.3.11).
-         Avalonia.ReactiveUI stays at 11.3.9 — its highest published version —
-         which still resolves against core 11.3.11 (>= 11.3.9, an upgrade of
-         the transitive, not a downgrade). -->
-    <PackageReference Include="Avalonia" Version="11.3.11" />
-    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="11.3.11" />
-    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.11" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.11" />
+    <!-- Avalonia core at 11.3.18 (latest 11.3.x; Dock 11.3.11.x requires
+         >= 11.3.11). Avalonia.ReactiveUI stays at 11.3.9 — its highest
+         published version — which still resolves against core (>= 11.3.9, an
+         upgrade of the transitive, not a downgrade). DataGrid is pinned to
+         11.3.13: its 11.3 line STOPS there, and asking for 11.3.18 is NU1605. -->
+    <PackageReference Include="Avalonia" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.13" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.18" />
     <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.9" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.18" />
     <!-- AvaloniaEdit backs the experimental editor-based Game window
          (GenieConfig.UseEditorGameWindow, default off). Pinned to 11.4.1: it
          floors at Avalonia >= 11.0.0 (no ceiling), so it resolves against our

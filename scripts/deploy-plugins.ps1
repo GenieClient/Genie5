@@ -113,6 +113,8 @@ foreach ($p in $Plugins) {
     dotnet build $csproj -c Release --nologo -v quiet
 
     $dllName = [System.IO.Path]::GetFileNameWithoutExtension($p.Csproj) + '.dll'
+    # net8.0 here is the EXTERNAL plugin repos' own TargetFramework, not ours —
+    # it only changes when those repos retarget, independent of the app's TFM.
     $dll     = Join-Path $clone "bin/Release/net8.0/$dllName"
     if (-not (Test-Path $dll)) {
         Write-Warning "Built but DLL not found: $dll"
