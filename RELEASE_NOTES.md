@@ -1,3 +1,37 @@
+# Genie 5 — v5.0.0-beta.5
+
+The long-haul release: Genie 5 now runs on **.NET 10**, the current
+long-term-support runtime. Nothing changes in how you use it — the download
+still bundles everything it needs — but the runtime inside is supported to
+November 2028 instead of expiring this November.
+
+## 🔧 Under the hood
+- **Retargeted to .NET 10 (#234).** Genie 5 ships self-contained: the .NET
+  runtime is baked into the download, so the version we build against is the
+  version you run. .NET 8 reaches end of support on **10 November 2026**,
+  after which it stops getting security patches — and a self-contained app
+  would keep shipping that unpatched runtime. .NET 10 is the current LTS,
+  supported through **14 November 2028**. There is nothing to install and
+  nothing to configure; existing profiles, scripts, maps, plugins and layouts
+  all carry over untouched. Thanks @simtel12 for the retarget.
+- **Dependencies moved with it.** The logging packages follow the same
+  support line (8.0.0 → 10.0.10), and Avalonia moves to 11.3.18. The
+  Avalonia DataGrid stays pinned at 11.3.13 — its 11.3 line stops there, and
+  unpinning it breaks the restore.
+- **Building from source now needs the .NET 10 SDK.** Only relevant if you
+  compile Genie yourself; see `docs/NET10_UPGRADE.md` for the details and
+  the reasoning behind skipping .NET 9 and 11.
+- **Plugin authors are unaffected.** The plugin contract is unchanged, and
+  existing plugin DLLs keep loading.
+
+## 🐛 Fixes
+- **Injuries figure spacing tightened.** In the assembled-figure layout the
+  thighs now meet the hips instead of floating below them, and the back and
+  nervous-system views sit closer to the body rather than stranded off to
+  the right.
+
+---
+
 # Genie 5 — v5.0.0-beta.4.g
 
 The hand-off release: `#goto` walks the Genie 4 way again — when the community

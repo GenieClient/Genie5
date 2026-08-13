@@ -4,7 +4,20 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.4.g — Hand-Off
+## Latest: v5.0.0-beta.5 — Long Haul
+
+Genie 5 now runs on **.NET 10**, the current long-term-support runtime. Nothing changes in how you use it — the download still bundles everything it needs — but the runtime inside is supported through November 2028 instead of expiring this November.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.5** as a delta from beta.4.g.
+
+- **Retargeted to .NET 10** — Genie ships self-contained, so the runtime we build against is the one you run. .NET 8 loses security support on 10 November 2026; .NET 10 is supported through 14 November 2028. Nothing to install, nothing to configure — profiles, scripts, maps, plugins and layouts all carry over (#234 — thanks @simtel12).
+- **Dependencies moved with it** — logging packages to 10.0.10, Avalonia to 11.3.18 (DataGrid pinned at 11.3.13, where its 11.3 line ends).
+- **Building from source now needs the .NET 10 SDK** — only relevant if you compile Genie yourself.
+- **Injuries figure spacing tightened** — in the assembled-figure layout the thighs meet the hips, and the back and nerves views sit closer to the body.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.5)
+
+## v5.0.0-beta.4.g — Hand-Off
 
 `#goto` walks the Genie 4 way again: with the community automapper.cmd installed, the script drives the route — special-move directives (`script ggbypass`, `ice nw`) and pacing globals all work. Plus spell timers match Genie 4 to the second, and rule files reload live on external edit.
 
