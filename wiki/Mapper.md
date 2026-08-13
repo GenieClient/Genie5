@@ -42,6 +42,20 @@ The walker is deliberately conservative — it assists an attentive player and i
 
 See [Policy Compliance](Policy-Compliance) for the full reasoning.
 
+### Community automapper.cmd hand-off
+
+If the community **automapper.cmd** script is in your Scripts folder (or the
+repo-scripts folder), `#goto` and click-to-walk **hand the planned route to the
+script** instead of walking natively — exactly what Genie 4 did. That matters on
+maps whose paths carry special-move directives (`script ggbypass`, `ice nw`,
+`swim …`, timed waits): the community script knows how to execute those, and it
+honors its own pacing globals (`$caravan`, `$powerwalk`, …). Starting a new
+`#goto` while one is running restarts the script with the new route (governed by
+`#config abortdupescript`). Without the script installed, the built-in walker
+handles everything as described above; `#config automapperscript false` forces
+the built-in walker even when the script is present. Cross-zone routes always
+use the built-in walker.
+
 ## Less Obvious Paths
 
 DragonRealms rooms have "obvious paths," but maps also record the non-obvious connections (a trellis you can climb, an alley with no signposted exit). Genie surfaces these as clickable buttons so you can take them without memorizing the verb.

@@ -472,6 +472,13 @@ public sealed class ScriptEngine
         return true;
     }
 
+    /// <summary>True when <paramref name="name"/> resolves to a script file —
+    /// the same Scripts-dir-then-repo-dir, extension-fallback lookup
+    /// <see cref="TryStart(string, IReadOnlyList{string})"/> uses. Lets callers
+    /// (the #goto automapper.cmd hand-off) decide availability without starting
+    /// anything.</summary>
+    public bool ScriptFileExists(string name) => ResolveScriptPath(name) is not null;
+
     private string? ResolveScriptPath(string name)
     {
         // Try the configured default extension first (Genie 4 ScriptExtension),

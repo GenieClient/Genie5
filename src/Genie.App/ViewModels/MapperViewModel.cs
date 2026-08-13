@@ -446,6 +446,7 @@ public class MapperViewModel : ReactiveObject
     public Action? FloatRequested { get; set; }
 
     private AutoMapperEngine?  _engine;
+    private GenieCore?         _core;
     private Genie.Core.Diagnostics.LiveAudit? _audit;
     private MapZoneRepository? _zoneRepo;
     private ZoneRoomIndex?     _roomIndex;   // whole-Maps room index for cross-zone #goto (lazy)
@@ -924,6 +925,7 @@ public class MapperViewModel : ReactiveObject
 
     public void Attach(GenieCore core)
     {
+        _core     = core;
         _engine   = core.AutoMapper;
         _zoneRepo = core.ZoneRepository;
         _commands = core.Commands;
@@ -1817,6 +1819,7 @@ public class MapperViewModel : ReactiveObject
         if (_engine.CurrentNode is not null)
         {
             if (_engine.CurrentNode.Id == target.Id) { LoadStatus = "Already here."; return; }
+            if (TryHandOffToAutomapperScript(_engine.CurrentNode, target)) return;
             if (!AutoWalk.Start(_engine.CurrentNode, target))
                 LoadStatus = AutoWalk.LastStatusFlash ?? $"No path to '{target.Title}'.";
             return;
@@ -1829,6 +1832,41 @@ public class MapperViewModel : ReactiveObject
         if (!TryStartCrossZoneWalk(SelectedZoneFile ?? "", target.Id, target.Title))
             LoadStatus = "Can't path yet — the mapper hasn't placed your character. " +
                          "Connect and walk a step (or the current room isn't mapped), then try again.";
+    }
+
+    /// <summary>
+    /// Genie 4-parity hand-off (#226): Genie 4's <c>#goto</c> never walked —
+    /// it sent <c>.automapper &lt;moves&gt;</c> and the community
+    /// <c>automapper.cmd</c> did the walking, which is where special-move
+    /// directives (<c>script ggbypass</c>, <c>ice nw</c>, <c>swim …</c>) and
+    /// the pacing globals (<c>$caravan</c>/<c>$powerwalk</c>/…) live. When
+    /// that script is present (and <c>#config automapperscript</c> is on,
+    /// the default), start it with the path as its arguments instead of the
+    /// built-in walker. Moves are passed as discrete script args — the
+    /// quote-safe equivalent of Genie 4's quoted PathText (NodeList.PathText).
+    /// Restart-while-running follows <c>abortdupescript</c> (default on):
+    /// a second <c>#goto</c> aborts the running instance and relaunches —
+    /// Genie 4's supersede semantics. Returns false (→ built-in walker) when
+    /// the hand-off doesn't apply; cross-zone gotos never come here.
+    /// </summary>
+    private bool TryHandOffToAutomapperScript(MapNode origin, MapNode target)
+    {
+        if (_core is null || _engine is null || !_core.Config.AutoMapperScript) return false;
+        if (!_core.Scripts.ScriptFileExists("automapper")) return false;
+
+        var moves = _engine.FindPath(origin, target);
+        if (moves is null || moves.Count == 0) return false;   // let the walker report "no path"
+
+        AutoWalk?.Cancel("handed to automapper.cmd");
+        if (!_core.Scripts.TryStart("automapper", moves))
+        {
+            // Only fails when an instance is running and abortdupescript is off —
+            // don't double-drive with the built-in walker on top of it.
+            LoadStatus = "automapper.cmd is already running (abortdupescript is off).";
+            return true;
+        }
+        LoadStatus = $"Handed {moves.Count}-move path to automapper.cmd.";
+        return true;
     }
 
     /// <summary>

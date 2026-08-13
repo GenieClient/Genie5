@@ -163,6 +163,15 @@ public sealed class GenieConfig
     public bool AutoMapper { get; set; } = true;
     public int AutoMapperAlpha { get; set; } = 255;
 
+    /// <summary>When <c>true</c> (default), <c>#goto</c> hands the walk to the
+    /// community <c>automapper.cmd</c> script whenever one exists in the Scripts
+    /// (or repo-scripts) directory — Genie 4 parity, so map special-move
+    /// directives (<c>script ggbypass</c>, <c>ice nw</c>, …) and the script's
+    /// pacing globals are honored. When the script is absent the built-in
+    /// walker drives the path; <c>#config automapperscript false</c> forces the
+    /// built-in walker always. Cross-zone gotos always use the built-in walker.</summary>
+    public bool AutoMapperScript { get; set; } = true;
+
     /// <summary>When <c>true</c>, the connection sequence emits its granular
     /// per-step SGE protocol marks (<c>→K sent</c>, <c>←32-byte key</c>,
     /// <c>→auth</c>, TCP/TLS handshake timings…) into the game window. The
@@ -627,6 +636,7 @@ public sealed class GenieConfig
         ("autolog", AutoLog.ToString()),
         ("automapper", AutoMapper.ToString()),
         ("automapperalpha", AutoMapperAlpha.ToString()),
+        ("automapperscript", AutoMapperScript.ToString()),
         ("conndebug", ConnDebug.ToString()),
         ("activitytimeout", ActivityTimeout.ToString()),
         ("editor", Editor),
@@ -752,7 +762,7 @@ public sealed class GenieConfig
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
-        ("Mapper",           new[] { "automapper", "automapperalpha", "updatemapperscripts" }),
+        ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
         ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsstreampriority", "ttsrate", "ttsvolume" }),
         ("Logging",          new[] { "autolog" }),
@@ -870,6 +880,7 @@ public sealed class GenieConfig
                 case "flagscheck": FlagsCheck = ToBool(value); break;
                 case "automapper": AutoMapper = ToBool(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "automapperalpha": AutoMapperAlpha = ClampAlpha(value); Notify(ConfigFieldUpdated.AutoMapper); break;
+                case "automapperscript": AutoMapperScript = ToBool(value); break;
                 case "conndebug": ConnDebug = ToBool(value); break;
                 case "activitytimeout":
                     // 0 = watchdog off; anything else clamps to 60s–1h so a typo
