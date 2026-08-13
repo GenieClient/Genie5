@@ -284,8 +284,12 @@ public class GameTextViewModel : ReactiveObject
         {
             for (int i = 0; i < Lines.Count; i++)
             {
-                var existing = Lines[i];
-                Lines[i] = new TextLine(existing.Text, existing.Color);
+                // `with { }` clones the record — a NEW instance (so the Replace
+                // event fires and Inlines re-evaluates) that keeps Links,
+                // BoldSpans, PresetSpans, Mono and Window. The old
+                // text+color-only rebuild stripped links and monster bold from
+                // the whole scrollback on every rule apply (public #232 sweep).
+                Lines[i] = Lines[i] with { };
             }
         });
     }

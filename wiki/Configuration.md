@@ -66,7 +66,7 @@ Make important lines jump out:
 
 Highlights support foreground and background colors, whole-line vs. substring matching, and case sensitivity — all editable in the Highlights tab. They paint in **every window** — the game window, the stream tabs, and the Room / Mobs / Players panels.
 
-A rule can also be **scoped to specific windows**: the Highlights tab's **Windows** field takes a comma-separated list of window ids (`main`, `room`, `mobs`, `players`, `backpack`, or a stream tab like `thoughts`); leave it blank for everywhere, which is the default for every existing and imported rule. The same list works as the last argument of `#highlight add`.
+A rule can also be **scoped to specific windows**: the Highlights tab's **Windows** field takes a comma-separated list of window ids (`main`, `room`, `mobs`, `players`, `backpack`, `experience`, a tracker panel by name like `Active Spells`, or a stream tab like `thoughts`); leave it blank for everywhere, which is the default for every existing and imported rule. Ids are case-insensitive. The same list works as the last argument of `#highlight add`.
 
 ![An inventory list with six different substring highlights colored, plus a clickable command link](images/config-highlights-in-action.png)
 

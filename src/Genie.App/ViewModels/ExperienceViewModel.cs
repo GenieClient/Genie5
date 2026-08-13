@@ -34,10 +34,16 @@ public class ExperienceViewModel : ReactiveObject
 
     private const string Placeholder = "(no experience data yet — train a skill, or type 'exp')";
 
+    /// <summary>Canonical window id these rows tokenize as, for per-window
+    /// highlight scoping. Without it TextLine defaults to "main", so a rule
+    /// scoped to "Experience" never painted here — and a rule scoped to only
+    /// "main" wrongly did (public #232).</summary>
+    private const string WindowId = "experience";
+
     /// <summary>The panel's lines. Rendered via <see cref="TextLine.Inlines"/>, so
     /// user highlight rules colour the Experience window exactly as they do the
     /// stream panels (#144).</summary>
-    public ObservableCollection<TextLine> Lines { get; } = new() { new TextLine(Placeholder, StreamColor.Main) };
+    public ObservableCollection<TextLine> Lines { get; } = new() { new TextLine(Placeholder, StreamColor.Main, Window: WindowId) };
 
     /// <summary>Slider position (0 Full … 4 Brief). Snapped to whole steps by the
     /// slider; a new level is applied + persisted <b>quietly</b> — straight to config,
@@ -156,8 +162,10 @@ public class ExperienceViewModel : ReactiveObject
         {
             for (int i = 0; i < Lines.Count; i++)
             {
-                var existing = Lines[i];
-                Lines[i] = new TextLine(existing.Text, existing.Color);
+                // `with { }` clones the record — a NEW instance (so the Replace
+                // event fires and Inlines re-evaluates) that keeps every other
+                // field, including the Window id the scoping depends on.
+                Lines[i] = Lines[i] with { };
             }
         });
     }
@@ -169,10 +177,10 @@ public class ExperienceViewModel : ReactiveObject
         Lines.Clear();
         if (string.IsNullOrEmpty(content))
         {
-            Lines.Add(new TextLine(Placeholder, StreamColor.Main));
+            Lines.Add(new TextLine(Placeholder, StreamColor.Main, Window: WindowId));
             return;
         }
         foreach (var line in content.Replace("\r\n", "\n").Split('\n'))
-            Lines.Add(new TextLine(line, StreamColor.Main));
+            Lines.Add(new TextLine(line, StreamColor.Main, Window: WindowId));
     }
 }
