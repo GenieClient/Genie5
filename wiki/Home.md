@@ -1,6 +1,6 @@
 # Genie 5
 
-Genie 5 is a cross-platform client for **[DragonRealms](https://www.play.net/dr)**, Simutronics' text MMO. It's a from-scratch rewrite of [Genie 4](https://github.com/GenieClient) on **.NET 8** and **[Avalonia](https://avaloniaui.net/)**, keeping Genie 4's scripting, mapping, highlighting, and triggering while running natively on **Windows, macOS, and Linux**.
+Genie 5 is a cross-platform client for **[DragonRealms](https://www.play.net/dr)**, Simutronics' text MMO. It's a from-scratch rewrite of [Genie 4](https://github.com/GenieClient) on **.NET 10** and **[Avalonia](https://avaloniaui.net/)**, keeping Genie 4's scripting, mapping, highlighting, and triggering while running natively on **Windows, macOS, and Linux**.
 
 ![Genie 5 in play — dockable panels around the game text, with the Mapper floating](images/interface-default-layout.png)
 

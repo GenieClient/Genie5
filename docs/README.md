@@ -1,6 +1,6 @@
 # Genie 5 Developer Documentation
 
-Genie 5 is a cross-platform Avalonia / .NET 8 rebuild of [Genie 4](https://github.com/GenieClient) — a long-running client for [DragonRealms](https://www.play.net/dr), Simutronics' text MMO. These docs cover the internals: how the client speaks to the server, how a line of game text turns into UI/scripts/state, how scripts execute, and how the mapper finds and walks paths.
+Genie 5 is a cross-platform Avalonia / .NET 10 rebuild of [Genie 4](https://github.com/GenieClient) — a long-running client for [DragonRealms](https://www.play.net/dr), Simutronics' text MMO. These docs cover the internals: how the client speaks to the server, how a line of game text turns into UI/scripts/state, how scripts execute, and how the mapper finds and walks paths.
 
 The codebase splits into three projects:
 

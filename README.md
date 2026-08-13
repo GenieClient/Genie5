@@ -22,7 +22,7 @@ A live DragonRealms session — game stream, Room panel, inventory, and stream t
 
 The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern .NET, cross-platform tooling, or the broader scripting ecosystem. Genie 5 is a clean rewrite that:
 
-- **Runs everywhere** — Windows, macOS, and Linux native, courtesy of [Avalonia UI](https://avaloniaui.net/) and .NET 8
+- **Runs everywhere** — Windows, macOS, and Linux native, courtesy of [Avalonia UI](https://avaloniaui.net/) and .NET 10
 - **Stays compatible** — runs your existing Genie 4 `.cmd` scripts, profile files, and `.xml` zone maps
 - **Plays well with the ecosystem** — supports direct SGE auth, [Lich 5](https://github.com/elanthia-online/lich-5) proxy, and dev-replay from recorded sessions
 - **Is built for inspection** — clean `Genie.Core` library with no UI dependencies; embed it in other clients, plugins, or test harnesses
@@ -78,7 +78,7 @@ The **Setup.exe** / **.pkg** / **AppImage** builds register for in-app updates; 
 
 ### Build from source
 
-Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```sh
 git clone https://github.com/GenieClient/Genie5.git

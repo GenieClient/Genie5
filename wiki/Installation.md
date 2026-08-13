@@ -83,7 +83,7 @@ If you installed via **`01-Windows-Genie5-Setup.exe`** (Windows) or the **`.pkg`
 
 ## Build from source
 
-For contributors, or to run the bleeding edge. You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) and [Git](https://git-scm.com/):
+For contributors, or to run the bleeding edge. You need the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and [Git](https://git-scm.com/):
 
 ```bash
 git clone https://github.com/GenieClient/Genie5.git

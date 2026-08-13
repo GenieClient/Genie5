@@ -17,7 +17,7 @@ Builds from before v5.0.0-alpha.10 are unsigned and always trigger the blue pane
 Make it executable first (`chmod +x 04-Linux-Genie5.AppImage`), then `./04-Linux-Genie5.AppImage`. For the FUSE error, install it — Debian/Ubuntu: `sudo apt install libfuse2` (Fedora usually works out of the box). If text renders oddly on a minimal distro, install `fontconfig`. For a desktop-menu entry, use [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher).
 
 **`dotnet` isn't recognized / build fails (building from source).**
-You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (the SDK, not just the runtime). Verify with `dotnet --version` (should be 8.x). See [Installation](Installation#build-from-source).
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (the SDK, not just the runtime). Verify with `dotnet --version` (should be 10.x). See [Installation](Installation#build-from-source).
 
 ## Connecting
 

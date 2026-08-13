@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <IsPackable>false</IsPackable>
@@ -15,7 +15,7 @@
          Override with -p:CoreRid=… or -p:CoreOutDir=… when needed. -->
     <CoreRid Condition="'$(CoreRid)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</CoreRid>
     <CoreRid Condition="'$(CoreRid)' == ''">$(NETCoreSdkRuntimeIdentifier)</CoreRid>
-    <CoreOutDir Condition="'$(CoreOutDir)' == ''">$(MSBuildThisFileDirectory)../../src/Genie.Core/bin/$(Configuration)/net8.0/$(CoreRid)/</CoreOutDir>
+    <CoreOutDir Condition="'$(CoreOutDir)' == ''">$(MSBuildThisFileDirectory)../../src/Genie.Core/bin/$(Configuration)/net10.0/$(CoreRid)/</CoreOutDir>
     <_GenieCoreProject>$(MSBuildThisFileDirectory)../../src/Genie.Core/Genie.Core.csproj</_GenieCoreProject>
   </PropertyGroup>
 

@@ -4,7 +4,7 @@ For contributors and the curious. End users only need [Installation](Installatio
 
 ## Prerequisites
 
-- **[.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)** (Windows, macOS, Linux).
+- **[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)** (Windows, macOS, Linux).
 - A DragonRealms account if you want to test against a live server (free trial accounts work for most testing).
 
 ## Clone and build
