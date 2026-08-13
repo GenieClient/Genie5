@@ -4,7 +4,21 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.4.f — Nested & Composed
+## Latest: v5.0.0-beta.4.g — Hand-Off
+
+`#goto` walks the Genie 4 way again: with the community automapper.cmd installed, the script drives the route — special-move directives (`script ggbypass`, `ice nw`) and pacing globals all work. Plus spell timers match Genie 4 to the second, and rule files reload live on external edit.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.4.g** as a delta from beta.4.f.
+
+- **`#goto` hands the walk to automapper.cmd** — Genie 4 parity: the community script drives when present (built-in walker otherwise, `#config automapperscript` to force it), so map special-move directives and `$caravan`/`$powerwalk` pacing work again (#226 — thanks @Azothy).
+- **Rule files reload live** — external edits to the seven rule `.json` files apply without a reconnect; invalid files are rejected whole (#231).
+- **Spell timers match Genie 4** — `$spellpreptime` exact, `$casttimeremaining` counts down live, `$casttime` is the raw epoch, `<spelltime>` parsed (#224 — thanks @SaragosDR).
+- **Experience-window highlight scoping fixed** — no cross-window bleed, no span loss on retokenize (#232).
+- **`#statusbar` slots size to content** — populated slots pack left; a giant un-numbered line still spans and ellipsizes.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.4.g)
+
+## v5.0.0-beta.4.f — Nested & Composed
 
 Script-engine parity weekend: nested `if … then {` blocks skip correctly, variables compose mid-name again (`%spell%countermana` → `%spell1mana`), and type-anywhere now forwards Backspace/Delete/Enter/arrows to the command bar — history recall and submit work with the Game window focused, like Genie 4.
 

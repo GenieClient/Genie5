@@ -1,3 +1,52 @@
+# Genie 5 — v5.0.0-beta.4.g
+
+The hand-off release: `#goto` walks the Genie 4 way again — when the community
+automapper.cmd is installed, it drives the route and every special-move
+directive works — plus spell timers now match Genie 4 to the second, and your
+rule files reload live when you edit them on disk.
+
+## ✨ New
+- **`#goto` hands the walk to automapper.cmd (#226).** Genie 4's `#goto`
+  never walked — it launched the community automapper.cmd, which is where
+  special-move directives (`script ggbypass`, `ice nw`, `swim …`, timed
+  waits) and the pacing globals (`$caravan`, `$powerwalk`, …) live. Genie 5
+  now does the same: when the script is in your Scripts folder (or the
+  repo-scripts folder), `#goto` and click-to-walk start it with the planned
+  route as its arguments; without it, the built-in walker handles everything
+  as before. `#config automapperscript false` forces the built-in walker,
+  and a second `#goto` mid-walk restarts the script with the new route,
+  matching Genie 4. Thanks @Azothy for the report and the field diagnosis.
+- **Rule files reload live (#231).** External edits to the seven rule
+  `.json` files — highlights, triggers, substitutes, gags, aliases,
+  variables, classes — now apply to the running engines the moment the file
+  is saved, no reconnect needed. The file on disk becomes the truth for its
+  rule type; a torn or invalid file is rejected whole rather than clearing
+  anything.
+
+## 🐛 Fixes
+- **Spell timers match Genie 4 (#224 follow-ups).** `$spellpreptime` no
+  longer reads one second short (19 for a 20s prep), `$casttimeremaining` is
+  a live countdown instead of a frozen snapshot, `$casttime` is the raw
+  epoch scripts compose with, and the `<spelltime>` tag is parsed. Thanks
+  @SaragosDR for the surgical repros.
+- **Experience-window highlights stay in their lane (#232).** Highlight
+  scoping no longer bleeds across the Experience window, and retokenizing a
+  line no longer drops styled spans.
+- **`#statusbar` slots size to their text.** Populated slots pack left and
+  take only the width they need; empty slots take none. A single giant
+  un-numbered line still spans the window and trims with an ellipsis instead
+  of pushing later slots off screen.
+
+## 🔧 Under the hood
+- **Line endings normalized (#237).** A `.gitattributes` now pins LF across
+  the repo, ending the CRLF churn in diffs. Thanks @simtel12.
+- **Replay harness can smoke-run real scripts.** An env-gated hook starts a
+  community `.cmd` through the fully-wired script engine during a replay —
+  it's how the automapper hand-off was validated against the real
+  2,500-line script before shipping.
+
+---
+
 # Genie 5 — v5.0.0-beta.4.f
 
 Script-engine parity weekend: both of Saturday's script bug reports fixed —
