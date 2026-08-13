@@ -180,7 +180,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = HighlightEngine;
         if (engine is null) return;
-        TrySave(() => _persistence.SaveHighlights(PathFor("highlights.json"), engine.Rules));
+        SaveRuleJson("highlights.json", path => _persistence.SaveHighlights(path, engine.Rules));
         SyncCfg("highlights.cfg", () => CfgFormat.HighlightLines(engine.Rules));
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
     }
@@ -205,7 +205,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = TriggerEngine;
         if (engine is null) return;
-        TrySave(() => _persistence.SaveTriggers(PathFor("triggers.json"), engine.Triggers));
+        SaveRuleJson("triggers.json", path => _persistence.SaveTriggers(path, engine.Triggers));
         SyncCfg("triggers.cfg", () => CfgFormat.TriggerLines(engine.Triggers));
     }
 
@@ -213,7 +213,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = SubstituteEngine;
         if (engine is null) return;
-        TrySave(() => _persistence.SaveSubstitutes(PathFor("substitutes.json"), engine.Rules));
+        SaveRuleJson("substitutes.json", path => _persistence.SaveSubstitutes(path, engine.Rules));
         SyncCfg("substitutes.cfg", () => CfgFormat.SubstituteLines(engine.Rules));
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
     }
@@ -222,7 +222,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = GagEngine;
         if (engine is null) return;
-        TrySave(() => _persistence.SaveGags(PathFor("gags.json"), engine.Rules));
+        SaveRuleJson("gags.json", path => _persistence.SaveGags(path, engine.Rules));
         SyncCfg("gags.cfg", () => CfgFormat.GagLines(engine.Rules));
     }
 
@@ -230,7 +230,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = AliasEngine;
         if (engine is null) return;
-        TrySave(() => _persistence.SaveAliases(PathFor("aliases.json"), engine.Aliases));
+        SaveRuleJson("aliases.json", path => _persistence.SaveAliases(path, engine.Aliases));
         SyncCfg("aliases.cfg", () => CfgFormat.AliasLines(engine.Aliases));
     }
 
@@ -246,7 +246,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var store = VariableStore;
         if (store is null) return;
-        TrySave(() => _persistence.SaveVariables(PathFor("variables.json"), store));
+        SaveRuleJson("variables.json", path => _persistence.SaveVariables(path, store));
         SyncCfg("variables.cfg", () => CfgFormat.VariableLines(store));
     }
 
@@ -296,6 +296,16 @@ public class ConfigurationViewModel : ReactiveObject
     private static void TrySave(Action save)
     {
         try { save(); } catch { /* non-fatal */ }
+    }
+
+    /// <summary>Save one of the live-reload-watched rule .json files, marking
+    /// the write first so the host's <see cref="RuleFileWatcher"/> doesn't
+    /// bounce our own save back as an "external edit" reload.</summary>
+    private void SaveRuleJson(string fileName, Action<string> save)
+    {
+        var path = PathFor(fileName);
+        RuleFileWatcher.MarkAppWrite(path);
+        TrySave(() => save(path));
     }
 
     /// <summary>

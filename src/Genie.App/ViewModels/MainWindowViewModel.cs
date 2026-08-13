@@ -3452,6 +3452,74 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         try { load(path); } catch { /* corrupt JSON shouldn't block connect */ }
     }
 
+    // ── Live reload of externally edited rule .json files ────────────────────
+
+    /// <summary>Watches the effective config dirs for hand edits to the rule
+    /// .json files (highlights/triggers/substitutes/gags/aliases/variables/
+    /// classes) and reloads them into the live engines. Created on first use,
+    /// re-scoped on every connect (the profile dir changes with the character).
+    /// Lives for the process, like the engines it feeds.</summary>
+    private RuleFileWatcher? _ruleFileWatcher;
+
+    private void RescopeRuleFileWatcher()
+    {
+        if (_ruleFileWatcher is null)
+        {
+            _ruleFileWatcher = new RuleFileWatcher();
+            // Events arrive on a thread-pool thread; engine mutation follows the
+            // same rule as the Configuration panels — UI thread only.
+            _ruleFileWatcher.RuleFileChanged += name =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => ReloadRuleFileFromDisk(name));
+        }
+        _ruleFileWatcher.Rescope(GetProfileConfigDir(ConnectedProfile), _configDir);
+    }
+
+    /// <summary>
+    /// An external edit to one of the watched rule .json files settled: make
+    /// the file the live truth via <see cref="RuleFileLiveReload"/> (parse
+    /// first — a torn/corrupt file keeps the current rules — then clear-and-
+    /// reload that engine and rewrite a coexisting profile .cfg so the next
+    /// connect's .cfg replay doesn't revert the edit). Rules added at runtime
+    /// (#trigger add, script #var) that were never saved are dropped by design:
+    /// the file on disk is what the user chose to make authoritative.
+    /// </summary>
+    private void ReloadRuleFileFromDisk(string fileName)
+    {
+        if (_core is null) return;
+        var core = _core;
+
+        int count;
+        try
+        {
+            count = RuleFileLiveReload.Reload(
+                fileName,
+                GetProfileConfigDir(ConnectedProfile),
+                _configDir,
+                highlights:  core.Highlights,
+                triggers:    core.Triggers,
+                substitutes: core.Substitutes,
+                gags:        core.Gags,
+                aliases:     core.Aliases,
+                variables:   core.Variables.Store,
+                classes:     core.Classes);
+        }
+        catch (ArgumentException)
+        {
+            return;   // not a watched rule file — the watcher shouldn't emit these
+        }
+        catch (Exception ex)
+        {
+            GameText.AddSystemLine($"[config] {fileName} changed on disk but could not be parsed — keeping current rules ({ex.Message})");
+            return;
+        }
+
+        // Repaint visible lines for the rule types the render path consults.
+        if (fileName is "highlights.json" or "substitutes.json")
+            UserHighlights.NotifyRulesChanged();
+
+        GameText.AddSystemLine($"[config] {fileName} changed on disk — reloaded ({count} entries).");
+    }
+
     /// <summary>
     /// Genie 4's classic numpad ("10-key") movement pad. Seeded on first run
     /// for a profile so directional travel works out of the box; the user can
@@ -3685,6 +3753,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             LoadSavedConfiguration(_core);    // replay this character's saved .json rules
             _loadedRuleKey = ruleKey;
         }
+
+        // (Re)point the rule-file watcher at this connection's effective config
+        // dirs so hand edits to the .json rule files apply without a reconnect.
+        RescopeRuleFileWatcher();
 
         // Re-arm the per-session overlay/metrics that DisconnectAsync detaches.
         UserHighlights.Metrics = _core!.Metrics;   // time the render-path highlight pass
@@ -3961,6 +4033,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 $"[data] profile override: scripts, rules and layouts load from {Path.GetFullPath(_sessionDataRoot)}");
 
         WireCore();
+
+        // Watch the global Config dir from the moment engines exist, so rule
+        // .json edits apply live even in an offline session. ConnectAsync
+        // re-scopes to the profile dir on connect.
+        RescopeRuleFileWatcher();
 
         // Offline-before-connect (#88): when the core is built outside a connect —
         // e.g. the user types a command or runs a logon script while disconnected —
