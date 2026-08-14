@@ -63,6 +63,21 @@ public static class WindowMenuBehavior
             Application.Current?.PlatformSettings?.HotkeyConfiguration.CommandModifiers
             ?? KeyModifiers.Control);
 
+    /// <summary>The Find gesture to advertise on the <b>editor</b> game window.
+    /// MainWindow answers the platform combo — Cmd+F on macOS — and routes it to
+    /// AvaloniaEdit's search panel there, which is also the gesture that renderer
+    /// answers by itself once the text has focus. Ctrl+F still opens the in-window
+    /// bar on macOS, but the platform gesture is the one worth labelling.
+    ///
+    /// <para>As with <see cref="CopySelectionGesture"/>: not used by the legacy
+    /// game window or the tool windows, whose Find is Ctrl+F on every platform,
+    /// and resolved per read because <c>Application.Current</c> may not be up
+    /// when this type is first touched.</para></summary>
+    public static KeyGesture FindGesture =>
+        new(Key.F,
+            Application.Current?.PlatformSettings?.HotkeyConfiguration.CommandModifiers
+            ?? KeyModifiers.Control);
+
     static WindowMenuBehavior()
     {
         RefreshOnOpenProperty.Changed.AddClassHandler<ContextMenu>((menu, e) =>

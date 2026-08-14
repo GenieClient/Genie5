@@ -1039,7 +1039,13 @@
           <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
       </Border.Styles>
-      <StackPanel Orientation="Horizontal" Spacing="4">
+      <!-- MinHeight pins the row to one chip's height (11px text + 1px chip     -->
+      <!-- padding + 1px chip border, top and bottom) so the strip keeps its     -->
+      <!-- height when every chip is hidden. Without it the panel measures 0     -->
+      <!-- and the docked strip shrinks ~19px, reflowing the whole window —      -->
+      <!-- which happens on every posture change, because the server clears the  -->
+      <!-- old posture in one indicator event and sets the new one in the next.  -->
+      <StackPanel Orientation="Horizontal" Spacing="4" MinHeight="20">
         <Border Classes="chip" Background="#223042" BorderBrush="#3a5570"
                 IsVisible="{Binding IconBar.PostureText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                 ToolTip.Tip="Posture — what the server says your body is doing (dead beats everything, then standing / kneeling / sitting / prone).">

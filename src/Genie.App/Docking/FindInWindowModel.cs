@@ -47,6 +47,29 @@ public sealed class FindInWindowModel : ReactiveObject
     /// <summary>Raised when a match should be scrolled into view + selected.</summary>
     public event Action<Match>? JumpRequested;
 
+    /// <summary>
+    /// Set by a renderer that ships its own, better find UI — currently only
+    /// <c>GameTextEditor</c>, which hands over to AvaloniaEdit's SearchPanel.
+    /// Returning true means the renderer took the request and this model's bar
+    /// stays shut; false (or no override at all) falls back to the bar.
+    ///
+    /// <para>The routing decision has to live on the view side: only the control
+    /// that actually rendered the window knows which surface is showing it, and
+    /// only it can reach the panel. The model just offers the hook so callers
+    /// (<see cref="Open"/>) stay renderer-agnostic.</para>
+    /// </summary>
+    public Func<bool>? OpenOverride { get; set; }
+
+    /// <summary>Open this window's find UI — the renderer's own if it has one
+    /// (<see cref="OpenOverride"/>), otherwise the in-window bar. Every
+    /// user-facing entry point that should prefer the native UI goes through
+    /// here; setting <see cref="IsOpen"/> directly opts out and forces the bar.</summary>
+    public void Open()
+    {
+        if (OpenOverride?.Invoke() == true) return;
+        IsOpen = true;
+    }
+
     /// <summary>Walk to the previous (older, upward) match.</summary>
     public ICommand OlderCommand { get; }
     /// <summary>Walk to the next (newer, downward) match.</summary>

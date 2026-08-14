@@ -847,9 +847,31 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             }
         }
 
-        // #120: Ctrl+F opens the Find bar on the selected game/stream window —
-        // PageScroll's click-target, so it follows the same "active window"
-        // the PageUp/PageDown keys scroll (main game window before any click).
+        // The platform Find gesture (Cmd+F on macOS, Ctrl+F elsewhere) opens
+        // whichever find UI the selected window's renderer provides: AvaloniaEdit's
+        // search panel on editor-backed windows, the in-window Find bar on the
+        // rest. Targeting is PageScroll's click-target either way, so Find follows
+        // the same "active window" the PageUp/PageDown keys scroll.
+        //
+        // Only reached when the game text does NOT have focus: with focus inside an
+        // editor window, AvaloniaEdit's own TextArea binding matches the same
+        // gesture further down the bubble route and opens the panel itself. Same
+        // destination, so the two paths agree — this one just extends it to the
+        // normal case where focus is sitting in the command bar.
+        if (e.Key == Key.F && e.KeyModifiers == PlatformCommandModifiers &&
+            !IsMacroBound(Key.F, e.KeyModifiers) &&
+            PageScroll.CurrentTarget?.DataContext is Docking.IFindHost platformFindHost)
+        {
+            platformFindHost.Find.Open();
+            e.Handled = true;
+            return;
+        }
+
+        // #120: Ctrl+F opens the Find bar on the same selected window. On Windows
+        // and Linux this is the platform gesture, already handled above; it stays
+        // live on macOS, where Ctrl+F is a separate keystroke from Cmd+F, so the
+        // Genie-4-era shortcut keeps working and stays a way to reach the bar even
+        // on a window whose renderer prefers its own panel.
         // Checked before the generic macro dispatch but only when no ctrl+f
         // macro exists, so an existing user binding keeps winning.
         if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.Control &&
@@ -872,6 +894,22 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         ViewModel.Core.ProcessInput(macro.Action);
         e.Handled = true;
     }
+
+    /// <summary>The platform's primary command modifier — Meta (Cmd) on macOS,
+    /// Control everywhere else. Read per use rather than cached, since
+    /// <c>Application.Current</c> may not be up when this type is first touched.</summary>
+    private static KeyModifiers PlatformCommandModifiers =>
+        Application.Current?.PlatformSettings?.HotkeyConfiguration.CommandModifiers
+        ?? KeyModifiers.Control;
+
+    /// <summary>True when the user has a macro bound to this keystroke, in which
+    /// case a built-in shortcut on the same keys must stand down (#120). Keystrokes
+    /// that can't be expressed as a macro at all — Cmd-modified ones, since
+    /// <see cref="MacroKeyConverter"/> knows only ctrl/alt/shift — are never
+    /// bound.</summary>
+    private bool IsMacroBound(Key key, KeyModifiers mods)
+        => MacroKeyConverter.ToMacroKey(key, mods) is { } macroKey &&
+           ViewModel?.Core?.Commands?.Macros?.Get(macroKey) is not null;
 
     /// <summary>
     /// Type-anywhere capture (public #141): printable text that reached the
