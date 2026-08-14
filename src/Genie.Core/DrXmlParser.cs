@@ -405,7 +405,27 @@ public sealed class DrXmlParser : IDisposable
                 continue;
             }
 
-            // We're at a '<' — find the matching '>'
+            // We're at a '<' — but a '<' only OPENS A TAG when what follows can
+            // legally start one: a name character (letter/'_'), a closing tag
+            // ("</x"), or an XML construct ("<!", "<?"). DR game text quotes
+            // angle-bracket literals — "<1-20>", "I <3 you", "a < b" — and
+            // consuming those to the next '>' silently deletes them (#238).
+            // Deciding needs the char after '<' (and after "</"): wait for it.
+            if (raw.Length < 2 || (raw[1] == '/' && raw.Length < 3))
+                return; // '<' (or "</") at buffer end — need the next char
+
+            char after = raw[1];
+            bool opensTag =
+                char.IsAsciiLetter(after) || after == '_' || after == '!' || after == '?' ||
+                (after == '/' && (char.IsAsciiLetter(raw[2]) || raw[2] == '_'));
+            if (!opensTag)
+            {
+                AccumulateText("<");
+                _rawBuffer.Remove(0, 1);
+                continue; // "1-20>" etc. re-enters as bare text
+            }
+
+            // Find the matching '>'
             int tagEnd = raw.IndexOf('>');
             if (tagEnd < 0)
                 return; // incomplete tag — wait for more data
@@ -2026,7 +2046,14 @@ public sealed class DrXmlParser : IDisposable
         if (input.Contains('\x1B'))
             input = _ansiRe.Replace(input, string.Empty);
         if (!input.Contains('<')) return input;
-        return System.Text.RegularExpressions.Regex.Replace(input, "<[^>]+>", string.Empty);
+        // Strip only spans that could actually BE tags — the same name-start
+        // rule the ProcessBuffer lexer uses ("<x", "</x", "<!", "<?"). Angle-
+        // bracket literals the lexer deliberately passed through as text
+        // ("<1-20>", "<*special*>") must survive this residual cleanup too
+        // (public #238); real leaked tags (a nested <d …> inside a component
+        // buffer) still get removed.
+        return System.Text.RegularExpressions.Regex.Replace(
+            input, "<(?:/?[A-Za-z_]|[!?])[^>]*>", string.Empty);
     }
 
     public void Dispose() => _events.Dispose();

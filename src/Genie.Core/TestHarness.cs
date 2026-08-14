@@ -1866,7 +1866,10 @@ static List<string> GenerateXmlBaseline(string filePath)
 
     foreach (var rawLine in allText.Split('\n'))
     {
-        var stripped = Regex.Replace(rawLine, "<[^>]+>", " ");
+        // Same tag-shape rule as the parser (see DrXmlParser.StripBasicXml):
+        // angle-bracket literals like "<1-20>" are game text, not tags (#238) —
+        // the COMPARE baseline must keep them or every literal reads as a diff.
+        var stripped = Regex.Replace(rawLine, "<(?:/?[A-Za-z_]|[!?])[^>]*>", " ");
         stripped = WebUtility.HtmlDecode(stripped);
         stripped = Regex.Replace(stripped, @"\s+", " ").Trim();
 
