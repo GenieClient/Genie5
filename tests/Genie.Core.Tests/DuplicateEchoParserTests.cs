@@ -122,4 +122,57 @@ public class DuplicateEchoParserTests
         var main = Assert.Single(texts, t => t.Stream == "main" && t.Text == "You whisper, \"psst.\"");
         Assert.True(main.DuplicateEcho);
     }
+
+    [Fact]
+    public void Outbound_whisper_real_wire_form_is_flagged()
+    {
+        // Public #256, captured by simtel12. The real outbound form wraps the
+        // attribution in <preset id="whisper"> with the quoted body OUTSIDE
+        // the tag — the synthetic cases above never exercised that shape.
+        var texts = Feed(
+            "<pushStream id=\"whispers\"/><preset id=\"whisper\">You whisper to Athlya,</preset> \"This whisper won't get duplicated\"\n" +
+            "<popStream/><preset id=\"whisper\">You whisper to Athlya,</preset> \"This whisper won't get duplicated\"\n" +
+            "<prompt time=\"1786651014\">&gt;</prompt>\n");
+
+        var main = Assert.Single(texts, t => t.Stream == "main" && t.Text.Contains("won't get duplicated"));
+        Assert.True(main.DuplicateEcho);
+    }
+
+    [Fact]
+    public void Ooc_triple_send_still_flags_the_bare_main_copy()
+    {
+        // Public #256. An `OOC:` whisper is sent THREE times: whispers, then
+        // the `ooc` stream, then bare main. The intervening `ooc` copy must not
+        // disarm the whispers→main adjacency match, or main shows it twice.
+        var texts = Feed(
+            "<pushStream id=\"whispers\"/><preset id=\"whisper\">You whisper to Athlya,</preset> \"OOC: This will get duplicated\"\n" +
+            "<popStream/><pushStream id=\"ooc\"/><preset id=\"whisper\">You whisper to Athlya,</preset> \"OOC: This will get duplicated\"\n" +
+            "<popStream/><preset id=\"whisper\">You whisper to Athlya,</preset> \"OOC: This will get duplicated\"\n" +
+            "<prompt time=\"1786651005\">&gt;</prompt>\n");
+
+        var whispers = Assert.Single(texts, t => t.Stream == "whispers");
+        var ooc      = Assert.Single(texts, t => t.Stream == "ooc");
+        var main     = Assert.Single(texts, t => t.Stream == "main" && t.Text.Contains("OOC:"));
+
+        Assert.False(whispers.DuplicateEcho);
+        Assert.True(ooc.DuplicateEcho);
+        Assert.True(main.DuplicateEcho);
+    }
+
+    [Fact]
+    public void Ooc_triple_send_flags_the_receiving_end_too()
+    {
+        // Public #256: simtel12 reports the dupe on BOTH ends. The inbound
+        // form differs only in the attribution text, so the same burst rule
+        // has to hold for it.
+        var texts = Feed(
+            "<pushStream id=\"whispers\"/><preset id=\"whisper\">Athlya whispers,</preset> \"OOC: hi there\"\n" +
+            "<popStream/><pushStream id=\"ooc\"/><preset id=\"whisper\">Athlya whispers,</preset> \"OOC: hi there\"\n" +
+            "<popStream/><preset id=\"whisper\">Athlya whispers,</preset> \"OOC: hi there\"\n" +
+            "<prompt time=\"1786651006\">&gt;</prompt>\n");
+
+        Assert.False(Assert.Single(texts, t => t.Stream == "whispers").DuplicateEcho);
+        Assert.True(Assert.Single(texts, t => t.Stream == "ooc").DuplicateEcho);
+        Assert.True(Assert.Single(texts, t => t.Stream == "main" && t.Text.Contains("OOC:")).DuplicateEcho);
+    }
 }

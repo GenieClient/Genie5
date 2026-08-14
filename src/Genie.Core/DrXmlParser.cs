@@ -608,7 +608,18 @@ public sealed class DrXmlParser : IDisposable
         // it, most notably ParseGameOnly triggers, which under Genie 4
         // parity fire on the Main-targeted copy of a line — for talk, that
         // IS this bare duplicate. Only a display sink should skip it.
-        var isDuplicateEcho = _activeStream == "main" && _lastEmittedStream is not null &&
+        //
+        // Public #256: the re-send isn't always a single bare `main` copy. An
+        // `OOC:` whisper goes out THREE times — whispers, then the `ooc`
+        // stream, then bare main — so keying strictly on "main" let the ooc
+        // copy re-arm the tracking with a stream outside the set, and the bare
+        // main copy at the end escaped the check and rendered a second time.
+        // Generalised: any emission OUTSIDE the double-send set that repeats
+        // the armed text is a redundant re-send. Emissions on the set itself
+        // are exempt so a genuinely-repeated talk line re-arms rather than
+        // flagging its own stream copy (see Two_talk_pairs_in_a_row).
+        var isDuplicateEcho = !DuplicateEchoStreams.Contains(_activeStream) &&
+            _lastEmittedStream is not null &&
             DuplicateEchoStreams.Contains(_lastEmittedStream) && stripped == _lastEmittedText;
 
         // Rebase every span offset from raw-buffer space into decoded-text
@@ -723,8 +734,14 @@ public sealed class DrXmlParser : IDisposable
         _events.OnNext(new TextEvent(_activeStream, stripped, links, boldSpans, presetSpans,
             Mono: _inMono, DuplicateEcho: isDuplicateEcho));
         _emittedTextLine = true;   // a real blank line may now follow (#176)
-        _lastEmittedStream = _activeStream;
-        _lastEmittedText   = stripped;
+        // A flagged re-send does NOT re-arm: the arming stays with the original
+        // talk/whispers copy so every later copy in the same burst is caught
+        // (#256 — whispers → ooc → main is three copies, not two).
+        if (!isDuplicateEcho)
+        {
+            _lastEmittedStream = _activeStream;
+            _lastEmittedText   = stripped;
+        }
     }
 
     // Map a span list from raw-buffer offsets into decoded-text offsets using
