@@ -24,6 +24,7 @@ namespace Genie.App.Tests;
 /// text+color only and strip Links/BoldSpans/Mono/Window from the whole
 /// scrollback on every rule apply.</para>
 /// </summary>
+[Collection("highlight-statics")]
 public class ExperienceHighlightScopingTests
 {
     /// <summary>Install a throwaway HighlightEngine into the process-wide

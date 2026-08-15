@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Text.RegularExpressions;
+using Avalonia.Controls;   // FindResource — the TextPrimary fallback below
 using Genie.Core;
 using Genie.Core.Config;
 using Genie.Core.Events;
@@ -90,6 +91,14 @@ public sealed class MobsViewModel : ReactiveObject
             .Where(e => string.Equals(e.ComponentId, "room objs", StringComparison.OrdinalIgnoreCase))
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(_ => Refresh());
+
+        // Preset / highlight / name rule edits (the Presets and Highlights
+        // panels + rule-file live reload all fire RulesChanged): rebuild the
+        // rows so their creatures-preset foreground (#236) and tokenized
+        // inlines pick up the new colours — same repaint contract as the
+        // Game/Experience windows.
+        Highlighting.UserHighlights.RulesChanged += () =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(Refresh);
 
         // Ignore-list changes from ANY source — GenieCore recomputed
         // Room.Creatures before this fires (it subscribed in its ctor), so
@@ -201,14 +210,26 @@ public sealed class MobItem
     public string Text { get; }
     /// <summary>The row tokenized through the shared highlight pipeline, so a
     /// user rule on a creature name colours it here too (the row's default
-    /// Warning foreground covers whatever no rule claims).</summary>
+    /// foreground below covers whatever no rule claims).</summary>
     public IReadOnlyList<Avalonia.Controls.Documents.Inline> Inlines { get; }
+    /// <summary>Default row colour = the <c>creatures</c> preset — the same
+    /// single source the Main window's MonsterBold layer uses (#236), so one
+    /// knob governs both. When the preset is "Default" the row falls back to
+    /// the theme's normal text colour (matching Main's weight-only fallback;
+    /// a null Foreground would render invisible glyphs, so the fallback is
+    /// resolved here, not left to inheritance). Rows are rebuilt on
+    /// <see cref="Highlighting.UserHighlights.RulesChanged"/>, so Presets-panel
+    /// edits apply live.</summary>
+    public Avalonia.Media.IBrush? Foreground { get; }
     public ReactiveCommand<Unit, Unit> IgnoreCommand { get; }
 
     public MobItem(string text, MobsViewModel owner)
     {
         Text          = text;
         Inlines       = Genie.App.Highlighting.DefaultHighlights.Tokenize(text, window: "mobs");
+        Foreground    = Genie.App.Highlighting.DefaultHighlights.CreaturesPresetBrush
+                        ?? Avalonia.Application.Current?.FindResource(Theming.ThemeKeys.TextPrimary)
+                           as Avalonia.Media.IBrush;
         IgnoreCommand = ReactiveCommand.Create(() => owner.IgnoreCreature(text));
     }
 }

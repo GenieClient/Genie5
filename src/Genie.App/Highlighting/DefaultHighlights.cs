@@ -155,6 +155,17 @@ public static class DefaultHighlights
     public static Genie.Core.Presets.PresetEngine? PresetEngine { get; set; }
 
     /// <summary>
+    /// The MonsterBold colour — the <c>creatures</c> preset resolved to a brush,
+    /// or null when the preset is "Default"/unset (weight-only bold). The ONE
+    /// source of truth for creature colouring (#236): the Main-window MonsterBold
+    /// layer above and the Mobs panel's default row foreground both read it, so
+    /// editing the preset moves every window together. Live updates ride
+    /// <see cref="UserHighlights.RulesChanged"/> (the Presets panel fires it).
+    /// </summary>
+    public static IBrush? CreaturesPresetBrush =>
+        PresetEngine is { } p ? GetUserBrush(p.GetForeground("creatures")) : null;
+
+    /// <summary>
     /// Active session's player-name highlight engine (#154). Set by
     /// <c>MainWindowViewModel</c> at connect, like <see cref="PresetEngine"/>.
     /// When set, <see cref="Tokenize"/> paints each name rule's foreground /
@@ -236,10 +247,10 @@ public static class DefaultHighlights
     /// maps. This is <see cref="Tokenize"/> minus the final emit pass — same rules,
     /// same precedence, same side effects (highlight sound / TTS fire here, once per
     /// matching line, exactly as before).
-    /// <para>Layer order, top to bottom: player names (#154, supreme) → user
-    /// highlight rules (#143) → built-in defaults → MonsterBold colour (#131) →
-    /// preset spans (base). Earlier layers win: each writes only where the channel
-    /// is still null.</para>
+    /// <para>Layer order, top to bottom: player names (#154, supreme) →
+    /// MonsterBold colour (#131, above user rules per #235) → user highlight
+    /// rules (#143) → built-in defaults → preset spans (base). Earlier layers
+    /// win: each writes only where the channel is still null.</para>
     /// </summary>
     public static StyleMap BuildStyleMap(string text,
                                          IReadOnlyList<LinkSpan>? links = null,
@@ -296,6 +307,25 @@ public static class DefaultHighlights
                     if (nameBg is not null && backgrounds[i] is null) backgrounds[i] = nameBg;
                 }
             }
+        }
+
+        // ── MonsterBold (#131) — above user highlights (#235) ────────────
+        // DR emphasises creature/NPC names and incoming combat/Events lines
+        // with <pushBold>…</pushBold>; Wrayth and Genie 3/4 render that
+        // "monster bold" in a distinct COLOUR, not just heavier weight, and it
+        // PRE-EMPTS normal highlights — a cosmetic rule ("You also see…") must
+        // never disguise a creature or an Events message. So the colour paints
+        // right after names (a named player inside a bold line keeps their
+        // name colour — names stay supreme) and before user/built-in rules.
+        // Foreground only: a user rule's BACKGROUND still applies beneath it.
+        // Set the `creatures` preset to Default in the Presets panel for
+        // weight-only bold (colour off, and user rules colour bold text again).
+        if (MonsterBoldEnabled && boldSpans is { Count: > 0 } && PresetEngine is { } mbPresets)
+        {
+            var mbBrush = GetUserBrush(mbPresets.GetForeground("creatures"));
+            if (mbBrush is not null)
+                for (int i = 0; i < bolds.Length; i++)
+                    if (bolds[i]) brushes[i] ??= mbBrush;
         }
 
         // ── User-defined highlights from the live HighlightEngine ─────
@@ -364,24 +394,6 @@ public static class DefaultHighlights
                 for (int i = m.Index; i < m.Index + m.Length; i++)
                     if (brushes[i] is null) brushes[i] = brush;
             }
-        }
-
-        // ── MonsterBold (#131) ───────────────────────────────────────────
-        // DR emphasises creature/NPC names and incoming combat hits with
-        // <pushBold>…</pushBold>; Wrayth and Genie 3/4 render that "monster
-        // bold" in a distinct COLOUR, not just heavier weight. Colour every
-        // bold char with the `creatures` preset foreground so pushBold text
-        // pops out of a busy scroll. Applied BEFORE the preset-span base layer
-        // so a creature inside a room description still shows monster-bold, but
-        // AFTER user/built-in highlights so those win (??=). On by default
-        // (creatures = Crimson); set the `creatures` preset to Default in the
-        // Presets panel to fall back to weight-only bold — i.e. colour off.
-        if (boldSpans is { Count: > 0 } && PresetEngine is { } mbPresets)
-        {
-            var mbBrush = GetUserBrush(mbPresets.GetForeground("creatures"));
-            if (mbBrush is not null)
-                for (int i = 0; i < bolds.Length; i++)
-                    if (bolds[i]) brushes[i] ??= mbBrush;
         }
 
         // ── Preset colours (base layer) ──────────────────────────────────

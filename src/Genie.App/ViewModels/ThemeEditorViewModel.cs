@@ -96,7 +96,9 @@ public sealed class ThemeEditorViewModel : ReactiveObject
         Add(Accents, ThemeKeys.AccentBorder, "Accent border",                      FromTheme(ThemeKeys.AccentBorder));
         Add(Accents, ThemeKeys.Success,      "Success (players, ok badges)",       FromTheme(ThemeKeys.Success));
         Add(Accents, ThemeKeys.SuccessBg,    "Success background",                 FromTheme(ThemeKeys.SuccessBg));
-        Add(Accents, ThemeKeys.Warning,      "Warning (creatures, stale)",         FromTheme(ThemeKeys.Warning));
+        // "creatures" dropped from the label (#236): the Mobs window's creature
+        // colour now follows the `creatures` preset, not this token.
+        Add(Accents, ThemeKeys.Warning,      "Warning (stale)",                    FromTheme(ThemeKeys.Warning));
         Add(Accents, ThemeKeys.WarningBg,    "Warning background",                 FromTheme(ThemeKeys.WarningBg));
         Add(Accents, ThemeKeys.Danger,       "Danger (errors, destructive)",       FromTheme(ThemeKeys.Danger));
         Add(Accents, ThemeKeys.DangerBg,     "Danger background",                  FromTheme(ThemeKeys.DangerBg));

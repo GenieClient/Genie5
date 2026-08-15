@@ -467,9 +467,11 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="vm:MobItem">
                   <!-- Inlines = the shared highlight pipeline (user rules paint
-                       creature names here too); Warning stays the default. -->
+                       creature names here too). Default row colour = the
+                       `creatures` preset via MobItem.Foreground (#236) — the
+                       same knob as the Main window's MonsterBold colour. -->
                   <SelectableTextBlock controls:InlinesBehavior.Source="{Binding Inlines}"
-                                       Foreground="{DynamicResource Theme.Warning}"
+                                       Foreground="{Binding Foreground}"
                                        FontSize="12" TextWrapping="Wrap" Margin="0,1">
                     <SelectableTextBlock.ContextMenu>
                       <ContextMenu>
