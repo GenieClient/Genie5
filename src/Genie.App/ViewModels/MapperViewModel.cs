@@ -411,57 +411,6 @@ public class MapperViewModel : ReactiveObject
     // included) — conflating the two was the original return-button bug.
     private string? _lastMatchedZoneFile;
 
-    /// <summary>
-    /// Should a zone load engage the browse-hold (freeze auto-follow and the
-    /// character-scoped script globals)? Pure so the rule can be pinned by
-    /// tests — three separate live bugs have come out of this one predicate.
-    ///
-    /// <para>Browsing = the user deliberately loaded a map that is NOT the
-    /// character's home zone, while a live room is known. Auto-follow is
-    /// suspended so room events can't yank the view straight back
-    /// (2026-08-04 smoke: cross-zone clicks during a ferry ride looked dead
-    /// because travel tracking re-loaded the character's zone in the same
-    /// beat).</para>
-    ///
-    /// <para><paramref name="userLoad"/> is false for engine-driven switches
-    /// (boundary-note follow, room-search auto-load) and for pre-connect loads
-    /// where no server room id exists yet — neither is ever browsing.</para>
-    ///
-    /// <para>Decided by zone IDENTITY, never by match-probing ("did the
-    /// character resolve in the loaded zone?"). Probing is unsound: cross-zone
-    /// BOUNDARY STUBS duplicate the character's room into neighbouring maps by
-    /// design, so browsing Map998 MATCHED its "Alfren's Ferry" stub, the
-    /// detection concluded "not browsing", lifted the freeze, followed the
-    /// stub's note back toward Map1, mis-rematched, and the fingerprint
-    /// auto-load landed on Map50 with $zoneid=50/$roomid=0 (2026-08-06 video,
-    /// frames 90→118).</para>
-    ///
-    /// <para>But identity needs a KNOWN home to compare against, which is why
-    /// <paramref name="lastMatchedZoneFile"/> being empty means "not browsing"
-    /// rather than "browsing". Until the character matches a room somewhere it
-    /// is null, and a bare <c>!string.Equals(filename, null)</c> is true for
-    /// EVERY pick — so the first zone load of a session counted as browsing
-    /// even when the user picked their own character's map. That LATCHED: the
-    /// freeze stayed on (globals stuck at the seed "0") while
-    /// LoadZone→Recalculate still resolved CurrentNode, so the canvas and the
-    /// #66 status bar showed the real Zone/Room (Refresh has no browse guard);
-    /// the CurrentNodeChanged handler's <c>if (BrowsingZone) return</c> ran
-    /// before it could record the home zone, so the hold could never
-    /// self-correct; and RoomNotFoundInZone — the only remaining release path
-    /// — never fires while the room IS in the loaded zone. Net: $roomid and
-    /// $zoneid read 0 for the rest of the session while the map plainly knew
-    /// where the character was (Shroom, 2026-08-14, #226 hand-off verify).
-    /// With no home recorded there is nothing to be browsing away FROM, so the
-    /// caller's !BrowsingZone branch lifts the freeze and re-resolves, and the
-    /// resulting match records the home zone — arming genuine browse detection
-    /// for every pick after this one.</para>
-    /// </summary>
-    internal static bool ShouldEnterBrowseHold(
-        bool userLoad, string? filename, string? lastMatchedZoneFile) =>
-        userLoad &&
-        !string.IsNullOrEmpty(lastMatchedZoneFile) &&
-        !string.Equals(filename, lastMatchedZoneFile, StringComparison.OrdinalIgnoreCase);
-
     // Server room id at the moment the browse-hold engaged; a room-change past
     // it releases the hold (browsing is stationary-only — see the
     // RoomNotFoundInZone handler).
@@ -1038,15 +987,40 @@ public class MapperViewModel : ReactiveObject
             var n = _engine?.CurrentNode;
             _audit?.Note("ROOM",
                 $"node={(n is null ? "LOST" : n.Id.ToString())} zone='{_engine?.ActiveZone?.Name}' title='{n?.Title}'");
-            // While BROWSING, a node match means nothing about the character:
-            // boundary stubs duplicate their room into the browsed map, so a
-            // stub "match" must not release the hold, must not overwrite the
-            // remembered home zone, and above all must not let the engine
-            // follow the stub's note and drag the view around. The hold's
-            // release paths are: the character MOVING (RoomNotFoundInZone
-            // sees a new server room id), the ⌖ Return button, or the user
-            // re-selecting the home zone (LoadSelectedZone's identity check).
-            if (BrowsingZone) return;
+            // While BROWSING, a node match usually means nothing about the
+            // character: boundary stubs duplicate their room into the browsed
+            // map, so the ANCHOR room "matching" must not release the hold,
+            // must not overwrite the remembered home zone, and must not let
+            // the engine follow the stub's note and drag the view around.
+            // Release paths: the character MOVING (RoomNotFoundInZone sees a
+            // new server room id), the ⌖ Return button, the user re-selecting
+            // the home zone (LoadSelectedZone's identity check) — and, below,
+            // a match on a DIFFERENT room than the hold anchor.
+            if (BrowsingZone)
+            {
+                // A match on a NEW server room means the character is moving
+                // AND the browsed zone resolves their rooms — it IS their
+                // zone; adopt it. Without this, browsing the character's own
+                // zone latched forever (rooms kept matching, so the
+                // RoomNotFoundInZone release never fired) and the hold-gated
+                // SyncMapperGlobals starved: $roomid/$zoneid read 0 all
+                // session while this handler's ungated Refresh() kept the
+                // status line tracking (Shroom's #226 live verify; travel.cmd
+                // reads $roomid=0 and starts MOVERANDOM).
+                if (Services.BrowseHoldPolicy.ShouldReleaseOnMatch(
+                        n is not null, _engine?.CurrentServerRoomId, _browseHoldRoomId))
+                {
+                    BrowsingZone = false;   // reactive mirror clears engine.ViewIsBrowsing
+                    _audit?.Note("ROOM", "browse-hold released — new room matched in the browsed zone; adopting it as the character's zone");
+                    _lastMatchedZoneFile = SelectedZoneFile;
+                    // The match that proved residency ran under the hold, so
+                    // the globals sync skipped it. Re-resolve with the hold
+                    // off; the recalc re-enters this handler (posted) with
+                    // BrowsingZone false and syncs $roomid/$zoneid normally.
+                    _engine?.Recalculate();
+                }
+                return;
+            }
 
             // Remember the zone the character last MATCHED in — this is what
             // "⌖ Return to Current Zone" jumps back to. Derivation-by-rematch
@@ -1818,10 +1792,31 @@ public class MapperViewModel : ReactiveObject
         try { _engine.LoadZone(zone); }
         finally { _loadingZone = false; }
 
-        // Browse-hold detection — see ShouldEnterBrowseHold. LoadZone →
-        // Recalculate runs synchronously, so CurrentNode is already resolved
-        // here.
-        BrowsingZone = ShouldEnterBrowseHold(userLoad, filename, _lastMatchedZoneFile);
+        // Browse-hold detection: a USER-initiated load (dropdown pick, cross-
+        // zone click, #mapper zone) that does NOT contain the character — while
+        // a live room is known — is browsing; suspend auto-follow so room
+        // events can't immediately re-load the character's zone (2026-08-04
+        // smoke: cross-zone clicks during a ferry ride looked dead because the
+        // travel tracking yanked the view back within the same beat). Engine-
+        // driven switches (_autoZoneSwitch) and pre-connect loads (no server
+        // room id yet) never enter browse mode. LoadZone → Recalculate runs
+        // synchronously, so CurrentNode is already resolved here.
+        // Browsing = the user picked a zone that ISN'T the character's home
+        // zone. Deciding by match-probing ("did the character resolve in the
+        // loaded zone?") is unsound: cross-zone BOUNDARY STUBS duplicate the
+        // character's room into neighbouring maps by design, so browsing
+        // Map998 MATCHED its "Alfren's Ferry" stub, the detection concluded
+        // "not browsing", lifted the freeze, followed the stub's note back
+        // toward Map1, mis-rematched, and the fingerprint auto-load landed on
+        // Map50 with $zoneid=50/$roomid=0 (2026-08-06 video, frames 90→118).
+        // Identity is decidable; probing is not.
+        // No zone has ever matched (fresh session): a user pick is a starting
+        // guess, not browsing — there's no home zone to protect, and latching
+        // here froze $roomid at 0 for the whole session whenever the guess was
+        // RIGHT (in-zone matches never released the hold). A wrong guess
+        // self-corrects: the first room event misses and auto-follow takes over.
+        BrowsingZone = Services.BrowseHoldPolicy.ShouldLatch(
+                           userLoad, _lastMatchedZoneFile, filename);
         // Anchor the hold to the room the character occupied when browsing
         // began — the RoomNotFoundInZone handler releases the hold as soon as
         // a DIFFERENT server room fires (character moved; tracking must win).

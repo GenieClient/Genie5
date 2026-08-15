@@ -44,13 +44,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Let the test project reach `internal` members so pure decision logic
-         (e.g. MapperViewModel.ShouldEnterBrowseHold) can be pinned by tests
-         without widening the shipping public API. -->
-    <InternalsVisibleTo Include="Genie.App.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- Avalonia core at 11.3.18 (latest 11.3.x; Dock 11.3.11.x requires
          >= 11.3.11). Avalonia.ReactiveUI stays at 11.3.9 — its highest
          published version — which still resolves against core (>= 11.3.9, an
