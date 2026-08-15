@@ -1751,7 +1751,7 @@ public sealed class ScriptEngine
                 var gLabel = rest.Trim();
                 // Capture before HotReload — it replaces inst.Lines, so
                 // currentIdx only indexes the OLD list.
-                var gOrigin = inst.Lines[currentIdx].Origin;
+                var gOrigin = OriginAt(inst, currentIdx);
                 // #script reload is consumed here — Genie 4 hot-reloads at the
                 // next goto (its "at the next label" message notwithstanding),
                 // so a running loop picks up edits at its natural jump point.
@@ -1802,7 +1802,7 @@ public sealed class ScriptEngine
                 inst.Pc = ss + 1;
                 DbgEcho(inst, 1, $"gosub {label.Trim()} → line {TargetLineNo(inst, ss + 1)}" +
                     (string.IsNullOrEmpty(gosubArgs) ? "" : $" args: {gosubArgs}"));
-                inst.Trace.Add($"gosub {label.Trim()}", inst.Lines[currentIdx].Origin, lineNo);
+                inst.Trace.Add($"gosub {label.Trim()}", OriginAt(inst, currentIdx), lineNo);
                 // Gosub arguments populate $0..$9 on a NEW stack frame — they
                 // do NOT touch %0..%9 (script args). On return the frame is
                 // popped, restoring the caller's $-scope. Matches Genie4.
@@ -1836,14 +1836,14 @@ public sealed class ScriptEngine
                     if (inst.DollarStack.Count > 1) inst.DollarStack.Pop();
                     if (inst.DollarCounts.Count > 1) inst.DollarCounts.Pop();
                     DbgEcho(inst, 1, $"return → line {TargetLineNo(inst, retPc)}");
-                    inst.Trace.Add("return", inst.Lines[currentIdx].Origin, lineNo);
+                    inst.Trace.Add("return", OriginAt(inst, currentIdx), lineNo);
                     inst.Pc = retPc;
                 }
                 else { inst.Running = false; NotifyFinished(inst); }   // return on an empty stack ends the script
                 return true;
 
             case "exit":
-                inst.Trace.Add("exit", inst.Lines[currentIdx].Origin, lineNo);
+                inst.Trace.Add("exit", OriginAt(inst, currentIdx), lineNo);
                 inst.Running = false;
                 NotifyFinished(inst);
                 return false;
@@ -2781,6 +2781,24 @@ public sealed class ScriptEngine
         => inst.Lines.Count == 0
             ? 0
             : inst.Lines[Math.Clamp(pc, 0, inst.Lines.Count - 1)].LineNumber;
+
+    /// <summary>
+    /// Origin (source file) of the compiled line at <paramref name="currentIdx"/>,
+    /// for the goto/gosub/return/exit debug trace. Returns "" when the caller has
+    /// no owning line: action bodies are dispatched with <c>currentIdx = -1</c>
+    /// (they are not entries in <see cref="ScriptInstance.Lines"/>), and the raw
+    /// <c>inst.Lines[currentIdx]</c> read threw
+    /// "Index was out of range … (Parameter 'index')" out of the flow-control
+    /// cases — killing EVERY <c>action … goto/gosub/exit</c> before the jump ran.
+    /// automapper.cmd routes nearly all movement recovery through those, so a
+    /// closed shop reported "[script] automapper action error: Index was out of
+    /// range" instead of handling the failure. <c>Trace.Add</c> already defaults
+    /// origin to "", so an empty origin is the established "no source file" value.
+    /// </summary>
+    private static string OriginAt(ScriptInstance inst, int currentIdx)
+        => (uint)currentIdx < (uint)inst.Lines.Count
+            ? inst.Lines[currentIdx].Origin
+            : string.Empty;
 
     /// <summary>Lazily build the per-script JavaScript library context (#104),
     /// bound to THIS instance's variable scope: bare getVar/setVar → the script's
