@@ -81,7 +81,7 @@
 
       <CheckBox Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="3"
                 Name="EchoToMainCheck" Content="Also show this stream in the Main window" Margin="0,2,0,4"
-                ToolTip.Tip="When checked, lines for this stream are echoed into the main game window in addition to their own panel. Applies to the text stream windows (Combat, Talk, Whispers, Thoughts, Familiar, Deaths, Logons, Assess, Atmospherics, ItemLog); ignored for other windows. Unlike 'Redirect if closed', this fires while the panel is still open."/>
+                ToolTip.Tip="When checked, lines for this stream are echoed into the main game window in addition to their own panel. Applies to the text stream windows (Combat, Talk, Whispers, Thoughts, Familiar, Deaths, Logons, Assess, Atmospherics, OOC, ItemLog); ignored for other windows. Leave it OFF for OOC — the game already sends every OOC line to the main window separately, so echoing it shows the line twice. Unlike 'Redirect if closed', this fires while the panel is still open."/>
 
       <StackPanel Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="3"
                   Orientation="Horizontal" Spacing="4" Margin="0,2,0,4">

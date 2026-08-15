@@ -357,6 +357,11 @@
                   IsChecked="{Binding AtmosphericsVisible, Mode=OneWay}"
                   Command="{Binding ToggleAtmosphericsCommand}"
                   ToolTip.Tip="Atmospherics / ambient feed — the server `atmospherics` stream (weather + room flavour)."/>
+        <MenuItem Header="_OOC"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding OocVisible, Mode=OneWay}"
+                  Command="{Binding ToggleOocCommand}"
+                  ToolTip.Tip="Out-of-character chat — the server `ooc` stream. Its own system, separate from Whispers and from Thoughts (Gweth). OOC lines also appear in the main game window, so this panel is opt-in."/>
         <MenuItem Header="Lo_g"
                   ToggleType="CheckBox"
                   IsChecked="{Binding LogVisible, Mode=OneWay}"

@@ -36,6 +36,19 @@ public class StreamTabsViewModel : ReactiveObject
     /// (#85); hidden by default, re-open via Window → Atmospherics.</summary>
     public StreamBuffer Atmospherics { get; } = new("Atmospherics");
 
+    /// <summary>Out-of-character chat — the server's <c>ooc</c> stream, declared
+    /// <c>&lt;streamWindow id='ooc' title='OOC' … timestamp='on' ifClosed=''/&gt;</c>
+    /// (public #260). Its own system, distinct from Whispers and from Gweth /
+    /// Thoughts, even though DR renders an <c>OOC:</c> message in whisper form.
+    /// <para>
+    /// DR sends each OOC line THREE times — on <c>whispers</c>, again here, and
+    /// a third time bare on <c>main</c> (public #256). The bare copy IS the main
+    /// -window rendering, which is why this window ships with
+    /// <c>EchoToMain</c> off and <c>IfClosed = ""</c> (drop) — DR's own declared
+    /// values. Turning the echo on puts every OOC line in Main twice.
+    /// </para></summary>
+    public StreamBuffer Ooc      { get; } = new("OOC");
+
     /// <summary>Consolidated conversation log — mirrors the speech streams
     /// (talk / whispers), Genie 4 "Log" window parity. Also an <c>#echo &gt;log</c>
     /// target (wired in MainWindowViewModel).</summary>
@@ -46,7 +59,7 @@ public class StreamTabsViewModel : ReactiveObject
     public StreamBuffer ItemLog  { get; } = new("ItemLog");
 
     public IReadOnlyList<StreamBuffer> All =>
-        [Logons, Talk, Whispers, Thoughts, Combat, Familiar, Death, Assess, Atmospherics, Log, ItemLog];
+        [Logons, Talk, Whispers, Thoughts, Combat, Familiar, Death, Assess, Atmospherics, Ooc, Log, ItemLog];
 
     /// <summary>Main game-window sink, handed in by <see cref="Attach"/> so a
     /// stream with its <c>EchoToMain</c> toggle on can also post into Main.</summary>
@@ -101,7 +114,17 @@ public class StreamTabsViewModel : ReactiveObject
                     "death"                => Death,
                     "assess"               => Assess,
                     "atmospherics"         => Atmospherics,
+                    "ooc"                  => Ooc,
                     "itemlog" or "itemLog" => ItemLog,
+                    // No buffer. Two very different reasons, neither of which
+                    // may be "route it to Main" — see public #260:
+                    //   • consumed elsewhere — `inv` (InventoryViewModel),
+                    //     `percWindow` (SpellTimerExtension), `room`,
+                    //     `experience`. Echoing these into Main would dump
+                    //     inventory and room descriptions over the game text.
+                    //   • declared by DR but not built yet — `conversation`,
+                    //     `group`. These DO silently vanish today; harmless
+                    //     only because DR also sends a bare `main` copy.
                     _                      => null
                 };
                 // #187: pass the parser's span metadata (bold / link / preset)
@@ -217,6 +240,7 @@ public class StreamTabsViewModel : ReactiveObject
         "death"                => Death,
         "assess"               => Assess,
         "atmospherics"         => Atmospherics,
+        "ooc"                  => Ooc,
         "log"                  => Log,
         "itemlog" or "itemLog" => ItemLog,
         _                      => null,

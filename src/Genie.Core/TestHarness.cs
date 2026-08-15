@@ -664,6 +664,7 @@ static ConsoleColor StreamColor(string stream) => stream switch
     "thoughts"    => ConsoleColor.Magenta,
     "familiar"    => ConsoleColor.DarkCyan,
     "atmospherics"=> ConsoleColor.DarkGreen,
+    "ooc"         => ConsoleColor.DarkMagenta,
     "combat"      => ConsoleColor.Red,
     "experience"  => ConsoleColor.DarkYellow,
     _             => ConsoleColor.Gray,

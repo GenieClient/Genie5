@@ -352,8 +352,10 @@ public sealed class GenieConfig
 
     /// <summary>Comma-separated streams read aloud when <see cref="TtsRead"/> is
     /// on (e.g. <c>whispers,talk,thoughts,death</c>). Default excludes floods
-    /// (combat/atmospherics/logons) and <c>main</c> (speech is duplicated there,
-    /// so reading both double-speaks). Edited by <c>#tts read/mute &lt;stream&gt;</c>.</summary>
+    /// (combat/atmospherics/logons) and the streams DR duplicates a line onto —
+    /// <c>main</c> and <c>ooc</c> both carry a second copy of a whispers line
+    /// (public #256), so reading either alongside <c>whispers</c> double-speaks.
+    /// Edited by <c>#tts read/mute &lt;stream&gt;</c>.</summary>
     public string TtsReadStreamsRaw { get; set; } = "whispers,talk,thoughts,death";
 
     /// <summary>True when <paramref name="stream"/> should be read aloud now

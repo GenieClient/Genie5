@@ -69,7 +69,7 @@ public class StreamTabsViewModelTests
         private static readonly string[] StreamIds =
         {
             "talk", "whispers", "thoughts", "combat", "logons",
-            "familiar", "death", "assess", "atmospherics", "log", "itemlog",
+            "familiar", "death", "assess", "atmospherics", "ooc", "log", "itemlog",
         };
 
         public Harness()
@@ -95,6 +95,7 @@ public class StreamTabsViewModelTests
             Tabs.Death.Settings        = Store.Get("death");
             Tabs.Assess.Settings       = Store.Get("assess");
             Tabs.Atmospherics.Settings = Store.Get("atmospherics");
+            Tabs.Ooc.Settings          = Store.Get("ooc");
             Tabs.Log.Settings          = Store.Get("log");
             Tabs.ItemLog.Settings      = Store.Get("itemlog");
 
@@ -293,5 +294,99 @@ public class StreamTabsViewModelTests
         Assert.Single(h.Tabs.Whispers.Lines);
         Assert.Single(h.Tabs.Log.Lines);
         Assert.Empty(h.Main.Lines);
+    }
+
+    // ── OOC window (public #260) ────────────────────────────────────────
+    // DR sends every OOC line THREE times — whispers, ooc, then bare main
+    // (public #256). The parser flags the 2nd and 3rd as DuplicateEcho and the
+    // main-window sink skips flagged lines, so the bare copy is what Main
+    // renders. That makes the OOC panel's job purely additive, and makes its
+    // shipped defaults load-bearing: EchoToMain OFF and IfClosed "" (drop),
+    // both taken from DR's own <streamWindow id='ooc' … ifClosed=''/>.
+
+    [Fact]
+    public async Task Ooc_ships_with_echo_off_and_drop_when_closed()
+    {
+        await using var h = new Harness();
+
+        // Straight off Register — no test override. These two defaults are the
+        // whole reason the OOC panel doesn't re-create the #256 duplicate.
+        Assert.False(h.Store.Get("ooc").EchoToMain);
+        Assert.Equal("", h.Store.Get("ooc").IfClosed);
+
+        // Every other stream window keeps the shipped echo-on default.
+        Assert.True(h.Store.Get("combat").EchoToMain);
+        Assert.True(h.Store.Get("whispers").EchoToMain);
+    }
+
+    [Fact]
+    public async Task Ooc_panel_open_shows_the_line_and_adds_nothing_to_main()
+    {
+        await using var h = new Harness();
+        h.Open("ooc");
+
+        h.Publish(new TextEvent("ooc", "You whisper to Athlya, \"OOC: brb\"", DuplicateEcho: true));
+
+        Assert.Single(h.Tabs.Ooc.Lines);
+        Assert.Equal("You whisper to Athlya, \"OOC: brb\"", h.Tabs.Ooc.Lines[0].Text);
+        // DR's own bare `main` copy is the main-window rendering; echoing the
+        // stream copy on top of it is exactly the #256 duplicate.
+        Assert.Empty(h.Main.Lines);
+    }
+
+    [Fact]
+    public async Task Ooc_panel_closed_drops_the_fallback_instead_of_prefixing_into_main()
+    {
+        await using var h = new Harness();
+        // panel left closed, defaults untouched → IfClosed "" resolves to Drop.
+
+        h.Publish(new TextEvent("ooc", "You whisper to Athlya, \"OOC: brb\"", DuplicateEcho: true));
+
+        Assert.Single(h.Tabs.Ooc.Lines);  // buffer still fills, so re-opening shows history
+        Assert.Empty(h.Main.Lines);       // no "[ooc] …" line on top of DR's bare copy
+    }
+
+    [Fact]
+    public async Task Full_ooc_burst_adds_nothing_to_main_from_the_side_streams()
+    {
+        // The #256 wire capture's shape with both panels open: whispers copy,
+        // ooc copy, bare main copy.
+        //
+        // SCOPE: this harness wires StreamTabsViewModel.Attach only — it never
+        // calls GameTextViewModel.Attach, so Main here receives lines solely
+        // through RouteToMain. What's asserted is therefore that the two SIDE
+        // streams contribute nothing to Main during the burst, leaving DR's
+        // bare copy as the single main-window rendering. The main-stream
+        // subscription's own `if (e.DuplicateEcho) return;` guard
+        // (GameTextViewModel.cs:126) is not exercised here; the flag it reads
+        // is covered by DuplicateEchoParserTests in Genie.Core.Tests.
+        await using var h = new Harness();
+        h.Open("whispers");
+        h.Open("ooc");
+        h.Store.Get("whispers").EchoToMain = false;   // its own panel is open
+
+        const string line = "You whisper to Athlya, \"OOC: This will get duplicated\"";
+        h.Publish(new TextEvent("whispers", line));
+        h.Publish(new TextEvent("ooc",  line, DuplicateEcho: true));
+        h.Publish(new TextEvent("main", line, DuplicateEcho: true));
+
+        Assert.Single(h.Tabs.Whispers.Lines);
+        Assert.Single(h.Tabs.Ooc.Lines);
+        Assert.Empty(h.Main.Lines);
+    }
+
+    [Fact]
+    public async Task Ooc_with_echo_manually_turned_on_reaches_main_once_not_twice()
+    {
+        // A user who deliberately flips OOC's EchoToMain on gets the echo — but
+        // only via that one route, never the echo AND the closed-panel fallback.
+        await using var h = new Harness();
+        h.Store.Get("ooc").EchoToMain = true;
+
+        h.Publish(new TextEvent("ooc", "You whisper to Athlya, \"OOC: brb\"", DuplicateEcho: true));
+
+        Assert.Single(h.Tabs.Ooc.Lines);
+        Assert.Single(h.Main.Lines);
+        Assert.Equal("You whisper to Athlya, \"OOC: brb\"", h.Main.Lines[0].Text); // plain, no prefix
     }
 }

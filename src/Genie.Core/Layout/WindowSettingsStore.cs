@@ -23,12 +23,26 @@ public sealed class WindowSettingsStore
     // and talk/whispers are already mirrored into it at StreamTabsViewModel.
     // Values must be registered ids (or the "main"/game-text main-window target)
     // or the IfClosedResolver treats them as unknown and safely routes to Main.
+    //
+    // "" = drop when closed. DR declares the OOC window that way itself
+    // (<streamWindow id='ooc' … ifClosed=''/>) because it already sends a bare
+    // `main` copy of every OOC line as the fallback — see DefaultNoEchoToMain.
     private static readonly Dictionary<string, string?> DefaultIfClosed =
         new(StringComparer.OrdinalIgnoreCase)
         {
             ["talk"]     = "log",
             ["whispers"] = "log",
+            ["ooc"]      = "",
         };
+
+    // Windows whose EchoToMain starts OFF. The property defaults to true (Genie
+    // 4's per-stream "also show in Main"), which is right for streams DR sends
+    // ONCE. OOC is not one of those: DR sends each OOC line on `whispers`, again
+    // on `ooc`, and a third time bare on `main` (public #256). The bare copy is
+    // already the main-window rendering, so echoing the `ooc` copy on top of it
+    // puts the line in Main twice — the very duplicate #256 fixed.
+    private static readonly HashSet<string> DefaultNoEchoToMain =
+        new(StringComparer.OrdinalIgnoreCase) { "ooc" };
 
     public WindowSettings Register(string id, string defaultTitle)
     {
@@ -39,6 +53,7 @@ public sealed class WindowSettingsStore
             FontFamily = "Cascadia Mono,Consolas,Courier New,monospace",
             FontSize = 13, Foreground = "Default", Background = "",
             Timestamp = false, IfClosed = defIfClosed,
+            EchoToMain = !DefaultNoEchoToMain.Contains(id),
         };
         _settings[id] = s;
         return s;
