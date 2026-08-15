@@ -29,6 +29,39 @@ public static class BrowseHoldPolicy
     /// first room event misses and ordinary auto-follow corrects it. Latching
     /// instead froze <c>$roomid</c> for the whole session when the guess was
     /// RIGHT (matches never release the hold).
+    ///
+    /// <para><paramref name="userLoad"/> is true only for a deliberate user
+    /// gesture (dropdown pick, cross-zone click, <c>#mapper zone</c>). It is
+    /// false for engine-driven switches (boundary-note follow, room-search
+    /// auto-load) and for pre-connect loads where no server room id exists
+    /// yet — neither is ever browsing.</para>
+    ///
+    /// <para><b>Decide by zone IDENTITY, never by match-probing</b> ("did the
+    /// character resolve in the loaded zone?"). Probing is unsound and this is
+    /// the invariant most likely to be "simplified" away by a later edit:
+    /// cross-zone BOUNDARY STUBS duplicate the character's room into
+    /// neighbouring maps by design, so browsing Map998 MATCHED its "Alfren's
+    /// Ferry" stub, a probing check concluded "not browsing", lifted the
+    /// freeze, followed the stub's note back toward Map1, mis-rematched, and
+    /// the fingerprint auto-load landed on Map50 with $zoneid=50/$roomid=0
+    /// (2026-08-06 video, frames 90→118). Identity is decidable; probing is
+    /// not. <see cref="ShouldReleaseOnMatch"/> is the one place a match may
+    /// speak, and only when the room differs from the hold anchor.</para>
+    ///
+    /// <para>Identity needs a KNOWN home to compare against — which is why an
+    /// empty <paramref name="lastMatchedZoneFile"/> means "not browsing"
+    /// rather than "browsing", and why the guard is load-bearing rather than
+    /// defensive. A bare <c>!string.Equals(filename, null)</c> is true for
+    /// EVERY pick, so the first zone load of a session counted as browsing
+    /// even when the user picked their own character's map. That LATCHED, and
+    /// every escape route was closed at once: the freeze stayed on (globals
+    /// stuck at the seed "0") while LoadZone→Recalculate still resolved
+    /// CurrentNode, so the canvas and the #66 status bar showed the real
+    /// Zone/Room (Refresh has no browse guard — which is precisely why the two
+    /// disagreed); the CurrentNodeChanged handler's <c>if (BrowsingZone)
+    /// return</c> ran before it could record the home zone, so the hold could
+    /// never self-correct; and RoomNotFoundInZone — the only release path that
+    /// existed then — never fires while the room IS in the loaded zone.</para>
     /// </summary>
     public static bool ShouldLatch(bool userLoad, string? lastMatchedZoneFile, string filename) =>
         userLoad &&

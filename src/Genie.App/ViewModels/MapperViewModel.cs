@@ -1792,29 +1792,15 @@ public class MapperViewModel : ReactiveObject
         try { _engine.LoadZone(zone); }
         finally { _loadingZone = false; }
 
-        // Browse-hold detection: a USER-initiated load (dropdown pick, cross-
-        // zone click, #mapper zone) that does NOT contain the character — while
-        // a live room is known — is browsing; suspend auto-follow so room
-        // events can't immediately re-load the character's zone (2026-08-04
-        // smoke: cross-zone clicks during a ferry ride looked dead because the
-        // travel tracking yanked the view back within the same beat). Engine-
-        // driven switches (_autoZoneSwitch) and pre-connect loads (no server
-        // room id yet) never enter browse mode. LoadZone → Recalculate runs
-        // synchronously, so CurrentNode is already resolved here.
-        // Browsing = the user picked a zone that ISN'T the character's home
-        // zone. Deciding by match-probing ("did the character resolve in the
-        // loaded zone?") is unsound: cross-zone BOUNDARY STUBS duplicate the
-        // character's room into neighbouring maps by design, so browsing
-        // Map998 MATCHED its "Alfren's Ferry" stub, the detection concluded
-        // "not browsing", lifted the freeze, followed the stub's note back
-        // toward Map1, mis-rematched, and the fingerprint auto-load landed on
-        // Map50 with $zoneid=50/$roomid=0 (2026-08-06 video, frames 90→118).
-        // Identity is decidable; probing is not.
-        // No zone has ever matched (fresh session): a user pick is a starting
-        // guess, not browsing — there's no home zone to protect, and latching
-        // here froze $roomid at 0 for the whole session whenever the guess was
-        // RIGHT (in-zone matches never released the hold). A wrong guess
-        // self-corrects: the first room event misses and auto-follow takes over.
+        // Browse-hold detection: suspend auto-follow while the user
+        // deliberately looks at a map that isn't the character's, so room
+        // events can't re-load their zone in the same beat (2026-08-04 smoke:
+        // cross-zone clicks during a ferry ride looked dead). The rule — and
+        // the history behind it, including why it compares zone IDENTITY and
+        // never probes for a match — lives on BrowseHoldPolicy.ShouldLatch.
+        // Call-site specifics: _autoZoneSwitch drives userLoad: false, and
+        // LoadZone → Recalculate ran synchronously above, so CurrentNode is
+        // already resolved here.
         BrowsingZone = Services.BrowseHoldPolicy.ShouldLatch(
                            userLoad, _lastMatchedZoneFile, filename);
         // Anchor the hold to the room the character occupied when browsing
