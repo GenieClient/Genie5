@@ -155,7 +155,7 @@ These are mirrored by [ScriptGlobalsSync](../src/Genie.Core/Scripting/ScriptGlob
 | Global | Source |
 | --- | --- |
 | `$health`, `$mana`, `$spirit`, `$stamina`/`$fatigue`, `$concentration`, `$encumbrance` | `<progressBar>` |
-| `$roundtime` | `<roundTime>` (seconds remaining at event time) |
+| `$roundtime`, `$roundtimeremaining` | computed live on every read: whole seconds left on the current roundtime, 0 when none |
 | `$casttime` | `<castTime>` raw epoch of when the cast is fully prepped (Genie 4 parity — compose `$casttime - $spellstarttime`) |
 | `$spellpreptime` | full prep length in seconds (`$casttime − $spellstarttime`, constant per spell) |
 | `$spelltime`, `$spellstarttime`, `$casttimeremaining` | computed live on every read: elapsed count-up, prep-start epoch, countdown-to-prepped |
@@ -166,7 +166,9 @@ These are mirrored by [ScriptGlobalsSync](../src/Genie.Core/Scripting/ScriptGlob
 | `$roomname`, `$roomdesc`, `$roomexits`, `$roomobjs`, `$roomplayers`, `$gameroomid` | room `<component>` / `<nav>` |
 | `$charactername`, `$gamename`/`$game`, `$connected` | session |
 
-Because these are mirrored at event time, use `timer start` / `%timer` for wall-clock waits rather than diffing `$roundtime` between prompts.
+Most of these are mirrored at event time, so they hold the value as of the last tag rather than as of the read — use `timer start` / `%timer` for wall-clock waits rather than diffing a mirrored global between prompts.
+
+The rows marked *computed live on every read* are the exception: they resolve in `ScriptEngine.TryResolveVar` **ahead of** the `Globals` lookup, so they always count down and no stored value can shadow them. This is load-bearing for anything time-gated — `automapper.cmd` opens every move with `if ($roundtime > 0) then pause $roundtime`, and while `$roundtime` was a stored snapshot (written only when roundtime *started*, never cleared when it lapsed) that gate paused the last roundtime's full length on every step.
 
 ## Diagnostics
 

@@ -198,6 +198,24 @@ public sealed class ScriptGlobalsSync : IDisposable
     {
         Set("prompt", p.Indicator);
 
+        // $roundtime / $roundtimeremaining — re-mirror from live state on every
+        // prompt, which is the only thing that ever walks them back DOWN to 0.
+        // Genie 4 does exactly this (Game.cs:2285-2304: `rt = roundTime −
+        // gametime`, store rt when > 0 else store "0"); we previously wrote
+        // these only on RoundTimeEvent, which fires when RT *starts*, so the
+        // mirror froze at the last RT length forever.
+        //
+        // Scripts and typed commands don't depend on this refresh — both read
+        // through ScriptEngine.TryResolveVar, which computes the value live and
+        // outranks the mirror. This keeps the globals dictionary itself honest
+        // for the variables panel and GetGlobalVariables() readers.
+        // CombatState.RoundTimeRemaining is already clamped at 0, so a lapsed
+        // RT lands on "0" without G4's explicit else-branch.
+        var rtText = ((int)Math.Ceiling(_state.Combat.RoundTimeRemaining))
+                     .ToString(CultureInfo.InvariantCulture);
+        Set("roundtime",          rtText);
+        Set("roundtimeremaining", rtText);
+
         // Genie 4 reserved $gametime — the server's clock (Unix seconds) carried
         // on each <prompt time='...'> tag. The parser leaves ServerTime at its
         // default when a prompt arrives without a time attribute; guard against
@@ -343,9 +361,18 @@ public sealed class ScriptGlobalsSync : IDisposable
         Set($"{prefix}handid",   existId ?? "");
     }
 
+    /// <summary>
+    /// Whole seconds left until <paramref name="expires"/>, floored at 0.
+    /// Rounds UP, matching <c>ScriptEngine.RoundTimeRemainingSeconds</c>
+    /// (GenieCore wires it as <c>Math.Ceiling</c>) and the RT wakeup
+    /// scheduler — a plain <c>(int)</c> cast truncated a 7s roundtime read a
+    /// millisecond later to "6", so the same RT reported 6 through this
+    /// mirror and 7 through the live resolver, and a script that paused on
+    /// the floored value woke a beat early and hit roundtime anyway.
+    /// </summary>
     private static string SecondsRemaining(DateTimeOffset expires)
     {
-        var sec = (int)Math.Max(0, (expires - DateTimeOffset.UtcNow).TotalSeconds);
+        var sec = (int)Math.Ceiling(Math.Max(0, (expires - DateTimeOffset.UtcNow).TotalSeconds));
         return sec.ToString(CultureInfo.InvariantCulture);
     }
 

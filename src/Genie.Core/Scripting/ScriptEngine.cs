@@ -3086,6 +3086,21 @@ public sealed class ScriptEngine
             // shadow it with a frozen value.
             if (name.Equals("casttimeremaining", StringComparison.OrdinalIgnoreCase))
             { value = (CastTimeRemainingSeconds?.Invoke() ?? 0).ToString(CultureInfo.InvariantCulture); return true; }
+            // $roundtime / $roundtimeremaining — live countdown of the seconds
+            // left on the current roundtime, 0 when none. Genie 4 recomputes
+            // `roundTime − gametime` on EVERY prompt and explicitly stores "0"
+            // once it lapses (Game.cs:2285-2304); we go one better and compute
+            // per substitution, same as $casttimeremaining above. Resolved
+            // BEFORE globals so the ScriptGlobalsSync mirror can never shadow
+            // it with a frozen value — that mirror was only written when RT
+            // *started*, so it stuck at the last RT length forever and the
+            // community automapper.cmd's `if ($roundtime > 0) then pause
+            // $roundtime` slept the full RT on every single move (Shroom's
+            // live #226 verify: one room per ~20s, and `#var roundtime 0`
+            // couldn't clear it because globals outrank #var here).
+            if (name.Equals("roundtime", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("roundtimeremaining", StringComparison.OrdinalIgnoreCase))
+            { value = (RoundTimeRemainingSeconds?.Invoke() ?? 0).ToString(CultureInfo.InvariantCulture); return true; }
             // $name: global session variables (set by #tvar, events, or host code).
             // Do NOT check inst.Vars here — that's for local %variables only.
             // $ prefix explicitly means "global", not "local with fallback to global".
