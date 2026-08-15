@@ -156,8 +156,15 @@ public sealed class ScriptInstance
     /// </summary>
     public DateTime NextSendAt = DateTime.MinValue;
 
-    // 'timer start' baseline for the %timer pseudo-variable.
+    // 'timer start' baseline for the %t / %timer pseudo-variable. Null while
+    // the timer is stopped.
     public DateTime? TimerStart;
+
+    // Elapsed milliseconds retained from the last 'timer stop' (Genie 4
+    // Script.cs m_dTimerLastTime). Two jobs, both G4 parity: %t keeps reading
+    // the final elapsed after a stop, and the next 'timer start' RESUMES from
+    // it rather than restarting at zero. Zeroed by 'timer clear'.
+    public double TimerLastMs;
 
     // Shared RNG for the 'random' command.
     public Random Rng = new();

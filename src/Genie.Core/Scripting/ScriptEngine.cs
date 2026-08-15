@@ -1988,18 +1988,68 @@ public sealed class ScriptEngine
 
             case "timer":
             {
-                // timer start | stop | clear | reset
-                // %timer reads the elapsed seconds since the last 'timer start'.
-                var op = rest.Trim().ToLowerInvariant();
-                switch (op)
+                // timer start | stop | clear | reset | setstart <datetime>
+                // %t (Genie 4) / %timer (Genie 5 alias) read the elapsed seconds.
+                //
+                // Faithful port of Genie 4 `EvalTimer` (Script.cs:2980). The
+                // subtle parts, all of which G5 previously got wrong:
+                //   • start after a stop RESUMES — G4 back-dates the new start
+                //     by the retained elapsed, so a stop/start pair does not
+                //     lose time. A start while already running is ignored.
+                //   • stop RETAINS the elapsed, so %t keeps reading the final
+                //     value afterwards (the `timer stop` / `echo %t` idiom).
+                //     G5 used to null the baseline, making %t read 0.
+                //   • clear is the only op that zeroes both.
+                // Each op drops any stored local `t`, so timer state owns the
+                // name from then on — G4's last-write-wins, where these commands
+                // write into the same local list a `var t …` would.
+                var (timerOp, timerArg) = SplitCmd(rest.Trim());
+                switch (timerOp.ToLowerInvariant())
                 {
                     case "":
-                    case "start": inst.TimerStart = DateTime.UtcNow; break;
+                    case "start":
+                        if (inst.TimerStart is null)
+                            inst.TimerStart = DateTime.UtcNow.AddMilliseconds(-inst.TimerLastMs);
+                        inst.Vars.Remove("t");
+                        break;
+
                     case "stop":
+                        if (inst.TimerStart is { } startedAt)
+                        {
+                            var ms = (DateTime.UtcNow - startedAt).TotalMilliseconds;
+                            inst.TimerLastMs = ms > 0 ? ms : 0;
+                            inst.TimerStart  = null;
+                        }
+                        else inst.TimerLastMs = 0;   // stop while stopped → %t = 0 (G4)
+                        inst.Vars.Remove("t");
+                        break;
+
                     case "clear":
-                    case "reset": inst.TimerStart = null;            break;
+                    case "reset":   // 'reset' is a G5 alias; G4 only has 'clear'
+                        inst.TimerStart  = null;
+                        inst.TimerLastMs = 0;
+                        inst.Vars.Remove("t");
+                        break;
+
+                    case "setstart":
+                        // Seed the baseline from a datetime literal. Parsed in
+                        // the user's culture like G4, then converted to UTC
+                        // because G5 keeps the baseline in UTC (a Kind of
+                        // Unspecified is treated as local, which is what G4's
+                        // all-local arithmetic did).
+                        if (DateTime.TryParse(timerArg.Trim(), CultureInfo.CurrentCulture,
+                                              DateTimeStyles.None, out var seed))
+                        {
+                            inst.TimerStart = seed.ToUniversalTime();
+                            inst.Vars.Remove("t");
+                        }
+                        else
+                            _echo($"[script] {inst.Name}:{lineNo} timer: invalid datetime " +
+                                  $"in 'timer setstart' — '{timerArg.Trim()}'");
+                        break;
+
                     default:
-                        _echo($"[script] {inst.Name}:{lineNo} timer: unknown sub-command '{op}'");
+                        _echo($"[script] {inst.Name}:{lineNo} timer: unknown sub-command '{timerOp}'");
                         break;
                 }
                 return true;
@@ -3042,11 +3092,27 @@ public sealed class ScriptEngine
         if (name.Length == 0) return false;
 
         // Pseudo-variables (computed each substitution rather than stored).
-        if (name.Equals("timer", StringComparison.OrdinalIgnoreCase))
+        //
+        // %t is the Genie 4 name (EvalTimer writes a local `t`); %timer is the
+        // Genie 5 alias that shipped first. Both read the same state: the live
+        // elapsed while the timer runs, otherwise the value retained by the
+        // last 'timer stop' — which is what makes G4's `timer stop` / `echo %t`
+        // idiom read the final time instead of 0. Fractional seconds, matching
+        // G4's (milliseconds / 1000) at Script.cs:2392.
+        //
+        // `t` resolves only for '%', and only when the script has no local of
+        // that name: `t` is a common loop/temp variable, and in G4 an explicit
+        // `var t …` just overwrites the timer's entry in the same local list.
+        // `timer` still resolves for any prefix — that is what already shipped.
+        if (name.Equals("timer", StringComparison.OrdinalIgnoreCase)
+            || (prefix == '%' && name.Equals("t", StringComparison.OrdinalIgnoreCase)
+                              && !inst.Vars.ContainsKey("t")))
         {
-            value = inst.TimerStart is { } t
-                ? ((int)(DateTime.UtcNow - t).TotalSeconds).ToString(CultureInfo.InvariantCulture)
-                : "0";
+            var elapsedMs = inst.TimerStart is { } t
+                ? (DateTime.UtcNow - t).TotalMilliseconds
+                : inst.TimerLastMs;
+            value = (elapsedMs > 0 ? elapsedMs / 1000d : 0d)
+                    .ToString("0.###", CultureInfo.InvariantCulture);
             return true;
         }
 
