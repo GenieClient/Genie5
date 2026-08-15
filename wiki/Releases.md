@@ -4,7 +4,24 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.5 — Long Haul
+## Latest: v5.0.0-beta.5.1 — Bearings
+
+A fix-focused follow-up to the .NET 10 release, built almost entirely from player reports. The mapper knows where you are again, four script behaviours match Genie 4 that quietly didn't, and out-of-character chatter finally has a window of its own.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.5.1** as a delta from beta.5.
+
+- **OOC window** — DR's `ooc` stream had nowhere to land, so out-of-character chatter fell into the main game window. There's now a dedicated OOC window, hidden by default; enable it from the Window menu. The `conversation` and `group` streams are still to come (#260).
+- **`$roomid` could read 0 for a whole session** — the map-browsing hold latched on a session's first zone load and never released. It no longer latches there, and now also releases when a room match proves you're standing in the zone you're browsing (thanks @Azothy).
+- **`$roundtime` counts down** — it was a frozen snapshot, so scripts gating on it waited on a number that never reached zero (thanks @Azothy).
+- **`action` bodies can branch again** — `goto`/`gosub`/`exit` inside an `action` had been dead engine-wide since mid-July, surfacing as an "Index was out of range" error (thanks @Azothy).
+- **`timer` and `%t` match Genie 4** — `%t` now resolves, `timer start` resumes after a stop, `timer stop` keeps the elapsed, and `timer setstart` works. `%timer` now reports fractional seconds like Genie 4, so an exact string match on it would see `12.346` where it saw `12` (thanks @Azothy).
+- **Literal angle brackets survive** — text like `<1-20>` was consumed as a tag and vanished (#238 — thanks @paragonmac).
+- **Outbound OOC whispers printed three times** — the `ooc` copy of DR's triple-send disarmed the duplicate check (#256).
+- **MonsterBold no longer loses to your own highlights** — creature names keep their colour when a rule matches the same line, and the `creatures` preset is the one colour source for both the main window and the Mobs panel (#235, #236 — thanks @SaragosDR).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.5.1)
+
+## v5.0.0-beta.5 — Long Haul
 
 Genie 5 now runs on **.NET 10**, the current long-term-support runtime. Nothing changes in how you use it — the download still bundles everything it needs — but the runtime inside is supported through November 2028 instead of expiring this November.
 

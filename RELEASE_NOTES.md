@@ -1,3 +1,56 @@
+# Genie 5 — v5.0.0-beta.5.1
+
+Bearings: a fix-focused follow-up to the .NET 10 release, built almost
+entirely from player reports. The mapper knows where you are again, four
+script behaviours match Genie 4 that quietly didn't, and out-of-character
+chatter finally has a window of its own.
+
+## ✨ New
+- **OOC window.** DR sends out-of-character chatter on its own `ooc` stream,
+  but Genie 5 had nowhere to put it, so it fell through into the main game
+  window. There is now a dedicated **OOC** window — hidden by default, enable
+  it from the Window menu. It follows DR's own declaration for the stream, so
+  it doesn't echo to main and doesn't swallow lines meant for other windows.
+  The `conversation` and `group` streams are still to come (#260).
+
+## 🐛 Fixes
+- **`$roomid` could read 0 for an entire session.** Browsing the map to another
+  zone puts a hold on your displayed location so scripts don't get dragged
+  along with the view — but on a session's first zone load that hold latched
+  and never released, leaving `$roomid` at 0 for every script depending on it.
+  The hold no longer latches on that first load, and it now also releases when
+  a room match proves the zone you're browsing is the one you're standing in.
+  Thanks @Azothy.
+- **`$roundtime` was a frozen snapshot, not a countdown.** It reported the
+  roundtime as of the moment it was set and never moved, so scripts gating on
+  it waited on a number that would never reach zero. Thanks @Azothy.
+- **`action` bodies can branch again.** `goto`, `gosub` and `exit` inside an
+  `action` body had been dead engine-wide since mid-July, and surfaced as an
+  "Index was out of range" script error rather than anything pointing at the
+  cause. Thanks @Azothy.
+- **`timer` and `%t` match Genie 4.** Four separate divergences, every one of
+  which failed silently in scripts carried over from Genie 4: the elapsed time
+  was readable only as `%timer` where Genie 4 names it `%t`; `timer start`
+  after a stop restarted from zero instead of resuming; `timer stop` discarded
+  the elapsed, so the standard `timer stop` / `echo %t` pair read `0`; and
+  `timer setstart <datetime>` was rejected outright. One thing to know if you
+  script against it: `%timer` now reports fractional seconds to match Genie 4,
+  so numeric comparisons behave as before but an exact string match would see
+  `12.346` where it saw `12`. Thanks @Azothy.
+- **Literal angle brackets survive.** Text such as `<1-20>` was consumed as if
+  it opened a tag and vanished from the window. A `<` now only opens a tag
+  when what follows it is a legal tag start (#238 — thanks @paragonmac).
+- **Outbound OOC whispers printed three times.** DR sends the same line on the
+  `whispers`, `ooc` and `main` streams; the `ooc` copy landed between the other
+  two and disarmed the duplicate check (#256).
+- **MonsterBold no longer loses to your own highlights.** Creature names keep
+  MonsterBold's colour even when one of your highlight rules matches the same
+  line, while rule backgrounds still show through — and the `creatures` preset
+  is now the single colour source for both the main window and the Mobs panel
+  (#235, #236 — thanks @SaragosDR).
+
+---
+
 # Genie 5 — v5.0.0-beta.5
 
 The long-haul release: Genie 5 now runs on **.NET 10**, the current
