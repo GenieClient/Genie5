@@ -21,15 +21,20 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.4 "Fresh Ink"
+## Where we are — v5.0.0-beta.5.1 "Bearings"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
-last parity gaps. Since this roadmap was rebuilt, beta.3 shipped If-Closed
+last parity gaps. Since this roadmap was rebuilt: beta.3 shipped If-Closed
 stream routing (#211), Hide Title Bar on floating windows (#181), and
-crtrStatus handling (#202), and beta.4 shipped the opt-in AvaloniaEdit game
-window (#200), File ▸ Open Log In Editor (#89), and the `send` eager-dash
-marker. Highlights of what works today:
+crtrStatus handling (#202); beta.4 shipped the opt-in AvaloniaEdit game window
+(#200), File ▸ Open Log In Editor (#89), and the `send` eager-dash marker;
+**beta.5 moved the whole solution to .NET 10**; and beta.5.1 was built almost
+entirely from player reports — the OOC stream window, the `$roomid` browse-hold
+and `$roundtime` countdown fixes, `action` body branching, Genie 4 parity for
+`timer` / `%t`, angle-bracket literals (#238), the triple-printed OOC whisper
+(#256), and MonsterBold colour precedence (#235, #236). Highlights of what
+works today:
 
 - **Connection** — SGE direct auth (TLS on 7910 by default, plaintext 7900
   fallback), Lich 5 proxy (with owned-Lich auto-launch and `#config lichdebug`
@@ -59,8 +64,12 @@ marker. Highlights of what works today:
   load-context isolation, `#plugin` load/unload, transform hooks
   (`OnGameText`/`OnEcho`/`OnInput`), and built-in extensions (EXP tracker,
   Inventory View, Spell Timer, Time Tracker, Circle Calc).
+- **Runtime** — .NET 10, the current LTS (supported to November 2028). Shipped
+  in beta.5; every download still bundles the runtime it needs.
 - **Updater** — in-process update system (Core via Velopack, Maps + Plugins via
-  GitHub feeds) with a beta channel. **Windows self-update is live.**
+  GitHub feeds) with a beta channel. **Windows self-update is live**, and the
+  macOS / Linux packaging and per-platform feeds ship on every release — what's
+  outstanding there is verification, not build work (see Track C).
 - **Code signing** — every tagged release is EV-signed under Shadow Realms LLC
   (the project's support partner) via SignPath, after per-release maintainer
   approval. First signed release: `v5.0.0-alpha.10`.
@@ -75,6 +84,26 @@ For the full per-release history see [RELEASE_NOTES.md](../RELEASE_NOTES.md).
 
 The honest short list. Several parallel tracks; none strictly blocks the
 others, but all should land before we cut a stable `5.0.0` off the beta channel.
+
+**Rough order of attack.** The tracks are independent, but if you're looking for
+where the next commit does the most good:
+
+1. **The P1 script-correctness bugs first** — roundtime against the local clock
+   ([#261](https://github.com/GenieClient/Genie5/issues/261)), script-engine
+   thread safety ([#242](https://github.com/GenieClient/Genie5/issues/242)), and
+   profile-vs-global rule layering
+   ([#257](https://github.com/GenieClient/Genie5/issues/257)). These break
+   working scripts in the field, mostly silently, and they're each a few days.
+2. **Track A (security)** — the actual gate, and the one with the longest tail.
+3. **The script validator**
+   ([#239](https://github.com/GenieClient/Genie5/issues/239)) before the in-app
+   editor (Track E). It's the cheaper half and a whole-corpus scan is a far
+   better regression signal for the script engine than waiting for a specific
+   line to execute.
+4. **Track B** (server-driven dialogs) and **Track E** (editor) — the two
+   multi-week builds.
+5. **Track C** in parallel throughout; it needs a tester more than it needs
+   developer time.
 
 ### Track A — Security-hardening backlog 🔒
 
@@ -109,24 +138,42 @@ these panels renders without per-panel code. This is the **biggest remaining
 Genie 4 parity gap.** Tracked as
 [#156](https://github.com/GenieClient/Genie5/issues/156).
 
-### Track C — macOS / Linux self-update
+### Track C — macOS / Linux self-update *(verification, not build work)*
 
-Cross-platform build artifacts already ship on every release, and
-`Genie.Core.Runtime.AppPaths` already resolves per-platform data dirs
-(`~/Library/Application Support`, XDG `~/.local/share`). What's missing is the
-self-updater on those platforms — a packaging target (`.app` bundle / AppImage)
-and an `IReleaseSource` that pulls the right per-platform artifact. Today mac
-and Linux users install fresh builds manually. Tracked as
-[#27](https://github.com/GenieClient/Genie5/issues/27).
+The packaging targets and per-platform feeds have **shipped**: `release.yml`
+builds win-x64, linux-x64 (AppImage), osx-arm64 and osx-x64, releases carry
+per-platform Velopack feeds, and the in-app updater routes each OS/arch to its
+channel. `Genie.Core.Runtime.AppPaths` already resolves per-platform data dirs
+(`~/Library/Application Support`, XDG `~/.local/share`).
+
+What remains is running the update loop **end-to-end off Windows** — install,
+then update N→N+1, and confirm the app relaunches on the new version with its
+data root intact — and fixing whatever falls out. The AppImage self-replace path
+is the least-exercised leg. This is the one Horizon 1 item that's blocked on
+hardware access rather than developer time: **macOS and Linux testers are the
+bottleneck, and volunteering on the issue genuinely unblocks a 1.0 gate.**
+Tracked as [#27](https://github.com/GenieClient/Genie5/issues/27).
 
 ### Track D — Beta soak
 
-Burn down real-user reports on the beta builds before we call it stable:
+Burn down real-user reports on the beta builds before we call it stable. The
+current set, all P1/P2 and all sourced from player reports:
 
-- Cross-machine window/state consistency
-  ([#203](https://github.com/GenieClient/Genie5/issues/203)).
-- Nested-variable resolution edge case
-  ([#180](https://github.com/GenieClient/Genie5/issues/180)).
+- Roundtime computed against the local PC clock rather than the server's, so
+  clock skew breaks the RT badge, `#send`, and every RT-gated script
+  ([#261](https://github.com/GenieClient/Genie5/issues/261)).
+- Script engine isn't thread-safe — a "Collection was modified" crash when game
+  lines arrive mid-execution
+  ([#242](https://github.com/GenieClient/Genie5/issues/242)).
+- Profile rule files replace the global set instead of layering on it
+  ([#257](https://github.com/GenieClient/Genie5/issues/257)).
+- Transport disembark race — `%offtransport` unset, so `put go %offtransport`
+  goes out literal ([#241](https://github.com/GenieClient/Genie5/issues/241)).
+- Experience window font size doesn't apply
+  ([#233](https://github.com/GenieClient/Genie5/issues/233)).
+- Astral Plane: seven missing Map999 conduit nodes, plus a pathfinder guard so
+  the built-in walker never routes through `script X` arcs it can't execute
+  ([#253](https://github.com/GenieClient/Genie5/issues/253)).
 
 ### Track E — In-app script editor
 
@@ -181,18 +228,34 @@ fit (GemStone's scripting culture differs from DR's). Reference:
 Low-risk items that can ship during the soak. Scoped well enough to pick up
 without a deep architecture discussion.
 
-### .NET 10 runtime retarget *(landing — community PR)*
+> The **.NET 10 runtime retarget** that sat here shipped in beta.5 — see
+> "Where we are" above, and [NET10_UPGRADE.md](NET10_UPGRADE.md) for the
+> reasoning and contributor impact.
 
-Move the whole solution from .NET 8 to .NET 10 **during the beta line**.
-.NET 8 support ends **November 10, 2026**, and Genie 5 ships self-contained —
-so staying put would mean bundling an unpatched runtime into every release
-after that date. .NET 10 is the current LTS (supported to November 2028);
-.NET 9 dies the same day as 8 and .NET 11 is short-term, so neither is a
-target. Scope is deliberately a retarget, not a rewrite: TFMs, logging
-packages, CI, and an Avalonia patch bump within the 11.3 line — the Avalonia
-12 migration is explicitly out of scope (it drags a ReactiveUI major upgrade
-with it and gets its own Horizon 3 entry). Full reasoning and contributor
-impact: [NET10_UPGRADE.md](NET10_UPGRADE.md).
+### Genie 4 plugin catalogue — parity audit and ports
+
+An audit of all 21 Genie 4 plugins, tracking for each one whether it's already
+built into Genie 5, worth porting, or safe to retire. The umbrella and its
+disposition table live in
+[#271](https://github.com/GenieClient/Genie5/issues/271); the individual ports
+are filed beneath it — Crutch
+([#263](https://github.com/GenieClient/Genie5/issues/263), the Empath healing
+console, and the largest of them), Combat Tracker
+([#265](https://github.com/GenieClient/Genie5/issues/265)), Bank Tracker
+([#266](https://github.com/GenieClient/Genie5/issues/266)), SpellInfo
+([#267](https://github.com/GenieClient/Genie5/issues/267)), ExpEcho
+([#268](https://github.com/GenieClient/Genie5/issues/268)), BestiaryQuery
+([#269](https://github.com/GenieClient/Genie5/issues/269)), and per-window
+logging ([#270](https://github.com/GenieClient/Genie5/issues/270)).
+
+Several carry a `design-question` label rather than a spec: the Genie 5 plugin
+contract is deliberately UI-free, so a plugin whose whole value is a clickable
+window needs a decision on built-in panel vs. plugin before code. **If you used
+one of these in Genie 4, saying so on its issue is the most useful input we can
+get** — a few are open questions about whether anyone still wants them at all.
+
+Related: ExpTracker sorting and the other Genie 4 ExpTracker options
+([#272](https://github.com/GenieClient/Genie5/issues/272)).
 
 ### Multi-line regex matching (per-rule opt-in)
 
