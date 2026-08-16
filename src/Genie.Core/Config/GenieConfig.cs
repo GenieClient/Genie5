@@ -160,7 +160,22 @@ public sealed class GenieConfig
     /// in Wizard/plain-text mode. Toggle with <c>#config flagscheck on|off</c>.</summary>
     public bool FlagsCheck { get; set; } = true;
 
-    public bool AutoMapper { get; set; } = true;
+    /// <summary>Record mode — "auto-map as you walk": the engine creates new
+    /// nodes for rooms the loaded zone doesn't contain, instead of staying
+    /// lookup-only. Read into <c>AutoMapperEngine.IsEnabled</c> at mapper attach
+    /// and followed live from there (#274); the ⏺ Record toggle writes back here.
+    /// <para><strong>Default off</strong>, matching the engine's own default and
+    /// the reasoning at <c>AutoMapperEngine</c>'s match branch: an imported
+    /// community map is read-only until the user opts in, so a wrong match can't
+    /// silently mutate the right node and fork the map from upstream. A profile
+    /// that says <c>automapper = True</c> — including a Genie 4 settings.cfg,
+    /// where the automapper did record as you walk — turns recording on, which
+    /// before #274 it silently failed to do.</para></summary>
+    public bool AutoMapper { get; set; }
+
+    /// <summary>Opacity (0–255) of the ghost rooms drawn for the floors directly
+    /// above and below the current level; 0 hides them (single-level view).
+    /// Applied live via <c>ConfigFieldUpdated.AutoMapper</c> (#275).</summary>
     public int AutoMapperAlpha { get; set; } = 255;
 
     /// <summary>When <c>true</c> (default), <c>#goto</c> hands the walk to the

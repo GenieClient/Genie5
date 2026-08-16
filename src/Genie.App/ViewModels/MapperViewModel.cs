@@ -923,6 +923,25 @@ public class MapperViewModel : ReactiveObject
                        Directory.Exists(Path.Combine(MapsDirectory, ".git"));
     }
 
+    /// <summary>
+    /// Re-read the two Mapper config keys — <c>automapper</c> (record mode) and
+    /// <c>automapperalpha</c> (ghost-floor opacity) — into the live view state.
+    /// Both raise <c>ConfigFieldUpdated.AutoMapper</c>, so one handler covers
+    /// them; called from <see cref="Attach"/>'s subscription on every such
+    /// notification (#274 / #275).
+    /// <para>
+    /// Safe against the write-back on <see cref="AutoCreateEnabled"/>: setting a
+    /// reactive property to its current value raises nothing, and the write-back
+    /// is itself change-guarded, so neither direction can re-enter the other.
+    /// </para>
+    /// </summary>
+    private void SyncAutoMapperFromConfig()
+    {
+        if (_core is null) return;
+        AutoMapperAlpha   = _core.Config.AutoMapperAlpha;
+        AutoCreateEnabled = _core.Config.AutoMapper;
+    }
+
     public void Attach(GenieCore core)
     {
         _core     = core;
@@ -1078,18 +1097,47 @@ public class MapperViewModel : ReactiveObject
             TryAutoLoadZoneFor(serverId, title, exits);
         };
 
-        // Toggle binding → engine.IsEnabled. WhenAnyValue emits initial value
-        // on subscribe; the engine starts disabled so we mirror that here.
-        AutoCreateEnabled = _engine.IsEnabled;
+        // Record mode ⇄ the `automapper` config key. The SAVED preference picks
+        // the starting mode — seeding from the engine's own default (always
+        // false) left the key inert: a profile with automapper=True still began
+        // every session in lookup-only mode, and `#mapper record on` echoed a
+        // state change that never reached the engine (#274). Push the seed into
+        // the engine explicitly; the subscription skips the initial emission.
+        AutoCreateEnabled = core.Config.AutoMapper;
+        _engine.IsEnabled = core.Config.AutoMapper;
         this.WhenAnyValue(x => x.AutoCreateEnabled)
             .Skip(1)   // ignore the initial emission; engine already matches
-            .Subscribe(v => { if (_engine is not null) _engine.IsEnabled = v; });
+            .Subscribe(v =>
+            {
+                if (_engine is not null) _engine.IsEnabled = v;
+                // Write back so the ⏺ Record toolbar toggle and the Maps-menu
+                // checkbox persist, like `#mapper record` already did. Guarded
+                // on an actual change so this and the ConfigChanged handler
+                // below can't bounce a value between each other.
+                if (_core is not null && _core.Config.AutoMapper != v)
+                    _core.Config.SetSetting("automapper", v.ToString(), showException: false);
+            });
 
-        // Allow-duplicate mirror (Genie 4 parity) — same pattern.
+        // Allow-duplicate mirror (Genie 4 parity) — same pattern. No config key
+        // backs this one, so it stays session-only (Genie 4 behaviour).
         AllowDuplicate = _engine.AllowDuplicateRooms;
         this.WhenAnyValue(x => x.AllowDuplicate)
             .Skip(1)
             .Subscribe(v => { if (_engine is not null) _engine.AllowDuplicateRooms = v; });
+
+        // Follow later config writes from ANY source — `#config automapper` /
+        // `#mapper record`, Maps ▸ AutoMapper Settings, Configuration ▸ Mapper,
+        // settings.cfg loads at connect. Both `automapper` and `automapperalpha`
+        // raise ConfigFieldUpdated.AutoMapper, and nothing had ever subscribed:
+        // the dialog's ghost-floor slider persisted its value but didn't repaint
+        // until the next core build (#275). SetSetting can run off the UI thread
+        // (scripts), hence the main-thread hop.
+        Observable.FromEvent<Action<Genie.Core.Config.ConfigFieldUpdated>, Genie.Core.Config.ConfigFieldUpdated>(
+                h => core.Config.ConfigChanged += h,
+                h => core.Config.ConfigChanged -= h)
+            .Where(f => f == Genie.Core.Config.ConfigFieldUpdated.AutoMapper)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => SyncAutoMapperFromConfig());
 
         RefreshAvailableZones();
 

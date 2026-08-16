@@ -97,9 +97,10 @@ setting; only `frontend` appears in `settings.cfg` and `#config list`).
 
 | Key | Default | What it does |
 | --- | --- | --- |
-| `automapper` | `True` | Enable the AutoMapper. |
-| `automapperalpha` | `255` | Mapper window opacity, 0–255. |
-| `updatemapperscripts` | `False` | Let mapper updates also update mapper support scripts. |
+| `automapper` | `False` | Record mode ("auto-map as you walk"): the mapper creates new rooms as you explore. Off = lookup-only, where the loaded map is read-only. Same toggle as the ⏺ Record button and `#mapper record on\|off`. |
+| `automapperalpha` | `255` | Opacity (0–255) of the ghost rooms drawn for the floors directly above and below the current level. 0 = off-level rooms hidden (single-level view). |
+| `automapperscript` | `True` | Let `#goto` hand the walk to a community `automapper.cmd` when one is present, so the map's special-move directives and the script's pacing are honored. Off forces the built-in walker. Cross-zone gotos always use the built-in walker. |
+| `updatemapperscripts` | `False` | Let mapper updates also update mapper support scripts. (Not yet wired — the in-app updater doesn't read this key.) |
 
 ## Auto-Walk
 
