@@ -49,9 +49,34 @@ public class CommandViewModel : ReactiveObject
         }
     }
 
+    /// <summary>
+    /// Down arrow: walk forward through recall history, or — when not mid-recall
+    /// — clear the input (#262).
+    ///
+    /// <para>
+    /// The clear is Genie 4 behaviour, added there on request and marked as such:
+    /// <c>ComponentTextBox.KeyDownHistory</c>'s final branch is
+    /// <c>else // On Request from Fatal (Down Clears)</c>, reached exactly when
+    /// <c>HistoryPos == -1</c> — not recalling. Genie 5 returned early in that
+    /// case instead, so Down did nothing on a freshly typed line and there was no
+    /// key that cleared the box at all (Esc is the script / auto-walk kill
+    /// switch and can't be borrowed for it).
+    /// </para>
+    ///
+    /// <para>
+    /// One deliberate divergence: Genie 4 guards the whole method with
+    /// <c>if (HistoryArray.Count == 0) return;</c>, so in a session where you
+    /// have not yet sent anything, Down does nothing there. That guard sits
+    /// ahead of the clear branch, which reads as an ordering artefact rather
+    /// than intent — and honouring it would mean Down silently doing nothing for
+    /// anyone testing the fix on a fresh session. We clear whenever the user is
+    /// not mid-recall, empty history included.
+    /// </para>
+    /// </summary>
     public void HistoryDown()
     {
-        if (_historyIndex < 0) return;
+        if (_historyIndex < 0) { CommandText = ""; return; }
+
         _historyIndex++;
         CommandText = _historyIndex < _history.Count ? _history[_historyIndex] : "";
         if (_historyIndex >= _history.Count) _historyIndex = -1;
