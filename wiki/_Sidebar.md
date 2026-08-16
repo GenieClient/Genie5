@@ -16,6 +16,7 @@
 - [Configuration & Rules](Configuration)
 - [Scripting](Scripting)
 - [The Mapper](Mapper)
+- [Alterations](Alterations)
 - [Updating Maps & Scripts](Updating-Maps-and-Scripts)
 - [Lich 5 Integration](Lich-5-Integration)
 

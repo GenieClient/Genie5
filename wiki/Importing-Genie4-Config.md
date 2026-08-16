@@ -59,6 +59,7 @@ When it finishes, the result line reports per-category counts (imported / skippe
 - **Maps (`*.xml`)** — imported through the mapper, not this dialog. See [Updating Maps and Scripts](Updating-Maps-and-Scripts). (Genie 5 uses the same Genie 4 XML map format, so maps largely carry over directly.)
 - **Account passwords** — for security, Genie 5 never reads Genie 4's stored credentials. Re-enter once via **File → Connect…** and save as a Genie 5 profile (encrypted AES-256-GCM).
 - **Window layouts** — Genie 5's docking model differs from Genie 4's MDI. Re-arrange via the **Window** menu and save via **Layout → Save Layout As…**.
+- **Alteration Buddy designs (`alterations.csv`)** — not this dialog, but they do come across: use **Alterations → Import from Genie 4…** and point it at the file in your Genie 4 Alteration Buddy plugin folder. See [Alterations](Alterations).
 
 ## Re-importing
 

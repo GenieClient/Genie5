@@ -78,6 +78,12 @@ A character dropdown switches whose history you're looking at. The store lives i
 
 The catalog is saved to `InventoryView.xml` in your data folder in the same format the Genie 4 InventoryView plugin used, so an existing file carries over as-is. Scans finish with a `InventoryView scan complete` line through the parse pipeline, so a login script can `waitforre` it. Type `/iv help` for the full command list.
 
+## The Alterations menu
+
+Not every tool belongs in the layout. **Alterations** is its own top-level menu rather than a panel, because designing an item alteration is something you sit down and do — nothing on that screen changes while you play, so it doesn't need a permanent slot competing with the panels that track your session.
+
+**Alterations ▸ Open Designer…** gives you the four alteration fields with live length counters, builds the request line as you type, and keeps a library of designs shared across your characters. It works entirely offline, before you connect. If you used the Alteration Buddy plugin in Genie 4, your `alterations.csv` imports straight in. See [Alterations](Alterations).
+
 ## The bottom strips
 
 ![The bottom strips — vitals bars, hands strip with a prepared spell and cast bar, roundtime counter, and the command bar](images/interface-bottom-strips.png)
@@ -157,4 +163,5 @@ A few more odds and ends:
 
 - [Configuration & Rules](Configuration) — highlight colors, aliases, triggers, and macros.
 - [The Mapper](Mapper) — the map panel in depth.
+- [Alterations](Alterations) — the built-in alteration designer and design library.
 - [Scripting](Scripting) — automate from the command bar.
