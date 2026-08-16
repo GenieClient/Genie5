@@ -28,6 +28,7 @@ If you're new to the codebase, read in this order: **[SGE Protocol](SGE_PROTOCOL
 | [JavaScript Scripts](javascript-scripts.md) | ✅ | The Jint-based `.js` array-script engine: the `genie.*` bridge, `include` libraries, and runtime guards. |
 | [Settings Reference](SETTINGS_REFERENCE.md) | ✅ | Every `settings.cfg` key — defaults, accepted values, and what each does — grouped by category. |
 | [Accessibility](accessibility.md) | ✅ | Screen-reader labelling: the `AutomationProperties` pattern, live-region policy, and NVDA test pass. |
+| [Alterations](alterations.md) | ✅ | The built-in alteration designer behind the top-level Alterations menu — DR length budgets, the design library, and Genie 4 `alterations.csv` interop. Ported from the Alteration Buddy plugin. |
 | [DR Flags](DR_FLAGS.md) | ✅ | The DR `flags` verb — which per-character server flags reshape the stream the parser reads. |
 | [Terminology](TERMINOLOGY.md) | ✅ | Shared project vocabulary (App vs Console, Live session / Recording / Replay, …). |
 | [Avalonia Notes](AVALONIA_NOTES.md) | ✅ | Hard-won Dock.Avalonia setup rules and ListBox-virtualization lessons. |

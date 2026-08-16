@@ -739,6 +739,38 @@
                   Command="{Binding ZoneConnectionsCommand}"
                   ToolTip.Tip="Open the meta-graph editor: transit links between zones (boats, climb-walls, ferry crossings) that the multi-zone pathfinder consults. Saves to {MapsDirectory}/ZoneConnections.xml."/>
       </MenuItem>
+      <!-- Alterations — the Genie 4 Alteration Buddy plugin (Djordje, GPL-3.0)
+           brought in-house. A top-level menu rather than a dockable panel: it
+           is a bounded design task with no live game feed behind it, so it gets
+           the Maps treatment (menu + dialog) instead of a permanent layout slot.
+           Saved Designs is rebuilt on open from the live library. -->
+      <MenuItem Header="A_lterations" SubmenuOpened="OnAlterationsMenuOpened">
+        <MenuItem Header="_Open Designer..."
+                  Command="{Binding ShowAlterationDesignerCommand}"
+                  ToolTip.Tip="Design a tap / look / read alteration with live length counters, and save it to your library."/>
+        <MenuItem x:Name="SavedAlterationsMenu" Header="_Saved Designs"
+                  ToolTip.Tip="Open one of your saved designs straight in the designer."/>
+        <Separator/>
+        <MenuItem Header="_Import from Genie 4..."
+                  Command="{Binding ImportAlterationsCommand}"
+                  ToolTip.Tip="Merge an Alteration Buddy alterations.csv into your library. Imports are added, never replace what you already have."/>
+        <MenuItem Header="_Export for Genie 4..."
+                  Command="{Binding ExportAlterationsCommand}"
+                  ToolTip.Tip="Write your library back out as an Alteration Buddy alterations.csv. Titles and notes aren't part of that format and are dropped."/>
+        <MenuItem Header="_Reload Library"
+                  Command="{Binding ReloadAlterationsCommand}"
+                  ToolTip.Tip="Re-read alterations.json from disk — use after hand-editing or syncing the file."/>
+        <MenuItem Header="Open Library _Folder"
+                  Command="{Binding OpenAlterationsFolderCommand}"
+                  ToolTip.Tip="Open the Config folder, where alterations.json lives."/>
+        <Separator/>
+        <MenuItem Header="Elanthipedia _Alteration Guide"
+                  Command="{Binding OpenAlterationGuideCommand}"
+                  ToolTip.Tip="The wiki's Alteration page — what merchants and GMs will and won't do."/>
+        <MenuItem Header="The _Witch's Workshop"
+                  Command="{Binding OpenWitchsWorkshopCommand}"
+                  ToolTip.Tip="Community alteration-design reference, linked by the original Alteration Buddy."/>
+      </MenuItem>
     </Menu>
 
     <!-- ── Hands / prepared-spell strip (Wrayth-style) ──────────────────── -->

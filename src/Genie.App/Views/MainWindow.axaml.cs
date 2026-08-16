@@ -296,6 +296,22 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 ctx.SetOutput(System.Reactive.Unit.Default);
             }));
 
+            d(ViewModel!.ShowAlterationDesignerDialog.RegisterHandler(async ctx =>
+            {
+                try
+                {
+                    // Works offline — the design library is local files, with no
+                    // dependency on a live session or a GenieConfig.
+                    await new AlterationDesignerDialog(ViewModel!.Alterations, ctx.Input)
+                        .ShowDialog(this);
+                }
+                catch (Exception ex)
+                {
+                    Genie.App.Diagnostics.ErrorLog.Log("AlterationDesignerDialog.Show", ex);
+                }
+                ctx.SetOutput(System.Reactive.Unit.Default);
+            }));
+
             d(ViewModel!.ShowMapperSettingsDialog.RegisterHandler(async ctx =>
             {
                 // Needs the live config (created at connect); pre-connect, point
@@ -479,6 +495,39 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             Command = vm.ResetThemeCommand,
             [ToolTip.TipProperty] = "Back to the default Dark theme.",
         });
+    }
+
+    /// <summary>
+    /// Rebuild Alterations ▸ Saved Designs on open, straight from the live
+    /// library. Built in code rather than as an ItemsSource for the same reason
+    /// the Theme menu is: the submenu needs an "(empty)" placeholder when there
+    /// are no designs, which an ItemsSource can't express — and rebuilding on
+    /// open picks up designs added by the designer dialog, an import, or a
+    /// hand-edit + Reload without any change notification plumbing.
+    /// </summary>
+    private void OnAlterationsMenuOpened(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not { } vm) return;
+
+        SavedAlterationsMenu.Items.Clear();
+
+        if (vm.Alterations.Designs.Count == 0)
+        {
+            SavedAlterationsMenu.Items.Add(new MenuItem
+            {
+                Header    = "(no saved designs)",
+                IsEnabled = false,
+            });
+            return;
+        }
+
+        for (var i = 0; i < vm.Alterations.Designs.Count; i++)
+            SavedAlterationsMenu.Items.Add(new MenuItem
+            {
+                Header           = vm.Alterations.Designs[i].DisplayName,
+                Command          = vm.OpenAlterationCommand,
+                CommandParameter = i,
+            });
     }
 
     // Rebuild the Plugins-menu list when it opens, so newly-loaded plugins

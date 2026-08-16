@@ -1,0 +1,102 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Genie.App.Views.AlterationDesignerDialog"
+        Title="Alteration Designer"
+        Width="900" Height="620" MinWidth="720" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <!-- Two columns: the design fields on the left, the saved library on the
+       right. Mirrors Alteration Buddy's arrangement so a Genie 4 player finds
+       everything where they expect it. -->
+  <Grid Margin="16" ColumnDefinitions="*,12,300" RowDefinitions="*,Auto">
+
+    <!-- ── Designer ─────────────────────────────────────────────────────── -->
+    <ScrollViewer Grid.Row="0" Grid.Column="0" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="10">
+
+        <StackPanel Spacing="3">
+          <TextBlock Text="Title" FontWeight="SemiBold"/>
+          <TextBox x:Name="TitleBox"
+                   Watermark="Optional — how this design is listed in the menu"/>
+        </StackPanel>
+
+        <StackPanel Spacing="3">
+          <TextBlock Text="Short Tap" FontWeight="SemiBold"/>
+          <TextBox x:Name="ShortTapBox"
+                   Watermark="a razor-edged scimitar"
+                   ToolTip.Tip="The item's inventory name. DR budgets this as article / adjective / noun, 15 characters each."/>
+          <TextBlock x:Name="ShortTapCount" FontSize="11" Opacity="0.75"/>
+        </StackPanel>
+
+        <StackPanel Spacing="3">
+          <TextBlock Text="Tap" FontWeight="SemiBold"/>
+          <TextBox x:Name="TapBox" Watermark="Shown when the item is tapped"/>
+          <TextBlock x:Name="TapCount" FontSize="11" Opacity="0.75"/>
+        </StackPanel>
+
+        <StackPanel Spacing="3">
+          <TextBlock Text="Look" FontWeight="SemiBold"/>
+          <TextBox x:Name="LookBox" AcceptsReturn="True" TextWrapping="Wrap"
+                   Height="120" VerticalContentAlignment="Top"
+                   Watermark="Shown on LOOK"/>
+          <TextBlock x:Name="LookCount" FontSize="11" Opacity="0.75"/>
+        </StackPanel>
+
+        <StackPanel Spacing="3">
+          <TextBlock Text="Read" FontWeight="SemiBold"/>
+          <TextBox x:Name="ReadBox" Watermark="Inscription shown on READ"/>
+          <TextBlock x:Name="ReadCount" FontSize="11" Opacity="0.75"/>
+        </StackPanel>
+
+        <StackPanel Spacing="3">
+          <TextBlock Text="Notes" FontWeight="SemiBold"/>
+          <TextBox x:Name="NotesBox" AcceptsReturn="True" TextWrapping="Wrap"
+                   Height="52" VerticalContentAlignment="Top"
+                   Watermark="Optional — merchant, festival, cost, reminders"/>
+        </StackPanel>
+
+        <StackPanel Spacing="3">
+          <TextBlock Text="Result" FontWeight="SemiBold"/>
+          <TextBox x:Name="ResultBox" IsReadOnly="True" AcceptsReturn="True"
+                   TextWrapping="Wrap" Height="90" VerticalContentAlignment="Top"/>
+          <TextBlock Text="This is the line you hand to the merchant or GM."
+                     FontSize="11" Opacity="0.7"/>
+        </StackPanel>
+
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- ── Saved library ────────────────────────────────────────────────── -->
+    <DockPanel Grid.Row="0" Grid.Column="2">
+      <TextBlock DockPanel.Dock="Top" Text="Saved Designs" FontWeight="SemiBold"
+                 Margin="0,0,0,6"/>
+      <TextBlock x:Name="LibraryHint" DockPanel.Dock="Bottom" FontSize="11"
+                 Opacity="0.7" TextWrapping="Wrap" Margin="0,6,0,0"
+                 Text="Double-click to load a design into the editor."/>
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8"
+                  Margin="0,8,0,0">
+        <Button x:Name="LoadButton"   Content="_Load"   MinWidth="72" Click="OnLoad"/>
+        <Button x:Name="DeleteButton" Content="_Delete" MinWidth="72" Click="OnDelete"/>
+      </StackPanel>
+      <ListBox x:Name="DesignList" DoubleTapped="OnListDoubleTapped"/>
+    </DockPanel>
+
+    <!-- ── Action row ───────────────────────────────────────────────────── -->
+    <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,14,0,0"
+          ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto">
+      <Button Grid.Column="0" Content="_New"  MinWidth="80" Click="OnNew" Margin="0,0,8,0"
+              ToolTip.Tip="Clear the editor and start a fresh design."/>
+      <Button Grid.Column="1" Content="_Save" MinWidth="80" Click="OnSave" Margin="0,0,8,0"
+              ToolTip.Tip="Save the editor's contents. Updates the loaded design, or adds a new one."/>
+      <Button Grid.Column="2" Content="_Copy Result" MinWidth="110" Click="OnCopyResult"
+              ToolTip.Tip="Copy the composed request line to the clipboard."/>
+      <TextBlock x:Name="StatusText" Grid.Column="3" VerticalAlignment="Center"
+                 Margin="16,0" FontSize="11" Opacity="0.8" TextWrapping="NoWrap"/>
+      <Button Grid.Column="4" Content="_Alteration Guide" Click="OnOpenGuide" Margin="0,0,8,0"
+              ToolTip.Tip="Open Elanthipedia's Alteration page in your browser."/>
+      <Button Grid.Column="5" Content="Cl_ose" MinWidth="88" IsCancel="True" Click="OnClose"/>
+    </Grid>
+
+  </Grid>
+</Window>

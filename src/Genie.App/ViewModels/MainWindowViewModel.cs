@@ -42,6 +42,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public InventoryViewViewModel InventoryView { get; } = new();
     public ScriptBarViewModel  ScriptBar  { get; } = new();
 
+    /// <summary>Backs the top-level Alterations menu and its designer dialog —
+    /// the Genie 4 Alteration Buddy plugin brought in as a first-class feature.
+    /// Not a dockable panel: nothing here tracks the session (see the type's
+    /// own remarks).</summary>
+    public AlterationsViewModel Alterations { get; } = new();
+
     /// <summary>Backs the dockable Scripts panel (running list with per-script
     /// Stop, a Start… picker, and the script output log). Distinct from
     /// <see cref="ScriptBar"/>, which is the always-on bottom strip.</summary>
@@ -175,6 +181,28 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public Interaction<Unit, Unit>                        ShowChangelogDialog      { get; } = new();
     public ReactiveCommand<Unit, Unit>                    ShowMapperSettingsCommand{ get; }
     public Interaction<Unit, Unit>                        ShowMapperSettingsDialog { get; } = new();
+
+    // ── Alterations menu ──────────────────────────────────────────────────────
+    /// <summary>Alterations ▸ Open Designer. The int payload is the library index
+    /// to load on open, or -1 for a blank design; the Saved Designs submenu uses
+    /// it to jump straight to an entry.</summary>
+    public ReactiveCommand<Unit, Unit>                    ShowAlterationDesignerCommand { get; }
+    public ReactiveCommand<int,  Unit>                    OpenAlterationCommand         { get; }
+    public Interaction<int, Unit>                         ShowAlterationDesignerDialog  { get; } = new();
+    /// <summary>Alterations ▸ Import from Genie 4 — merges an Alteration Buddy
+    /// <c>alterations.csv</c> into the library.</summary>
+    public ReactiveCommand<Unit, Unit>                    ImportAlterationsCommand      { get; }
+    /// <summary>Alterations ▸ Export for Genie 4.</summary>
+    public ReactiveCommand<Unit, Unit>                    ExportAlterationsCommand      { get; }
+    /// <summary>Alterations ▸ Reload Library — pick up a hand-edited file.</summary>
+    public ReactiveCommand<Unit, Unit>                    ReloadAlterationsCommand      { get; }
+    /// <summary>Alterations ▸ Open Library Folder.</summary>
+    public ReactiveCommand<Unit, Unit>                    OpenAlterationsFolderCommand  { get; }
+    /// <summary>Alterations ▸ Alteration Guide (Elanthipedia).</summary>
+    public ReactiveCommand<Unit, Unit>                    OpenAlterationGuideCommand    { get; }
+    /// <summary>Alterations ▸ The Witch's Workshop — the community design
+    /// reference Alteration Buddy linked from its own form.</summary>
+    public ReactiveCommand<Unit, Unit>                    OpenWitchsWorkshopCommand     { get; }
 
     /// <summary>Fired on a session-ending disconnect (one that is NOT
     /// auto-reconnecting) when <see cref="DisplaySettings.ShowDisconnectPopup"/>
@@ -1085,6 +1113,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         ErrorLog.Initialize(_configDir);
 
+        // Saved alteration designs — account-level, so the shared Config dir
+        // rather than a profile dir, and loaded here so the Alterations menu
+        // works before any connection.
+        Alterations.Initialize(_configDir);
+
         // ── Game-window renderer (experimental, default off) ───────────────
         // The dock layout is built further down this constructor, and the
         // renderer has to be chosen when the Game document is constructed — but
@@ -1599,6 +1632,56 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // Maps → AutoMapper Settings (#147) — slim consolidation dialog.
         ShowMapperSettingsCommand = ReactiveCommand.CreateFromTask(async () =>
             await ShowMapperSettingsDialog.Handle(Unit.Default));
+
+        // ── Alterations menu ────────────────────────────────────────────────
+        // The Alteration Buddy plugin (Djordje, GPL-3.0) brought in-house. The
+        // library is plain local files, so every one of these works offline and
+        // before connecting — none of them touch the game session.
+        ShowAlterationDesignerCommand = ReactiveCommand.CreateFromTask(async () =>
+            await ShowAlterationDesignerDialog.Handle(-1));
+
+        OpenAlterationCommand = ReactiveCommand.CreateFromTask<int>(async index =>
+            await ShowAlterationDesignerDialog.Handle(index));
+
+        ImportAlterationsCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            var path = await PickAlterationCsvAsync(forSave: false);
+            if (string.IsNullOrEmpty(path)) return;
+
+            var added = Alterations.ImportGenie4(path);
+            GameText.AddSystemLine(string.IsNullOrEmpty(Alterations.StatusText)
+                ? $"[alterations] imported {added} design(s) from {Path.GetFileName(path)}."
+                : $"[alterations] {Alterations.StatusText}");
+        });
+
+        ExportAlterationsCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            var path = await PickAlterationCsvAsync(forSave: true);
+            if (string.IsNullOrEmpty(path)) return;
+
+            var ok = Alterations.ExportGenie4(path);
+            GameText.AddSystemLine(ok
+                ? $"[alterations] exported {Alterations.Designs.Count} design(s) to {path} " +
+                   "(titles and notes are not part of the Genie 4 format and were dropped)."
+                : $"[alterations] {Alterations.StatusText}");
+        });
+
+        ReloadAlterationsCommand = ReactiveCommand.Create(() =>
+        {
+            Alterations.Reload();
+            GameText.AddSystemLine(string.IsNullOrEmpty(Alterations.StatusText)
+                ? $"[alterations] reloaded {Alterations.Designs.Count} design(s)."
+                : $"[alterations] {Alterations.StatusText}");
+        });
+
+        OpenAlterationsFolderCommand = ReactiveCommand.Create(() =>
+            OpenFolder(_configDir, "OpenAlterationsFolder"));
+
+        OpenAlterationGuideCommand = ReactiveCommand.Create(() =>
+            OpenUrl("https://elanthipedia.play.net/Alteration", "the Alteration guide"));
+
+        OpenWitchsWorkshopCommand  = ReactiveCommand.Create(() =>
+            OpenUrl("https://sites.google.com/site/thewitchsworkshop/", "The Witch's Workshop"));
 
         // All Help-menu external links funnel through OpenUrl() (defined below),
         // which hands the URL to the OS shell. Ported from the Genie 4 Help menu;
@@ -2762,6 +2845,46 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             catch (Exception ex) { ErrorLog.Log("EnsureCaptureFolder", ex); }
         }
         return await SetCaptureFolderAsync();
+    }
+
+    /// <summary>
+    /// File picker for Alteration Buddy's <c>alterations.csv</c> — open when
+    /// <paramref name="forSave"/> is false, save-as when true. Returns null on
+    /// cancel or when there is no desktop lifetime (Console / headless).
+    /// The old file was tab-separated despite the .csv name, so the filter
+    /// offers .csv but does not insist on it.
+    /// </summary>
+    private async Task<string?> PickAlterationCsvAsync(bool forSave)
+    {
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            return null;
+        if (desktop.MainWindow?.StorageProvider is not { } sp) return null;
+
+        var types = new[]
+        {
+            new FilePickerFileType("Alteration Buddy file") { Patterns = new[] { "*.csv" } },
+            new FilePickerFileType("All files")             { Patterns = new[] { "*" } },
+        };
+
+        if (forSave)
+        {
+            var target = await sp.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title                  = "Export designs for Genie 4",
+                SuggestedFileName      = "alterations.csv",
+                DefaultExtension       = "csv",
+                FileTypeChoices        = types,
+            });
+            return target?.Path.LocalPath;
+        }
+
+        var picked = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title         = "Import alterations.csv from Genie 4",
+            AllowMultiple = false,
+            FileTypeFilter = types,
+        });
+        return picked?.FirstOrDefault()?.Path.LocalPath;
     }
 
     /// <summary>Folder picker for the capture output dir. Persists + returns the
