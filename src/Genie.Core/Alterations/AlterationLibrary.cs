@@ -4,6 +4,27 @@ using System.Text.Json;
 
 namespace Genie.Core.Alterations;
 
+/// <summary>Which designs to show — drafts you are still working on, work that is
+/// already done, or everything.</summary>
+public enum AlterationFilter
+{
+    All,
+    Drafts,
+    Completed
+}
+
+/// <summary>
+/// One design paired with its position in the library.
+///
+/// Display order deliberately differs from storage order (drafts float above
+/// completed work), so every caller that acts on a row — load, delete, mark
+/// done — must carry the library index rather than reuse the row's position.
+/// Positional guessing is exactly how you delete the wrong design.
+/// </summary>
+/// <param name="Index">Position in <see cref="AlterationLibrary.Designs"/>.</param>
+/// <param name="Design">The design itself.</param>
+public readonly record struct AlterationEntry(int Index, AlterationDesign Design);
+
 /// <summary>
 /// The player's saved alteration designs, and their on-disk store.
 ///
@@ -56,6 +77,46 @@ public sealed class AlterationLibrary
     {
         _designs.Clear();
         _designs.AddRange(designs);
+    }
+
+    public int DraftCount    => _designs.Count(d => !d.IsCompleted);
+    public int CompletedCount => _designs.Count(d => d.IsCompleted);
+
+    /// <summary>
+    /// The library as the UI should present it: **drafts first, then completed
+    /// work**, each group in file order.
+    ///
+    /// Sorting rather than storage order is the whole point of the completed
+    /// flag — finished alterations are kept as a record but stop crowding the
+    /// designs you are still drafting. Ordering here (not in the view) keeps the
+    /// dialog list and the Saved Designs menu identical, and makes it testable.
+    ///
+    /// The sort is stable within each group, so marking one design done moves
+    /// only that design; nothing else shuffles.
+    /// </summary>
+    public IReadOnlyList<AlterationEntry> InDisplayOrder(AlterationFilter filter = AlterationFilter.All)
+    {
+        var entries = _designs
+            .Select((d, i) => new AlterationEntry(i, d))
+            .Where(e => filter switch
+            {
+                AlterationFilter.Drafts    => !e.Design.IsCompleted,
+                AlterationFilter.Completed =>  e.Design.IsCompleted,
+                _                          => true
+            });
+
+        // OrderBy is documented-stable in LINQ to Objects, so file order survives
+        // inside each group.
+        return entries.OrderBy(e => e.Design.IsCompleted).ToList();
+    }
+
+    /// <summary>Mark a design done (or put it back to a draft). Returns false when
+    /// the index is out of range.</summary>
+    public bool SetCompleted(int index, bool completed)
+    {
+        if (index < 0 || index >= _designs.Count) return false;
+        _designs[index].IsCompleted = completed;
+        return true;
     }
 
     // ── JSON store (G5 native) ──────────────────────────────────────────────

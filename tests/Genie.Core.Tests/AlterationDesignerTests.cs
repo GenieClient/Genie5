@@ -294,6 +294,170 @@ public class AlterationDesignerTests : IDisposable
         Assert.Equal("a plain ring", library.Designs[1].Tap);
     }
 
+    // ── Completed / draft separation (Bardolf's request) ────────────────────
+
+    private static AlterationLibrary LibraryOf(params (string tap, bool done)[] designs)
+    {
+        var library = new AlterationLibrary();
+        foreach (var (tap, done) in designs)
+            library.Add(new AlterationDesign { Tap = tap, IsCompleted = done });
+        return library;
+    }
+
+    [Fact]
+    public void Designs_default_to_draft()
+    {
+        // Libraries written before the completed flag existed have no such field;
+        // everything in them must read as a draft, not as finished work.
+        Assert.False(new AlterationDesign().IsCompleted);
+    }
+
+    [Fact]
+    public void Display_order_puts_drafts_above_completed_work()
+    {
+        var library = LibraryOf(("done-1", true), ("draft-1", false), ("done-2", true), ("draft-2", false));
+
+        var order = library.InDisplayOrder().Select(e => e.Design.Tap).ToList();
+
+        Assert.Equal(new[] { "draft-1", "draft-2", "done-1", "done-2" }, order);
+    }
+
+    [Fact]
+    public void Display_order_keeps_file_order_within_each_group()
+    {
+        // A stable sort matters: marking one design done should move that design
+        // and shuffle nothing else.
+        var library = LibraryOf(("a", false), ("b", false), ("c", false));
+        library.SetCompleted(1, true);
+
+        Assert.Equal(new[] { "a", "c", "b" }, library.InDisplayOrder().Select(e => e.Design.Tap));
+    }
+
+    [Fact]
+    public void Entries_carry_their_library_index_not_their_row_position()
+    {
+        // This is the load-bearing property: display order != storage order, so a
+        // row's position is not a valid index. Deleting or editing by row would
+        // hit the wrong design.
+        var library = LibraryOf(("done", true), ("draft", false));
+
+        var rows = library.InDisplayOrder();
+
+        Assert.Equal("draft", rows[0].Design.Tap);
+        Assert.Equal(1,       rows[0].Index);
+        Assert.Equal("done",  rows[1].Design.Tap);
+        Assert.Equal(0,       rows[1].Index);
+    }
+
+    // NB: these are three Facts rather than one Theory over AlterationFilter.
+    // An InlineData argument typed as a Genie.Core enum breaks xUnit DISCOVERY in
+    // this project — attribute argument types are resolved before the
+    // ModuleInitializer resolver in ModuleInit.cs can locate Genie.Core.dll
+    // (referenced by HintPath with Private=false, since Core is a self-contained
+    // exe and can't be a ProjectReference). Keep Core types out of attributes.
+    [Fact]
+    public void The_drafts_filter_selects_only_unfinished_designs()
+    {
+        var library = LibraryOf(("draft-1", false), ("done-1", true), ("draft-2", false));
+
+        Assert.Equal(new[] { "draft-1", "draft-2" },
+                     library.InDisplayOrder(AlterationFilter.Drafts).Select(e => e.Design.Tap));
+    }
+
+    [Fact]
+    public void The_completed_filter_selects_only_finished_designs()
+    {
+        var library = LibraryOf(("draft-1", false), ("done-1", true), ("draft-2", false));
+
+        Assert.Equal(new[] { "done-1" },
+                     library.InDisplayOrder(AlterationFilter.Completed).Select(e => e.Design.Tap));
+    }
+
+    [Fact]
+    public void The_all_filter_keeps_everything_in_display_order()
+    {
+        var library = LibraryOf(("draft-1", false), ("done-1", true), ("draft-2", false));
+
+        Assert.Equal(new[] { "draft-1", "draft-2", "done-1" },
+                     library.InDisplayOrder(AlterationFilter.All).Select(e => e.Design.Tap));
+    }
+
+    [Fact]
+    public void Filtered_entries_still_carry_true_library_indexes()
+    {
+        var library = LibraryOf(("draft-1", false), ("done-1", true), ("draft-2", false));
+
+        Assert.Equal(new[] { 1 }, library.InDisplayOrder(AlterationFilter.Completed).Select(e => e.Index));
+        Assert.Equal(new[] { 0, 2 }, library.InDisplayOrder(AlterationFilter.Drafts).Select(e => e.Index));
+    }
+
+    [Fact]
+    public void SetCompleted_flips_a_design_both_ways_and_reports_out_of_range()
+    {
+        var library = LibraryOf(("a", false));
+
+        Assert.True(library.SetCompleted(0, true));
+        Assert.True(library.Designs[0].IsCompleted);
+
+        Assert.True(library.SetCompleted(0, false));
+        Assert.False(library.Designs[0].IsCompleted);
+
+        Assert.False(library.SetCompleted(5, true));
+        Assert.False(library.SetCompleted(-1, true));
+    }
+
+    [Fact]
+    public void Counts_split_drafts_from_completed()
+    {
+        var library = LibraryOf(("a", false), ("b", true), ("c", true));
+
+        Assert.Equal(1, library.DraftCount);
+        Assert.Equal(2, library.CompletedCount);
+        Assert.Equal(3, library.Count);
+    }
+
+    [Fact]
+    public void Completed_state_survives_a_save_and_reload()
+    {
+        var path = Path.Combine(_root, "alterations.json");
+        LibraryOf(("draft", false), ("done", true)).Save(path);
+
+        var reloaded = new AlterationLibrary();
+        reloaded.Load(path);
+
+        Assert.False(reloaded.Designs[0].IsCompleted);
+        Assert.True(reloaded.Designs[1].IsCompleted);
+    }
+
+    [Fact]
+    public void A_library_file_predating_the_completed_flag_loads_as_all_drafts()
+    {
+        var path = Path.Combine(_root, "alterations.json");
+        File.WriteAllText(path, """[{"Title":"","ShortTap":"","Tap":"old","Look":"","Read":"","Notes":""}]""");
+
+        var library = new AlterationLibrary();
+        library.Load(path);
+
+        Assert.Equal(1, library.DraftCount);
+        Assert.Equal(0, library.CompletedCount);
+    }
+
+    [Fact]
+    public void Completed_state_is_not_representable_in_the_genie4_format()
+    {
+        // Four fields, no more -- so a round-trip through the old format loses it.
+        // Documented rather than worked around; the same is true of Title/Notes.
+        var design = new AlterationDesign { Tap = "a plain ring", IsCompleted = true };
+
+        Assert.False(AlterationDesign.FromGenie4Line(design.ToGenie4Line()).IsCompleted);
+    }
+
+    [Fact]
+    public void Clone_carries_the_completed_flag()
+    {
+        Assert.True(new AlterationDesign { IsCompleted = true }.Clone().IsCompleted);
+    }
+
     // ── JSON store ──────────────────────────────────────────────────────────
 
     [Fact]

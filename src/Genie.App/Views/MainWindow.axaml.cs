@@ -521,12 +521,30 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             return;
         }
 
-        for (var i = 0; i < vm.Alterations.Designs.Count; i++)
+        // Drafts first, then finished work behind a separator, so completed
+        // alterations stay available as a record without burying what you are
+        // still drafting. CommandParameter is the LIBRARY index, not the row —
+        // display order deliberately differs from storage order.
+        foreach (var entry in vm.Alterations.InDisplayOrder(Genie.Core.Alterations.AlterationFilter.Drafts))
             SavedAlterationsMenu.Items.Add(new MenuItem
             {
-                Header           = vm.Alterations.Designs[i].DisplayName,
+                Header           = entry.Design.DisplayName,
                 Command          = vm.OpenAlterationCommand,
-                CommandParameter = i,
+                CommandParameter = entry.Index,
+            });
+
+        var completed = vm.Alterations.InDisplayOrder(Genie.Core.Alterations.AlterationFilter.Completed);
+        if (completed.Count == 0) return;
+
+        if (vm.Alterations.DraftCount > 0) SavedAlterationsMenu.Items.Add(new Separator());
+        SavedAlterationsMenu.Items.Add(new MenuItem { Header = "Completed", IsEnabled = false });
+
+        foreach (var entry in completed)
+            SavedAlterationsMenu.Items.Add(new MenuItem
+            {
+                Header           = "✓  " + entry.Design.DisplayName,
+                Command          = vm.OpenAlterationCommand,
+                CommandParameter = entry.Index,
             });
     }
 

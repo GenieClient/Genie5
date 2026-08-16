@@ -119,6 +119,25 @@ public class AlterationsViewModel : ReactiveObject
         Save();
     }
 
+    /// <summary>Mark a design completed (or back to a draft) and persist. Indexes
+    /// into <see cref="Designs"/>, NOT into a filtered display list.</summary>
+    public bool SetCompleted(int index, bool completed)
+    {
+        if (!_library.SetCompleted(index, completed)) return false;
+        Sync();
+        Save();
+        return true;
+    }
+
+    /// <summary>Drafts first, then completed work — the order every surface shows.
+    /// Each row carries its library index, so acting on a row never depends on
+    /// its position in the filtered list.</summary>
+    public IReadOnlyList<AlterationEntry> InDisplayOrder(AlterationFilter filter = AlterationFilter.All) =>
+        _library.InDisplayOrder(filter);
+
+    public int DraftCount     => _library.DraftCount;
+    public int CompletedCount => _library.CompletedCount;
+
     /// <summary>
     /// Merge an Alteration Buddy <c>alterations.csv</c> into the library.
     /// Imports append rather than replace — a player pulling designs off an old

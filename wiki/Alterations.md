@@ -59,6 +59,24 @@ Saved designs appear in two places:
 - The list on the right of the designer — double-click to load, or select and use
   **Load** / **Delete**.
 
+### Keeping finished work out of the way
+
+Once you've actually had an alteration done, mark it **completed** — either tick
+**Alteration completed** in the designer, or select it in the list and press
+**Mark Done**. Nothing is deleted: completed designs stay as your record, for
+reference or in case an item ever needs replacing.
+
+What changes is where they sit. Completed designs drop below your drafts, get a
+✓ in the list, and appear under their own **Completed** heading in the Saved
+Designs menu. The dropdown above the list filters to **Drafts only** or
+**Completed only** when you want one or the other on its own.
+
+**Mark Done** works without opening the design, so filing away a batch of
+finished work is a couple of clicks. Changed your mind, or a merchant fell
+through? The same button reads **Mark Draft** and puts it back.
+
+*Thanks to Bardolf for the suggestion.*
+
 Designs are shared across all your characters. They live in **`alterations.json`**
 in your Config folder (**Alterations ▸ Open Library Folder** takes you there; see
 [Application Folders](Application-Folders)). If you hand-edit that file or sync it
@@ -79,7 +97,8 @@ saved in a state Genie 4 itself couldn't read back — those come across intact
 here.
 
 **Export for Genie 4…** writes your library back out in the old format if you
-need it elsewhere. Title and Notes have no home in that format and are left
+need it elsewhere. Title, Notes and the completed mark have no home in that
+format and are left
 behind.
 
 ## Reference links

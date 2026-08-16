@@ -58,6 +58,32 @@ Two counter bugs in the original are fixed here, and pinned by tests so a later
 - `"a  b"` counted as three words, because every run of consecutive spaces added
   one.
 
+## Drafts vs completed work
+
+Requested by **Bardolf** (2024-11-18): players keep finished alterations as a
+record — for reference, and in case an item needs replacing — but in Alteration
+Buddy those sat mixed in with designs not yet made.
+
+`AlterationDesign.IsCompleted` splits the two. Completed designs are never
+auto-removed; they sort below the drafts and can be filtered out entirely
+(**All designs** / **Drafts only** / **Completed only** in the designer, and a
+separate `Completed` group in the Saved Designs menu). **Mark Done** on the list
+flips a design without loading it into the editor.
+
+The ordering lives in `AlterationLibrary.InDisplayOrder(AlterationFilter)`, not
+in the view, so the dialog list and the menu agree by construction. It is a
+**stable** sort, so marking one design done moves that design and shuffles
+nothing else.
+
+⚠ **Display order is not storage order.** `InDisplayOrder` therefore returns
+`AlterationEntry` records that carry the library index, and every surface acts on
+that index — never on a row position. Using a row position would edit or delete
+the wrong design as soon as a filter or the draft/completed split is in play.
+
+`IsCompleted` defaults to false, so a library written before the flag existed
+loads as all drafts. Like `Title` and `Notes`, it has no home in the four-field
+Genie 4 format and is dropped on export.
+
 ## Storage
 
 Designs live in **`{Config}/alterations.json`** — the shared Config directory,

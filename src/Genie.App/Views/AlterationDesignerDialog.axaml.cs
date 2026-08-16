@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -32,11 +33,17 @@ public partial class AlterationDesignerDialog : Window
 {
     private readonly AlterationsViewModel? _vm;
 
-    /// <summary>Index in the library that the editor is currently editing, or
+    /// <summary>Index into the LIBRARY that the editor is currently editing, or
     /// -1 for an unsaved new design. Save updates in place when set, appends
     /// when not — the role Alteration Buddy's <c>LoadedFromIndex</c> played,
     /// minus its "0 means new" overloading of a real list position.</summary>
     private int _editingIndex = -1;
+
+    /// <summary>The rows currently displayed, in display order, each carrying its
+    /// library index. The list is filtered and re-sorted (drafts above completed
+    /// work), so a row's position is NOT its library index — every action reads
+    /// the index from here instead.</summary>
+    private IReadOnlyList<AlterationEntry> _rows = Array.Empty<AlterationEntry>();
 
     private bool _suppressUpdates;
 
@@ -51,6 +58,8 @@ public partial class AlterationDesignerDialog : Window
         LookBox.TextChanged     += (_, _) => Recalculate();
         ReadBox.TextChanged     += (_, _) => Recalculate();
 
+        FilterBox.SelectionChanged += (_, _) => RefreshList();
+
         RefreshList();
 
         if (loadIndex >= 0 && loadIndex < _vm.Designs.Count)
@@ -61,48 +70,121 @@ public partial class AlterationDesignerDialog : Window
 
     // ── Library list ────────────────────────────────────────────────────────
 
+    private AlterationFilter CurrentFilter => FilterBox.SelectedIndex switch
+    {
+        1 => AlterationFilter.Drafts,
+        2 => AlterationFilter.Completed,
+        _ => AlterationFilter.All
+    };
+
+    /// <summary>Rebuild the list from the library under the current filter,
+    /// preserving the selected DESIGN (by library index) rather than the selected
+    /// row — the row a design sits on moves when it is marked done.</summary>
     private void RefreshList()
     {
         if (_vm is null) return;
 
-        var selected = DesignList.SelectedIndex;
-        DesignList.ItemsSource = _vm.Designs.Select(d => d.DisplayName).ToList();
-        DesignList.SelectedIndex = selected < _vm.Designs.Count ? selected : -1;
+        var previouslySelected = SelectedLibraryIndex();
 
-        LibraryHint.Text = _vm.Designs.Count == 0
-            ? "No saved designs yet. Fill in the fields and press Save."
-            : "Double-click to load a design into the editor.";
+        _rows = _vm.InDisplayOrder(CurrentFilter);
+        DesignList.ItemsSource = _rows.Select(RowLabel).ToList();
+
+        var restored = _rows.Select((e, row) => (e, row))
+                            .FirstOrDefault(t => t.e.Index == previouslySelected);
+        DesignList.SelectedIndex = previouslySelected >= 0 && restored.e.Index == previouslySelected
+            ? restored.row
+            : -1;
+
+        LibraryHint.Text = DescribeLibrary();
+        UpdateToggleButton();
     }
 
-    private void LoadIntoEditor(int index)
+    /// <summary>A completed design is marked with a check so the two groups stay
+    /// distinguishable even when the filter is showing everything.</summary>
+    private static string RowLabel(AlterationEntry entry) =>
+        (entry.Design.IsCompleted ? "✓  " : "") + entry.Design.DisplayName;
+
+    private string DescribeLibrary()
     {
-        if (_vm is null || index < 0 || index >= _vm.Designs.Count) return;
+        if (_vm is null) return "";
 
-        var design = _vm.Designs[index];
+        if (_vm.Designs.Count == 0)
+            return "No saved designs yet. Fill in the fields and press Save.";
 
-        _suppressUpdates = true;
-        TitleBox.Text    = design.Title;
-        ShortTapBox.Text = design.ShortTap;
-        TapBox.Text      = design.Tap;
-        LookBox.Text     = design.Look;
-        ReadBox.Text     = design.Read;
-        NotesBox.Text    = design.Notes;
-        _suppressUpdates = false;
+        if (_rows.Count == 0)
+            return CurrentFilter == AlterationFilter.Completed
+                ? "Nothing completed yet."
+                : "No drafts — everything here is marked done.";
 
-        _editingIndex            = index;
-        DesignList.SelectedIndex = index;
+        return $"{_vm.DraftCount} draft(s), {_vm.CompletedCount} completed. " +
+                "Double-click to load a design into the editor.";
+    }
+
+    /// <summary>Library index of the selected row, or -1.</summary>
+    private int SelectedLibraryIndex()
+    {
+        var row = DesignList.SelectedIndex;
+        return row >= 0 && row < _rows.Count ? _rows[row].Index : -1;
+    }
+
+    private void UpdateToggleButton()
+    {
+        var index = SelectedLibraryIndex();
+        var done  = index >= 0 && _vm is not null && _vm.Designs[index].IsCompleted;
+
+        ToggleDoneButton.Content   = done ? "Mark _Draft" : "Mark _Done";
+        ToggleDoneButton.IsEnabled = index >= 0;
+    }
+
+    private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e) => UpdateToggleButton();
+
+    private void LoadIntoEditor(int libraryIndex)
+    {
+        if (_vm is null || libraryIndex < 0 || libraryIndex >= _vm.Designs.Count) return;
+
+        var design = _vm.Designs[libraryIndex];
+
+        _suppressUpdates        = true;
+        TitleBox.Text           = design.Title;
+        ShortTapBox.Text        = design.ShortTap;
+        TapBox.Text             = design.Tap;
+        LookBox.Text            = design.Look;
+        ReadBox.Text            = design.Read;
+        NotesBox.Text           = design.Notes;
+        CompletedCheck.IsChecked = design.IsCompleted;
+        _suppressUpdates        = false;
+
+        _editingIndex = libraryIndex;
+        SelectLibraryIndex(libraryIndex);
         Recalculate();
         SetStatus($"Editing “{design.DisplayName}”.");
     }
 
+    /// <summary>Select the row showing a given library index, if it is visible
+    /// under the current filter.</summary>
+    private void SelectLibraryIndex(int libraryIndex)
+    {
+        for (var row = 0; row < _rows.Count; row++)
+            if (_rows[row].Index == libraryIndex)
+            {
+                DesignList.SelectedIndex = row;
+                UpdateToggleButton();
+                return;
+            }
+
+        DesignList.SelectedIndex = -1;
+        UpdateToggleButton();
+    }
+
     private AlterationDesign CurrentDesign() => new()
     {
-        Title    = TitleBox.Text    ?? "",
-        ShortTap = ShortTapBox.Text ?? "",
-        Tap      = TapBox.Text      ?? "",
-        Look     = LookBox.Text     ?? "",
-        Read     = ReadBox.Text     ?? "",
-        Notes    = NotesBox.Text    ?? ""
+        Title       = TitleBox.Text    ?? "",
+        ShortTap    = ShortTapBox.Text ?? "",
+        Tap         = TapBox.Text      ?? "",
+        Look        = LookBox.Text     ?? "",
+        Read        = ReadBox.Text     ?? "",
+        Notes       = NotesBox.Text    ?? "",
+        IsCompleted = CompletedCheck.IsChecked == true
     };
 
     // ── Live counters + result ──────────────────────────────────────────────
@@ -131,10 +213,12 @@ public partial class AlterationDesignerDialog : Window
     {
         _suppressUpdates = true;
         TitleBox.Text = ShortTapBox.Text = TapBox.Text = LookBox.Text = ReadBox.Text = NotesBox.Text = "";
+        CompletedCheck.IsChecked = false;
         _suppressUpdates = false;
 
         _editingIndex            = -1;
         DesignList.SelectedIndex = -1;
+        UpdateToggleButton();
         Recalculate();
         SetStatus("New design.");
     }
@@ -159,7 +243,7 @@ public partial class AlterationDesignerDialog : Window
         }
 
         RefreshList();
-        DesignList.SelectedIndex = _editingIndex;
+        SelectLibraryIndex(_editingIndex);
 
         // Over-budget designs still save: a player may be drafting, or the GM
         // may allow more. Say so rather than blocking the save.
@@ -171,16 +255,52 @@ public partial class AlterationDesignerDialog : Window
                 : $"Saved “{design.DisplayName}” — over budget: {string.Join(" ", problems)}");
     }
 
-    private void OnLoad(object? sender, RoutedEventArgs e) => LoadIntoEditor(DesignList.SelectedIndex);
+    private void OnLoad(object? sender, RoutedEventArgs e) => LoadIntoEditor(SelectedLibraryIndex());
 
-    private void OnListDoubleTapped(object? sender, TappedEventArgs e) => LoadIntoEditor(DesignList.SelectedIndex);
+    private void OnListDoubleTapped(object? sender, TappedEventArgs e) => LoadIntoEditor(SelectedLibraryIndex());
+
+    /// <summary>
+    /// Flip the selected design between draft and completed without loading it
+    /// into the editor — the point being to file finished work away quickly.
+    /// The row moves (and may vanish under a filter), so re-anchor the selection
+    /// on the design rather than the row.
+    /// </summary>
+    private void OnToggleCompleted(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is null) return;
+
+        var index = SelectedLibraryIndex();
+        if (index < 0)
+        {
+            SetStatus("Select a design first.");
+            return;
+        }
+
+        var design = _vm.Designs[index];
+        var name   = design.DisplayName;
+        var done   = !design.IsCompleted;
+
+        if (!_vm.SetCompleted(index, done)) return;
+
+        // Keep the editor's checkbox honest if it is showing this same design.
+        if (_editingIndex == index)
+        {
+            _suppressUpdates         = true;
+            CompletedCheck.IsChecked = done;
+            _suppressUpdates         = false;
+        }
+
+        RefreshList();
+        SelectLibraryIndex(index);
+        SetStatus(done ? $"Marked “{name}” completed." : $"Moved “{name}” back to drafts.");
+    }
 
     private async void OnDelete(object? sender, RoutedEventArgs e)
     {
         if (_vm is null) return;
 
-        var index = DesignList.SelectedIndex;
-        if (index < 0 || index >= _vm.Designs.Count)
+        var index = SelectedLibraryIndex();
+        if (index < 0)
         {
             SetStatus("Select a design to delete.");
             return;
@@ -193,7 +313,7 @@ public partial class AlterationDesignerDialog : Window
 
         _vm.RemoveAt(index);
 
-        // The editor may have been pointed at the removed row, or at one that
+        // The editor may have been pointed at the removed design, or at one that
         // just shifted down; re-anchor rather than silently overwriting a
         // neighbour on the next Save.
         if (_editingIndex == index)      _editingIndex = -1;

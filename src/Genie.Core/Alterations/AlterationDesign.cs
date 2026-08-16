@@ -42,6 +42,18 @@ public sealed class AlterationDesign
     /// G5-only, like <see cref="Title"/>, and dropped on Genie 4 export.</summary>
     public string Notes { get; set; } = "";
 
+    /// <summary>
+    /// True once the alteration has actually been done, so finished work stops
+    /// crowding the drafts you are still working on (requested by Bardolf).
+    /// Completed designs are kept, not deleted — they are the record you reach
+    /// for when an item needs replacing — they just sort and filter apart.
+    ///
+    /// G5-only and dropped on Genie 4 export. Absent from older
+    /// <c>alterations.json</c> files, where it deserialises to false: everything
+    /// that predates this is a draft, which is the right default.
+    /// </summary>
+    public bool IsCompleted { get; set; }
+
     /// <summary>Label for the saved-designs menu and list. Never empty.</summary>
     public string DisplayName
     {
@@ -64,12 +76,13 @@ public sealed class AlterationDesign
 
     public AlterationDesign Clone() => new()
     {
-        Title    = Title,
-        ShortTap = ShortTap,
-        Tap      = Tap,
-        Look     = Look,
-        Read     = Read,
-        Notes    = Notes
+        Title       = Title,
+        ShortTap    = ShortTap,
+        Tap         = Tap,
+        Look        = Look,
+        Read        = Read,
+        Notes       = Notes,
+        IsCompleted = IsCompleted
     };
 
     /// <summary>
