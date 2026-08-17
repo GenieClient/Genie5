@@ -1082,6 +1082,23 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// document. Changing the setting needs a restart.</summary>
     public bool UseEditorGameWindow { get; private set; }
 
+    /// <summary>Render the Raw XML window with AvaloniaEdit instead of the
+    /// per-line ItemsControl (<c>#config useeditorrawxmlwindow</c>, default
+    /// off). Same read-once-at-startup contract as
+    /// <see cref="UseEditorGameWindow"/>; consumed by
+    /// <see cref="Genie.App.Docking.GenieDockFactory"/> when it creates the
+    /// Raw XML tool. Changing the setting needs a restart.</summary>
+    public bool UseEditorRawXmlWindow { get; private set; }
+
+    /// <summary>Render every Stream window (Logons, Talk, Whispers, ...) with
+    /// AvaloniaEdit instead of the per-line ItemsControl (<c>#config
+    /// useeditorstreamwindow</c>, default off). One flag governs all 12
+    /// <see cref="Docking.StreamTool"/> instances. Same read-once-at-startup
+    /// contract as <see cref="UseEditorGameWindow"/>; consumed by
+    /// <see cref="Genie.App.Docking.GenieDockFactory"/> when it creates each
+    /// stream tool. Changing the setting needs a restart.</summary>
+    public bool UseEditorStreamWindow { get; private set; }
+
     public MainWindowViewModel() : this(null) { }
 
     public MainWindowViewModel(StartupOptions? startup)
@@ -1130,7 +1147,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         {
             var startupConfig = new Genie.Core.Config.GenieConfig(dir);
             startupConfig.Load();
-            UseEditorGameWindow = startupConfig.UseEditorGameWindow;
+            UseEditorGameWindow   = startupConfig.UseEditorGameWindow;
+            UseEditorRawXmlWindow = startupConfig.UseEditorRawXmlWindow;
+            UseEditorStreamWindow = startupConfig.UseEditorStreamWindow;
         }
         catch (Exception ex)
         {
