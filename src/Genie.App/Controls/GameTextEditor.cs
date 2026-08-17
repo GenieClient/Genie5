@@ -20,10 +20,12 @@ using ReactiveUI;
 namespace Genie.App.Controls;
 
 /// <summary>
-/// The experimental AvaloniaEdit-backed renderer for the main Game window
-/// (<c>#config useeditorgamewindow on</c>, default off). It hosts a single
-/// read-only <see cref="TextEditor"/> and mirrors
-/// <see cref="GameTextViewModel.Lines"/> — still the source of truth — into its
+/// The experimental AvaloniaEdit-backed renderer shared by the Game, Raw XML,
+/// and Stream windows (<c>#config useeditorgamewindow</c> /
+/// <c>useeditorrawxmlwindow</c> / <c>useeditorstreamwindow</c>, all default
+/// off). It hosts a single read-only <see cref="TextEditor"/> and mirrors
+/// whatever <see cref="ITextEditorHost"/> it is bound to —
+/// <see cref="ITextEditorHost.Lines"/> is still the source of truth — into its
 /// document, one buffered line per document line.
 ///
 /// <para>Only the <i>rendering</i> moves. Timestamping, the Name-List-Only filter,
@@ -31,9 +33,14 @@ namespace Genie.App.Controls;
 /// view-model and are untouched by which renderer is active.</para>
 ///
 /// <para>Selected out of the legacy path by type, not by a visibility toggle:
-/// <see cref="EditorGameTextDocument"/> gets its own <c>DataTemplate</c>, so with
-/// the flag off this control is never constructed and the legacy subtree is
-/// exactly what it always was.</para>
+/// <see cref="EditorGameTextDocument"/>, <see cref="EditorRawXmlTool"/>, and
+/// <see cref="EditorStreamTool"/> each get their own <c>DataTemplate</c>, so
+/// with a flag off this control is never constructed for that window type and
+/// the legacy subtree is exactly what it always was. Colorizing (highlight
+/// rules) and link generation are opt-in per host
+/// (<see cref="ITextEditorHost.EnableColorizing"/> /
+/// <see cref="ITextEditorHost.EnableLinks"/>) — on for Game/Stream, off for
+/// Raw XML, which stays a plain verbatim dump.</para>
 /// </summary>
 public sealed class GameTextEditor : UserControl
 {
@@ -46,9 +53,9 @@ public sealed class GameTextEditor : UserControl
     private readonly TextDocument _document = new();
     private readonly List<GameLineEntry> _entries = [];
 
-    private GameTextDocument?   _host;
-    private GameTextViewModel?  _vm;
+    private ITextEditorHost?    _host;
     private FindInWindowModel?  _find;
+    private bool                _renderersConfigured;
 
     private bool _atBottom = true;
     private bool _paused;
@@ -110,8 +117,9 @@ public sealed class GameTextEditor : UserControl
         area.CaretBrush   = Brushes.Transparent;   // read-only view: no caret
         area.ContextFlyout = null;
         area.TextView.ContextFlyout = null;
-        area.TextView.LineTransformers.Add(new GameTextColorizer(EntryAt));
-        area.TextView.ElementGenerators.Add(new GameLinkGenerator(EntryAt, area));
+        // Colorizing/link-generation are opt-in per host (EnableColorizing /
+        // EnableLinks) — added lazily in Subscribe(), once, the first time a
+        // host resolves. DataContext isn't available yet in the constructor.
 
         // The ScrollViewer normally exists by TemplateApplied; LayoutUpdated is the
         // belt-and-braces retry (it unhooks itself the moment the lookup succeeds)
@@ -160,15 +168,27 @@ public sealed class GameTextEditor : UserControl
     {
         if (_host is not null) return;                       // already wired
         if (this.GetVisualRoot() is null) return;              // wired on attach instead
-        if (DataContext is not GameTextDocument host) return;
+        if (DataContext is not ITextEditorHost host) return;
 
         _host = host;
-        _vm   = host.ViewModel;
         _find = host.Find;
 
-        host.PropertyChanged        += OnHostPropertyChanged;
-        _vm.Lines.CollectionChanged += OnLinesChanged;
-        _find.JumpRequested         += OnFindJump;
+        // Decided once per control instance, the first time a host resolves —
+        // a given DataTemplate instance always binds to the same concrete
+        // host type for its lifetime (visual-tree re-parenting re-attaches the
+        // same host; it never swaps Game for Raw XML under one control).
+        if (!_renderersConfigured)
+        {
+            _renderersConfigured = true;
+            if (host.EnableColorizing)
+                _editor.TextArea.TextView.LineTransformers.Add(new GameTextColorizer(EntryAt));
+            if (host.EnableLinks)
+                _editor.TextArea.TextView.ElementGenerators.Add(new GameLinkGenerator(EntryAt, _editor.TextArea));
+        }
+
+        host.PropertyChanged         += OnHostPropertyChanged;
+        host.Lines.CollectionChanged += OnLinesChanged;
+        if (_find is not null) _find.JumpRequested += OnFindJump;
 
         ApplyHostSettings();
         _paused = host.IsScrollPaused;
@@ -178,10 +198,9 @@ public sealed class GameTextEditor : UserControl
     private void Unsubscribe()
     {
         if (_host is not null) _host.PropertyChanged -= OnHostPropertyChanged;
-        if (_vm   is not null) _vm.Lines.CollectionChanged -= OnLinesChanged;
+        if (_host is not null) _host.Lines.CollectionChanged -= OnLinesChanged;
         if (_find is not null) _find.JumpRequested -= OnFindJump;
         _host = null;
-        _vm   = null;
         _find = null;
     }
 
@@ -190,7 +209,7 @@ public sealed class GameTextEditor : UserControl
         if (_host is null) return;
         switch (e.PropertyName)
         {
-            case nameof(GameTextDocument.IsScrollPaused):
+            case nameof(ITextEditorHost.IsScrollPaused):
                 SetPaused(_host.IsScrollPaused);
                 break;
             default:
@@ -366,16 +385,16 @@ public sealed class GameTextEditor : UserControl
     private void RebuildAll()
     {
         _entries.Clear();
-        if (_vm is null || _vm.Lines.Count == 0)
+        if (_host is null || _host.Lines.Count == 0)
         {
             _document.Text = "";
             return;
         }
 
         var sb = new System.Text.StringBuilder();
-        for (var i = 0; i < _vm.Lines.Count; i++)
+        for (var i = 0; i < _host.Lines.Count; i++)
         {
-            var line = _vm.Lines[i];
+            var line = _host.Lines[i];
             _entries.Add(new GameLineEntry(line));
             if (i > 0) sb.Append('\n');
             sb.Append(Flatten(line.Text));
