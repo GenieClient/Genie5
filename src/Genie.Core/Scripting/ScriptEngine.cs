@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Genie.Core.Config;
@@ -22,6 +22,48 @@ namespace Genie.Core.Scripting;
 public sealed class ScriptEngine
 {
     private readonly List<ScriptInstance> _instances = new();
+
+    /// <summary>
+    /// Serializes every public entry point that reads or mutates engine state —
+    /// <see cref="_instances"/> and the per-instance fields hung off it (issue
+    /// #242).
+    ///
+    /// <para><b>Why.</b> The engine is driven from two independent sources: the
+    /// thread that starts a script (<see cref="TryStart"/>, typically UI/command
+    /// input) and the thread that delivers game text (<see cref="OnGameLine"/> →
+    /// <see cref="Tick"/>, the connection's read loop). Nothing here is
+    /// concurrent-safe: <see cref="_instances"/> is a plain
+    /// <see cref="List{T}"/>, and both paths add to it, remove from it, and
+    /// enumerate it. Interleaved, that throws <i>"Collection was modified;
+    /// enumeration operation may not execute"</i> — reproducible by replaying a
+    /// recorded session at speed while a large script starts.</para>
+    ///
+    /// <para><b>Why the desktop app has not been crashing.</b> Only by accident.
+    /// <c>GenieCore</c> subscribes without any <c>ObserveOn</c>, so the pipeline
+    /// runs on whatever thread the read loop resumes on — and that happens to be
+    /// the UI thread solely because <c>GameConnection.ReadLoopAsync</c> awaits
+    /// without <c>ConfigureAwait(false)</c> and so recaptures Avalonia's
+    /// synchronization context. That is an omission, not a design: adding
+    /// <c>ConfigureAwait(false)</c> to a library that documents itself as
+    /// UI-free would silently unmask the race. This lock removes the dependency
+    /// on that accident.</para>
+    ///
+    /// <para><b>Re-entrancy is expected and safe.</b> <see cref="OnGameLine"/>
+    /// calls <see cref="Tick"/>; a running script row can call
+    /// <see cref="TryStart"/>, <see cref="Stop"/> or <see cref="StopAll"/>
+    /// through an action. All of that is same-thread nesting, which
+    /// <see cref="Monitor"/> permits.</para>
+    ///
+    /// <para><b>Contention is bounded.</b> A tick never holds the lock longer
+    /// than <see cref="MaxTickBudgetMs"/> before returning, so a waiting caller
+    /// blocks for tens of milliseconds at worst — the same stall the UI thread
+    /// already absorbs today, when it runs the tick itself.</para>
+    ///
+    /// <para>This is the standalone fix. #251 (moving the pipeline off the UI
+    /// thread) may later replace it with a single-threaded game loop, at which
+    /// point the lock becomes uncontended rather than unnecessary — leave it.</para>
+    /// </summary>
+    private readonly object _exec = new();
     private readonly TypeAheadSession     _typeAhead;
     private readonly Action<string>       _sendCommand;
     private readonly Action<string>       _echo;
@@ -280,15 +322,30 @@ public sealed class ScriptEngine
     /// distinct from <see cref="ScriptsDir"/>, else null — the single
     /// authority the Scripts panel and resolution share (issue #221).</summary>
     public string? RepoScriptsDir => RepoScriptsDirOrNull();
-    public IReadOnlyList<ScriptInstance> Instances => _instances;
-    public bool AnyRunning => _instances.Any(i => i.Running) || _js.AnyRunning;
+    /// <summary>Snapshot of the live script instances. A COPY, deliberately
+    /// (#242): handing out <see cref="_instances"/> itself let callers enumerate
+    /// the list while the engine mutated it on another thread, which is the same
+    /// crash <see cref="_exec"/> exists to prevent — the lock cannot protect an
+    /// enumeration that happens outside the engine.</summary>
+    public IReadOnlyList<ScriptInstance> Instances
+    {
+        get { lock (_exec) return _instances.ToList(); }
+    }
+
+    public bool AnyRunning
+    {
+        get { lock (_exec) return _instances.Any(i => i.Running) || _js.AnyRunning; }
+    }
 
     /// <summary>Names of every running script, both .cmd and .js — used by the
     /// <c>$scriptlist</c> pseudo-variable and the scripts panel.</summary>
-    public IReadOnlyList<string> RunningScriptNames() =>
-        _instances.Where(i => i.Running).Select(i => i.Name)
-                  .Concat(_js.RunningNames())
-                  .ToList();
+    public IReadOnlyList<string> RunningScriptNames()
+    {
+        lock (_exec)
+            return _instances.Where(i => i.Running).Select(i => i.Name)
+                             .Concat(_js.RunningNames())
+                             .ToList();
+    }
 
     /// <summary>True if a currently-running script of this name is a <c>.js</c>
     /// script (vs a .cmd script). Used by the UI to tag rows by language.</summary>
@@ -300,10 +357,13 @@ public sealed class ScriptEngine
     /// itself from the engine's real level instead of assuming 0.</summary>
     public int GetTrace(string name)
     {
-        foreach (var inst in _instances)
-            if (inst.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-                return inst.DebugLevel;
-        return 0;
+        lock (_exec)
+        {
+            foreach (var inst in _instances)
+                if (inst.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                    return inst.DebugLevel;
+            return 0;
+        }
     }
 
     /// <summary>Wire (or clear) the JS line-dispatch timing sink — used by the
@@ -353,7 +413,9 @@ public sealed class ScriptEngine
     /// </summary>
     public event Action<string, int>? DebugLevelChanged;
 
-    public bool TryStart(string name, IReadOnlyList<string> args)
+    public bool TryStart(string name, IReadOnlyList<string> args) { lock (_exec) return TryStartCore(name, args); }
+
+    private bool TryStartCore(string name, IReadOnlyList<string> args)
     {
         var path = ResolveScriptPath(name);
         if (path is null)
@@ -378,7 +440,9 @@ public sealed class ScriptEngine
     /// (reload semantics, arg seeding, ScriptStarted, gating), so a recipe runs
     /// exactly like any user script.
     /// </summary>
-    public bool TryStartFile(string fullPath, IReadOnlyList<string>? args = null)
+    public bool TryStartFile(string fullPath, IReadOnlyList<string>? args = null) { lock (_exec) return TryStartFileCore(fullPath, args); }
+
+    private bool TryStartFileCore(string fullPath, IReadOnlyList<string>? args)
     {
         if (string.IsNullOrWhiteSpace(fullPath) || !File.Exists(fullPath))
         {
@@ -468,7 +532,7 @@ public sealed class ScriptEngine
         // an hour to exactly that).
         _echo($"[script] {name} started ({inst.SourcePath})");
         ScriptStarted?.Invoke(name);
-        Tick();
+        TickCore();
         return true;
     }
 
@@ -529,7 +593,9 @@ public sealed class ScriptEngine
     /// (the script side of Genie 4's <c>#queue clear</c>). In-flight type-ahead
     /// accounting is untouched — those commands are already on the wire.
     /// </summary>
-    public void ClearPendingSends()
+    public void ClearPendingSends() { lock (_exec) ClearPendingSendsCore(); }
+
+    private void ClearPendingSendsCore()
     {
         foreach (var inst in _instances)
         {
@@ -538,7 +604,9 @@ public sealed class ScriptEngine
         }
     }
 
-    public void StopAll()
+    public void StopAll() { lock (_exec) StopAllCore(); }
+
+    private void StopAllCore()
     {
         _js.StopAll();
         if (_instances.Count == 0) return;
@@ -549,7 +617,9 @@ public sealed class ScriptEngine
         foreach (var i in stopped) NotifyFinished(i);
     }
 
-    public void Stop(string name)
+    public void Stop(string name) { lock (_exec) StopCore(name); }
+
+    private void StopCore(string name)
     {
         _js.Stop(name);
         for (int i = _instances.Count - 1; i >= 0; i--)
@@ -563,7 +633,9 @@ public sealed class ScriptEngine
         }
     }
 
-    public void PauseScript(string name)
+    public void PauseScript(string name) { lock (_exec) PauseScriptCore(name); }
+
+    private void PauseScriptCore(string name)
     {
         _js.Pause(name);
         foreach (var inst in _instances)
@@ -571,7 +643,9 @@ public sealed class ScriptEngine
             { inst.UserPaused = true; _echo($"[script] {name} paused"); }
     }
 
-    public void ResumeScript(string name)
+    public void ResumeScript(string name) { lock (_exec) ResumeScriptCore(name); }
+
+    private void ResumeScriptCore(string name)
     {
         _js.Resume(name);
         foreach (var inst in _instances)
@@ -584,7 +658,9 @@ public sealed class ScriptEngine
     /// 0–10 (0 = off; higher surfaces more <c>[dbg:N]</c> traces). The global
     /// equivalent is <c>#traceall</c> (<see cref="GenieCore"/> ICommandHost).
     /// <c>.js</c> scripts have no per-line trace level, so they're unaffected.</summary>
-    public void SetTrace(string name, int level)
+    public void SetTrace(string name, int level) { lock (_exec) SetTraceCore(name, level); }
+
+    private void SetTraceCore(string name, int level)
     {
         if (level < 0) level = 0;
         if (level > 10) level = 10;
@@ -600,7 +676,9 @@ public sealed class ScriptEngine
     /// <summary>Toggle pause/resume per script (Genie 4 <c>#script
     /// pauseorresume</c> — each matching script flips its OWN state, so a mixed
     /// set inverts rather than synchronising). Null/empty name = every script.</summary>
-    public void PauseOrResume(string? name)
+    public void PauseOrResume(string? name) { lock (_exec) PauseOrResumeCore(name); }
+
+    private void PauseOrResumeCore(string? name)
     {
         bool all = string.IsNullOrEmpty(name);
         bool any = false;
@@ -618,14 +696,16 @@ public sealed class ScriptEngine
             if (s.Paused) _js.Resume(s.Name); else _js.Pause(s.Name);
         }
         if (!any && !all) _echo($"[script] no running script named {name}");
-        Tick();
+        TickCore();
     }
 
     /// <summary>Mark script(s) for hot reload at their next <c>goto</c>
     /// (Genie 4 <c>#script reload</c>). Null/empty name = every running .cmd
     /// script. .js scripts have no label structure, so a .js target is
     /// rejected with an explanatory echo.</summary>
-    public void RequestReload(string? name)
+    public void RequestReload(string? name) { lock (_exec) RequestReloadCore(name); }
+
+    private void RequestReloadCore(string? name)
     {
         bool all = string.IsNullOrEmpty(name);
         bool any = false;
@@ -656,7 +736,9 @@ public sealed class ScriptEngine
     /// the Script Manager panel's row model. Poll on a UI timer (the panel's
     /// analogue of <see cref="JsRunningStats"/>); also the single source the
     /// string-based <see cref="StatusLines"/> formats from.</summary>
-    public IReadOnlyList<ScriptStatus> GetStatuses()
+    public IReadOnlyList<ScriptStatus> GetStatuses() { lock (_exec) return GetStatusesCore(); }
+
+    private IReadOnlyList<ScriptStatus> GetStatusesCore()
     {
         var list = new List<ScriptStatus>();
         foreach (var inst in _instances)
@@ -688,7 +770,9 @@ public sealed class ScriptEngine
     /// (file.cmd)</c>. Used by <c>#script</c>/<c>#scripts</c> listings and the
     /// vars/trace dump headers. <paramref name="filter"/> is an exact script
     /// name; null/empty/"all" = everything.</summary>
-    public IReadOnlyList<string> StatusLines(string? filter)
+    public IReadOnlyList<string> StatusLines(string? filter) { lock (_exec) return StatusLinesCore(filter); }
+
+    private IReadOnlyList<string> StatusLinesCore(string? filter)
     {
         bool all = string.IsNullOrEmpty(filter) ||
                    filter!.Equals("all", StringComparison.OrdinalIgnoreCase);
@@ -705,7 +789,9 @@ public sealed class ScriptEngine
     /// per matching .cmd script followed by its <c>name=value</c> rows
     /// (sorted; <paramref name="valueFilter"/> is a case-insensitive substring
     /// match on the whole row). Null/empty/"all" name = every script.</summary>
-    public IReadOnlyList<string> VarsLines(string? name, string valueFilter)
+    public IReadOnlyList<string> VarsLines(string? name, string valueFilter) { lock (_exec) return VarsLinesCore(name, valueFilter); }
+
+    private IReadOnlyList<string> VarsLinesCore(string? name, string valueFilter)
     {
         bool all = string.IsNullOrEmpty(name) ||
                    name!.Equals("all", StringComparison.OrdinalIgnoreCase);
@@ -731,7 +817,9 @@ public sealed class ScriptEngine
     /// <summary>Control-flow trace dump for <c>#script trace</c>: a status
     /// header per matching .cmd script followed by its rolling
     /// <see cref="ScriptTrace"/> entries (oldest first).</summary>
-    public IReadOnlyList<string> TraceDumpLines(string? name)
+    public IReadOnlyList<string> TraceDumpLines(string? name) { lock (_exec) return TraceDumpLinesCore(name); }
+
+    private IReadOnlyList<string> TraceDumpLinesCore(string? name)
     {
         bool all = string.IsNullOrEmpty(name) ||
                    name!.Equals("all", StringComparison.OrdinalIgnoreCase);
@@ -849,19 +937,23 @@ public sealed class ScriptEngine
         return best;
     }
 
-    public void PauseAll()
+    public void PauseAll() { lock (_exec) PauseAllCore(); }
+
+    private void PauseAllCore()
     {
         _js.PauseAll();
         foreach (var inst in _instances) inst.UserPaused = true;
         _echo("[script] all scripts paused");
     }
 
-    public void ResumeAll()
+    public void ResumeAll() { lock (_exec) ResumeAllCore(); }
+
+    private void ResumeAllCore()
     {
         _js.ResumeAll();
         foreach (var inst in _instances) inst.UserPaused = false;
         _echo("[script] all scripts resumed");
-        Tick();
+        TickCore();
     }
 
     /// <summary>An extension wrote a line to the game window (<see cref="IExtensionHost.Echo"/>).
@@ -886,7 +978,9 @@ public sealed class ScriptEngine
         finally { _inExtensionEcho = false; }
     }
 
-    public void OnGameLine(string line)
+    public void OnGameLine(string line) { lock (_exec) OnGameLineCore(line); }
+
+    private void OnGameLineCore(string line)
     {
         if (string.IsNullOrEmpty(line)) return;
 
@@ -956,10 +1050,12 @@ public sealed class ScriptEngine
                 }
             }
         }
-        Tick();
+        TickCore();
     }
 
-    public void OnPrompt()
+    public void OnPrompt() { lock (_exec) OnPromptCore(); }
+
+    private void OnPromptCore()
     {
         if (_inFlight > 0) _inFlight--;
         Extensions.DispatchPrompt();
@@ -981,7 +1077,7 @@ public sealed class ScriptEngine
         // (e.g. preset timers) fire even without a corresponding game line.
         for (int i = 0; i < _instances.Count; i++)
             FireActions(_instances[i], null);
-        Tick();
+        TickCore();
     }
 
     /// <summary>
@@ -989,7 +1085,9 @@ public sealed class ScriptEngine
     /// equivalent). Unblocks any script paused by the <c>move</c> command —
     /// matches Genie4's TriggerMove behavior.
     /// </summary>
-    public void OnRoomChanged()
+    public void OnRoomChanged() { lock (_exec) OnRoomChangedCore(); }
+
+    private void OnRoomChangedCore()
     {
         bool wokeAny = false;
         for (int i = 0; i < _instances.Count; i++)
@@ -1003,10 +1101,12 @@ public sealed class ScriptEngine
                 wokeAny = true;
             }
         }
-        if (wokeAny) Tick();
+        if (wokeAny) TickCore();
     }
 
-    public void Tick()
+    public void Tick() { lock (_exec) TickCore(); }
+
+    private void TickCore()
     {
         // Cap the per-Tick statement count. The previous limit (10_000) was
         // there to handle pathological hand-written scripts but cost real
