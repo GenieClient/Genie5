@@ -144,15 +144,17 @@ public class SendCommandTests : IDisposable
     }
 
     [Fact]
-    public void Send_negative_number_queues_eager_matching_the_in_script_verb()
+    public void Send_dash_number_queues_a_positive_pause()
     {
-        // ParseSendDelay treats a leading '-N' as "send eagerly" (a past
-        // fire-time), so #send stays consistent with the bare `send` verb.
+        // Genie 4 quick-send (public #278): `-N` is the quick-send prefix and
+        // its number is a POSITIVE wait-before-send — G4's queue re-parses the
+        // dash row into `#send N …`. (An earlier reading treated it as a
+        // negative "send eagerly" delay; that had no G4 basis.)
         var (_, queue, engine) = NewEngine();
         engine.ProcessInput("#send -1 flee");
 
         var item = Assert.Single(queue.EventList);
-        Assert.Equal(-1.0, item.Delay);
+        Assert.Equal(1.0, item.Delay);
         Assert.Equal("flee", item.Action);
     }
 
@@ -170,11 +172,12 @@ public class SendCommandTests : IDisposable
     }
 
     [Fact]
-    public void Send_bare_dash_verb_queues_the_stripped_verb_eagerly()
+    public void Send_bare_dash_verb_queues_the_stripped_verb()
     {
-        // Community "fire eagerly" idiom: `send -cast` must reach the game as
-        // `cast`, not the hyphen-prefixed form DR rejects. Shared ParseSendDelay
-        // strip, exercised through the #send path.
+        // Community idiom: `send -cast` must reach the game as `cast`, not the
+        // hyphen-prefixed form DR rejects. Under the real G4 rule this is the
+        // quick-send prefix in bare-verb form — a 0-delay RT-gated send
+        // (public #278) — normalized via QuickSend on the #send path.
         var (_, queue, engine) = NewEngine();
         engine.ProcessInput("#send -cast");
 
@@ -197,9 +200,12 @@ public class SendCommandTests : IDisposable
     [Fact]
     public void Put_leaves_a_leading_dash_verb_verbatim()
     {
-        // Regression guard: the eager-dash strip is a send/#send behavior only.
-        // #put stays immediate and verbatim (Genie 4 parity) — a `-cast` typed
-        // via #put is the user's literal text.
+        // Regression guard: the quick-send rewrite applies to ';'-chain
+        // segments and #send bodies, not to #put's own body — a `-cast` given
+        // directly to #put is the user's literal text. (Deliberate G5
+        // simplification: G4's #put re-parses its args through ParseCommand,
+        // which would quick-send this too; nobody types `#put -verb` on
+        // purpose, and keeping #put verbatim is the safer contract.)
         var (host, queue, engine) = NewEngine();
         engine.ProcessInput("#put -cast");
 

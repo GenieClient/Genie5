@@ -4,36 +4,23 @@ using Xunit;
 namespace Genie.Core.Tests;
 
 /// <summary>
-/// <see cref="ScriptEngine.ParseSendDelay"/> — the leading-delay / eager-marker
-/// parser shared by the in-script <c>send</c> verb and <c>#send</c>. Covers the
-/// numeric-delay rules AND the bare-<c>-verb</c> "fire eagerly" strip that lets
-/// community idioms like <c>send -touch my orb;-0.05 cast</c> reach the game
-/// instead of bouncing as "Please rephrase".
+/// <see cref="ScriptEngine.ParseSendDelay"/> — the leading-delay parser shared
+/// by the in-script <c>send</c> verb and <c>#send</c>. Handles only the
+/// dashless <c>N cmd</c> form; dash-prefixed segments are Genie 4's quick-send
+/// form (a POSITIVE RT-gated pause) and are normalized by
+/// <see cref="Genie.Core.Commanding.QuickSend"/> BEFORE either call site
+/// invokes this parser (public #278 — this replaced the earlier "leading '-'
+/// = eager/no-wait" reading, which had no Genie 4 basis). A stray dash
+/// segment reaching this parser passes through literal.
 /// </summary>
 public class ParseSendDelayTests
 {
-    // ---- bare leading '-' verb → eager (strip dash, zero delay) --------------
+    // ---- dashless numeric delays -------------------------------------------
 
     [Theory]
-    [InlineData("-cast", "cast")]
-    [InlineData("-gesture", "gesture")]
-    [InlineData("-touch my orb", "touch my orb")]
-    [InlineData("-release spell", "release spell")]
-    [InlineData("-health", "health")]
-    public void Bare_dash_verb_is_stripped_and_fires_eagerly(string seg, string expectedCmd)
-    {
-        var (delay, cmd) = ScriptEngine.ParseSendDelay(seg);
-        Assert.Equal(0.0, delay);
-        Assert.Equal(expectedCmd, cmd);
-    }
-
-    // ---- numeric delays unchanged (incl. negative = eager) ------------------
-
-    [Theory]
-    [InlineData("-0.05 cast", -0.05, "cast")]
     [InlineData("0.5 unload my bow", 0.5, "unload my bow")]
-    [InlineData("-1 flee", -1.0, "flee")]
     [InlineData("2 stand", 2.0, "stand")]
+    [InlineData("5 $lastcommand", 5.0, "$lastcommand")]
     public void Numeric_delay_is_parsed_and_command_follows(string seg, double expectedDelay, string expectedCmd)
     {
         var (delay, cmd) = ScriptEngine.ParseSendDelay(seg);
@@ -41,26 +28,33 @@ public class ParseSendDelayTests
         Assert.Equal(expectedCmd, cmd);
     }
 
-    // ---- regression guards: things that must NOT be touched -----------------
+    // ---- dash segments: quick-send is the callers' job → literal here -------
 
     [Theory]
-    [InlineData("gesture")]        // plain verb, no marker
-    [InlineData("release mana")]   // plain multiword
-    [InlineData("2nd")]            // starts with digit but no boundary → literal
-    [InlineData("5fire")]          // number glued to word → literal, not a delay
-    [InlineData("swap-weapon")]    // hyphen mid-token is not a leading marker
-    public void Non_marker_segments_pass_through_unchanged(string seg)
+    [InlineData("-cast")]
+    [InlineData("-touch my orb")]
+    [InlineData("-0.05 cast")]
+    [InlineData("-1 flee")]
+    [InlineData("-")]
+    public void Dash_segments_pass_through_literal(string seg)
     {
         var (delay, cmd) = ScriptEngine.ParseSendDelay(seg);
         Assert.Equal(0.0, delay);
         Assert.Equal(seg, cmd);
     }
 
-    [Fact]
-    public void Lone_dash_yields_empty_command()
+    // ---- regression guards: things that must NOT be touched -----------------
+
+    [Theory]
+    [InlineData("gesture")]        // plain verb, no delay
+    [InlineData("release mana")]   // plain multiword
+    [InlineData("2nd")]            // starts with digit but no boundary → literal
+    [InlineData("5fire")]          // number glued to word → literal, not a delay
+    [InlineData("swap-weapon")]    // hyphen mid-token is not a marker
+    public void Non_delay_segments_pass_through_unchanged(string seg)
     {
-        var (delay, cmd) = ScriptEngine.ParseSendDelay("-");
+        var (delay, cmd) = ScriptEngine.ParseSendDelay(seg);
         Assert.Equal(0.0, delay);
-        Assert.Equal("", cmd);
+        Assert.Equal(seg, cmd);
     }
 }

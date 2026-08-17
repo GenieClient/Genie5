@@ -1357,8 +1357,9 @@ public sealed class ScriptEngine
 
             // Arm the gate for the new head from ITS leading delay, measured
             // from now (i.e. from when this segment was dispatched — Genie4
-            // CommandQueue.SetNextTime parity). Non-positive delays clear the
-            // gate so `put` tails and eager (negative) sends fire immediately.
+            // CommandQueue.SetNextTime parity). Zero-delay heads clear the
+            // gate so `put` tails and quick-send segments (whose wait lives
+            // inside their `#send N …` form) dispatch on the next drain.
             inst.NextSendAt = inst.PendingSends.Count > 0 && inst.PendingSends.Peek().Delay > 0
                 ? DateTime.UtcNow.AddSeconds(inst.PendingSends.Peek().Delay)
                 : DateTime.MinValue;
@@ -1569,19 +1570,34 @@ public sealed class ScriptEngine
                 // Each is queued and drained one-per-tick so the type-ahead
                 // budget is respected per command, not per statement.
                 //
-                // For `send` ONLY, each segment may carry a leading delay in
-                // seconds (Genie4 CommandQueue parity) — e.g. `send fire;0.5
-                // unload my $weapon` fires `fire`, waits 0.5s (plus roundtime),
-                // then `unload …`. A leading '-' is accepted and treated as
-                // "send eagerly" (no wait). `put` never parses a delay, so its
-                // behavior is unchanged.
+                // A segment starting with '-' is Genie 4's QUICK-SEND form
+                // (public #278) — for `put` AND `send` alike, since in G4 every
+                // put/send chain re-enters ParseCommand, which rewrites the
+                // dash segment to `#send <rest>`: a POSITIVE wait-before-send
+                // on the RT-gated CommandQueue (glued digits allowed:
+                // `-3knock concealed door`). `put health;-0.05 encumbrance`
+                // therefore sends `health` now and `encumbrance` 0.05s later.
+                // We represent such a segment AS its `#send` form so the
+                // existing meta path lands it on the host CommandQueue.
+                // `put 20 kronars in box` is untouched — no dash, no parse.
+                //
+                // For dashless `send` segments, a leading delay in seconds is
+                // still honored (Genie4 CommandQueue parity) — e.g. `send
+                // fire;0.5 unload my $weapon` fires `fire`, waits 0.5s (plus
+                // roundtime), then `unload …`.
                 bool isSend = lower == "send";
                 var parts = SplitSemicolons(rest);
                 if (parts.Count == 0) return true;
 
                 var segs = new List<(double Delay, string Cmd)>(parts.Count);
                 foreach (var p in parts)
-                    segs.Add(isSend ? ParseSendDelay(p) : (0.0, p));
+                {
+                    if (p[0] == Commanding.QuickSend.Char &&
+                        Commanding.QuickSend.TryRewrite(p, '#', out var quick))
+                        segs.Add((0.0, quick));
+                    else
+                        segs.Add(isSend ? ParseSendDelay(p) : (0.0, p));
+                }
 
                 var first = segs[0].Cmd;
                 bool sendsToGame = first.Length > 0 && first[0] != '#' && first[0] != '.';
@@ -2766,26 +2782,23 @@ public sealed class ScriptEngine
     /// <summary>
     /// Parse an optional leading delay (seconds) off a <c>send</c> segment.
     /// Genie4's CommandQueue reads a leading run of digits/<c>.</c> as a
-    /// wait-before-send; we additionally accept a leading <c>-</c> so scripts
-    /// can request "send eagerly" (negative ⇒ no wait). The number must be
-    /// followed by whitespace (or be the whole segment) to count as a delay —
-    /// otherwise a command that merely starts with a digit (e.g. <c>2nd</c>)
-    /// is left intact.
-    /// <para>A leading <c>-</c> that is NOT part of a number (e.g. <c>-cast</c>,
-    /// <c>-touch my orb</c>) is the same "fire eagerly" marker in bare-verb form:
-    /// long-standing community scripts (uber.cmd et al.) prefix a verb with
-    /// <c>-</c> as an inline no-wait hint. DR rejects a hyphen-prefixed verb
-    /// ("Please rephrase"), so left intact it would silently bounce. We strip the
-    /// lone leading <c>-</c> (zero delay) so the verb actually reaches the game.
-    /// Only a hyphen at position 0 qualifies — a hyphen mid-token is left be.</para>
-    /// Returns <c>(0, trimmedSegment)</c> when no delay/marker is present.
+    /// wait-before-send. The number must be followed by whitespace (or be the
+    /// whole segment) to count as a delay — otherwise a command that merely
+    /// starts with a digit (e.g. <c>2nd</c>, <c>5fire</c>) is left intact
+    /// (deliberate G5 deviation: G4's scanner needs no boundary).
+    /// <para>Dash-prefixed segments (<c>-0.05 cast</c>, <c>-cast</c>) never
+    /// reach this parser: they are Genie 4's <b>quick-send</b> form — a
+    /// POSITIVE RT-gated pause, not a negative/eager delay — and both call
+    /// sites (the script put/send chain splitter and <c>#send</c>) normalize
+    /// them via <see cref="Commanding.QuickSend"/> first (public #278; this
+    /// replaced an earlier "eager marker" reading of the dash that had no G4
+    /// basis). A stray dash segment passed here is returned literal.</para>
+    /// Returns <c>(0, trimmedSegment)</c> when no delay is present.
     /// <paramref name="seg"/> arrives already trimmed.
     /// </summary>
     internal static (double delay, string cmd) ParseSendDelay(string seg)
     {
         int i = 0;
-        bool hadMinus = false;
-        if (i < seg.Length && seg[i] == '-') { i++; hadMinus = true; }
         bool dot = false, sawDigit = false;
         while (i < seg.Length && (char.IsDigit(seg[i]) || (seg[i] == '.' && !dot)))
         {
@@ -2797,8 +2810,6 @@ public sealed class ScriptEngine
             double.TryParse(seg[..i], System.Globalization.NumberStyles.Float,
                             System.Globalization.CultureInfo.InvariantCulture, out var d))
             return (d, seg[i..].Trim());
-        // Bare leading '-' (not a numeric delay) → eager, strip it. See remarks.
-        if (hadMinus && !sawDigit) return (0.0, seg[1..].Trim());
         return (0.0, seg.Trim());
     }
 

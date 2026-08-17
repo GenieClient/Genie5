@@ -177,6 +177,23 @@ public sealed class CommandEngine
                 {
                     // Alias matched and was dispatched recursively.
                 }
+                else if (command[0] == QuickSend.Char &&
+                         QuickSend.TryParse(command, out var qsDelay, out var qsCmd))
+                {
+                    // Genie 4 quick-send (public #278): a ';'-segment starting
+                    // with '-' is `#send` + remainder (G4 Core/Command.cs:254),
+                    // i.e. a POSITIVE wait-before-send on the RT-gated command
+                    // queue — the community idiom for pacing chains:
+                    // `#put health;-0.05 encumbrance` sends `health` now and
+                    // `encumbrance` 0.05s later. Glued digits work (`-3knock
+                    // concealed door`); a bare `-verb` is a 0-delay RT-gated
+                    // send. Alias lookup runs first (G4 checks aliases before
+                    // the rewrite); degenerate dash rows ("-", "-3") fall
+                    // through to the game literally.
+                    HandleInternalCommand(qsDelay.Length > 0
+                        ? $"send {qsDelay} {qsCmd}"
+                        : $"send {qsCmd}");
+                }
                 else if (command[0] == '/' && ClientSlashCommand?.Invoke(command) == true)
                 {
                     // Claimed client-side (extension /commands — /track, /calc,
@@ -372,9 +389,14 @@ public sealed class CommandEngine
                 // the queue. hunt.cmd relies on this — e.g. `#send 5 $lastcommand`
                 // (retry after 5s + RT when webbed) and the `clear` subcommand.
                 // Delay parse is shared with the in-script `send` verb via
-                // ParseSendDelay, so `#send 5 x` and `send 5 x` behave alike
-                // (incl. the `-N` eager form; a number needs a trailing space,
-                // so `5fire` stays literal).
+                // ParseSendDelay, so `#send 5 x` and `send 5 x` behave alike.
+                // A `-N`-prefixed body is the quick-send form (public #278):
+                // G4 nets it out to a POSITIVE N-second RT-gated pause (its
+                // queue re-parses the dash row into `#send N …`), so normalize
+                // it here — glued digits included (`#send -3knock door`).
+                // A dashless number still needs a trailing space (`5fire`
+                // stays literal — deliberate G5 deviation; G4's scanner would
+                // read it as delay 5 + `fire`).
                 if (parts.Count > 1)
                 {
                     var body = string.Join(" ", parts.Skip(1));
@@ -384,6 +406,9 @@ public sealed class CommandEngine
                     }
                     else
                     {
+                        if (body.Length > 0 && body[0] == QuickSend.Char &&
+                            QuickSend.TryParse(body, out var qDelay, out var qCmd))
+                            body = qDelay.Length > 0 ? $"{qDelay} {qCmd}" : qCmd;
                         var (sendDelay, sendCmd) =
                             Scripting.ScriptEngine.ParseSendDelay(body);
                         if (sendCmd.Length > 0)

@@ -93,9 +93,11 @@ public static class MoveVerb
     /// roundtime-gated. Community maps lean on this for timed door rituals:
     /// <c>move="pull sconce;-1 go door"</c> (Boar Clan), <c>move="room
     /// sear;-3knock concealed door;-whisp door $haven.pw"</c> (Riverhaven —
-    /// note the glued <c>-3knock</c>). Genie 5's ProcessInput has no quick-send
-    /// rewrite, so a dash segment would reach the game verbatim and bounce
-    /// ("Please rephrase that command.").
+    /// note the glued <c>-3knock</c>). ProcessInput now performs this same
+    /// rewrite itself (public #278, see <see cref="Commanding.QuickSend"/>);
+    /// the expansion here predates it and is kept so the walker dispatches a
+    /// deterministic, already-normalized form that the arc matcher
+    /// (<see cref="TryStripQuickSend"/>) can correlate.
     /// <para>Each dash segment becomes <c>{commandChar}send {delay} {cmd}</c>
     /// (delay omitted when absent — a bare <c>-whisp …</c> is a 0-delay
     /// roundtime-gated send in G4's quick-send path, NOT the script-send eager
@@ -144,29 +146,10 @@ public static class MoveVerb
             && TryParseQuickSend(segment.Trim(), out _, out cmd);
     }
 
-    /// <summary>Split a quick-send segment into delay + command, mirroring G4's
-    /// Send() scanner: after the dash, a leading run of digits (one '.' allowed)
-    /// is the delay even with no separating space (<c>-3knock</c>). A lone dot
-    /// is not a delay (G4: <c>sNumber != "."</c>). True only when a non-empty
-    /// command remains — a degenerate "-3" stays literal.</summary>
+    /// <summary>Split a quick-send segment into delay + command. The parser
+    /// itself lives in <see cref="Commanding.QuickSend"/> (shared with
+    /// ProcessInput and the script engine since public #278); this shim keeps
+    /// the mapper-local call sites unchanged.</summary>
     private static bool TryParseQuickSend(string segment, out string delay, out string cmd)
-    {
-        delay = string.Empty;
-        cmd = string.Empty;
-        if (segment.Length < 2 || segment[0] != '-') return false;
-
-        var rest = segment[1..].TrimStart();
-        var i = 0;
-        bool dot = false, sawDigit = false;
-        while (i < rest.Length && (char.IsDigit(rest[i]) || (rest[i] == '.' && !dot)))
-        {
-            if (rest[i] == '.') dot = true; else sawDigit = true;
-            i++;
-        }
-        if (!sawDigit) i = 0;   // lone "." or no number at all — no delay
-
-        delay = rest[..i];
-        cmd = rest[i..].Trim();
-        return cmd.Length > 0;
-    }
+        => Commanding.QuickSend.TryParse(segment, out delay, out cmd);
 }

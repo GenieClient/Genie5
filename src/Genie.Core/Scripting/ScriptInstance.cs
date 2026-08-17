@@ -5,9 +5,10 @@ public enum PauseMode { None, Pause, Wait, Delay, Move }
 public sealed record ScriptLine(int LineNumber, string Origin, string Raw, string Trimmed, int Indent);
 
 /// <summary>One queued command from a multi-part put/send statement.
-/// <paramref name="Delay"/> is the leading number of seconds a `send` segment
-/// asked to wait before being dispatched (0 for `put`; negative is allowed and
-/// treated as "send eagerly" — no extra wait).</summary>
+/// <paramref name="Delay"/> is the leading number of seconds a dashless `send`
+/// segment asked to wait before being dispatched (0 for `put` tails and for
+/// quick-send segments, whose wait lives inside their rewritten
+/// `#send N …` command — see Commanding.QuickSend, public #278).</summary>
 public readonly record struct PendingSend(string Command, double Delay);
 
 public sealed class ScriptInstance
