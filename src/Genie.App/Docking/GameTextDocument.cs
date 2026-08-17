@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Media;
 using Dock.Model.Mvvm.Controls;
@@ -7,9 +8,13 @@ using Genie.Core.Layout;
 
 namespace Genie.App.Docking;
 
-public class GameTextDocument : Document, IWindowMenuHost, IFindHost
+public class GameTextDocument : Document, IWindowMenuHost, IFindHost, ITextEditorHost
 {
     public GameTextViewModel ViewModel { get; }
+
+    public ObservableCollection<TextLine> Lines => ViewModel.Lines;
+    public bool EnableColorizing => true;
+    public bool EnableLinks      => true;
 
     /// <summary>In-window Find bar state (#120). The overlay in the game-text
     /// template binds to this; Ctrl+F / the window menu opens it.</summary>
