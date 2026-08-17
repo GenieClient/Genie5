@@ -159,6 +159,32 @@ public class GenieDockFactory : Factory
             : new GameTextDocument(_vm.GameText, settings);
     }
 
+    /// <summary>Render the Raw XML window via <see cref="EditorRawXmlTool"/> when
+    /// <c>#config useeditorrawxmlwindow</c> is on. Same read-once, type-based
+    /// selection as <see cref="NewGameText"/>.</summary>
+    private RawXmlTool NewRawXmlTool(Genie.Core.Layout.WindowSettingsStore ws)
+    {
+        var settings = ws.Get("raw-xml");
+        return _vm.UseEditorRawXmlWindow
+            ? new EditorRawXmlTool(_vm.RawXml, settings)
+            : new RawXmlTool(_vm.RawXml, settings);
+    }
+
+    /// <summary>Render every Stream window via <see cref="EditorStreamTool"/>
+    /// when <c>#config useeditorstreamwindow</c> is on — one flag governs all
+    /// 12 instances. <paramref name="buffer"/> varies (Logons, Talk, ...); the
+    /// id derivation (<c>buffer.Name.ToLowerInvariant()</c>) matches
+    /// <see cref="StreamTool"/>'s own constructor exactly, so the same
+    /// <see cref="Genie.Core.Layout.WindowSettingsStore"/> entry resolves
+    /// either way.</summary>
+    private StreamTool NewStreamTool(StreamBuffer buffer, Genie.Core.Layout.WindowSettingsStore ws)
+    {
+        var settings = ws.Get(buffer.Name.ToLowerInvariant());
+        return _vm.UseEditorStreamWindow
+            ? new EditorStreamTool(buffer, settings)
+            : new StreamTool(buffer, settings);
+    }
+
     public override IRootDock CreateLayout()
     {
         // Wire the host-window locator. Dock.Avalonia's FloatDockable silently
@@ -193,18 +219,18 @@ public class GenieDockFactory : Factory
         var room     = new RoomTool        (_vm.Room,             ws.Get("room"));
         var backpack = new BackpackTool    (_vm.Inventory,        ws.Get("backpack"));
         var mapper   = new MapperTool      (_vm.Mapper,           ws.Get("mapper"));
-        var logons   = new StreamTool      (_vm.StreamTabs.Logons,   ws.Get("logons"));
-        var talk     = new StreamTool      (_vm.StreamTabs.Talk,     ws.Get("talk"));
-        var whispers = new StreamTool      (_vm.StreamTabs.Whispers, ws.Get("whispers"));
-        var thoughts = new StreamTool      (_vm.StreamTabs.Thoughts, ws.Get("thoughts"));
-        var combat   = new StreamTool      (_vm.StreamTabs.Combat,   ws.Get("combat"));
-        var familiar = new StreamTool      (_vm.StreamTabs.Familiar, ws.Get("familiar"));
-        var death    = new StreamTool      (_vm.StreamTabs.Death,    ws.Get("death"));
-        var assess   = new StreamTool      (_vm.StreamTabs.Assess,   ws.Get("assess"));
-        var atmospherics = new StreamTool  (_vm.StreamTabs.Atmospherics, ws.Get("atmospherics"));
-        var ooc      = new StreamTool      (_vm.StreamTabs.Ooc,      ws.Get("ooc"));
-        var log      = new StreamTool      (_vm.StreamTabs.Log,      ws.Get("log"));
-        var itemlog  = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
+        var logons   = NewStreamTool(_vm.StreamTabs.Logons,   ws);
+        var talk     = NewStreamTool(_vm.StreamTabs.Talk,     ws);
+        var whispers = NewStreamTool(_vm.StreamTabs.Whispers, ws);
+        var thoughts = NewStreamTool(_vm.StreamTabs.Thoughts, ws);
+        var combat   = NewStreamTool(_vm.StreamTabs.Combat,   ws);
+        var familiar = NewStreamTool(_vm.StreamTabs.Familiar, ws);
+        var death    = NewStreamTool(_vm.StreamTabs.Death,    ws);
+        var assess   = NewStreamTool(_vm.StreamTabs.Assess,   ws);
+        var atmospherics = NewStreamTool(_vm.StreamTabs.Atmospherics, ws);
+        var ooc      = NewStreamTool(_vm.StreamTabs.Ooc,      ws);
+        var log      = NewStreamTool(_vm.StreamTabs.Log,      ws);
+        var itemlog  = NewStreamTool(_vm.StreamTabs.ItemLog,  ws);
         var experience = new ExperienceTool(_vm.Experience,          ws.Get("experience"));
         var analytics  = new AnalyticsTool (_vm.Analytics,           ws.Get("analytics"));
         var activeSpells = new ActiveSpellsTool(_vm.ActiveSpells,    ws.Get("active-spells"));
@@ -214,7 +240,7 @@ public class GenieDockFactory : Factory
         var scene      = new SceneTool     (_vm.Scene,              ws.Get("scene"));
         var mobs       = new MobsTool      (_vm.Mobs,               ws.Get("mobs"));
         var players    = new PlayersTool   (_vm.Players,            ws.Get("players"));
-        var rawXml     = new RawXmlTool    (_vm.RawXml,             ws.Get("raw-xml"));
+        var rawXml     = NewRawXmlTool(ws);
         var injuries   = new InjuriesTool  (_vm.Injuries,           ws.Get("injuries"));
 
         // ── Default ship layout — three vertical columns ─────────────────
@@ -456,18 +482,18 @@ public class GenieDockFactory : Factory
         var room       = new RoomTool        (_vm.Room,               ws.Get("room"));
         var backpack   = new BackpackTool    (_vm.Inventory,          ws.Get("backpack"));
         var mapper     = new MapperTool      (_vm.Mapper,             ws.Get("mapper"));
-        var logons     = new StreamTool      (_vm.StreamTabs.Logons,   ws.Get("logons"));
-        var talk       = new StreamTool      (_vm.StreamTabs.Talk,     ws.Get("talk"));
-        var whispers   = new StreamTool      (_vm.StreamTabs.Whispers, ws.Get("whispers"));
-        var thoughts   = new StreamTool      (_vm.StreamTabs.Thoughts, ws.Get("thoughts"));
-        var combat     = new StreamTool      (_vm.StreamTabs.Combat,   ws.Get("combat"));
-        var familiar   = new StreamTool      (_vm.StreamTabs.Familiar, ws.Get("familiar"));
-        var death      = new StreamTool      (_vm.StreamTabs.Death,    ws.Get("death"));
-        var assess     = new StreamTool      (_vm.StreamTabs.Assess,   ws.Get("assess"));
-        var atmospherics = new StreamTool    (_vm.StreamTabs.Atmospherics, ws.Get("atmospherics"));
-        var ooc        = new StreamTool      (_vm.StreamTabs.Ooc,      ws.Get("ooc"));
-        var log        = new StreamTool      (_vm.StreamTabs.Log,      ws.Get("log"));
-        var itemlog    = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
+        var logons     = NewStreamTool(_vm.StreamTabs.Logons,   ws);
+        var talk       = NewStreamTool(_vm.StreamTabs.Talk,     ws);
+        var whispers   = NewStreamTool(_vm.StreamTabs.Whispers, ws);
+        var thoughts   = NewStreamTool(_vm.StreamTabs.Thoughts, ws);
+        var combat     = NewStreamTool(_vm.StreamTabs.Combat,   ws);
+        var familiar   = NewStreamTool(_vm.StreamTabs.Familiar, ws);
+        var death      = NewStreamTool(_vm.StreamTabs.Death,    ws);
+        var assess     = NewStreamTool(_vm.StreamTabs.Assess,   ws);
+        var atmospherics = NewStreamTool(_vm.StreamTabs.Atmospherics, ws);
+        var ooc        = NewStreamTool(_vm.StreamTabs.Ooc,      ws);
+        var log        = NewStreamTool(_vm.StreamTabs.Log,      ws);
+        var itemlog    = NewStreamTool(_vm.StreamTabs.ItemLog,  ws);
         var experience = new ExperienceTool  (_vm.Experience,          ws.Get("experience"));
         var analytics  = new AnalyticsTool   (_vm.Analytics,           ws.Get("analytics"));
         var activeSpells = new ActiveSpellsTool(_vm.ActiveSpells,       ws.Get("active-spells"));
@@ -476,7 +502,7 @@ public class GenieDockFactory : Factory
         var scene      = new SceneTool        (_vm.Scene,              ws.Get("scene"));
         var mobs       = new MobsTool         (_vm.Mobs,               ws.Get("mobs"));
         var players    = new PlayersTool      (_vm.Players,            ws.Get("players"));
-        var rawXml     = new RawXmlTool       (_vm.RawXml,             ws.Get("raw-xml"));
+        var rawXml     = NewRawXmlTool(ws);
         var injuries   = new InjuriesTool     (_vm.Injuries,           ws.Get("injuries"));
 
         // Every MDI panel in canonical order, paired with its id.
