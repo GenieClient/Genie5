@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Media;
 using Dock.Model.Mvvm.Controls;
@@ -7,9 +8,13 @@ using Genie.Core.Layout;
 
 namespace Genie.App.Docking;
 
-public class StreamTool : Tool, IWindowMenuHost, IFindHost
+public class StreamTool : Tool, IWindowMenuHost, IFindHost, ITextEditorHost
 {
     public StreamBuffer Buffer { get; }
+
+    public ObservableCollection<TextLine> Lines => Buffer.Lines;
+    public bool EnableColorizing => true;
+    public bool EnableLinks      => true;
 
     /// <summary>In-window Find bar state (#120).</summary>
     public FindInWindowModel Find { get; }
@@ -82,4 +87,20 @@ public class StreamTool : Tool, IWindowMenuHost, IFindHost
             ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
             : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
     }
+}
+
+/// <summary>
+/// A Stream window (Logons, Talk, Whispers, ...) rendered by
+/// <see cref="Controls.GameTextEditor"/> (AvaloniaEdit) instead of the
+/// per-line <c>ItemsControl</c>. Created by <see cref="GenieDockFactory"/> in
+/// place of a plain <see cref="StreamTool"/> when
+/// <c>GenieConfig.UseEditorStreamWindow</c> is on — one flag governs every
+/// Stream instance, since they all share this one class. Experimental;
+/// default off. Same type-based renderer selection as
+/// <see cref="EditorGameTextDocument"/> — see that type's doc comment for why.
+/// </summary>
+public sealed class EditorStreamTool : StreamTool
+{
+    public EditorStreamTool(StreamBuffer buffer, WindowSettings? settings = null)
+        : base(buffer, settings) { }
 }
