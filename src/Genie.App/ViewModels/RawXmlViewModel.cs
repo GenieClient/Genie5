@@ -30,9 +30,13 @@ public class RawXmlViewModel : ReactiveObject
     /// is generous but still finite.</summary>
     private const int MaxLines = 5000;
 
-    /// <summary>One raw line per row. Plain strings (not <c>TextLine</c>) —
-    /// this is a verbatim protocol dump, so no highlighting / inlines.</summary>
-    public ObservableCollection<string> Lines { get; } = [];
+    /// <summary>One raw line per row, as a plain <c>TextLine</c> (Color =
+    /// StreamColor.Main, no Links/BoldSpans/PresetSpans) — this is a verbatim
+    /// protocol dump, so no highlighting/inlines happen. Unified with
+    /// GameTextViewModel/StreamBuffer's shape so the AvaloniaEdit renderer
+    /// (GameTextEditor) can bind against any of the three without a special
+    /// case (#274).</summary>
+    public ObservableCollection<TextLine> Lines { get; } = [];
 
     public ReactiveCommand<Unit, Unit> ClearCommand { get; }
 
@@ -70,7 +74,7 @@ public class RawXmlViewModel : ReactiveObject
             var line = raw.TrimEnd('\r');
             if (line.Length == 0) continue;
 
-            Lines.Add(line);
+            Lines.Add(new TextLine(line, StreamColor.Main));
             if (Lines.Count > MaxLines)
                 Lines.RemoveAt(0);
         }

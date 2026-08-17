@@ -1669,8 +1669,8 @@
                           FontSize="{Binding ToolFontSize}"
                           Foreground="#7fc4a0" Margin="4">
               <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="x:String">
-                  <SelectableTextBlock Text="{Binding}"/>
+                <DataTemplate DataType="vm:TextLine">
+                  <SelectableTextBlock Text="{Binding Text}"/>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>

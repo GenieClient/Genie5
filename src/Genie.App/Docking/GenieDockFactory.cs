@@ -926,7 +926,7 @@ public class GenieDockFactory : Factory
             StreamTool st       => ReactiveCommand.CreateFromTask(
                 () => WindowClipboard.CopyLinesAsync(st.Buffer.Lines.Select(l => l.Text))),
             RawXmlTool rx       => ReactiveCommand.CreateFromTask(
-                () => WindowClipboard.CopyLinesAsync(rx.ViewModel.Lines)),
+                () => WindowClipboard.CopyLinesAsync(rx.ViewModel.Lines.Select(l => l.Text))),
             PluginWindowTool pw => ReactiveCommand.CreateFromTask(
                 () => WindowClipboard.CopyLinesAsync(pw.ViewModel.Lines.Select(l => l.Text))),
             BackpackTool bp     => ReactiveCommand.CreateFromTask(
@@ -955,7 +955,7 @@ public class GenieDockFactory : Factory
             BackpackTool bp     => ReactiveCommand.CreateFromTask(
                 () => WindowSaveAs.SaveLinesAsync(bp.Title, bp.ViewModel.Items.Select(l => l.Text))),
             RawXmlTool rx       => ReactiveCommand.CreateFromTask(
-                () => WindowSaveAs.SaveLinesAsync(rx.Title, rx.ViewModel.Lines)),
+                () => WindowSaveAs.SaveLinesAsync(rx.Title, rx.ViewModel.Lines.Select(l => l.Text))),
             PluginWindowTool pw => ReactiveCommand.CreateFromTask(
                 () => WindowSaveAs.SaveLinesAsync(pw.Title, pw.ViewModel.Lines.Select(l => l.Text))),
             RoomTool rm         => ReactiveCommand.CreateFromTask(
