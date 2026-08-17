@@ -1099,9 +1099,19 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// stream tool. Changing the setting needs a restart.</summary>
     public bool UseEditorStreamWindow { get; private set; }
 
-    public MainWindowViewModel() : this(null) { }
+    public MainWindowViewModel() : this(null, null) { }
 
-    public MainWindowViewModel(StartupOptions? startup)
+    public MainWindowViewModel(StartupOptions? startup) : this(startup, null) { }
+
+    /// <summary>Test-only entry point: <paramref name="dataDirectoryOverride"/>
+    /// points the whole data root at an isolated directory instead of letting
+    /// <see cref="LocalDirectoryService"/> discover the real per-user Genie5
+    /// AppData folder — everything below (Profiles.Load, Display.Load, the
+    /// Maps migration, ...) then reads/writes under it instead. Null (every
+    /// real caller) keeps normal discovery. Mirrors
+    /// <see cref="Genie.Core.GenieCore"/>'s own <c>dataDirectoryOverride</c>
+    /// parameter.</summary>
+    public MainWindowViewModel(StartupOptions? startup, string? dataDirectoryOverride)
     {
         Startup = startup;
 
@@ -1109,6 +1119,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // LocalDirectoryService honors portable mode (Config\ next to the exe)
         // and XDG / AppSupport paths on Linux / macOS.
         var dir       = new LocalDirectoryService("Genie5", AppContext.BaseDirectory);
+        if (!string.IsNullOrWhiteSpace(dataDirectoryOverride))
+            dir.UseExplicitRoot(dataDirectoryOverride);
         _configDir    = dir.Current.ValidateDirectory("Config");
         _profilesPath = Path.Combine(_configDir, "profiles.json");
         _displayPath  = Path.Combine(_configDir, "display.json");
