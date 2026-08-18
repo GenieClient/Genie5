@@ -1440,7 +1440,28 @@ public class MapperViewModel : ReactiveObject
         // Useful for debugging when the index unexpectedly has 0 entries
         // (Maps dir empty, all XMLs malformed, etc.).
         Dispatcher.UIThread.Post(() =>
-            LoadStatus = $"Indexed for auto-detect: {fpIndex.Count} fingerprints, {idIndex.Count} server ids.");
+        {
+            LoadStatus = $"Indexed for auto-detect: {fpIndex.Count} fingerprints, {idIndex.Count} server ids.";
+
+            // This index build races the very first room event on connect:
+            // Attach() kicks off both the engine's state subscription and
+            // this scan in the same breath, and reading + parsing every zone
+            // XML in the Maps directory is "non-trivial" (see the comment at
+            // the call site). If the room arrives first, TryAutoLoadZoneFor
+            // bails out with "Waiting for zone index" — but the engine has
+            // already cached that room's title/exits/desc as "last seen", so
+            // its own change-detection swallows every later re-check of the
+            // SAME room. Nothing then retries the lookup until the player
+            // physically moves to a new room (new title/exits), which is
+            // exactly the reported symptom: first connection can't find the
+            // map, but moving after a manual pick works fine. Force one
+            // re-resolution now that the index is actually populated — but
+            // only when the character hasn't been placed anywhere yet, so an
+            // already-matched room isn't re-evaluated on every index rebuild
+            // (e.g. from a Maps-directory change mid-session).
+            if (_engine is { CurrentNode: null })
+                _engine.Recalculate();
+        });
     }
 
     private void Refresh()

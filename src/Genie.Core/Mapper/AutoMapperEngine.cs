@@ -175,12 +175,23 @@ public sealed class AutoMapperEngine
     public void LoadZone(MapZone zone)
     {
         _zone = zone;
+        _zoneEverLoaded = true;
         RebuildIndex();
         CurrentNode = null;
         CurrentNodeChanged?.Invoke();
         MapChanged?.Invoke();
         Recalculate();
     }
+
+    /// <summary>
+    /// True once <see cref="LoadZone"/> has run at least once this session —
+    /// from a community file, an app-layer cross-zone auto-detect, or the
+    /// player's own "New Zone". False only while the engine is still sitting
+    /// on the empty placeholder <see cref="MapZone"/> it was constructed
+    /// with. See the auto-create branch in <see cref="OnRoomChanged"/> for
+    /// why this distinction matters.
+    /// </summary>
+    private bool _zoneEverLoaded;
 
     /// <summary>
     /// Force a re-evaluation of the current room from the latest IMapperGameState,
@@ -562,6 +573,26 @@ public sealed class AutoMapperEngine
             // every title change instead — better to attempt the
             // lookup once with a partial fingerprint than to leave the
             // player visibly stranded in the wrong zone.
+            CurrentNode = null;
+            CurrentNodeChanged?.Invoke();
+            RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
+            return;
+        }
+        else if (!_zoneEverLoaded)
+        {
+            // Auto-create is on, but no zone has EVER been explicitly loaded
+            // this session — the engine is still sitting on its pristine
+            // construction-time placeholder, not a map anyone chose. Seeding
+            // an orphan node into it here (the pre-fix behaviour) silently
+            // strands the character in a nameless, invisible zone even when
+            // a matching community map exists locally: auto-create mode
+            // short-circuits straight to node-creation, so RoomNotFoundInZone
+            // never fires and the app-layer cross-zone auto-detect
+            // (MapperViewModel.TryAutoLoadZoneFor) never runs. Give the
+            // lookup the same one shot lookup-only mode gets — LoadZone
+            // (called on a successful auto-detect, a manual pick, or "New
+            // Zone") flips _zoneEverLoaded permanently, so this only ever
+            // gates the very first, otherwise-orphaned room of a session.
             CurrentNode = null;
             CurrentNodeChanged?.Invoke();
             RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
