@@ -169,6 +169,8 @@ public sealed class GameTextEditor : UserControl
         host.PropertyChanged        += OnHostPropertyChanged;
         _vm.Lines.CollectionChanged += OnLinesChanged;
         _find.JumpRequested         += OnFindJump;
+        // Claim Find for this window while this renderer is the one showing it.
+        _find.OpenOverride           = OpenSearchPanel;
 
         ApplyHostSettings();
         _paused = host.IsScrollPaused;
@@ -179,7 +181,13 @@ public sealed class GameTextEditor : UserControl
     {
         if (_host is not null) _host.PropertyChanged -= OnHostPropertyChanged;
         if (_vm   is not null) _vm.Lines.CollectionChanged -= OnLinesChanged;
-        if (_find is not null) _find.JumpRequested -= OnFindJump;
+        if (_find is not null)
+        {
+            _find.JumpRequested -= OnFindJump;
+            // Release the claim: a detached renderer must not keep answering Find
+            // for a document some other surface may now be showing.
+            if (_find.OpenOverride == OpenSearchPanel) _find.OpenOverride = null;
+        }
         _host = null;
         _vm   = null;
         _find = null;
@@ -422,6 +430,39 @@ public sealed class GameTextEditor : UserControl
     }
 
     // ── Find (#120) ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Open AvaloniaEdit's own search panel instead of the in-window Find bar —
+    /// the richer UI (live match highlighting through the scrollback, match
+    /// count, regex / match-case / whole-word toggles) and the one this renderer
+    /// already answers Cmd+F with when the text has focus. Wired in as
+    /// <c>FindInWindowModel.OpenOverride</c> for as long as this control is the
+    /// window's renderer.
+    ///
+    /// <para>Mirrors AvaloniaEdit's own <c>SearchInputHandler.ExecuteFind</c>:
+    /// seed the term from a single-line selection, then focus the box on the
+    /// Input priority so it wins over the click/keystroke that opened it.
+    /// Replace mode is forced off — the view is read-only, so the replace row
+    /// would be dead UI.</para>
+    ///
+    /// <para>Returns false before the template has applied (no panel exists yet),
+    /// which drops the caller back to the Find bar rather than silently doing
+    /// nothing.</para>
+    /// </summary>
+    private bool OpenSearchPanel()
+    {
+        if (_editor.SearchPanel is not { } panel) return false;
+
+        panel.IsReplaceMode = false;
+        panel.Open();
+
+        var selection = _editor.TextArea.Selection;
+        if (!selection.IsEmpty && !selection.IsMultiline)
+            panel.SearchPattern = selection.GetText();
+
+        Dispatcher.UIThread.Post(panel.Reactivate, DispatcherPriority.Input);
+        return true;
+    }
 
     private void OnFindJump(FindInWindowModel.Match match)
         => Dispatcher.UIThread.Post(() =>

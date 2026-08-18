@@ -969,9 +969,11 @@ public class GenieDockFactory : Factory
             _                   => null
         };
 
-        // Find… (#120) — any window hosting an in-window find bar.
+        // Find… (#120) — any window hosting an in-window find bar. Open() rather
+        // than IsOpen so the menu item lands on the same UI the Find gesture does:
+        // the renderer's own search panel where it has one, the bar otherwise.
         ICommand? find = dockable is IFindHost findHost
-            ? ReactiveCommand.Create(() => { findHost.Find.IsOpen = true; })
+            ? ReactiveCommand.Create(() => { findHost.Find.Open(); })
             : null;
 
         // Word Wrap (#120) — WindowSettings-backed per-window toggle for the

@@ -127,10 +127,15 @@
             <MenuItem Header="Save As…"
                       Command="{Binding WindowMenu.SaveAsCommand}"
                       IsVisible="{Binding WindowMenu.ShowSaveAs}" />
-            <!-- Find really is Ctrl+F on both renderers (MainWindow's key handler),
-                 so this label is accurate everywhere and stays as-is. -->
+            <!-- Platform gesture again: on this renderer Find opens AvaloniaEdit's
+                 search panel, which answers Cmd+F on macOS both through
+                 MainWindow's handler and through AvaloniaEdit's own binding once
+                 the text has focus. Ctrl+F still opens the in-window Find bar
+                 there, but the platform combo is the one to advertise. The legacy
+                 template below stays hardcoded Ctrl+F, which is all that renderer
+                 has. -->
             <MenuItem Header="Find…"
-                      InputGesture="Ctrl+F"
+                      InputGesture="{x:Static docking:WindowMenuBehavior.FindGesture}"
                       Command="{Binding WindowMenu.FindCommand}"
                       IsVisible="{Binding WindowMenu.ShowFind}" />
             <MenuItem Header="Clear"
