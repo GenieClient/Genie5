@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Avalonia;
@@ -36,8 +37,11 @@ internal static class InjurySprites
     private static readonly Color Scar   = Color.Parse("#7e9cb4");
     private static readonly Color Damage = Color.Parse("#a87ed6");
 
-    private static readonly Dictionary<string, Bitmap?> BaseCache = new(StringComparer.Ordinal);
-    private static readonly Dictionary<(string Region, InjuryKind Kind, int Severity), Bitmap?> TintCache = new();
+    // Concurrent: the app only touches these from the UI thread, but test hosts
+    // construct view models from parallel xUnit collections (two of them build a
+    // MainWindowViewModel), and a plain Dictionary corrupts under that.
+    private static readonly ConcurrentDictionary<string, Bitmap?> BaseCache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<(string Region, InjuryKind Kind, int Severity), Bitmap?> TintCache = new();
 
     /// <summary>Sprite for a region in a given state; null if the asset can't
     /// load (headless/test contexts) — the view just shows the label.</summary>
