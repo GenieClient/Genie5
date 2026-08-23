@@ -1158,7 +1158,13 @@
           <Binding Path="StatusSlots.HasAny"/>
         </MultiBinding>
       </Border.IsVisible>
-      <controls:StatusSlotPanel>
+      <!-- MinHeight pins the row to one populated cell's height (11px text +   -->
+      <!-- 2px cell padding top and bottom) so the strip keeps its height while -->
+      <!-- every slot is momentarily empty. The HasAny linger keeps the Border  -->
+      <!-- VISIBLE through a clear-then-rewrite loop, but invisible cells still -->
+      <!-- measure 0, so without the floor the docked strip shrank ~19px and    -->
+      <!-- reflowed the whole window on every script status rewrite.            -->
+      <controls:StatusSlotPanel MinHeight="20">
         <controls:StatusSlotPanel.Styles>
           <Style Selector="Border.statusSlot">
             <Setter Property="BorderBrush" Value="#2f363d"/>
