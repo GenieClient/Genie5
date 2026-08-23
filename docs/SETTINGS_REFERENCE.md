@@ -44,6 +44,8 @@ setting; only `frontend` appears in `settings.cfg` and `#config list`).
 | `sizeinputtogame` | `False` | Size the input box to match the game window width. |
 | `scrollbacklines` | `2000` | Game-window scrollback cap — rendered lines kept before trimming the oldest (clamped 100–100000). |
 | `useeditorgamewindow` | `False` | Experimental: render the main Game window with AvaloniaEdit instead of the per-line ItemsControl. Read once at layout build — needs a restart. |
+| `useeditorrawxmlwindow` | `False` | Experimental: render the Raw XML window with AvaloniaEdit instead of the per-line ItemsControl. Read once at layout build — needs a restart. |
+| `useeditorstreamwindow` | `False` | Experimental: render every Stream window (Logons, Talk, Whispers, …) with AvaloniaEdit instead of the per-line ItemsControl — one flag governs all 12. Read once at layout build — needs a restart. |
 
 ## Display / Parser
 
