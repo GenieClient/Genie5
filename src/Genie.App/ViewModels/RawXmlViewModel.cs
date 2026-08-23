@@ -35,7 +35,7 @@ public class RawXmlViewModel : ReactiveObject
     /// protocol dump, so no highlighting/inlines happen. Unified with
     /// GameTextViewModel/StreamBuffer's shape so the AvaloniaEdit renderer
     /// (GameTextEditor) can bind against any of the three without a special
-    /// case (#274).</summary>
+    /// case (#296).</summary>
     public ObservableCollection<TextLine> Lines { get; } = [];
 
     public ReactiveCommand<Unit, Unit> ClearCommand { get; }
