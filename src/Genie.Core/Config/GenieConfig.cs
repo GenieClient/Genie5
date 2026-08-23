@@ -61,6 +61,17 @@ public sealed class GenieConfig
     /// layout is built — swapping renderers under a populated buffer is not
     /// worth the complexity, so changing it needs a restart.</summary>
     public bool UseEditorGameWindow { get; set; }
+    /// <summary>Render the Raw XML window with AvaloniaEdit instead of the
+    /// per-line ItemsControl. Same experimental contract as
+    /// <see cref="UseEditorGameWindow"/> — default off, read ONCE when the dock
+    /// layout is built, so changing it needs a restart.</summary>
+    public bool UseEditorRawXmlWindow { get; set; }
+    /// <summary>Render every Stream window (Logons, Talk, Whispers, ...) with
+    /// AvaloniaEdit instead of the per-line ItemsControl. One flag governs all
+    /// 12 StreamTool instances. Same experimental contract as
+    /// <see cref="UseEditorGameWindow"/> — default off, read ONCE when the dock
+    /// layout is built, so changing it needs a restart.</summary>
+    public bool UseEditorStreamWindow { get; set; }
     public bool ShowSpellTimer { get; set; } = true;
     /// <summary>Built-in Experience tracker ($Skill.* / $TDPs globals + "Experience"
     /// dock panel). Default on. Was the external Plugin_EXPTrackerV5, now in Core.</summary>
@@ -643,6 +654,8 @@ public sealed class GenieConfig
         ("aliases", EnableAliases.ToString()),
         ("scrollbacklines", ScrollbackLines.ToString()),
         ("useeditorgamewindow", UseEditorGameWindow.ToString()),
+        ("useeditorrawxmlwindow", UseEditorRawXmlWindow.ToString()),
+        ("useeditorstreamwindow", UseEditorStreamWindow.ToString()),
         ("spelltimer", ShowSpellTimer.ToString()),
         ("showexperience", ShowExperience.ToString()),
         ("experiencedensity", ExperienceDensity.ToString()),
@@ -775,7 +788,7 @@ public sealed class GenieConfig
     {
         ("Connection",       new[] { "activitytimeout", "classicconnect", "conndebug", "connectscript", "flagscheck", "frontend", "reconnect" }),
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
-        ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow" }),
+        ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
@@ -821,6 +834,8 @@ public sealed class GenieConfig
                 case "aliases": EnableAliases = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
                 case "scrollbacklines": ScrollbackLines = Math.Clamp(UtilityCore.StringToInteger(value), 100, 100000); break;
                 case "useeditorgamewindow": UseEditorGameWindow = ToBool(value); break;
+                case "useeditorrawxmlwindow": UseEditorRawXmlWindow = ToBool(value); break;
+                case "useeditorstreamwindow": UseEditorStreamWindow = ToBool(value); break;
                 case "spelltimer": ShowSpellTimer = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "showexperience": ShowExperience = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "experiencedensity": ExperienceDensity = Math.Clamp(UtilityCore.StringToInteger(value), 0, 4); Notify(ConfigFieldUpdated.Trackers); break;

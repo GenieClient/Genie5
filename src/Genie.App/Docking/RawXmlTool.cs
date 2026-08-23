@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Avalonia.Media;
 using Dock.Model.Mvvm.Controls;
 using Genie.App.Controls;
@@ -12,7 +13,7 @@ namespace Genie.App.Docking;
 /// Window → Raw XML. A dev/debug panel, grouped beside the other utility tabs
 /// (Scripts / Scene) in the default layout.
 /// </summary>
-public class RawXmlTool : Tool, IWindowMenuHost
+public class RawXmlTool : Tool, IWindowMenuHost, ITextEditorHost
 {
     public RawXmlViewModel ViewModel { get; }
 
@@ -29,6 +30,27 @@ public class RawXmlTool : Tool, IWindowMenuHost
 
     private double     _toolFontSize = 11;
     public  double     ToolFontSize { get => _toolFontSize; private set => SetProperty(ref _toolFontSize, value); }
+
+    // ── ITextEditorHost (consumed only when useeditorrawxmlwindow is on) ────────
+    // Raw XML stays exactly as minimal under the editor renderer as it is under
+    // the legacy one: a fixed colour (not a resolvable per-window
+    // ToolForeground like Game/Stream get), no word-wrap toggle (NoWrap +
+    // horizontal scroll, matching the legacy "long tags stay on one line"
+    // behavior), no Find, no highlighting/links.
+    private static readonly IBrush RawXmlForeground = new SolidColorBrush(Color.Parse("#7fc4a0"));
+
+    public ObservableCollection<TextLine> Lines           => ViewModel.Lines;
+    public IBrush?                        ToolForeground   => RawXmlForeground;
+    public TextWrapping                   ToolTextWrapping => TextWrapping.NoWrap;
+    public Avalonia.Controls.Primitives.ScrollBarVisibility ToolHScroll
+        => Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
+
+    private bool _isScrollPaused;
+    public  bool IsScrollPaused { get => _isScrollPaused; set => SetProperty(ref _isScrollPaused, value); }
+
+    public FindInWindowModel? Find             => null;
+    public bool                EnableColorizing => false;
+    public bool                EnableLinks      => false;
 
     public RawXmlTool(RawXmlViewModel vm, WindowSettings? settings = null)
     {
@@ -49,4 +71,18 @@ public class RawXmlTool : Tool, IWindowMenuHost
         ToolFontFamily = WindowSettingsResolver.ResolveFontFamily(s.FontFamily);
         ToolFontSize   = WindowSettingsResolver.ResolveFontSize(s.FontSize);
     }
+}
+
+/// <summary>
+/// The Raw XML window rendered by <see cref="Controls.GameTextEditor"/>
+/// (AvaloniaEdit) instead of the per-line <c>ItemsControl</c>. Created by
+/// <see cref="GenieDockFactory"/> in place of a plain <see cref="RawXmlTool"/>
+/// when <c>GenieConfig.UseEditorRawXmlWindow</c> is on. Experimental; default
+/// off. Same type-based renderer selection as
+/// <see cref="EditorGameTextDocument"/> — see that type's doc comment for why.
+/// </summary>
+public sealed class EditorRawXmlTool : RawXmlTool
+{
+    public EditorRawXmlTool(RawXmlViewModel vm, WindowSettings? settings = null)
+        : base(vm, settings) { }
 }

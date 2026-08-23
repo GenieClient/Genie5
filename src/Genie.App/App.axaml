@@ -1295,6 +1295,59 @@
       </Grid>
     </DataTemplate>
 
+    <!-- ── Stream windows (experimental AvaloniaEdit renderer) ────────────── -->
+    <!-- MUST stay ABOVE the StreamTool template below — see the
+         EditorGameTextDocument comment for why. Only reached when
+         #config useeditorstreamwindow is on — GenieDockFactory constructs the
+         subtype only then, so with the flag off (the default) this template
+         matches nothing and the legacy subtree below is built exactly as it
+         always was. One flag, one template, all 12 Stream instances. -->
+    <DataTemplate DataType="docking:EditorStreamTool">
+      <Grid Background="{Binding ToolBackground}">
+        <controls:GameTextEditor x:Name="streamEditor"
+                                 Width="{Binding $parent[Grid].Bounds.Width}"
+                                 Height="{Binding $parent[Grid].Bounds.Height}"/>
+
+        <Button HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="0,0,20,8"
+                IsVisible="{Binding #streamEditor.IsScrolledUp}"
+                Command="{Binding #streamEditor.JumpToBottomCommand}"
+                Content="↓ Bottom" FontSize="11" Padding="8,4" Opacity="0.85"/>
+
+        <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                Margin="0,4,20,0" Padding="4,2" CornerRadius="3"
+                Background="{DynamicResource Theme.ToolbarBg}"
+                BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1"
+                IsVisible="{Binding Find.IsOpen}">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBox Text="{Binding Find.FindText}" Watermark="Find…"
+                     AutomationProperties.Name="Find in window"
+                     Width="160" FontSize="11" MinHeight="0" Padding="4,2"
+                     controls:FindInWindow.BoxModel="{Binding Find}"/>
+            <TextBlock Text="{Binding Find.Status}" FontSize="10"
+                       Foreground="{DynamicResource Theme.TextMuted}"
+                       VerticalAlignment="Center"/>
+            <Button Content="▲" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find previous"
+                    AutomationProperties.HelpText="Older match (Enter)"
+                    Command="{Binding Find.OlderCommand}"
+                    ToolTip.Tip="Older match (Enter)"/>
+            <Button Content="▼" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find next"
+                    AutomationProperties.HelpText="Newer match (Shift+Enter)"
+                    Command="{Binding Find.NewerCommand}"
+                    ToolTip.Tip="Newer match (Shift+Enter)"/>
+            <Button Content="✕" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Background="Transparent" BorderThickness="0"
+                    AutomationProperties.Name="Close find bar"
+                    AutomationProperties.HelpText="Close (Esc)"
+                    Command="{Binding Find.CloseCommand}"
+                    ToolTip.Tip="Close (Esc)"/>
+          </StackPanel>
+        </Border>
+      </Grid>
+    </DataTemplate>
+
     <!-- ── Streams (shared template for all 5 stream tools) ──────────────── -->
     <DataTemplate DataType="docking:StreamTool">
       <Grid Background="{Binding ToolBackground}">
@@ -1643,6 +1696,32 @@
       <views:ScriptManagerView DataContext="{Binding ViewModel}"/>
     </DataTemplate>
 
+    <!-- ── Raw XML window (experimental AvaloniaEdit renderer) ────────────── -->
+    <!-- MUST stay ABOVE the RawXmlTool template below — see the
+         EditorGameTextDocument comment for why. Only reached when
+         #config useeditorrawxmlwindow is on. Stays as minimal as the legacy
+         template: fixed green foreground, no Find, no word-wrap toggle — only
+         the rendering control underneath changes. -->
+    <DataTemplate DataType="docking:EditorRawXmlTool">
+      <Grid RowDefinitions="Auto,*" Margin="4">
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6"
+                    Margin="0,0,0,4">
+          <Button Content="Clear" Command="{Binding ViewModel.ClearCommand}"
+                  FontSize="11" Padding="8,2"
+                  ToolTip.Tip="Clear the buffer"/>
+          <TextBlock Text="Live raw server XML — local view only."
+                     Foreground="{DynamicResource Theme.SectionHeader}" FontSize="11" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Background="{DynamicResource Theme.PanelBgDeep}" BorderBrush="{DynamicResource Theme.Border}"
+                BorderThickness="1" CornerRadius="3">
+          <controls:GameTextEditor Width="{Binding $parent[Border].Bounds.Width}"
+                                   Height="{Binding $parent[Border].Bounds.Height}"/>
+        </Border>
+      </Grid>
+    </DataTemplate>
+
     <!-- ── Raw XML window (#14) — verbatim live server stream ─────────────── -->
     <!-- Read-only protocol dump for parser development / "where did that come   -->
     <!-- from?" debugging. Capped rolling buffer, auto-scroll, default hidden.    -->
@@ -1669,8 +1748,8 @@
                           FontSize="{Binding ToolFontSize}"
                           Foreground="#7fc4a0" Margin="4">
               <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="x:String">
-                  <SelectableTextBlock Text="{Binding}"/>
+                <DataTemplate DataType="vm:TextLine">
+                  <SelectableTextBlock Text="{Binding Text}"/>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>

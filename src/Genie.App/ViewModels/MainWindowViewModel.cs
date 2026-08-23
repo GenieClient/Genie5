@@ -1082,9 +1082,36 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// document. Changing the setting needs a restart.</summary>
     public bool UseEditorGameWindow { get; private set; }
 
-    public MainWindowViewModel() : this(null) { }
+    /// <summary>Render the Raw XML window with AvaloniaEdit instead of the
+    /// per-line ItemsControl (<c>#config useeditorrawxmlwindow</c>, default
+    /// off). Same read-once-at-startup contract as
+    /// <see cref="UseEditorGameWindow"/>; consumed by
+    /// <see cref="Genie.App.Docking.GenieDockFactory"/> when it creates the
+    /// Raw XML tool. Changing the setting needs a restart.</summary>
+    public bool UseEditorRawXmlWindow { get; private set; }
 
-    public MainWindowViewModel(StartupOptions? startup)
+    /// <summary>Render every Stream window (Logons, Talk, Whispers, ...) with
+    /// AvaloniaEdit instead of the per-line ItemsControl (<c>#config
+    /// useeditorstreamwindow</c>, default off). One flag governs all 12
+    /// <see cref="Docking.StreamTool"/> instances. Same read-once-at-startup
+    /// contract as <see cref="UseEditorGameWindow"/>; consumed by
+    /// <see cref="Genie.App.Docking.GenieDockFactory"/> when it creates each
+    /// stream tool. Changing the setting needs a restart.</summary>
+    public bool UseEditorStreamWindow { get; private set; }
+
+    public MainWindowViewModel() : this(null, null) { }
+
+    public MainWindowViewModel(StartupOptions? startup) : this(startup, null) { }
+
+    /// <summary>Test-only entry point: <paramref name="dataDirectoryOverride"/>
+    /// points the whole data root at an isolated directory instead of letting
+    /// <see cref="LocalDirectoryService"/> discover the real per-user Genie5
+    /// AppData folder — everything below (Profiles.Load, Display.Load, the
+    /// Maps migration, ...) then reads/writes under it instead. Null (every
+    /// real caller) keeps normal discovery. Mirrors
+    /// <see cref="Genie.Core.GenieCore"/>'s own <c>dataDirectoryOverride</c>
+    /// parameter.</summary>
+    public MainWindowViewModel(StartupOptions? startup, string? dataDirectoryOverride)
     {
         Startup = startup;
 
@@ -1092,6 +1119,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // LocalDirectoryService honors portable mode (Config\ next to the exe)
         // and XDG / AppSupport paths on Linux / macOS.
         var dir       = new LocalDirectoryService("Genie5", AppContext.BaseDirectory);
+        if (!string.IsNullOrWhiteSpace(dataDirectoryOverride))
+            dir.UseExplicitRoot(dataDirectoryOverride);
         _configDir    = dir.Current.ValidateDirectory("Config");
         _profilesPath = Path.Combine(_configDir, "profiles.json");
         _displayPath  = Path.Combine(_configDir, "display.json");
@@ -1130,7 +1159,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         {
             var startupConfig = new Genie.Core.Config.GenieConfig(dir);
             startupConfig.Load();
-            UseEditorGameWindow = startupConfig.UseEditorGameWindow;
+            UseEditorGameWindow   = startupConfig.UseEditorGameWindow;
+            UseEditorRawXmlWindow = startupConfig.UseEditorRawXmlWindow;
+            UseEditorStreamWindow = startupConfig.UseEditorStreamWindow;
         }
         catch (Exception ex)
         {
