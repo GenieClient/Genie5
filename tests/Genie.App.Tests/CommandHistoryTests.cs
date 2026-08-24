@@ -186,6 +186,46 @@ public class CommandHistoryTests
         Assert.Equal("   ", vm.CommandText);
     }
 
+    // ── Consecutive duplicates collapse in history ───────────────────────────
+
+    [Fact]
+    public void Immediate_duplicate_submissions_add_only_one_history_entry()
+    {
+        // "look" before the run of duplicates proves the count: with dedup, one
+        // Up reaches "attack" and a second reaches "look" directly. Without
+        // dedup it would take three Ups to get past the repeated "attack"s.
+        var (vm, sent) = NewVm();
+        Submit(vm, "look");
+        Submit(vm, "attack");
+        Submit(vm, "attack");
+        Submit(vm, "attack");
+
+        Assert.Equal(new[] { "look", "attack", "attack", "attack" }, sent);
+
+        vm.HistoryUp();
+        Assert.Equal("attack", vm.CommandText);
+        vm.HistoryUp();
+        Assert.Equal("look", vm.CommandText);
+        vm.HistoryUp();
+        Assert.Equal("look", vm.CommandText);   // stops at the oldest entry
+    }
+
+    [Fact]
+    public void Non_consecutive_duplicates_are_all_recorded()
+    {
+        var (vm, _) = NewVm();
+        Submit(vm, "attack");
+        Submit(vm, "look");
+        Submit(vm, "attack");
+
+        vm.HistoryUp();
+        Assert.Equal("attack", vm.CommandText);
+        vm.HistoryUp();
+        Assert.Equal("look", vm.CommandText);
+        vm.HistoryUp();
+        Assert.Equal("attack", vm.CommandText);
+    }
+
     [Fact]
     public void Connect_passwords_are_masked_in_recall_but_sent_intact()
     {

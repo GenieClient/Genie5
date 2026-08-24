@@ -31,7 +31,8 @@ public class CommandViewModel : ReactiveObject
         // Store a password-masked copy in the recall history so an explicit
         // `#connect account password character game` can't be retrieved in
         // plaintext via Up-arrow. The real (unmasked) line is still sent.
-        _history.Add(ConnectCommandMask.Mask(cmd));
+        var masked = ConnectCommandMask.Mask(cmd);
+        if (_history.Count == 0 || _history[^1] != masked) _history.Add(masked);
         _historyIndex = -1;
         CommandText = "";
 
