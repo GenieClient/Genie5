@@ -75,6 +75,16 @@ public sealed class AutoMapperEngine
     private string _staleTrackSrvid = string.Empty;
     private bool   _serverIdStale;
 
+    // Deferred-record context: the last unmatched room record mode DECLINED to
+    // create because the arrival carried no walk evidence (the teleport gate in
+    // OnRoomChanged). Consumed by RecordDeferredRoom() when the host's
+    // cross-zone auto-detect finds no zone claiming the room; superseded by the
+    // next room block.
+    private string   _deferredTitle = string.Empty;
+    private string   _deferredDesc  = string.Empty;
+    private string[] _deferredExits = Array.Empty<string>();
+    private string   _deferredSrvid = string.Empty;
+
     // The movement command that was sent before the last room change fired.
     // _pendingDirection is set when the player typed a compass primitive
     // ("ne", "northwest", "up", "out"…); _pendingMoveCommand carries the raw
@@ -281,6 +291,56 @@ public sealed class AutoMapperEngine
         var zone = new MapZone { Name = name };
         LoadZone(zone);
         return zone;
+    }
+
+    /// <summary>
+    /// Create the node record mode deferred because the arrival carried no
+    /// walk evidence (the teleport gate in OnRoomChanged). Called by the
+    /// host's RoomNotFoundInZone handler once the cross-zone auto-detect
+    /// finds no zone claiming the room. No-op unless auto-create is on, a
+    /// deferred room is pending, and the player is still standing in it.
+    /// The node is an orphan by design — a teleport arrival has no walked
+    /// arc to author. Returns true when a node was created.
+    /// </summary>
+    public bool RecordDeferredRoom()
+    {
+        if (!IsEnabled || _deferredTitle.Length == 0 || _state is null) return false;
+        if (!string.Equals(_state.RoomTitle, _deferredTitle, StringComparison.Ordinal)) return false;
+
+        var node = new MapNode
+        {
+            Id           = NextNodeId(),
+            Title        = _deferredTitle,
+            Description  = _deferredDesc,
+            ServerRoomId = _deferredSrvid,
+        };
+        AssignCoordinates(node, null, Direction.None);
+        _zone.Nodes[node.Id] = node;
+
+        var fp = MapFingerprint.Compute(_deferredTitle, _deferredExits);
+        if (!_fingerprintIndex.TryGetValue(fp, out var fpList))
+            _fingerprintIndex[fp] = fpList = new List<int>();
+        fpList.Add(node.Id);
+
+        if (!string.IsNullOrEmpty(_deferredSrvid) &&
+            _serverRoomIndex.TryAdd(_deferredSrvid, node.Id))
+            _nodeServerIdIndex.TryAdd(node.Id, _deferredSrvid);
+
+        foreach (var exitStr in _deferredExits)
+        {
+            var dir = DirectionHelper.Parse(exitStr);
+            if (dir != Direction.None && node.GetExit(dir) is null)
+                node.Exits.Add(new MapExit { Direction = dir, MoveCommand = exitStr });
+        }
+
+        _deferredTitle = string.Empty;
+        CurrentNode = node;
+        Diagnostics?.Invoke(
+            $"[mapper]   -> (deferred) => #{node.Id} via new-node " +
+            "(host confirmed: no other zone claims this room)");
+        CurrentNodeChanged?.Invoke();
+        MapChanged?.Invoke();
+        return true;
     }
 
     // ── Manual editor operations (Genie 4 AutoMapper toolbar parity) ──────────
@@ -499,6 +559,10 @@ public sealed class AutoMapperEngine
         // and exit-linking code below deliberately keeps using usedDir, so a
         // recorded "swim north" never degrades into an arc that says "north".
         var matchDir = usedDir != Direction.None ? usedDir : usedVerbDir;
+
+        // Every new room block supersedes any pending deferred record — the
+        // player has moved on, so the host must not create the stale one.
+        _deferredTitle = string.Empty;
 
         bool zoneChanged = false;
 
@@ -819,6 +883,36 @@ public sealed class AutoMapperEngine
             // (called on a successful auto-detect, a manual pick, or "New
             // Zone") flips _zoneEverLoaded permanently, so this only ever
             // gates the very first, otherwise-orphaned room of a session.
+            CurrentNode = null;
+            CurrentNodeChanged?.Invoke();
+            RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
+            return;
+        }
+        else if (_zone.Nodes.Count > 0 &&
+                 usedDir == Direction.None && usedVerbDir == Direction.None &&
+                 !MoveVerb.IsMovementCommand(usedMoveCommand))
+        {
+            // Auto-create is on and the zone is a real map, but this arrival
+            // carries NO walk evidence — no compass direction, no movement
+            // command — which is the signature of the GAME moving the player
+            // (astral exit, portal, ferry docking) rather than the player
+            // walking. Recording here seeds a foreign room into the loaded
+            // zone: live 2026-08-23, leaving the Astral Plane teleported into
+            // 'Observatory, Foyer' and record mode stitched it into the
+            // Ponthilas map. Walking is also exactly the condition an arc
+            // needs, so nothing chartable is lost by deferring: give the
+            // cross-zone auto-detect the same shot lookup-only mode gets, and
+            // the host calls RecordDeferredRoom() if no zone claims the room —
+            // virgin territory reached by teleport still records, as an orphan
+            // node, which is honest (there was no walked arc to author). The
+            // Nodes.Count gate keeps NewZone's first-room seeding intact.
+            _deferredTitle = title;
+            _deferredDesc  = description;
+            _deferredExits = exits.ToArray();
+            _deferredSrvid = serverRoomId;
+            Diagnostics?.Invoke(
+                $"[mapper]   -> NO MATCH in zone '{_zone.Name}' and no walk evidence " +
+                $"(was {DescribeCurrent()}); deferring record, asking host for a zone");
             CurrentNode = null;
             CurrentNodeChanged?.Invoke();
             RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);

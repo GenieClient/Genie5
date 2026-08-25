@@ -1330,7 +1330,19 @@ public class MapperViewModel : ReactiveObject
             // (first connect, no zone yet).
             var idHint = string.IsNullOrEmpty(serverRoomId) ? "" : $" [server {serverRoomId}]";
             var diag   = $"No local zone contains \"{title}\" with exits {exitList}{idHint}.";
-            Dispatcher.UIThread.Post(() => LoadStatus = diag);
+            Dispatcher.UIThread.Post(() =>
+            {
+                // Record mode deferred this room pending our answer (the
+                // teleport gate — the arrival had no walk evidence). No zone
+                // claims it, so it really is uncharted: record it here after
+                // all, as an orphan node. Recording stays hands-off — no
+                // toggle needed for teleport travel through mapped areas, and
+                // virgin territory reached by teleport still charts.
+                if (AutoCreateEnabled && _engine is not null && _engine.RecordDeferredRoom())
+                    LoadStatus = $"No local zone contains \"{title}\" — recorded it in '{ZoneName}' (teleport arrival).";
+                else
+                    LoadStatus = diag;
+            });
             return;
         }
 
@@ -1362,7 +1374,19 @@ public class MapperViewModel : ReactiveObject
         if (string.Equals(SelectedZoneFile, zoneFile, StringComparison.OrdinalIgnoreCase))
         {
             var diag = $"Engine can't match \"{title}\" (exits: {exitList}) in '{zoneFile}'.";
-            Dispatcher.UIThread.Post(() => LoadStatus = diag);
+            Dispatcher.UIThread.Post(() =>
+            {
+                // Same drift case, record-mode flavour: the index says this
+                // zone should contain the room but the engine can't match it
+                // (stale map, edited titles). If record mode deferred the room
+                // (teleport arrival), recording a fresh node is what record
+                // mode is for — the srv-veto keeps a later fresh nav from
+                // collapsing it into the wrong old node.
+                if (AutoCreateEnabled && _engine is not null && _engine.RecordDeferredRoom())
+                    LoadStatus = $"\"{title}\" wasn't matched in '{zoneFile}' — recorded it as a new room.";
+                else
+                    LoadStatus = diag;
+            });
             return;
         }
 
