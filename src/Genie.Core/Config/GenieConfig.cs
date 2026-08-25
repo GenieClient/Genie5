@@ -335,6 +335,15 @@ public sealed class GenieConfig
     /// full Lich-proxy connection diagnosis. <c>#config lichdebug true</c>.</summary>
     public bool LichDebug { get; set; }
 
+    /// <summary>When <c>true</c>, the automapper echoes one <c>[mapper]</c> trace
+    /// line per server turn: the room block it received, which change triggered a
+    /// re-resolve (or that it was suppressed for having no delta), and which
+    /// matching tier placed the player. Default OFF. This is the only way to tell
+    /// the three "map stopped following me" failures apart from the outside —
+    /// suppressed update, wrong match, or no room data at all.
+    /// <c>#config mapperdebug true</c>.</summary>
+    public bool MapperDebug { get; set; }
+
     public string ScriptDirRaw { get; set; } = "Scripts";
 
     /// <summary>Where the Scripts updater pulls repo scripts to (issue #221).
@@ -724,6 +733,7 @@ public sealed class GenieConfig
         ("lichargs", LichArguments),
         ("lichstartpause", LichStartPause.ToString()),
         ("lichdebug", LichDebug.ToString()),
+        ("mapperdebug", MapperDebug.ToString()),
         ("autoupdate", AutoUpdate.ToString()),
         ("checkforupdates", CheckForUpdates.ToString()),
         ("scriptextension", ScriptExtension),
@@ -792,7 +802,7 @@ public sealed class GenieConfig
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
-        ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts" }),
+        ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
         ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsstreampriority", "ttsrate", "ttsvolume" }),
         ("Logging",          new[] { "autolog" }),
@@ -939,6 +949,7 @@ public sealed class GenieConfig
                 case "lichargs": LichArguments = value.Trim(); break;
                 case "lichstartpause": LichStartPause = Math.Clamp((int)UtilityCore.StringToDouble(value), 1, 120); break;
                 case "lichdebug": LichDebug = ToBool(value); Notify(ConfigFieldUpdated.LichDebug); break;
+                case "mapperdebug": MapperDebug = ToBool(value); Notify(ConfigFieldUpdated.MapperDebug); break;
                 case "autoupdate": AutoUpdate = ToBool(value); Notify(ConfigFieldUpdated.AutoUpdate); break;
                 case "checkforupdates": CheckForUpdates = ToBool(value); Notify(ConfigFieldUpdated.CheckForUpdates); break;
                 case "scriptextension": ScriptExtension = string.IsNullOrWhiteSpace(value) ? "cmd" : value; break;

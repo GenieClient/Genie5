@@ -611,6 +611,17 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         SyncMapperGlobals();
         AutoMapper.CurrentNodeChanged += SyncMapperGlobals;
 
+        // Mapper room-resolution trace (`#config mapperdebug on`). Attached and
+        // detached live so a player hunting a "the map stopped following me"
+        // report can turn it on mid-session, walk the stretch, and turn it off
+        // without reconnecting. Detaching nulls the sink so the engine pays
+        // nothing (it never builds the message strings) when off.
+        SyncMapperDebug();
+        Config.ConfigChanged += field =>
+        {
+            if (field == Genie.Core.Config.ConfigFieldUpdated.MapperDebug) SyncMapperDebug();
+        };
+
         // ── Live Audit (developer troubleshooting) ────────────────────────────
         // Off until `#audit on`. Tees raw XML + parsed events + live zone/room
         // into <LogDir>/live_audit.log so a collaborator can follow the session
@@ -1964,6 +1975,18 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     {
         get => _connection?.AiPipeEnabled ?? false;
         set { if (_connection is not null) _connection.AiPipeEnabled = value; }
+    }
+
+    /// <summary>
+    /// Attach or detach the mapper's room-resolution trace to match
+    /// <c>#config mapperdebug</c>. Lines land in the game window like any other
+    /// system echo, so the player can copy the stretch straight out of the log.
+    /// </summary>
+    private void SyncMapperDebug()
+    {
+        AutoMapper.Diagnostics = Config.MapperDebug ? RaiseEchoLine : null;
+        if (Config.MapperDebug)
+            RaiseEchoLine("[mapper] Room-resolution trace ON. `#config mapperdebug off` to stop.");
     }
 
     /// <summary>

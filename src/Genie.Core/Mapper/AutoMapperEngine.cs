@@ -50,6 +50,7 @@ public sealed class AutoMapperEngine
     private string  _lastTitle = string.Empty;
     private string  _lastExitKey = string.Empty; // sorted join used for change detection
     private string  _lastDescription = string.Empty; // tracks desc so late-arriving descriptions retry the match
+    private string  _lastServerRoomId = string.Empty; // the ONLY delta between identical-looking adjacent rooms
 
     // The movement command that was sent before the last room change fired.
     // _pendingDirection is set when the player typed a compass primitive
@@ -59,6 +60,13 @@ public sealed class AutoMapperEngine
     // matching MapExit.MoveCommand.
     private Direction _pendingDirection   = Direction.None;
     private string    _pendingMoveCommand = string.Empty;
+
+    // Compass direction recovered from a movement PHRASE ("swim north" → North).
+    // Kept separate from _pendingDirection because it is a MATCHING aid only:
+    // feeding it into the arc-authoring path below would record move="north" on
+    // a river arc that really needs "swim north", corrupting the map in
+    // auto-create mode.
+    private Direction _pendingVerbDirection = Direction.None;
 
     public MapNode?  CurrentNode  { get; private set; }
 
@@ -101,6 +109,20 @@ public sealed class AutoMapperEngine
     /// (de-duplication is the right behaviour for almost every zone).
     /// </summary>
     public bool      AllowDuplicateRooms { get; set; } = false;
+
+    /// <summary>
+    /// Optional diagnostic sink for room-resolution tracing, wired by
+    /// <see cref="GenieCore"/> when <c>#config mapperdebug on</c>. Null (the
+    /// default) costs nothing — every call site is null-conditional and the
+    /// message strings are only built when a sink is attached.
+    ///
+    /// <para>This exists because the failure modes here are invisible from the
+    /// outside: the player sees "the map stopped following me" whether the
+    /// engine suppressed the update, matched the wrong node, or was never given
+    /// a room block at all. The trace distinguishes those in one line per server
+    /// turn.</para>
+    /// </summary>
+    public Action<string>? Diagnostics { get; set; }
 
     public event Action? MapChanged;
     public event Action? CurrentNodeChanged;
@@ -169,6 +191,12 @@ public sealed class AutoMapperEngine
             // match arc.MoveCommand exactly.
             _pendingDirection   = Direction.None;
             _pendingMoveCommand = first;
+
+            // "swim north" / "go se" also carry a usable compass bearing. Keep
+            // it for matching so the graph walk works even when the community
+            // map authored the arc as a bare "north" (or vice versa) — that
+            // mismatch is what froze the Segoltha crossing live.
+            MoveVerb.TryGetCompassTarget(first, out _pendingVerbDirection);
         }
     }
 
@@ -201,9 +229,10 @@ public sealed class AutoMapperEngine
     public void Recalculate()
     {
         if (_state is null) return;
-        _lastTitle       = string.Empty;
-        _lastExitKey     = string.Empty;
-        _lastDescription = string.Empty;
+        _lastTitle        = string.Empty;
+        _lastExitKey      = string.Empty;
+        _lastDescription  = string.Empty;
+        _lastServerRoomId = string.Empty;
         OnStateChanged();
     }
 
@@ -309,32 +338,103 @@ public sealed class AutoMapperEngine
     {
         if (_state is null) return;
 
-        var title       = _state.RoomTitle;
-        var exits       = _state.Exits;
-        var description = _state.RoomDescription;
-        var exitKey     = string.Join(",", exits.Order(StringComparer.OrdinalIgnoreCase));
+        var title        = _state.RoomTitle;
+        var exits        = _state.Exits;
+        var description  = _state.RoomDescription;
+        var serverRoomId = _state.ServerRoomId;
+        var exitKey      = string.Join(",", exits.Order(StringComparer.OrdinalIgnoreCase));
 
         // Require at least a title before tracking
         if (string.IsNullOrWhiteSpace(title)) return;
 
-        // Re-process whenever any of title / exits / description changes.
+        // Re-process whenever any of title / exits / description / server room
+        // id changes.
+        //
         // Description is included because DR's server can deliver the parts
         // of a room transition (title, compass, description, nav) in different
         // orders — if a previous fire failed to match on title alone and we
         // didn't track desc, a later desc-arrival would be silently skipped
         // even though it carries the disambiguating signal the (e) tiebreaker
         // needs.
-        bool titleChanged = title       != _lastTitle;
-        bool exitsChanged = exitKey     != _lastExitKey;
-        bool descChanged  = description != _lastDescription;
-        if (!titleChanged && !exitsChanged && !descChanged) return;
+        //
+        // ServerRoomId is included because a corridor of rooms can be identical
+        // in ALL THREE of the other fields, making a real move invisible here.
+        // The Segoltha River is the worst case in the community maps: eleven
+        // "Segoltha River, Midstream" nodes (7, 9, 10, 11, 16-21, 32) share one
+        // title, one description, and the full eight-point compass exit set. On
+        // a title/exits/desc-only test, `swim north` produced a zero delta, this
+        // guard returned, OnRoomChanged never ran, and CurrentNode stayed pinned
+        // to whichever room the player entered the water at — freezing $roomid
+        // for the entire crossing and hanging every swim script that gates on it.
+        // The server id is distinct for each of those rooms, so it is both the
+        // strongest "you moved" signal we get and the only one that survives a
+        // same-title/same-desc corridor. Note this must gate the EARLY RETURN,
+        // not just tier (a): without re-entering OnRoomChanged the graph-walk
+        // tier (b) — the only resolver that works when room numbers are off —
+        // never runs either, and _pendingDirection goes stale unconsumed.
+        bool titleChanged  = title        != _lastTitle;
+        bool exitsChanged  = exitKey      != _lastExitKey;
+        bool descChanged   = description  != _lastDescription;
+        bool roomIdChanged = serverRoomId != _lastServerRoomId
+                             && !string.IsNullOrEmpty(serverRoomId);
 
-        _lastTitle       = title;
-        _lastExitKey     = exitKey;
-        _lastDescription = description;
+        // Last resort for an identical-corridor move when the player has room
+        // numbers turned OFF: there is then NO observable difference between the
+        // two rooms, and the only evidence a move happened is that we sent a
+        // movement command and the server answered with a fresh room block. The
+        // adapter only raises StateChanged after a nav/compass/room-component
+        // event, so a blocked move ("You can't go that way.") emits no room data
+        // and never reaches this line.
+        //
+        // The pending command must be classified before we trust it. GenieCore
+        // calls OnCommandSent for EVERY outbound command (GenieCore.cs:1088), not
+        // just movement, and `look` re-sends the whole room block — so an
+        // unfiltered "something is pending" test would read a look as a move and
+        // drift the player up the river.
+        //
+        // The test is VERB-based (MoveVerb.IsMovementCommand), deliberately not
+        // "does this match an authored arc on CurrentNode". An arc-based test
+        // fails in exactly the cases that need it: a map that authors the
+        // Segoltha arcs as move="north" while the script sends "swim north"
+        // matches nothing, and nothing matches at all while CurrentNode is still
+        // null. Verb classification is independent of both the map data and our
+        // current placement.
+        bool movePending = _pendingDirection != Direction.None
+                           || MoveVerb.IsMovementCommand(_pendingMoveCommand);
+
+        if (!titleChanged && !exitsChanged && !descChanged && !roomIdChanged && !movePending)
+        {
+            Diagnostics?.Invoke(
+                $"[mapper] SUPPRESSED (no delta) room='{title}' exits='{exitKey}' " +
+                $"srvid='{(serverRoomId.Length == 0 ? "-" : serverRoomId)}' " +
+                $"desc={(description.Length == 0 ? "empty" : description.Length + "ch")} " +
+                $"pending='{DescribePending()}' at={DescribeCurrent()}");
+            return;
+        }
+
+        Diagnostics?.Invoke(
+            $"[mapper] room block: '{title}' exits='{exitKey}' " +
+            $"srvid='{(serverRoomId.Length == 0 ? "-" : serverRoomId)}' " +
+            $"trigger={(titleChanged ? "title " : "")}{(exitsChanged ? "exits " : "")}" +
+            $"{(descChanged ? "desc " : "")}{(roomIdChanged ? "srvid " : "")}" +
+            $"{(movePending ? "move" : "")}".TrimEnd() +
+            $" pending='{DescribePending()}' from={DescribeCurrent()}");
+
+        _lastTitle        = title;
+        _lastExitKey      = exitKey;
+        _lastDescription  = description;
+        _lastServerRoomId = serverRoomId;
 
         OnRoomChanged(title, description, exits);
     }
+
+    private string DescribePending() =>
+        _pendingDirection != Direction.None
+            ? _pendingDirection.ToString().ToLowerInvariant()
+            : _pendingMoveCommand.Length > 0 ? _pendingMoveCommand : "-";
+
+    private string DescribeCurrent() =>
+        CurrentNode is { } n ? $"#{n.Id}" : "(unplaced)";
 
     private void OnRoomChanged(string title, string description, IReadOnlyCollection<string> exits)
     {
@@ -343,10 +443,18 @@ public sealed class AutoMapperEngine
         var prevNode        = CurrentNode;
         var usedDir         = _pendingDirection;
         var usedMoveCommand = _pendingMoveCommand;
+        var usedVerbDir     = _pendingVerbDirection;
 
         // Always clear pending movement after consuming it.
-        _pendingDirection   = Direction.None;
-        _pendingMoveCommand = string.Empty;
+        _pendingDirection     = Direction.None;
+        _pendingMoveCommand   = string.Empty;
+        _pendingVerbDirection = Direction.None;
+
+        // Direction used for MATCHING only (tiers b / c-adjacency / d). Falls
+        // back to the bearing parsed out of a movement phrase. The arc-authoring
+        // and exit-linking code below deliberately keeps using usedDir, so a
+        // recorded "swim north" never degrades into an arc that says "north".
+        var matchDir = usedDir != Direction.None ? usedDir : usedVerbDir;
 
         bool zoneChanged = false;
 
@@ -369,12 +477,22 @@ public sealed class AutoMapperEngine
 
         MapNode? node = null;
 
+        // True when the match came from a tier that is grounded in the arc graph
+        // (b / c-adjacency / d) rather than a fuzzy text guess. Only these are
+        // trustworthy enough to teach the tier (a) server-id index — see the
+        // learn block after the tier cascade.
+        bool graphGrounded = false;
+
+        // Which tier resolved the room, for the #config mapperdebug trace.
+        string tier = "none";
+
         // (a) Server room ID — definitive match
         if (!string.IsNullOrEmpty(serverRoomId) &&
             _serverRoomIndex.TryGetValue(serverRoomId, out var srvId) &&
             _zone.Nodes.TryGetValue(srvId, out var srvNode))
         {
             node = srvNode;
+            tier = "a:server-id";
         }
 
         // (b) Graph walk: if we know where we were and which movement command
@@ -387,9 +505,9 @@ public sealed class AutoMapperEngine
         if (node is null && prevNode != null)
         {
             MapExit? arc = null;
-            if (usedDir != Direction.None)
+            if (matchDir != Direction.None)
             {
-                arc = prevNode.GetExit(usedDir);
+                arc = prevNode.GetExit(matchDir);
             }
             else if (!string.IsNullOrEmpty(usedMoveCommand))
             {
@@ -402,6 +520,8 @@ public sealed class AutoMapperEngine
                 arcDest.Title.Equals(title, StringComparison.OrdinalIgnoreCase))
             {
                 node = arcDest;
+                graphGrounded = true;
+                tier = "b:graph-walk";
             }
         }
 
@@ -426,6 +546,7 @@ public sealed class AutoMapperEngine
             if (candidateIds.Count == 1)
             {
                 _zone.Nodes.TryGetValue(candidateIds[0], out node);
+                if (node != null) tier = "c:fingerprint-unique";
             }
             else
             {
@@ -435,8 +556,8 @@ public sealed class AutoMapperEngine
                 if (prevNode != null)
                 {
                     MapExit? fwd = null;
-                    if (usedDir != Direction.None)
-                        fwd = prevNode.GetExit(usedDir);
+                    if (matchDir != Direction.None)
+                        fwd = prevNode.GetExit(matchDir);
                     else if (!string.IsNullOrEmpty(usedMoveCommand))
                         fwd = prevNode.Exits.FirstOrDefault(e =>
                             MoveCommandMatches(e.MoveCommand, usedMoveCommand));
@@ -445,6 +566,8 @@ public sealed class AutoMapperEngine
                         && _zone.Nodes.TryGetValue(destId, out var graphHit))
                     {
                         node = graphHit;
+                        graphGrounded = true;
+                        tier = "c:fingerprint+adjacency";
                     }
                 }
 
@@ -458,7 +581,7 @@ public sealed class AutoMapperEngine
                         if (string.IsNullOrEmpty(cand.Description)) continue;
                         var descB = cand.Description.Length > 80 ? cand.Description[..80] : cand.Description;
                         if (descA.Equals(descB, StringComparison.OrdinalIgnoreCase))
-                        { node = cand; break; }
+                        { node = cand; tier = "c:fingerprint+desc"; break; }
                     }
                 }
                 // If still ambiguous, fall through — never blindly pick the
@@ -468,8 +591,8 @@ public sealed class AutoMapperEngine
 
         // (d) Reverse-arc search: among all nodes with matching title, find one
         //     that has a reverse exit linking back to prevNode.
-        if (node is null && prevNode != null && usedDir != Direction.None &&
-            DirectionHelper.Opposite.TryGetValue(usedDir, out var oppDir))
+        if (node is null && prevNode != null && matchDir != Direction.None &&
+            DirectionHelper.Opposite.TryGetValue(matchDir, out var oppDir))
         {
             foreach (var candidate in _zone.Nodes.Values)
             {
@@ -477,7 +600,7 @@ public sealed class AutoMapperEngine
                     continue;
                 var backArc = candidate.GetExit(oppDir);
                 if (backArc?.DestinationId == prevNode.Id)
-                { node = candidate; break; }
+                { node = candidate; graphGrounded = true; tier = "d:reverse-arc"; break; }
             }
         }
 
@@ -496,7 +619,7 @@ public sealed class AutoMapperEngine
                 var descB = candidate.Description.Length > 80
                     ? candidate.Description[..80] : candidate.Description;
                 if (descA.Equals(descB, StringComparison.OrdinalIgnoreCase))
-                { node = candidate; break; }
+                { node = candidate; tier = "e:desc-only"; break; }
             }
         }
 
@@ -529,6 +652,7 @@ public sealed class AutoMapperEngine
                 if (liveDirs.Count == 0 || nodeDirs.Overlaps(liveDirs))
                 {
                     node = candidate;
+                    tier = "f:title+exit-overlap";
                     break;
                 }
             }
@@ -560,6 +684,28 @@ public sealed class AutoMapperEngine
                     zoneChanged = true;
                 }
             }
+
+            // Learn the server-id → node mapping for THIS SESSION regardless of
+            // IsEnabled. Community map files carry no server room ids, and the
+            // on-disk stamp above only happens in auto-create mode, so in the
+            // default lookup-only mode the tier (a) index would stay empty
+            // forever — every visit re-runs the fuzzy tiers and a same-title/
+            // same-description corridor (Segoltha) stays unresolvable even
+            // though the server told us exactly where we are.
+            //
+            // Gated on graphGrounded — ONLY the arc-graph tiers (b / c-adjacency
+            // / d) may teach the index. The fuzzy tiers are guesses, and tier (a)
+            // is definitive and checked FIRST, so learning a fuzzy guess would
+            // promote it to unquestionable and pin every future visit to it. In
+            // a Segoltha-shaped corridor the description tiebreaker picks the
+            // first of eleven identical rooms, which is exactly the wrong answer
+            // to make permanent.
+            //
+            // In-memory only: does NOT set node.ServerRoomId and does NOT set
+            // zoneChanged, so nothing reaches disk and the imported map stays
+            // byte-identical to upstream. Rebuilt from disk on every LoadZone.
+            if (graphGrounded && !string.IsNullOrEmpty(serverRoomId))
+                _serverRoomIndex.TryAdd(serverRoomId, node.Id);
         }
         else if (!IsEnabled)
         {
@@ -573,6 +719,9 @@ public sealed class AutoMapperEngine
             // every title change instead — better to attempt the
             // lookup once with a partial fingerprint than to leave the
             // player visibly stranded in the wrong zone.
+            Diagnostics?.Invoke(
+                $"[mapper]   -> NO MATCH in zone '{_zone.Name}' (was {DescribeCurrent()}, " +
+                $"moved '{DescribePending()}'); asking host to find a zone for this room");
             CurrentNode = null;
             CurrentNodeChanged?.Invoke();
             RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
@@ -623,6 +772,7 @@ public sealed class AutoMapperEngine
             if (!string.IsNullOrEmpty(serverRoomId))
                 _serverRoomIndex.TryAdd(serverRoomId, node.Id);
             zoneChanged = true;
+            tier = "new-node";
         }
 
         // ── 2. Link exits between prevNode and node ──────────────────────────
@@ -673,6 +823,11 @@ public sealed class AutoMapperEngine
         }
 
         // ── 4. Update current node and fire events ───────────────────────────
+        Diagnostics?.Invoke(
+            $"[mapper]   -> {DescribeCurrent()} => #{node.Id} via {tier}" +
+            (graphGrounded ? " (graph-grounded)" : "") +
+            (prevNode is not null && prevNode.Id == node.Id ? "  [NO CHANGE]" : ""));
+
         CurrentNode = node;
         CurrentNodeChanged?.Invoke();
         if (zoneChanged) MapChanged?.Invoke();

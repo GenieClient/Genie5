@@ -49,6 +49,92 @@ public static class MoveVerb
     private static readonly string[] SearchInnerVerbs = { "go", "climb" };
 
     /// <summary>
+    /// DR verbs whose whole purpose is to leave the room. Used by
+    /// <see cref="IsMovementCommand"/>; deliberately does NOT include
+    /// <c>search</c> (a bare search stays put — only the map-data
+    /// <c>"search go …"</c> directive form moves, and that is recognised by its
+    /// inner verb).
+    /// </summary>
+    private static readonly string[] MovementVerbs =
+    {
+        "go", "climb", "swim", "dive", "wade", "ford", "crawl", "squeeze",
+        "enter", "exit", "board", "disembark", "jump", "leap", "slide",
+        "ascend", "descend", "walk", "run", "follow",
+    };
+
+    /// <summary>
+    /// True when <paramref name="command"/> is a command that attempts to change
+    /// rooms — a compass/vertical primitive ("n", "northwest", "up", "out"), or a
+    /// phrase led by a movement verb ("swim north", "go shore", "climb bank").
+    ///
+    /// <para>This is the mapper's "did the player just try to move?" test, and it
+    /// has to be verb-based rather than arc-based. The obvious alternative —
+    /// "does this command match an authored arc on the current node?" — silently
+    /// fails wherever it is needed most: a community map that authors the
+    /// Segoltha arcs as <c>move="north"</c> while the player's script sends
+    /// <c>swim north</c> would not match, and neither would anything at all when
+    /// the mapper hasn't placed the player yet (CurrentNode null). Both cases are
+    /// exactly the identical-room corridors where this signal is the only
+    /// evidence a move happened.</para>
+    ///
+    /// <para>Pacing prefixes are stripped first, so <c>"rt north"</c> and
+    /// <c>"slow south"</c> classify as movement.</para>
+    /// </summary>
+    /// <summary>
+    /// Recover the compass direction from a two-token movement phrase —
+    /// <c>"swim north"</c> → <see cref="Direction.North"/>, <c>"go se"</c> →
+    /// <see cref="Direction.SouthEast"/>. False for anything else.
+    ///
+    /// <para>Strictly two tokens by design. <c>"go north gate"</c> is a move
+    /// through a portal named "north gate", NOT a move northward, and treating
+    /// it as compass would walk the wrong arc. Three-token phrases keep falling
+    /// back to whole-string MoveCommand matching, which is what they need.</para>
+    ///
+    /// <para>The direction this returns is for MATCHING ONLY — it must not be
+    /// used to author an arc, or recording a Segoltha swim would write
+    /// <c>move="north"</c> onto a river arc that actually requires
+    /// <c>swim north</c>.</para>
+    /// </summary>
+    public static bool TryGetCompassTarget(string? command, out Direction direction)
+    {
+        direction = Direction.None;
+        if (string.IsNullOrWhiteSpace(command)) return false;
+
+        var v = Normalize(command.Split(';')[0].Trim());
+        var space = v.IndexOf(' ');
+        if (space < 0) return false;
+
+        var verb = v[..space];
+        if (!MovementVerbs.Contains(verb, StringComparer.OrdinalIgnoreCase)) return false;
+
+        var rest = v[(space + 1)..].Trim();
+        if (rest.Contains(' ')) return false;   // "go north gate" is not a compass move
+
+        direction = DirectionHelper.Parse(rest);
+        return direction != Direction.None;
+    }
+
+    public static bool IsMovementCommand(string? command)
+    {
+        if (string.IsNullOrWhiteSpace(command)) return false;
+
+        // Take the first ';' segment — the pipeline dispatches those separately.
+        var v = Normalize(command.Split(';')[0].Trim());
+        if (v.Length == 0) return false;
+
+        if (DirectionHelper.Parse(v) != Direction.None) return true;
+
+        var space = v.IndexOf(' ');
+        var verb  = space < 0 ? v : v[..space];
+
+        // "search go trampled path" — the directive form moves; "search bushes"
+        // does not.
+        if (TryParseSearchDirective(v, out _)) return true;
+
+        return MovementVerbs.Contains(verb, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Recognize the Genie 4 <b>search directive</b> arc form: <c>move="search go
     /// trampled path"</c> (also <c>search climb …</c>) marks a <b>hidden exit</b> —
     /// the destination only opens after a successful in-room <c>search</c>. The

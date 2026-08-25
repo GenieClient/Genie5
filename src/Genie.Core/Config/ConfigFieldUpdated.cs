@@ -28,5 +28,9 @@ public enum ConfigFieldUpdated
     MonsterIgnore,
     /// <summary>Owned-Lich debug-log mirror toggle changed (<c>#config lichdebug</c>)
     /// — the host may start/stop tailing that session's <c>temp/debug-*.log</c>.</summary>
-    LichDebug
+    LichDebug,
+    /// <summary>Automapper room-resolution trace toggle changed
+    /// (<c>#config mapperdebug</c>) — GenieCore attaches/detaches the engine's
+    /// diagnostic sink.</summary>
+    MapperDebug
 }
