@@ -59,6 +59,22 @@ public sealed class AutoMapperEngine
     private string  _lastDescription = string.Empty; // tracks desc so late-arriving descriptions retry the match
     private string  _lastServerRoomId = string.Empty; // the ONLY delta between identical-looking adjacent rooms
 
+    // Server-id staleness tracking, on DEDICATED fields: Recalculate() force-
+    // clears the _last* set to reprocess the same block, and a forced re-resolve
+    // must not launder a stale id into a fresh-looking one. DR only sends
+    // <nav rm=…> for rooms that have server ids; areas without them (the Astral
+    // Plane, live 2026-08-23) deliver full room transitions with NO nav, so
+    // IMapperGameState.ServerRoomId silently keeps the id of the last nav'd
+    // room. A room delta without a srvid delta therefore means the id belongs
+    // to a PREVIOUS room — matching or stamping on it is wrong (tier (a) pinned
+    // an entire astral walk to the Phelim's Sanctum node, stale id 1152010
+    // answering [NO CHANGE] on every pillar and conduit).
+    private string _staleTrackTitle = string.Empty;
+    private string _staleTrackExits = string.Empty;
+    private string _staleTrackDesc  = string.Empty;
+    private string _staleTrackSrvid = string.Empty;
+    private bool   _serverIdStale;
+
     // The movement command that was sent before the last room change fired.
     // _pendingDirection is set when the player typed a compass primitive
     // ("ne", "northwest", "up", "out"…); _pendingMoveCommand carries the raw
@@ -354,6 +370,24 @@ public sealed class AutoMapperEngine
         // Require at least a title before tracking
         if (string.IsNullOrWhiteSpace(title)) return;
 
+        // Server-id staleness (see the _staleTrack* field comment): a srvid
+        // delta marks the id fresh; a room delta WITHOUT one marks it stale —
+        // this room never sent a nav, so the id belongs to a previous room.
+        // Order matters: when a coalesced block carries both, the srvid delta
+        // wins (it arrived with this room).
+        {
+            bool srvDelta  = serverRoomId.Length > 0 && serverRoomId != _staleTrackSrvid;
+            bool roomDelta = title != _staleTrackTitle
+                             || exitKey != _staleTrackExits
+                             || description != _staleTrackDesc;
+            if (srvDelta)       _serverIdStale = false;
+            else if (roomDelta) _serverIdStale = true;
+            _staleTrackTitle = title;
+            _staleTrackExits = exitKey;
+            _staleTrackDesc  = description;
+            _staleTrackSrvid = serverRoomId;
+        }
+
         // Re-process whenever any of title / exits / description / server room
         // id changes.
         //
@@ -413,7 +447,7 @@ public sealed class AutoMapperEngine
         {
             Diagnostics?.Invoke(
                 $"[mapper] SUPPRESSED (no delta) room='{title}' exits='{exitKey}' " +
-                $"srvid='{(serverRoomId.Length == 0 ? "-" : serverRoomId)}' " +
+                $"srvid='{(serverRoomId.Length == 0 ? "-" : serverRoomId)}{(_serverIdStale && serverRoomId.Length > 0 ? " STALE" : "")}' " +
                 $"desc={(description.Length == 0 ? "empty" : description.Length + "ch")} " +
                 $"pending='{DescribePending()}' at={DescribeCurrent()}");
             return;
@@ -421,7 +455,7 @@ public sealed class AutoMapperEngine
 
         Diagnostics?.Invoke(
             $"[mapper] room block: '{title}' exits='{exitKey}' " +
-            $"srvid='{(serverRoomId.Length == 0 ? "-" : serverRoomId)}' " +
+            $"srvid='{(serverRoomId.Length == 0 ? "-" : serverRoomId)}{(_serverIdStale && serverRoomId.Length > 0 ? " STALE" : "")}' " +
             $"trigger={(titleChanged ? "title " : "")}{(exitsChanged ? "exits " : "")}" +
             $"{(descChanged ? "desc " : "")}{(roomIdChanged ? "srvid " : "")}" +
             $"{(movePending ? "move" : "")}".TrimEnd() +
@@ -446,7 +480,10 @@ public sealed class AutoMapperEngine
     private void OnRoomChanged(string title, string description, IReadOnlyCollection<string> exits)
     {
         var fingerprint     = MapFingerprint.Compute(title, exits);
-        var serverRoomId    = _state?.ServerRoomId ?? string.Empty;
+        // A stale id (room delta with no nav — see _staleTrack*) is treated as
+        // absent: tier (a), the srv-veto, and every stamping site below already
+        // guard the empty string, so this one substitution disarms them all.
+        var serverRoomId    = _serverIdStale ? string.Empty : _state?.ServerRoomId ?? string.Empty;
         var prevNode        = CurrentNode;
         var usedDir         = _pendingDirection;
         var usedMoveCommand = _pendingMoveCommand;
