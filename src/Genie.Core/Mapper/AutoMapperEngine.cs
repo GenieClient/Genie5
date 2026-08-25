@@ -39,6 +39,13 @@ public sealed class AutoMapperEngine
     // ServerRoomId → NodeId for exact room matching via <nav rm="..."/>
     private readonly Dictionary<string, int> _serverRoomIndex = new(StringComparer.OrdinalIgnoreCase);
 
+    // NodeId → the server room id that node is known to be. Reverse of
+    // _serverRoomIndex, fed by the same three writers (rebuild, stamp,
+    // session-learn). Powers the srv-veto in OnRoomChanged: the fuzzy tiers
+    // must not match a node that is known to be a DIFFERENT server room than
+    // the block on the wire.
+    private readonly Dictionary<int, string> _nodeServerIdIndex = new();
+
     // lowercased tag → node ids carrying it. Drives #goto @tag nearest-routing
     // (Lich find_nearest_by_tag). Rebuilt by RebuildIndex alongside the others.
     private readonly Dictionary<string, List<int>> _tagIndex = new();
@@ -486,6 +493,26 @@ public sealed class AutoMapperEngine
         // Which tier resolved the room, for the #config mapperdebug trace.
         string tier = "none";
 
+        // Server-id contradiction veto for the text-based tiers below. Tier (a)
+        // treats the server id as definitive, so the contrapositive must hold
+        // too: a candidate already known to be a DIFFERENT server room —
+        // stamped on the map or learned earlier this session — cannot be this
+        // room, however well its text matches. Without this, two adjacent
+        // same-fingerprint rooms collapse onto one node: Leth Deriel has twin
+        // 'Liyos Approach' rooms (srvid 100075/100076, identical title and
+        // nw/se exits) and recording through them dropped the second room.
+        bool srvVetoed = false;
+        bool ContradictsServerId(MapNode cand)
+        {
+            if (string.IsNullOrEmpty(serverRoomId)) return false;
+            if (!_nodeServerIdIndex.TryGetValue(cand.Id, out var known) ||
+                string.IsNullOrEmpty(known) ||
+                known.Equals(serverRoomId, StringComparison.OrdinalIgnoreCase))
+                return false;
+            srvVetoed = true;
+            return true;
+        }
+
         // (a) Server room ID — definitive match
         if (!string.IsNullOrEmpty(serverRoomId) &&
             _serverRoomIndex.TryGetValue(serverRoomId, out var srvId) &&
@@ -517,7 +544,8 @@ public sealed class AutoMapperEngine
 
             if (arc?.DestinationId is { } destId &&
                 _zone.Nodes.TryGetValue(destId, out var arcDest) &&
-                arcDest.Title.Equals(title, StringComparison.OrdinalIgnoreCase))
+                arcDest.Title.Equals(title, StringComparison.OrdinalIgnoreCase) &&
+                !ContradictsServerId(arcDest))
             {
                 node = arcDest;
                 graphGrounded = true;
@@ -543,6 +571,13 @@ public sealed class AutoMapperEngine
         //          graph walk runs from the wrong room and stays wrong.
         if (node is null && allowFuzzy && _fingerprintIndex.TryGetValue(fingerprint, out var candidateIds))
         {
+            // Drop candidates the srv-veto rules out before any disambiguation —
+            // a "unique" fingerprint hit that is really a different server room
+            // must not win here (nor be picked by adjacency/desc below).
+            if (!string.IsNullOrEmpty(serverRoomId))
+                candidateIds = candidateIds.Where(id =>
+                    _zone.Nodes.TryGetValue(id, out var cn) && !ContradictsServerId(cn)).ToList();
+
             if (candidateIds.Count == 1)
             {
                 _zone.Nodes.TryGetValue(candidateIds[0], out node);
@@ -598,6 +633,7 @@ public sealed class AutoMapperEngine
             {
                 if (!candidate.Title.Equals(title, StringComparison.OrdinalIgnoreCase))
                     continue;
+                if (ContradictsServerId(candidate)) continue;
                 var backArc = candidate.GetExit(oppDir);
                 if (backArc?.DestinationId == prevNode.Id)
                 { node = candidate; graphGrounded = true; tier = "d:reverse-arc"; break; }
@@ -612,6 +648,7 @@ public sealed class AutoMapperEngine
             {
                 if (!candidate.Title.Equals(title, StringComparison.OrdinalIgnoreCase))
                     continue;
+                if (ContradictsServerId(candidate)) continue;
                 if (string.IsNullOrEmpty(candidate.Description)) continue;
                 // Compare the first 80 chars of description (handles minor
                 // trailing variations like player names in room text).
@@ -641,6 +678,7 @@ public sealed class AutoMapperEngine
             {
                 if (!candidate.Title.Equals(title, StringComparison.OrdinalIgnoreCase))
                     continue;
+                if (ContradictsServerId(candidate)) continue;
                 var nodeDirs = candidate.Exits
                     .Select(e => e.Direction)
                     .Where(d => d != Direction.None)
@@ -680,7 +718,8 @@ public sealed class AutoMapperEngine
                 if (!string.IsNullOrEmpty(serverRoomId) && string.IsNullOrEmpty(node.ServerRoomId))
                 {
                     node.ServerRoomId = serverRoomId;
-                    _serverRoomIndex.TryAdd(serverRoomId, node.Id);
+                    if (_serverRoomIndex.TryAdd(serverRoomId, node.Id))
+                        _nodeServerIdIndex.TryAdd(node.Id, serverRoomId);
                     zoneChanged = true;
                 }
             }
@@ -704,8 +743,9 @@ public sealed class AutoMapperEngine
             // In-memory only: does NOT set node.ServerRoomId and does NOT set
             // zoneChanged, so nothing reaches disk and the imported map stays
             // byte-identical to upstream. Rebuilt from disk on every LoadZone.
-            if (graphGrounded && !string.IsNullOrEmpty(serverRoomId))
-                _serverRoomIndex.TryAdd(serverRoomId, node.Id);
+            if (graphGrounded && !string.IsNullOrEmpty(serverRoomId) &&
+                _serverRoomIndex.TryAdd(serverRoomId, node.Id))
+                _nodeServerIdIndex.TryAdd(node.Id, serverRoomId);
         }
         else if (!IsEnabled)
         {
@@ -769,8 +809,9 @@ public sealed class AutoMapperEngine
             }
             fpList.Add(node.Id);
 
-            if (!string.IsNullOrEmpty(serverRoomId))
-                _serverRoomIndex.TryAdd(serverRoomId, node.Id);
+            if (!string.IsNullOrEmpty(serverRoomId) &&
+                _serverRoomIndex.TryAdd(serverRoomId, node.Id))
+                _nodeServerIdIndex.TryAdd(node.Id, serverRoomId);
             zoneChanged = true;
             tier = "new-node";
         }
@@ -826,6 +867,7 @@ public sealed class AutoMapperEngine
         Diagnostics?.Invoke(
             $"[mapper]   -> {DescribeCurrent()} => #{node.Id} via {tier}" +
             (graphGrounded ? " (graph-grounded)" : "") +
+            (srvVetoed ? " [srv-veto]" : "") +
             (prevNode is not null && prevNode.Id == node.Id ? "  [NO CHANGE]" : ""));
 
         CurrentNode = node;
@@ -1170,6 +1212,7 @@ public sealed class AutoMapperEngine
     {
         _fingerprintIndex.Clear();
         _serverRoomIndex.Clear();
+        _nodeServerIdIndex.Clear();
         _tagIndex.Clear();
         foreach (var node in _zone.Nodes.Values)
         {
@@ -1181,8 +1224,9 @@ public sealed class AutoMapperEngine
             }
             list.Add(node.Id);
 
-            if (!string.IsNullOrEmpty(node.ServerRoomId))
-                _serverRoomIndex.TryAdd(node.ServerRoomId, node.Id);
+            if (!string.IsNullOrEmpty(node.ServerRoomId) &&
+                _serverRoomIndex.TryAdd(node.ServerRoomId, node.Id))
+                _nodeServerIdIndex.TryAdd(node.Id, node.ServerRoomId);
 
             foreach (var tag in node.Tags)
             {
