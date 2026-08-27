@@ -1413,7 +1413,7 @@ public sealed class ScriptEngine
                 // time so %-references to vars written earlier in the chain
                 // see the fresh value, not the pre-fire one.
                 foreach (var stmt in SplitSemicolons(act.Command))
-                    Dispatch(SubstituteVars(stmt, inst), inst, 0, -1);
+                    Dispatch(SubstituteVars(stmt, inst), inst, 0, -1, fromAction: true);
             }
             catch (Exception ex)
             { _echo($"[script] {inst.Name} action error: {ex.Message}"); }
@@ -1574,9 +1574,51 @@ public sealed class ScriptEngine
         return Dispatch(substituted, inst, line.LineNumber, currentIdx);
     }
 
+    /// <summary>
+    /// Clear every script-authored blocking state — pause/wait/delay/move,
+    /// an armed matchwait, waitfor, and waiteval — so the next tick steps the
+    /// instance again. Used by an action-dispatched <c>goto</c> (public #297).
+    /// Deliberately does NOT touch <see cref="ScriptInstance.UserPaused"/>,
+    /// <see cref="ScriptInstance.RtBypass"/>, or PendingSends, and only clears
+    /// PendingMatches as part of an armed matchwait (the caller decides about
+    /// unarmed accumulated patterns). Returns a short description of what was
+    /// cleared, or null when the instance wasn't blocked.
+    /// </summary>
+    private static string? ClearScriptBlocks(ScriptInstance inst)
+    {
+        string? what = null;
+        void Note(string s) => what = what is null ? s : $"{what}+{s}";
+
+        if (inst.Paused)
+        {
+            Note(inst.PauseMode.ToString().ToLowerInvariant());
+            inst.Paused = false; inst.PauseMode = PauseMode.None; inst.PauseUntil = DateTime.MinValue;
+        }
+        if (inst.InMatchWait)
+        {
+            Note("matchwait");
+            inst.InMatchWait = false; inst.MatchWaitDeadline = DateTime.MaxValue;
+            inst.PendingMatches.Clear();
+        }
+        if (inst.WaitForPattern is not null)
+        {
+            Note("waitfor");
+            inst.WaitForPattern = null; inst.WaitForDeadline = DateTime.MaxValue;
+        }
+        if (inst.WaitEvalExpr is not null)
+        {
+            Note("waiteval");
+            inst.WaitEvalExpr = null; inst.WaitEvalDeadline = DateTime.MaxValue;
+        }
+        return what;
+    }
+
     /// <param name="text">Statement text, already %var/$var-substituted.</param>
     /// <param name="currentIdx">Index in inst.Lines of the source line, used for if/else jump lookups.</param>
-    private bool Dispatch(string text, ScriptInstance inst, int lineNo, int currentIdx)
+    /// <param name="fromAction">True when this statement is an action body firing on a
+    /// game line rather than a stepped script line — a `goto` then abandons any
+    /// blocking state the script is parked in (Genie 4 parity, public #297).</param>
+    private bool Dispatch(string text, ScriptInstance inst, int lineNo, int currentIdx, bool fromAction = false)
     {
         var (cmd, rest) = SplitCmd(text);
         var lower = cmd.ToLowerInvariant();
@@ -1599,7 +1641,7 @@ public sealed class ScriptEngine
             // the inline body (or empty / "{" for block form).
             int tIdx = ScriptParser.FindThenKeyword(rest);
             var afterThen = tIdx >= 0 ? rest[(tIdx + 4)..].Trim() : rest;
-            return HandleConditional(present, afterThen, inst, lineNo, currentIdx);
+            return HandleConditional(present, afterThen, inst, lineNo, currentIdx, fromAction);
         }
 
         switch (lower)
@@ -1628,7 +1670,7 @@ public sealed class ScriptEngine
                 bool cond = EvalConditionSafe(condText, inst, $"line {lineNo}", out var dbgNote);
                 DbgEcho(inst, 3, $"{lower} ({condText}) = {cond}" +
                                  (dbgNote is null ? "" : $"  ⚠ {dbgNote}"));
-                return HandleConditional(cond, afterThen, inst, lineNo, currentIdx);
+                return HandleConditional(cond, afterThen, inst, lineNo, currentIdx, fromAction);
             }
 
             case "else":
@@ -1645,7 +1687,7 @@ public sealed class ScriptEngine
                 // here.) Matches Genie4's split of `else <body>` into two
                 // lines: `else` + `<body>`.
                 if (rest.Length > 0)
-                    return Dispatch(rest, inst, lineNo, currentIdx);
+                    return Dispatch(rest, inst, lineNo, currentIdx, fromAction);
                 return true;
 
             case "put":
@@ -1875,6 +1917,25 @@ public sealed class ScriptEngine
                 if (inst.Labels.TryGetValue(gLabel, out var gi))
                 {
                     inst.Pc = gi + 1;
+                    // Genie 4 parity (public #297): an ACTION-dispatched goto
+                    // abandons whatever the script is blocked on and resumes at
+                    // the target label. G4 does this on exactly this path —
+                    // Script.cs:2299-2303 clears MatchList (even patterns armed
+                    // before the matchwait), WaitForMatchAction, and the
+                    // pause/matchwait state — while a NORMAL goto clears
+                    // nothing: the register-matches-then-goto-to-a-shared-
+                    // matchwait idiom depends on that asymmetry. Without this,
+                    // the goto moved the program counter but the step gate
+                    // still saw the block, parking the script forever.
+                    // UserPaused survives: that is the player's pause, not the
+                    // script's.
+                    if (fromAction)
+                    {
+                        var cleared = ClearScriptBlocks(inst);
+                        inst.PendingMatches.Clear();
+                        if (cleared is not null)
+                            DbgEcho(inst, 1, $"action goto {gLabel} — cleared {cleared}");
+                    }
                     DbgEcho(inst, 1, $"goto {gLabel} → line {TargetLineNo(inst, gi + 1)}");
                     inst.Trace.Add($"goto {gLabel}", gOrigin, lineNo);
                 }
@@ -2471,7 +2532,8 @@ public sealed class ScriptEngine
     }
 
     private bool HandleConditional(bool cond, string afterThen,
-                                    ScriptInstance inst, int lineNo, int currentIdx)
+                                    ScriptInstance inst, int lineNo, int currentIdx,
+                                    bool fromAction = false)
     {
         // "then {" on the same line is a brace block, not an inline body.
         // The parser records an IfFalseJump for this line just like when the
@@ -2479,7 +2541,7 @@ public sealed class ScriptEngine
         if (afterThen.Length > 0 && afterThen != "{")
         {
             // inline form: execute the after-then as a statement (only when true)
-            if (cond) return Dispatch(afterThen, inst, lineNo, currentIdx);
+            if (cond) return Dispatch(afterThen, inst, lineNo, currentIdx, fromAction);
             return true;
         }
 
