@@ -161,6 +161,47 @@ public class SendGateMatchReplayTests : IDisposable
     }
 
     [Fact]
+    public void Action_goto_abandons_the_gate_buffer_with_the_rest_of_the_context()
+    {
+        // #297 × #309 interaction: an action-dispatched goto wipes the match
+        // list (G4 parity), so a matchwait armed AFTER the jump can never see
+        // lines from before it in Genie 4 — the gate buffer must go with the
+        // abandoned context, not replay pre-goto lines into the new match set.
+        Start("interrupted",
+            "action goto jumped when ^INTERRUPT\n" +
+            "match old TARGET-LINE\n" +
+            "put cmd1\n" +
+            "put cmd2\n" +
+            "matchwait\n" +
+            "echo NO\n" +
+            "exit\n" +
+            ":jumped\n" +
+            "match new TARGET-LINE\n" +
+            "put cmd3\n" +
+            "matchwait 0.2\n" +
+            "echo JUMP-NO-MATCH\n" +
+            "exit\n" +
+            ":new\n" +
+            "echo WRONG-REPLAY\n" +
+            "exit\n" +
+            ":old\n" +
+            "echo WRONG-OLD\n" +
+            "exit\n");
+        Pump();                                            // cmd1 sent, cmd2 gated
+        _engine.OnGameLine("TARGET-LINE arrives early.");  // buffered in the gate window
+        _engine.OnGameLine("INTERRUPT now");               // action goto :jumped
+        _engine.OnPrompt();
+        Pump();                                            // cmd3 sends, matchwait 0.2 arms
+        Thread.Sleep(250);
+        Pump();                                            // matchwait times out
+
+        Assert.Contains("cmd3", _sent);
+        Assert.Contains("JUMP-NO-MATCH", _echoed);
+        Assert.DoesNotContain("WRONG-REPLAY", _echoed);
+        Assert.DoesNotContain("WRONG-OLD", _echoed);
+    }
+
+    [Fact]
     public void Fired_match_reports_label_and_line_at_debug_level_2()
     {
         Start("dbg",

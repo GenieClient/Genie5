@@ -1978,6 +1978,13 @@ public sealed class ScriptEngine
                     {
                         var cleared = ClearScriptBlocks(inst);
                         inst.PendingMatches.Clear();
+                        // The send-gate replay buffer (public #309) belongs to
+                        // the context being abandoned: G4's action goto wipes
+                        // the match list, so a matchwait armed AFTER the jump
+                        // can never see lines from before it. Keeping the
+                        // buffer would replay pre-goto lines into the new
+                        // match set.
+                        inst.GateReplay.Clear();
                         if (cleared is not null)
                             DbgEcho(inst, 1, $"action goto {gLabel} — cleared {cleared}");
                     }
