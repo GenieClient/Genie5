@@ -123,6 +123,19 @@ public sealed class ScriptInstance
     public string?  WaitEvalExpr;
     public DateTime WaitEvalDeadline = DateTime.MaxValue;
 
+    // Send-gate replay buffer (public #309). SendGateBlocked is true while the
+    // last StepOne attempt ended parked in an ENGINE-imposed send gate (the
+    // 1-deep put pipeline, the type-ahead budget, or a queued-send delay) —
+    // gates Genie 4 doesn't have: its put/send never block the script, so a
+    // G4 script reaches its matchwait/waitfor before any response returns.
+    // Lines arriving while gated are buffered here and replayed through the
+    // matcher when matchwait/waitfor arms, restoring the visibility G4 would
+    // have had. Script-authored blocks (pause/wait/delay/move/nextroom/
+    // waiteval) clear the buffer — lines missed during those are missed in
+    // G4 too, so replaying them would over-match.
+    public bool SendGateBlocked;
+    public readonly List<string> GateReplay = new();
+
     public bool IsBlocked => Paused || InMatchWait || WaitForPattern != null || WaitEvalExpr != null;
 
     /// <summary>Set when a <c>delay</c> timer expires; lets the tick loop run

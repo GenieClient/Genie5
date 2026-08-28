@@ -1036,21 +1036,51 @@ public sealed class ScriptEngine
             // match / matchre + matchwait
             if (inst.InMatchWait)
             {
-                foreach (var (label, pattern, isRegex) in inst.PendingMatches)
-                {
-                    if (!TryMatch(line, pattern, isRegex, inst, capture: true)) continue;
-                    if (!inst.Labels.TryGetValue(label, out var idx)) continue;
-
-                    inst.Pc                = idx + 1;
-                    inst.InMatchWait       = false;
-                    inst.MatchWaitDeadline = DateTime.MaxValue;
-                    inst.PendingMatches.Clear();
-                    inst.Trace.Add($"match {label}");
-                    break;
-                }
+                TryFireMatch(inst, line, replayed: false);
+            }
+            else if (inst.SendGateBlocked)
+            {
+                // The script is parked in an engine-imposed send gate (public
+                // #309) — in Genie 4 it would already be at its matchwait /
+                // waitfor, so this line must stay testable. Buffer it; the
+                // matchwait/waitfor handlers replay the buffer when they arm.
+                if (inst.GateReplay.Count >= GateReplayCap)
+                    inst.GateReplay.RemoveAt(0);
+                inst.GateReplay.Add(line);
             }
         }
         TickCore();
+    }
+
+    /// <summary>Upper bound on buffered gate-period lines per script (public
+    /// #309). A send gate lasts at most a few server round trips, so a real
+    /// gate period is tens of lines; the cap only guards against a script that
+    /// keeps re-gating without ever reaching a matchwait. Oldest lines drop
+    /// first — recency wins because the buffer is consumed newest-idiom-first
+    /// at the next arm anyway.</summary>
+    private const int GateReplayCap = 400;
+
+    /// <summary>Test one game line against the armed <c>match</c>/<c>matchre</c>
+    /// list and jump to the winning label. Shared by the live matchwait path
+    /// (line just arrived) and the send-gate replay (line arrived while the
+    /// script was parked in the engine's send gate — public #309).</summary>
+    private bool TryFireMatch(ScriptInstance inst, string line, bool replayed)
+    {
+        foreach (var (label, pattern, isRegex) in inst.PendingMatches)
+        {
+            if (!TryMatch(line, pattern, isRegex, inst, capture: true)) continue;
+            if (!inst.Labels.TryGetValue(label, out var idx)) continue;
+
+            inst.Pc                = idx + 1;
+            inst.InMatchWait       = false;
+            inst.MatchWaitDeadline = DateTime.MaxValue;
+            inst.PendingMatches.Clear();
+            inst.GateReplay.Clear();
+            inst.Trace.Add($"match {label}");
+            DbgEcho(inst, 2, $"match {label}{(replayed ? " (replayed)" : "")} on \"{line}\" → line {TargetLineNo(inst, idx + 1)}");
+            return true;
+        }
+        return false;
     }
 
     public void OnPrompt() { lock (_exec) OnPromptCore(); }
@@ -1432,6 +1462,10 @@ public sealed class ScriptEngine
 
     private bool StepOne(ScriptInstance inst)
     {
+        // Assume this attempt makes progress; the send-gate defer points below
+        // re-set the flag when the script ends up parked instead (public #309).
+        inst.SendGateBlocked = false;
+
         // Drain any pending semicolon-split sends before advancing the PC.
         if (inst.PendingSends.Count > 0)
         {
@@ -1442,6 +1476,7 @@ public sealed class ScriptEngine
             // self-wakeup so we drain even if no server traffic arrives.
             if (DateTime.UtcNow < inst.NextSendAt)
             {
+                inst.SendGateBlocked = true;
                 ScheduleTick?.Invoke(inst.NextSendAt - DateTime.UtcNow + TimeSpan.FromSeconds(0.05));
                 return false;
             }
@@ -1452,7 +1487,7 @@ public sealed class ScriptEngine
             var peek = inst.PendingSends.Peek().Command;
             bool nextSendsToGame = peek.Length > 0 && peek[0] != '#' && peek[0] != '.';
             int effectiveLimit = nextSendsToGame ? 1 : _typeAhead.Limit;
-            if (_inFlight >= effectiveLimit) return false;
+            if (_inFlight >= effectiveLimit) { inst.SendGateBlocked = true; return false; }
             var next = inst.PendingSends.Dequeue().Command;
 
             // Arm the gate for the new head from ITS leading delay, measured
@@ -1771,6 +1806,7 @@ public sealed class ScriptEngine
                 int effectiveLimit = sendsToGame ? 1 : _typeAhead.Limit;
                 if (_inFlight >= effectiveLimit)
                 {
+                    inst.SendGateBlocked = true;
                     inst.Pc--; // re-execute next tick when budget frees up
                     return false;
                 }
@@ -1832,6 +1868,10 @@ public sealed class ScriptEngine
                 if (!string.IsNullOrWhiteSpace(rest) &&
                     double.TryParse(rest.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var p))
                     secs = p;
+                // A script-authored block ends the send-gate replay window —
+                // lines that land during a pause are missed in Genie 4 too,
+                // so a later matchwait must not see them (public #309).
+                inst.GateReplay.Clear();
                 inst.Paused     = true;
                 inst.PauseMode  = PauseMode.Pause;
                 inst.PauseUntil = DateTime.UtcNow.AddSeconds(secs);
@@ -1845,6 +1885,7 @@ public sealed class ScriptEngine
                 // wait — block until next game prompt. Genie4 parity: no
                 // roundtime gating, no timer component (script unblocks on
                 // the first prompt event after this statement).
+                inst.GateReplay.Clear();  // script-authored block (public #309)
                 inst.Paused     = true;
                 inst.PauseMode  = PauseMode.Wait;
                 inst.PauseUntil = DateTime.MinValue; // no timer — prompt-driven
@@ -1860,6 +1901,7 @@ public sealed class ScriptEngine
                 if (!string.IsNullOrWhiteSpace(rest) &&
                     double.TryParse(rest.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var p))
                     secs = p;
+                inst.GateReplay.Clear();  // script-authored block (public #309)
                 inst.Paused     = true;
                 inst.PauseMode  = PauseMode.Delay;
                 inst.PauseUntil = DateTime.UtcNow.AddSeconds(secs);
@@ -1879,6 +1921,7 @@ public sealed class ScriptEngine
                 {
                     if (_inFlight >= _typeAhead.Limit)
                     {
+                        inst.SendGateBlocked = true;
                         inst.Pc--; // re-run next tick when budget frees up
                         return false;
                     }
@@ -1887,6 +1930,7 @@ public sealed class ScriptEngine
                     Extensions.DispatchCommand(rest);
                     _sendCommand(rest);
                 }
+                inst.GateReplay.Clear();  // script-authored block (public #309)
                 inst.Paused     = true;
                 inst.PauseMode  = PauseMode.Move;
                 inst.PauseUntil = DateTime.MaxValue; // wakes only on room change
@@ -1898,6 +1942,7 @@ public sealed class ScriptEngine
                 // Pause until the next room change without sending anything.
                 // Genie4 equivalent for waiting on someone else's movement
                 // (e.g. dragging) or a passive room transition.
+                inst.GateReplay.Clear();  // script-authored block (public #309)
                 inst.Paused     = true;
                 inst.PauseMode  = PauseMode.Move;
                 inst.PauseUntil = DateTime.MaxValue;
@@ -2050,33 +2095,65 @@ public sealed class ScriptEngine
             }
 
             case "matchwait":
-                inst.InMatchWait = true;
-                if (double.TryParse(rest.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var mw))
-                    inst.MatchWaitDeadline = DateTime.UtcNow.AddSeconds(mw);
-                else
-                    inst.MatchWaitDeadline = DateTime.MaxValue;
+            {
+                bool hasTimeout = double.TryParse(rest.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var mw);
                 DbgEcho(inst, 2, $"matchwait ({inst.PendingMatches.Count} patterns" +
                     (mw > 0 ? $", timeout {mw}s)" : ")"));
+
+                // G4 parity (public #309): before blocking, replay lines that
+                // arrived while this script was parked in the engine's send
+                // gate. Genie 4's `put` never waits, so its matchwait is armed
+                // before any response returns — the replay restores exactly
+                // that visibility. The buffer holds only gate-period lines
+                // (script-authored pause/wait/etc clear it), so nothing G4
+                // would have missed can match here.
+                if (inst.GateReplay.Count > 0)
+                {
+                    var replay = inst.GateReplay.ToArray();
+                    inst.GateReplay.Clear();
+                    foreach (var l in replay)
+                        if (TryFireMatch(inst, l, replayed: true))
+                            return true;   // jumped to the matched label — keep executing
+                }
+
+                inst.InMatchWait       = true;
+                inst.MatchWaitDeadline = hasTimeout ? DateTime.UtcNow.AddSeconds(mw) : DateTime.MaxValue;
                 return false;
+            }
 
             case "waitfor":
-                inst.WaitForPattern  = rest;
-                inst.WaitForIsRegex  = false;
-                inst.WaitForDeadline = DateTime.MaxValue;
-                DbgEcho(inst, 2, $"waitfor \"{rest}\"");
-                return false;
-
             case "waitforre":
+            {
+                bool wfRegex = lower == "waitforre";
+                DbgEcho(inst, 2, $"{lower} \"{rest}\"");
+
+                // Same G4-parity replay as matchwait (public #309): a waitfor
+                // that follows multiple puts must see the earlier puts'
+                // responses, which arrived while the script was still parked
+                // in the send gate.
+                if (inst.GateReplay.Count > 0)
+                {
+                    var replay = inst.GateReplay.ToArray();
+                    inst.GateReplay.Clear();
+                    foreach (var l in replay)
+                    {
+                        if (!TryMatch(l, rest, wfRegex, inst, capture: true)) continue;
+                        DbgEcho(inst, 2, $"{lower} matched (replayed) on \"{l}\"");
+                        return true;   // pattern already satisfied — don't block
+                    }
+                }
+
                 inst.WaitForPattern  = rest;
-                inst.WaitForIsRegex  = true;
+                inst.WaitForIsRegex  = wfRegex;
                 inst.WaitForDeadline = DateTime.MaxValue;
-                DbgEcho(inst, 2, $"waitforre \"{rest}\"");
                 return false;
+            }
 
             case "waiteval":
                 // waiteval <expression> — block until expression evaluates true.
                 // The expression is stored raw (not substituted) so live
                 // variable state is re-read on each evaluation.
+                inst.GateReplay.Clear();  // script-authored block (public #309)
                 inst.WaitEvalExpr     = rest;
                 inst.WaitEvalDeadline = DateTime.MaxValue;
                 DbgEcho(inst, 2, $"waiteval {rest}");
@@ -2365,6 +2442,7 @@ public sealed class ScriptEngine
                 // post-substitution so $/% vars are resolved.
                 if (_inFlight >= 1)
                 {
+                    inst.SendGateBlocked = true;
                     inst.Pc--; // re-execute next tick when the budget frees up
                     return false;
                 }
