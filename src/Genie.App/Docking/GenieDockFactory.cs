@@ -2054,7 +2054,11 @@ public class GenieDockFactory : Factory
             : name.Trim();
 
         var vm   = new PluginWindowViewModel(title);
-        var tool = new PluginWindowTool(vm, id, title);
+        // Public #233: register the dynamic window so Configuration → Layout
+        // offers per-window fonts for it (one create per id/session — the
+        // _pluginWindowTools cache prevents a re-Register clobbering edits).
+        var settings = _vm.WindowSettings.Register(id, title);
+        var tool = new PluginWindowTool(vm, id, title, settings);
 
         _pluginWindowVms[id]   = vm;
         _pluginWindowTools[id] = tool;

@@ -1,6 +1,7 @@
 using System;
 using Avalonia.Media;
 using Dock.Model.Mvvm.Controls;
+using Genie.App.Controls;
 using Genie.App.ViewModels;
 using ReactiveUI;
 
@@ -28,11 +29,13 @@ public class PluginWindowTool : Tool, IWindowMenuHost, IFindHost
     /// <summary>Right-click window menu (Clear / Close), built by <see cref="GenieDockFactory"/>.</summary>
     public WindowMenuModel? WindowMenu { get; set; }
 
-    public FontFamily ToolFontFamily { get; } =
-        new("Cascadia Mono,Consolas,Courier New,monospace");
-    public double ToolFontSize { get; } = 12;
+    private FontFamily _toolFontFamily = new("Cascadia Mono,Consolas,Courier New,monospace");
+    public  FontFamily ToolFontFamily { get => _toolFontFamily; private set => SetProperty(ref _toolFontFamily, value); }
+    private double     _toolFontSize = 12;
+    public  double     ToolFontSize { get => _toolFontSize; private set => SetProperty(ref _toolFontSize, value); }
 
-    public PluginWindowTool(PluginWindowViewModel vm, string id, string title)
+    public PluginWindowTool(PluginWindowViewModel vm, string id, string title,
+                            Genie.Core.Layout.WindowSettings? settings = null)
     {
         ViewModel = vm;
         Find      = new FindInWindowModel(() => vm.Lines.Select(l => l.Text).ToArray());
@@ -42,5 +45,24 @@ public class PluginWindowTool : Tool, IWindowMenuHost, IFindHost
         // Keep the dock tab caption in sync if the plugin renames its window.
         vm.WhenAnyValue(x => x.Title)
           .Subscribe(t => { if (!string.IsNullOrWhiteSpace(t)) Title = t; });
+
+        // Public #233: honour per-window font settings. Plugin windows are
+        // registered into the WindowSettingsStore at creation (they are
+        // dynamic, so they only appear in Configuration → Layout once the
+        // plugin has opened them; settings are session-scoped for now —
+        // persisted rows for ids registered after load are dropped by
+        // WindowSettingsStore.Apply). DisplayTitle is deliberately NOT
+        // applied here: the plugin owns its own window title.
+        if (settings is not null)
+        {
+            ApplyFonts(settings);
+            settings.Changed += () => ApplyFonts(settings);
+        }
+    }
+
+    private void ApplyFonts(Genie.Core.Layout.WindowSettings s)
+    {
+        ToolFontFamily = WindowSettingsResolver.ResolveFontFamily(s.FontFamily);
+        ToolFontSize   = WindowSettingsResolver.ResolveFontSize(s.FontSize);
     }
 }
