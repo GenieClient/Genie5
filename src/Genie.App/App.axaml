@@ -65,6 +65,36 @@
       </Setter>
     </Style>
 
+    <!-- Tab overflow: with more tabs than the strip is wide, the extras were
+         simply clipped — the only way to reach them was an undiscoverable
+         mouse-wheel scroll. Dock's tab-strip ScrollViewer theme
+         (DockTabStripScrollViewerHorizontal) already carries left/right
+         repeat-arrow buttons whose visibility converter shows them exactly
+         while there is hidden content on that side — but the stock ToolTabStrip
+         theme pins HorizontalScrollBarVisibility="Hidden", and the converter
+         returns false for Hidden/Disabled, so the arrows could never appear.
+         "Auto" is what Dock's own horizontal DocumentTabStrip uses. No actual
+         scrollbar can show up — that ScrollViewer theme contains no ScrollBar
+         element; the property only gates the arrows. App-level Style priority
+         outranks the ControlTheme's own setter, so this wins without cloning
+         the whole ToolTabStrip theme. -->
+    <Style Selector="ToolTabStrip /template/ ScrollViewer#PART_ScrollViewer">
+      <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
+    </Style>
+
+    <!-- Second half of the tab-overflow fix: keep the ACTIVE tab visible.
+         Nothing in Dock scrolls the strip when the selection changes, so
+         activating an off-screen tab (window cycling, a stream tab
+         auto-activating, a restored layout) left its header hidden past the
+         edge. Applied to both strip types so docked tools, floated windows and
+         tabbed documents all behave. -->
+    <Style Selector="ToolTabStrip">
+      <Setter Property="(docking:TabStripAutoScroll.Enabled)" Value="True"/>
+    </Style>
+    <Style Selector="DocumentTabStrip">
+      <Setter Property="(docking:TabStripAutoScroll.Enabled)" Value="True"/>
+    </Style>
+
     <!-- Local-echo lines: italic + echo colour, driven by DisplaySettings.
          Use :is(TextBlock) so SelectableTextBlock (which subclasses TextBlock)
          also picks up the .echo class style. -->
