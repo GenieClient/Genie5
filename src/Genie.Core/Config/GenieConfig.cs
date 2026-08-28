@@ -98,6 +98,29 @@ public sealed class GenieConfig
     /// hides the controls to reclaim the row, the settings behind them still
     /// apply. Toggled from the Experience window's right-click menu.</summary>
     public bool ExperienceConfigBar { get; set; } = true;
+    /// <summary>Experience-window sort mode (Genie 4 EXPTracker's
+    /// <c>$ExpTracker.SortType</c>, public #272): 0 = A to Z, 1 = Left to Right
+    /// (DR's own `exp` table order — Armor, Weapons, Magic, Survival, Lore),
+    /// 2 = Learning Rate high→low, 3 = Learning Rate low→high. Default 2 —
+    /// the order Genie 5 has always shown, so existing panels don't reshuffle.</summary>
+    public int ExperienceSort { get; set; } = 2;
+    /// <summary>Category order for Experience sort mode 1 (Left to Right) — a
+    /// comma list over <c>armor, weapons, magic, survival, lore</c>. Reordering it
+    /// yields the "Weapons first" / "Magic first" variants without extra modes
+    /// (public #272). Categories left out keep their relative Genie 4 order after
+    /// the listed ones; unknown skills always sort last.</summary>
+    public string ExperienceSortOrder { get; set; } = "armor,weapons,magic,survival,lore";
+    /// <summary>Echo experience pulses to the game window (Genie 4 EXPTracker's
+    /// <c>$ExpTracker.EchoExp</c>, public #272): each prompt flushes one
+    /// <c>Learned: Skill(+2), …</c> line for mindstate gains and a
+    /// <c>Pulsed: Skill(-1), …</c> line for drains. The lines also feed script
+    /// actions/triggers, like Genie 4's <c>#parse</c> leg. Default off.</summary>
+    public bool ExperienceEcho { get; set; }
+    /// <summary>Show rested experience in the Experience window's summary
+    /// (Genie 4 EXPTracker's <c>DisplayREXP</c>, public #272): the stored /
+    /// usable / cycle-refresh times DR pushes in the <c>exp rexp</c> component.
+    /// The $RestedEXP.* globals populate regardless. Default off.</summary>
+    public bool ExperienceRested { get; set; }
     /// <summary>Built-in Time Tracker (Elanthian time / sky "Time Tracker" dock panel).
     /// Default on. Was the external Plugin_TimeTrackerV5, now in Core.</summary>
     public bool ShowTimeTracker { get; set; } = true;
@@ -671,6 +694,10 @@ public sealed class GenieConfig
         ("experiencetrackgain", ExperienceTrackGain.ToString()),
         ("experienceg4layout", ExperienceG4Layout.ToString()),
         ("experienceconfigbar", ExperienceConfigBar.ToString()),
+        ("experiencesort", ExperienceSort.ToString()),
+        ("experiencesortorder", ExperienceSortOrder),
+        ("experienceecho", ExperienceEcho.ToString()),
+        ("experiencerested", ExperienceRested.ToString()),
         ("showtimetracker", ShowTimeTracker.ToString()),
         ("autolog", AutoLog.ToString()),
         ("automapper", AutoMapper.ToString()),
@@ -799,7 +826,7 @@ public sealed class GenieConfig
         ("Connection",       new[] { "activitytimeout", "classicconnect", "conndebug", "connectscript", "flagscheck", "frontend", "reconnect" }),
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
-        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
+        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug" }),
@@ -852,6 +879,10 @@ public sealed class GenieConfig
                 case "experiencetrackgain": ExperienceTrackGain = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "experienceg4layout": ExperienceG4Layout = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "experienceconfigbar": ExperienceConfigBar = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
+                case "experiencesort": ExperienceSort = Math.Clamp(UtilityCore.StringToInteger(value), 0, 3); Notify(ConfigFieldUpdated.Trackers); break;
+                case "experiencesortorder": ExperienceSortOrder = value.Trim(); Notify(ConfigFieldUpdated.Trackers); break;
+                case "experienceecho": ExperienceEcho = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
+                case "experiencerested": ExperienceRested = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "showtimetracker": ShowTimeTracker = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "autolog": AutoLog = ToBool(value); Notify(ConfigFieldUpdated.Autolog); break;
                 case "classicconnect": ClassicConnect = ToBool(value); Notify(ConfigFieldUpdated.ClassicConnect); break;

@@ -75,6 +75,19 @@ public sealed class ExperienceExtension : IGameExtension
     /// switch. Guarded by <see cref="_gate"/>.</summary>
     private DateTime? _sessionStart;
 
+    /// <summary>Pulse-echo accumulators (Genie 4 EXPTracker's EchoExp, public #272):
+    /// mindstate rises collect into <see cref="_echoLearned"/> ("Skill(+2)") and
+    /// drops into <see cref="_echoPulsed"/> ("Skill(-1)", deduped by name like G4);
+    /// <see cref="OnPrompt"/> flushes each as one line. Guarded by <see cref="_gate"/>.</summary>
+    private readonly List<string> _echoLearned = new();
+    private readonly List<string> _echoPulsed  = new();
+    private readonly HashSet<string> _echoPulsedNames = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Latest rested-EXP snapshot from the <c>exp rexp</c> component
+    /// ("5:58", "5:56", "17:11" — the " hours" suffix stripped), or null before any
+    /// arrives. Guarded by <see cref="_gate"/>; cleared on character switch.</summary>
+    private (string Stored, string Usable, string Refresh)? _rested;
+
     /// <summary>Canonical 35 DR learning states (0–34), authoritative order from
     /// Genie 4's EXPTracker.</summary>
     private static readonly string[] MindStates =
@@ -87,6 +100,65 @@ public sealed class ExperienceExtension : IGameExtension
         "captivated", "engrossed", "riveted", "very riveted", "rapt",
         "very rapt", "enthralled", "nearly locked", "mind lock",
     };
+
+    /// <summary>Genie 4 EXPTracker's master skill order (its "Left to Right" sort,
+    /// recovered from the plugin) — the order DR's own <c>exp</c> table walks the
+    /// skillsets. The hundreds band doubles as the category: 0xx Armor, 1xx Weapons,
+    /// 2xx Magic, 3xx Survival, 4xx Lore. Skills DR adds later fall to
+    /// <see cref="UnknownOrder"/> (sorted last, alphabetically).</summary>
+    private static readonly Dictionary<string, int> SkillOrder = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Shield Usage"] = 0,   ["Light Armor"] = 1,     ["Chain Armor"] = 2,     ["Brigandine"] = 3,
+        ["Plate Armor"] = 4,    ["Defending"] = 5,       ["Conviction"] = 6,
+        ["Parry Ability"] = 100, ["Small Edged"] = 101,  ["Large Edged"] = 102,   ["Twohanded Edged"] = 103,
+        ["Small Blunt"] = 104,  ["Large Blunt"] = 105,   ["Twohanded Blunt"] = 106, ["Slings"] = 107,
+        ["Bow"] = 108,          ["Crossbow"] = 109,      ["Staves"] = 110,        ["Polearms"] = 111,
+        ["Light Thrown"] = 112, ["Heavy Thrown"] = 113,  ["Brawling"] = 114,      ["Offhand Weapon"] = 115,
+        ["Melee Mastery"] = 116, ["Missile Mastery"] = 117, ["Expertise"] = 118,
+        ["Lunar Magic"] = 200,  ["Elemental Magic"] = 200, ["Holy Magic"] = 200,  ["Life Magic"] = 200,
+        ["Arcane Magic"] = 200, ["Inner Magic"] = 200,   ["Inner Fire"] = 200,
+        ["Attunement"] = 201,   ["Arcana"] = 202,        ["Targeted Magic"] = 203, ["Augmentation"] = 204,
+        ["Debilitation"] = 205, ["Utility"] = 206,       ["Warding"] = 207,       ["Sorcery"] = 208,
+        ["Astrology"] = 209,    ["Summoning"] = 209,     ["Theurgy"] = 209,
+        ["Evasion"] = 300,      ["Athletics"] = 301,     ["Perception"] = 302,    ["Stealth"] = 303,
+        ["Locksmithing"] = 304, ["Thievery"] = 305,      ["First Aid"] = 306,     ["Outdoorsmanship"] = 307,
+        ["Skinning"] = 308,     ["Backstab"] = 309,      ["Scouting"] = 309,      ["Thanatology"] = 309,
+        ["Forging"] = 401,      ["Engineering"] = 402,   ["Outfitting"] = 403,    ["Alchemy"] = 404,
+        ["Enchanting"] = 405,   ["Scholarship"] = 406,   ["Mechanical Lore"] = 407, ["Appraisal"] = 408,
+        ["Performance"] = 409,  ["Bardic Lore"] = 410,   ["Empathy"] = 410,       ["Tactics"] = 410,
+        ["Trading"] = 410,
+    };
+
+    private const int UnknownOrder = 500;
+
+    /// <summary>Left-to-right index for a skill (Genie 4 master order); unknown
+    /// skills get <see cref="UnknownOrder"/>.</summary>
+    internal static int OrderOf(string name)
+        => SkillOrder.TryGetValue(name, out var v) ? v : UnknownOrder;
+
+    /// <summary>Category name for a skill ("armor" / "weapons" / "magic" /
+    /// "survival" / "lore"), or "" for a skill not in the master table.</summary>
+    internal static string CategoryOf(string name) => OrderOf(name) switch
+    {
+        < 100 => "armor",
+        < 200 => "weapons",
+        < 300 => "magic",
+        < 400 => "survival",
+        < UnknownOrder => "lore",
+        _ => "",
+    };
+
+    /// <summary>Rank of a skill's category within the user's
+    /// <c>experiencesortorder</c> list. Listed categories come first in the
+    /// user's order; a known category the user omitted keeps its Genie 4
+    /// relative position after them; unknown skills always land last.</summary>
+    internal static int GroupRank(string name, string[] order)
+    {
+        var cat = CategoryOf(name);
+        if (cat.Length == 0) return order.Length + 10;         // unknown skill → last
+        var idx = Array.IndexOf(order, cat);
+        return idx >= 0 ? idx : order.Length + OrderOf(name) / 100;  // omitted → after listed, G4-relative
+    }
 
     private static readonly Regex TagRe    = new("<[^>]*>", RegexOptions.Compiled);
     private static readonly Regex DigitsRe = new(@"\d+", RegexOptions.Compiled);
@@ -106,6 +178,13 @@ public sealed class ExperienceExtension : IGameExtension
     private static readonly Regex TdpRe = new(
         @"Time Development Points:\s*(\d+)", RegexOptions.Compiled);
 
+    /// <summary>The <c>exp rexp</c> component body: <c>Rested EXP Stored: 5:58 hours
+    /// Usable This Cycle: 5:56 hours  Cycle Refreshes: 17:11 hours</c>. Values can be
+    /// bare ("6 hours") or H:MM; the " hours" suffix is dropped on capture.</summary>
+    private static readonly Regex RestedRe = new(
+        @"Rested EXP Stored:\s*(.+?)\s+Usable This Cycle:\s*(.+?)\s+Cycle Refreshes:\s*(.+)$",
+        RegexOptions.Compiled);
+
     public void Initialize(IExtensionHost host) => _host = host;
     public void OnCommandSent(string command) { }
     public void Shutdown() { }
@@ -121,6 +200,10 @@ public sealed class ExperienceExtension : IGameExtension
             _skills.Clear();
             _baseline.Clear();
             _sessionStart = null;
+            _rested = null;
+            _echoLearned.Clear();
+            _echoPulsed.Clear();
+            _echoPulsedNames.Clear();
         }
         _dirty = false;
         _host?.SetWindow(WindowName, Render());
@@ -150,8 +233,24 @@ public sealed class ExperienceExtension : IGameExtension
             }
             return;
         }
-        if (sub.Equals("rexp",  StringComparison.OrdinalIgnoreCase) ||
-            sub.Equals("favor", StringComparison.OrdinalIgnoreCase) ||
+        if (sub.Equals("rexp", StringComparison.OrdinalIgnoreCase))
+        {
+            // Rested EXP (public #272). Globals always publish; the panel line is
+            // gated on #config experiencerested at render time.
+            var r = RestedRe.Match(inner);
+            if (r.Success)
+            {
+                var snap = (Stored:  StripHours(r.Groups[1].Value),
+                            Usable:  StripHours(r.Groups[2].Value),
+                            Refresh: StripHours(r.Groups[3].Value));
+                _host.Globals["RestedEXP.Stored"]  = snap.Stored;
+                _host.Globals["RestedEXP.Usable"]  = snap.Usable;
+                _host.Globals["RestedEXP.Refresh"] = snap.Refresh;
+                lock (_gate) { if (_rested != snap) { _rested = snap; _dirty = true; } }
+            }
+            return;
+        }
+        if (sub.Equals("favor", StringComparison.OrdinalIgnoreCase) ||
             sub.Equals("mxp",   StringComparison.OrdinalIgnoreCase))
             return;                                       // not skills — ignore
 
@@ -196,9 +295,30 @@ public sealed class ExperienceExtension : IGameExtension
 
     public void OnPrompt()
     {
+        FlushEchoExp();
         if (!_dirty) return;
         _dirty = false;
         _host.SetWindow(WindowName, Render());
+    }
+
+    /// <summary>Flush the accumulated pulse echoes as at most two lines —
+    /// <c>Learned: Skill(+2), …</c> / <c>Pulsed: Skill(-1), …</c> — matching Genie 4
+    /// EXPTracker's EchoExp output shape (numbers are mindstate deltas). Goes through
+    /// <see cref="IExtensionHost.Echo"/>, which also feeds script actions/triggers —
+    /// the equivalent of G4's extra <c>#parse Learned: …</c> leg. While the toggle is
+    /// off the accumulators are discarded so turning it on doesn't replay a backlog.</summary>
+    private void FlushEchoExp()
+    {
+        List<string>? learned = null, pulsed = null;
+        lock (_gate)
+        {
+            if (_echoLearned.Count > 0) { learned = new List<string>(_echoLearned); _echoLearned.Clear(); }
+            if (_echoPulsed.Count  > 0) { pulsed  = new List<string>(_echoPulsed);  _echoPulsed.Clear(); }
+            _echoPulsedNames.Clear();
+        }
+        if (!EchoExp()) return;
+        if (learned is not null) _host.Echo("Learned: " + string.Join(", ", learned));
+        if (pulsed  is not null) _host.Echo("Pulsed: "  + string.Join(", ", pulsed));
     }
 
     /// <summary>Re-render the panel immediately (without waiting for the next prompt) —
@@ -318,8 +438,21 @@ public sealed class ExperienceExtension : IGameExtension
         {
             _sessionStart ??= DateTime.UtcNow;   // session clock starts at the first datum
             _baseline.TryAdd(name, (rank, pct));  // first-seen rank = session baseline (#144)
-            changed = !(_skills.TryGetValue(name, out var prev) && prev == info);  // no display change
-            if (changed) _skills[name] = info;
+            var had = _skills.TryGetValue(name, out var prev);
+            changed = !(had && prev == info);     // no display change
+            if (changed)
+            {
+                _skills[name] = info;
+                // EchoExp accumulation (public #272): the number is the MINDSTATE
+                // delta, exactly like Genie 4's build_echo_exp — a rise is
+                // "Learned", a drop is "Pulsed" (deduped per flush by name). A
+                // skill's first appearance counts as learning from clear (0).
+                var delta = mind - (had ? prev.Mindstate : 0);
+                if (delta > 0)
+                    _echoLearned.Add($"{name}(+{delta})");
+                else if (delta < 0 && _echoPulsedNames.Add(name))
+                    _echoPulsed.Add($"{name}({delta})");
+            }
         }
         if (!changed) return;
         _dirty = true;
@@ -355,6 +488,42 @@ public sealed class ExperienceExtension : IGameExtension
     /// <c>#config experienceg4layout</c> so the panel checkbox, command line, and
     /// settings.cfg all drive one value.</summary>
     private bool G4Layout() => bool.TryParse(_host.GetConfig("experienceg4layout"), out var b) && b;
+
+    /// <summary>Sort mode (public #272): 0 = A to Z, 1 = Left to Right (G4 master
+    /// order, category-grouped), 2 = Learning Rate high→low, 3 = low→high. Read live
+    /// from <c>#config experiencesort</c>; unset falls back to 2, the order the G5
+    /// panel has always used.</summary>
+    private int SortMode() =>
+        int.TryParse(_host.GetConfig("experiencesort"), out var s) ? Math.Clamp(s, 0, 3) : 2;
+
+    /// <summary>Category order for sort mode 1, from <c>#config
+    /// experiencesortorder</c> — lower-cased, trimmed; unset/blank falls back to the
+    /// Genie 4 order.</summary>
+    private string[] SortOrder()
+    {
+        var raw = _host.GetConfig("experiencesortorder");
+        if (string.IsNullOrWhiteSpace(raw)) raw = "armor,weapons,magic,survival,lore";
+        return raw.ToLowerInvariant()
+                  .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    /// <summary>Pulse echo toggle (public #272), read live from
+    /// <c>#config experienceecho</c>.</summary>
+    private bool EchoExp() => bool.TryParse(_host.GetConfig("experienceecho"), out var b) && b;
+
+    /// <summary>Rested-EXP summary line toggle (public #272), read live from
+    /// <c>#config experiencerested</c>.</summary>
+    private bool ShowRested() => bool.TryParse(_host.GetConfig("experiencerested"), out var b) && b;
+
+    /// <summary>"5:58 hours" / "6 hours" → "5:58" / "6" — the panel line and the
+    /// $RestedEXP.* globals carry the bare duration.</summary>
+    internal static string StripHours(string v)
+    {
+        v = v.Trim();
+        if (v.EndsWith(" hours", StringComparison.OrdinalIgnoreCase)) return v[..^6].TrimEnd();
+        if (v.EndsWith(" hour",  StringComparison.OrdinalIgnoreCase)) return v[..^5].TrimEnd();
+        return v;
+    }
 
     /// <summary>Render one learning row at the given density. 0 = Full (rank, %,
     /// learning word, count); 1 = drop the <c>(n/34)</c> count; 2 = numbers only
@@ -409,15 +578,29 @@ public sealed class ExperienceExtension : IGameExtension
         List<KeyValuePair<string, SkillInfo>> learning;
         Dictionary<string, (int Rank, int Percent)> baseline;
         DateTime? start;
+        (string Stored, string Usable, string Refresh)? rested;
         int locked;
         double totalGain;
+        var sortMode  = SortMode();
+        var sortOrder = sortMode == 1 ? SortOrder() : Array.Empty<string>();
         lock (_gate)
         {
-            learning = _skills
-                .Where(kv => kv.Value.Mindstate > 0)
-                .OrderByDescending(kv => kv.Value.Mindstate)
-                .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var active = _skills.Where(kv => kv.Value.Mindstate > 0);
+            // Sort modes (public #272), Genie 4 EXPTracker's $ExpTracker.SortType:
+            // 0 A to Z · 1 Left to Right (category-grouped, user-orderable) ·
+            // 2 Learning Rate high→low (the long-standing G5 default) · 3 reverse.
+            learning = (sortMode switch
+            {
+                0 => active.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase),
+                1 => active.OrderBy(kv => GroupRank(kv.Key, sortOrder))
+                           .ThenBy(kv => OrderOf(kv.Key))
+                           .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase),
+                3 => active.OrderBy(kv => kv.Value.Mindstate)
+                           .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase),
+                _ => active.OrderByDescending(kv => kv.Value.Mindstate)
+                           .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase),
+            }).ToList();
+            rested = _rested;
             locked = _skills.Count(kv => kv.Value.Mindstate >= MindStates.Length - 1);  // 34 = mind lock
             start  = _sessionStart;
             totalGain = 0;
@@ -440,6 +623,13 @@ public sealed class ExperienceExtension : IGameExtension
         summary.Append("Learning Skills: ").Append(learning.Count);
         if (locked > 0)     summary.Append("   Locked: ").Append(locked);
         if (start is { } s) summary.Append("   Session ").Append(FormatElapsed(DateTime.UtcNow - s));
+        // Rested-EXP summary line (public #272, G4 DisplayREXP): rides directly
+        // under the "Learning Skills" summary in whichever layout placed it.
+        if (ShowRested() && rested is { } r)
+            summary.Append('\n')
+                   .Append("Rested: stored ").Append(r.Stored)
+                   .Append(" · usable ").Append(r.Usable)
+                   .Append(" · refreshes ").Append(r.Refresh);
 
         const string Rule = "──────────────────────────────────────";
 

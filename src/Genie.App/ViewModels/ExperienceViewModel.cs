@@ -27,6 +27,14 @@ public class ExperienceViewModel : ReactiveObject
     private bool _trackGain;
     private bool _g4Layout;
     private bool _showConfigBar = true;
+    private int _sortIndex = 2;
+    private bool _echoExp;
+    private bool _showRested;
+
+    /// <summary>Sort-mode names for the config-bar dropdown, indexed by the
+    /// <c>experiencesort</c> value (Genie 4 EXPTracker's SortType, public #272).</summary>
+    public static string[] SortModes { get; } =
+        { "A to Z", "Left to Right", "Learning Rate", "Learning Rate Rev" };
 
     /// <summary>Stop names for the 0–4 density slider, indexed by level.</summary>
     private static readonly string[] LevelNames =
@@ -123,6 +131,58 @@ public class ExperienceViewModel : ReactiveObject
         }
     }
 
+    /// <summary>Sort-mode dropdown index == the <c>experiencesort</c> value
+    /// (public #272). Written quietly like the density slider; the config change
+    /// fires the tracker notify, which re-renders the panel in the new order.</summary>
+    public int SortIndex
+    {
+        get => _sortIndex;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _sortIndex, value);
+            var mode = Math.Clamp(value, 0, 3);
+            if (_core is not null && _core.Config.ExperienceSort != mode)
+            {
+                _core.Config.SetSetting("experiencesort", mode.ToString(), showException: false);
+                _core.Config.Save();
+            }
+        }
+    }
+
+    /// <summary>Pulse-echo toggle (public #272). Writes <c>experienceecho</c>
+    /// quietly; the tracker flushes "Learned:"/"Pulsed:" lines on each prompt
+    /// while it's on.</summary>
+    public bool EchoExp
+    {
+        get => _echoExp;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _echoExp, value);
+            if (_core is not null && _core.Config.ExperienceEcho != value)
+            {
+                _core.Config.SetSetting("experienceecho", value.ToString(), showException: false);
+                _core.Config.Save();
+            }
+        }
+    }
+
+    /// <summary>Rested-EXP summary toggle (public #272). Writes
+    /// <c>experiencerested</c> quietly; the tracker adds the stored/usable/refresh
+    /// line under the summary while it's on.</summary>
+    public bool ShowRested
+    {
+        get => _showRested;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _showRested, value);
+            if (_core is not null && _core.Config.ExperienceRested != value)
+            {
+                _core.Config.SetSetting("experiencerested", value.ToString(), showException: false);
+                _core.Config.Save();
+            }
+        }
+    }
+
     public void Attach(GenieCore core)
     {
         _core = core;
@@ -135,6 +195,12 @@ public class ExperienceViewModel : ReactiveObject
         this.RaisePropertyChanged(nameof(G4Layout));
         _showConfigBar = core.Config.ExperienceConfigBar;
         this.RaisePropertyChanged(nameof(ShowConfigBar));
+        _sortIndex = Math.Clamp(core.Config.ExperienceSort, 0, 3);
+        this.RaisePropertyChanged(nameof(SortIndex));
+        _echoExp = core.Config.ExperienceEcho;
+        this.RaisePropertyChanged(nameof(EchoExp));
+        _showRested = core.Config.ExperienceRested;
+        this.RaisePropertyChanged(nameof(ShowRested));
 
         core.SetPluginWindow += (window, content) =>
         {

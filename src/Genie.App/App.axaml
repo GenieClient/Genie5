@@ -1440,6 +1440,17 @@
           <CheckBox Content="G4 layout" VerticalAlignment="Center" FontSize="11"
                     IsChecked="{Binding ViewModel.G4Layout, Mode=TwoWay}"
                     ToolTip.Tip="Genie 4 EXPTracker look: 'Learning Skills' summary as a footer below the list instead of a header on top."/>
+          <TextBlock Text="Sort" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
+          <ComboBox ItemsSource="{x:Static vm:ExperienceViewModel.SortModes}"
+                    SelectedIndex="{Binding ViewModel.SortIndex, Mode=TwoWay}"
+                    FontSize="11" MinHeight="0" Padding="6,2" VerticalAlignment="Center"
+                    ToolTip.Tip="Genie 4 EXPTracker sort: A to Z, Left to Right (Armor / Weapons / Magic / Survival / Lore — reorder via #config experiencesortorder), or by learning rate."/>
+          <CheckBox Content="Echo" VerticalAlignment="Center" FontSize="11"
+                    IsChecked="{Binding ViewModel.EchoExp, Mode=TwoWay}"
+                    ToolTip.Tip="Echo experience pulses to the game window each prompt — 'Learned: Skill(+2)' / 'Pulsed: Skill(-1)'. The lines also feed triggers, like Genie 4's EchoExp."/>
+          <CheckBox Content="Rested" VerticalAlignment="Center" FontSize="11"
+                    IsChecked="{Binding ViewModel.ShowRested, Mode=TwoWay}"
+                    ToolTip.Tip="Show rested EXP (stored / usable / cycle refresh) under the summary. The $RestedEXP.* globals populate either way."/>
         </StackPanel>
         <!-- One SelectableTextBlock per row (via Lines/Inlines) so user highlights -->
         <!-- fire on the Experience window (#144). No wrapping: keep columns aligned; -->
