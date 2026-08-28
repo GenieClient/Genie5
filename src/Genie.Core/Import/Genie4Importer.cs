@@ -555,7 +555,11 @@ public static class Genie4Importer
 
             if (mode == ImportMode.AddOnly && existing.Contains(name)) { skipped++; continue; }
 
-            store.Set(name, value);
+            // Set() refuses reserved connection-state names (public #294) —
+            // Genie 4's type-flip quirk means any profile that ever ran
+            // `#var connected …` carries a stale connected row in
+            // variables.cfg; count it as skipped, not imported.
+            if (!store.Set(name, value)) { skipped++; continue; }
             existing.Add(name);
             imported++;
         }

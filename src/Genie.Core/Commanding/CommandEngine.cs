@@ -1438,7 +1438,7 @@ public sealed class CommandEngine
             if (parts.Count < 4) { _host.Echo("Usage: #var set <name> <value>"); return; }
             var setName  = parts[2];
             var setValue = ResolveValueCommand(string.Join(" ", parts.Skip(3)));
-            Variables.Store.Set(setName, setValue);
+            SetVarValue(setName, setValue);
             if (_processInputDepth == 1 && _interactive)
                 EchoRule($"Variable set: {setName}={setValue}");
             return;
@@ -1469,7 +1469,7 @@ public sealed class CommandEngine
         {
             var name  = parts[2];
             var value = ResolveValueCommand(string.Join(" ", parts.Skip(3)));
-            Variables.Store.Set(name, value);
+            SetVarValue(name, value);
             if (_processInputDepth == 1 && _interactive)
                 EchoRule($"Variable set: {name}={value}");
             return;
@@ -1477,9 +1477,26 @@ public sealed class CommandEngine
 
         var implicitName  = parts[1];
         var implicitValue = ResolveValueCommand(string.Join(" ", parts.Skip(2)));
-        Variables.Store.Set(implicitName, implicitValue);
+        SetVarValue(implicitName, implicitValue);
         if (_processInputDepth == 1 && _interactive)
             EchoRule($"Variable set: {implicitName}={implicitValue}");
+    }
+
+    /// <summary>
+    /// Store a <c>#var</c> value. A reserved connection-state name (currently
+    /// <c>connected</c>) is routed to the LIVE session globals instead of the
+    /// persisted store: Genie 4 had one variable list, so <c>#var connected 0</c>
+    /// overwrote the live reserved var — with the split stores a store row
+    /// would be inert while connected (globals outrank it), shadow
+    /// <c>$connected</c> for scripts run before the session's first connect,
+    /// and pin a stale copy into variables.json/.cfg forever (public #294).
+    /// </summary>
+    private void SetVarValue(string name, string value)
+    {
+        if (ReservedConnectionVars.Contains(name))
+            _host.SetGlobalVariable(name, value);
+        else
+            Variables!.Store.Set(name, value);
     }
 
     /// <summary>

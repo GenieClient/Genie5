@@ -529,6 +529,17 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // MaxGoSubDepth, AbortDupeScript, ScriptExtension).
         Scripts.Config = Config;
 
+        // $connected exists from app launch, seeded "0" (Genie 4 parity:
+        // Lists/Globals.cs:882 seeds the reserved var "0" at startup). Without
+        // this the global didn't exist until the first BuildConnection, so a
+        // script started BEFORE the session's first connect — the natural way
+        // to run a reconnect watcher — resolved $connected through the
+        // persisted #var store (a stale imported connected=1 row read "1"
+        // while fully offline) or, with no row, left it literal (public #294).
+        // The connection layer owns it from here: ScriptGlobalsSync re-seeds
+        // "0" per connect and _connectedVarSub tracks the live link.
+        Scripts.Globals["connected"] = "0";
+
         // Wire game-state callbacks for RT-gated script pausing (closures over the
         // persistent state, so they stay valid across reconnect).
         Scripts.InRoundtime              = () => _state.Combat.InRoundTime;
@@ -928,6 +939,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // script polling it after a drop saw a stale "1" forever (issue #87).
         // Plugins are notified too (OnVariableChanged), matching Genie 4's
         // VariableChanged broadcast.
+        //
+        // ORDERING: this must subscribe BEFORE _connStateRelaySub (end of this
+        // method) — Subjects dispatch in subscription order, so the global is
+        // already "1" when outside observers (App, harness) see Connected.
+        // Since the per-connect seed became "0" (public #294), a relay
+        // subscriber reading $connected on the Connected event depends on it.
         _connectedVarSub = connection.StateStream.Subscribe(e =>
         {
             var value = e.Kind == ConnectionEventKind.Connected ? "1" : "0";

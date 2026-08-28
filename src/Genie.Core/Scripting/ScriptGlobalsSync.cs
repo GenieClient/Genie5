@@ -87,7 +87,14 @@ public sealed class ScriptGlobalsSync : IDisposable
         Set("charactername", string.IsNullOrEmpty(_state.CharacterName) ? _characterName : _state.CharacterName);
         Set("gamename",      _gameCode);
         Set("game",          _gameCode);    // common alias used by some scripts
-        Set("connected",     "1");
+        // $connected: "0" until the socket+auth actually complete — Genie 4
+        // sets it only on EventConnected (Game.cs:3220), and GenieCore's
+        // _connectedVarSub (subscribed before the dial) writes the "1" the
+        // moment the Connected event fires. This seed runs at BuildConnection,
+        // BEFORE the dial: seeding "1" here let a polling reconnect script
+        // read a false "connected" for up to ConnectTimeoutMs while the
+        // connect was still in flight or failing (public #294).
+        Set("connected",     "0");
 
         // Session statics — known at construction, never change for this session.
         Set("account",       _accountName);
