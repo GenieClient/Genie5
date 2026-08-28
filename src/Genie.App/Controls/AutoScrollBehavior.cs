@@ -94,6 +94,18 @@ public sealed class AutoScrollState : ReactiveObject
     private bool _atBottom = true;
     private bool _paused;
 
+    // Trim anchor (#293): the scrollback cap trims lines from the TOP of the
+    // buffer, which slides the remaining content up under a numerically
+    // unchanged Offset.Y — the reader's text drifts through a "held" viewport
+    // (and the positional selection under it copies the wrong lines, #298).
+    // While the view is not following the tail, the line at the top of the
+    // viewport is captured before layout reacts to the removal and restored to
+    // the same viewport position after. Anchoring is by REFERENCE: TextLine is
+    // a record, and duplicate lines (repeated combat spam) are value-equal.
+    private object? _anchorItem;
+    private double  _anchorDelta;
+    private bool    _restorePending;
+
     [Reactive] public bool IsScrolledUp { get; private set; }
 
     /// <summary>"Pause Scrolling" — when true, new items no longer drag the view
@@ -125,9 +137,87 @@ public sealed class AutoScrollState : ReactiveObject
 
     internal void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (_paused) return;   // frozen: let the buffer grow without following it
-        if (e.Action == NotifyCollectionChangedAction.Add && _atBottom)
-            Dispatcher.UIThread.Post(ScrollToBottom, DispatcherPriority.Loaded);
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+                if (!_paused && _atBottom)
+                    Dispatcher.UIThread.Post(ScrollToBottom, DispatcherPriority.Loaded);
+                break;
+
+            case NotifyCollectionChangedAction.Remove when e.OldStartingIndex == 0:
+                // Scrollback trim. Anchor only while the view holds still —
+                // when following the tail, the bottom pin already covers it.
+                if (!_paused && _atBottom) break;
+                CaptureAnchor(e.OldItems);
+                if (_anchorItem is not null && !_restorePending)
+                {
+                    _restorePending = true;
+                    Dispatcher.UIThread.Post(RestoreAnchor, DispatcherPriority.Loaded);
+                }
+                break;
+
+            case NotifyCollectionChangedAction.Reset:
+                _anchorItem = null;   // buffer cleared — nothing left to hold
+                break;
+        }
+    }
+
+    // ── Trim anchor (#293) ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Record which line sits at the top of the viewport, and where in it the
+    /// viewport top falls. Runs inside the CollectionChanged event, BEFORE the
+    /// layout pass reacts: container bounds still reflect the layout that
+    /// Offset.Y was last read against, so the pair is self-consistent. First
+    /// removal of a frame wins; the batched restore reuses it.
+    /// </summary>
+    private void CaptureAnchor(IList? removedItems)
+    {
+        if (_anchorItem is not null) return;
+        if (_sv.Content is not ItemsControl ic) return;
+
+        Control? top   = null;
+        var      bestY = double.MaxValue;
+        foreach (var c in ic.GetRealizedContainers())
+        {
+            var b = c.Bounds;
+            if (b.Y + b.Height <= _sv.Offset.Y) continue;   // fully above the viewport
+            if (b.Y >= bestY) continue;
+            if (ContainsRef(removedItems, c.DataContext)) continue;   // being trimmed
+            bestY = b.Y;
+            top   = c;
+        }
+        if (top is null) return;
+        _anchorItem  = top.DataContext;
+        _anchorDelta = _sv.Offset.Y - bestY;
+    }
+
+    /// <summary>Post-layout: put the anchored line back at the same viewport
+    /// position. If the anchor itself got trimmed away (reader parked at the
+    /// very top of the buffer), there is nothing to hold — let the view clamp.</summary>
+    private void RestoreAnchor()
+    {
+        _restorePending = false;
+        var item = _anchorItem;
+        _anchorItem = null;
+        if (item is null) return;
+        if (!_paused && _atBottom) return;   // user returned to the tail meanwhile
+        if (_sv.Content is not ItemsControl ic) return;
+
+        foreach (var c in ic.GetRealizedContainers())
+        {
+            if (!ReferenceEquals(c.DataContext, item)) continue;
+            _sv.Offset = _sv.Offset.WithY(Math.Max(0, c.Bounds.Y + _anchorDelta));
+            return;
+        }
+    }
+
+    private static bool ContainsRef(IList? items, object? candidate)
+    {
+        if (items is null) return false;
+        foreach (var i in items)
+            if (ReferenceEquals(i, candidate)) return true;
+        return false;
     }
 
     // ── Scroll tracking ────────────────────────────────────────────────────

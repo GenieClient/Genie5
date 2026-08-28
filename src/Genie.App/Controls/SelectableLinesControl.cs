@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Specialized;
 using System.Linq;
 using System.Text;
 using Avalonia;
@@ -58,6 +59,25 @@ public sealed class LineSelection
     /// menu's Copy item.</summary>
     public static string? GetSelectedText(ItemsControl ic) =>
         ic.GetValue(BehaviorProperty)?.GetSelectedText();
+
+    /// <summary>
+    /// Re-index a cross-line selection after <paramref name="removed"/> lines
+    /// were trimmed from the TOP of the buffer (the scrollback cap). Selection
+    /// endpoints are (line, offset) pairs, so without this shift a selection
+    /// made at line x resolves to line x+n once n lines have trimmed — the
+    /// wrong-text copy of public #298. Offsets survive untouched (the lines
+    /// themselves don't change), an endpoint that fell off the top clamps to
+    /// the buffer start, and a selection trimmed away entirely returns null.
+    /// </summary>
+    public static ((int Line, int Off) Anchor, (int Line, int Off) Focus)?
+        ShiftAfterTrim((int Line, int Off) anchor, (int Line, int Off) focus, int removed)
+    {
+        if (Math.Max(anchor.Line, focus.Line) < removed) return null;
+        return (Shift(anchor, removed), Shift(focus, removed));
+
+        static (int Line, int Off) Shift((int Line, int Off) p, int n)
+            => p.Line < n ? (0, 0) : (p.Line - n, p.Off);
+    }
 }
 
 /// <summary>The per-control state + handlers backing <see cref="LineSelection"/>.
@@ -82,6 +102,10 @@ internal sealed class LineSelectionBehavior
     private DispatcherTimer?       _autoScroll;
     private double                 _autoDir;
 
+    private INotifyCollectionChanged? _buffer;
+    private bool _attached;
+    private bool _renderPending;
+
     public LineSelectionBehavior(ItemsControl ic)
     {
         _ic = ic;
@@ -95,12 +119,85 @@ internal sealed class LineSelectionBehavior
         _ic.AddHandler(InputElement.PointerReleasedEvent, OnReleased,    RoutingStrategies.Bubble);
         _ic.AddHandler(InputElement.KeyDownEvent,         OnKeyDown,     RoutingStrategies.Bubble);
 
+        // #298: watch the line buffer so the (line, offset) selection can be
+        // re-indexed when the scrollback cap trims lines off the top.
+        _ic.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == ItemsControl.ItemsSourceProperty) WatchBuffer();
+        };
+
         _ic.AttachedToVisualTree   += (_, _) =>
         {
             _scroll = _ic.FindAncestorOfType<ScrollViewer>();
             _autoScroll ??= CreateTimer();
+            _attached = true;
+            WatchBuffer();
         };
-        _ic.DetachedFromVisualTree += (_, _) => { _autoScroll?.Stop(); };
+        _ic.DetachedFromVisualTree += (_, _) =>
+        {
+            _autoScroll?.Stop();
+            _attached = false;
+            WatchBuffer();   // drops the buffer subscription while off-tree
+        };
+    }
+
+    /// <summary>(Re)subscribe to the current ItemsSource. Subscribed only while
+    /// in the visual tree so a discarded list doesn't stay pinned to the
+    /// long-lived line buffer through this handler.</summary>
+    private void WatchBuffer()
+    {
+        if (_buffer is not null)
+        {
+            _buffer.CollectionChanged -= OnBufferChanged;
+            _buffer = null;
+        }
+        if (!_attached || _ic.ItemsSource is not INotifyCollectionChanged incc) return;
+        _buffer = incc;
+        _buffer.CollectionChanged += OnBufferChanged;
+    }
+
+    private void OnBufferChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Remove when e.OldStartingIndex == 0:
+                ReindexAfterTrim(e.OldItems?.Count ?? 0);
+                break;
+            case NotifyCollectionChangedAction.Reset:   // #clear — buffer gone
+                _anchor = (0, 0);
+                _focus  = (0, 0);
+                break;
+        }
+    }
+
+    private void ReindexAfterTrim(int removed)
+    {
+        if (removed <= 0 || _anchor == _focus) return;   // no live selection
+        if (LineSelection.ShiftAfterTrim(_anchor, _focus, removed) is { } s)
+        {
+            (_anchor, _focus) = s;
+        }
+        else
+        {
+            _anchor = (0, 0);   // the whole selection was trimmed away
+            _focus  = (0, 0);
+        }
+        ScheduleRender();
+    }
+
+    /// <summary>Repaint the per-line highlight after a trim, batched per UI
+    /// frame (combat trims one line per incoming line — rendering each would
+    /// be an O(lines) walk per line).</summary>
+    private void ScheduleRender()
+    {
+        if (_renderPending) return;
+        _renderPending = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _renderPending = false;
+            RebuildLineCache();
+            RenderSelection();
+        }, DispatcherPriority.Loaded);
     }
 
     private DispatcherTimer CreateTimer()
