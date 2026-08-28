@@ -103,9 +103,20 @@ public sealed class CombatState
     public DateTimeOffset   RoundTimeEnd{ get; set; }
     public DateTimeOffset   CastTimeEnd { get; set; }
     public string           PreparedSpell { get; set; } = "";
-    /// <summary>Wall-clock instant the current spell was prepared (null = none).
-    /// Backs the Genie 4 <c>$spelltime</c> countup.</summary>
+    /// <summary>LOCAL-clock instant the current spell was prepared (null =
+    /// none) — server stamps are converted through the prompt-learned clock
+    /// offset at ingestion (#261). Backs the Genie 4 <c>$spelltime</c> countup
+    /// and every difference computed against the equally-converted
+    /// <see cref="CastTimeEnd"/> ($spellpreptime / $casttimeremaining — the
+    /// shared offset cancels in differences).</summary>
     public DateTimeOffset?  SpellTimeStart { get; set; }
+
+    /// <summary>RAW SERVER epoch of the prep start (0 = none) — the value
+    /// <c>$spellstarttime</c> publishes. Kept alongside the converted
+    /// <see cref="SpellTimeStart"/> because scripts compose it against the
+    /// equally-raw <c>$casttime</c> (Genie 4 Game.cs:2122/2131 — a
+    /// server-minus-server difference that must stay skew-immune).</summary>
+    public long             SpellTimeStartServerEpoch { get; set; }
     public Stance           Stance      { get; set; } = Stance.Neutral;
     public bool             InRoundTime => DateTimeOffset.UtcNow < RoundTimeEnd;
     public bool             InCastTime  => DateTimeOffset.UtcNow < CastTimeEnd;
@@ -250,6 +261,7 @@ public sealed class GameState
         Combat.RoundTimeEnd  = default;
         Combat.CastTimeEnd   = default;
         Combat.SpellTimeStart = null;
+        Combat.SpellTimeStartServerEpoch = 0;
         Combat.Stance        = Stance.Neutral;
         Combat.CreatureStatuses.Clear();
 

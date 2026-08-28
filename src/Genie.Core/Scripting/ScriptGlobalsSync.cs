@@ -162,7 +162,11 @@ public sealed class ScriptGlobalsSync : IDisposable
             case ComponentEvent comp:  OnComponent(comp);  break;
             case CompassEvent comp:    OnCompass(comp);    break;
             case NavEvent nav:         Set("gameroomid", nav.RoomId ?? string.Empty); break;
-            case RoundTimeEvent rt:    { var s = SecondsRemaining(rt.ExpiresAt); Set("roundtime", s); Set("roundtimeremaining", s); break; }
+            // Trigger-only: the corrected end lives in GameState — the engine
+            // subscribes first and has already converted the server instant
+            // through the prompt-learned clock offset (#261). Reading the raw
+            // event here would republish the PC-clock skew.
+            case RoundTimeEvent:       { var s = SecondsRemaining(_state.Combat.RoundTimeEnd); Set("roundtime", s); Set("roundtimeremaining", s); break; }
             // $casttime = the tag's raw epoch (G4 Game.cs:2122), not a countdown —
             // the live countdown is $casttimeremaining (computed in ScriptEngine).
             case CastTimeEvent ct:     Set("casttime", ct.ExpiresAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)); break;

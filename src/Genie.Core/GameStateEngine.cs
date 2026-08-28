@@ -32,12 +32,53 @@ public sealed class GameStateEngine : IDisposable
     public GameStateEngine(
         IObservable<GameEvent> gameEvents,
         Models.GameState       state,
-        ILogger<GameStateEngine> log)
+        ILogger<GameStateEngine> log,
+        Func<DateTimeOffset>?  utcNow = null)
     {
-        _state = state;
-        _log   = log;
+        _state  = state;
+        _log    = log;
+        _utcNow = utcNow ?? (static () => DateTimeOffset.UtcNow);
         _subscription = gameEvents.Subscribe(Apply);
     }
+
+    /// <summary>Clock seam for tests — production always reads the real clock.</summary>
+    private readonly Func<DateTimeOffset> _utcNow;
+
+    // ── Server-clock offset (public #261) ────────────────────────────────────
+    // Roundtime, cast time, and spell-prep time all arrive as ABSOLUTE server
+    // epochs, but every consumer compares them against the LOCAL clock — so any
+    // skew between the player's PC and DR's host landed straight in the values
+    // (a machine 97s behind the server displayed `roundtime 3` as a 100-second
+    // RT, wedged #send, and stalled every RT-gated script). Genie 4 was immune
+    // by construction: it derived RT as `roundTime − gametime`, two SERVER
+    // values, and only then anchored the interval locally (Game.cs:2278-2288).
+    //
+    // Same idea here, applied once at ingestion: every <prompt time=…/> learns
+    // `offset = serverNow − localNow`, and each server instant is converted to
+    // a local instant (`server − offset`) as it is stored. Consumers — the RT
+    // badge, the command queue's RT gate, $roundtime, $spelltime — stay
+    // untouched and keep comparing against the local clock, now correctly.
+    //
+    // Until the first prompt arrives the offset is unknown and values pass
+    // through unconverted (the pre-fix behavior — <roundTime> can precede the
+    // first <prompt>). Implausible prompt stamps (epoch 0 from a parse
+    // fallback, ancient garbage) never teach the offset. In replay, recorded
+    // prompts are in the past, so the learned offset is large and negative and
+    // the conversion lands recorded RTs at their correct RELATIVE position —
+    // replay roundtimes now count down instead of reading as long-expired
+    // (that documented quirk is gone by design).
+    private TimeSpan? _serverClockOffset;
+
+    /// <summary>Server-instant → local-instant using the learned offset;
+    /// pass-through until the first plausible prompt teaches one.</summary>
+    private DateTimeOffset ToLocalInstant(DateTimeOffset serverInstant)
+        => _serverClockOffset is { } o ? serverInstant - o : serverInstant;
+
+    /// <summary>Earliest prompt stamp accepted as a clock source (2001-09-09,
+    /// epoch 1e9) — rejects epoch-0 fallbacks and garbage without rejecting
+    /// any clock a real machine could plausibly have.</summary>
+    private static readonly DateTimeOffset MinPlausiblePrompt =
+        DateTimeOffset.FromUnixTimeSeconds(1_000_000_000);
 
     private void Apply(GameEvent evt)
     {
@@ -65,16 +106,21 @@ public sealed class GameStateEngine : IDisposable
 
             // ── Round / cast time ─────────────────────────────────────────
             case RoundTimeEvent rt:
-                // RoundTimeOffset (Genie 4 parity): extend the RT end by the
-                // configured seconds so RT-gating waits a safety margin past the
-                // server's stated end. Default 0 → no change.
+            {
+                // Server instant → local instant first (#261, see
+                // _serverClockOffset), THEN the user's RoundTimeOffset margin
+                // (Genie 4 parity): extend the RT end by the configured seconds
+                // so RT-gating waits a safety margin past the server's stated
+                // end. Default 0 → no change.
+                var localEnd = ToLocalInstant(rt.ExpiresAt);
                 var rtOffset = Config?.RoundTimeOffset ?? 0;
                 _state.Combat.RoundTimeEnd =
-                    rtOffset != 0 ? rt.ExpiresAt.AddSeconds(rtOffset) : rt.ExpiresAt;
+                    rtOffset != 0 ? localEnd.AddSeconds(rtOffset) : localEnd;
                 break;
+            }
 
             case CastTimeEvent ct:
-                _state.Combat.CastTimeEnd = ct.ExpiresAt;
+                _state.Combat.CastTimeEnd = ToLocalInstant(ct.ExpiresAt);
                 break;
 
             // ── Indicators ────────────────────────────────────────────────
@@ -116,9 +162,22 @@ public sealed class GameStateEngine : IDisposable
                 // SetSpellTime); clear it when nothing is prepared. A duplicate
                 // refresh of the same spell keeps the original start.
                 if (isNone)
+                {
                     _state.Combat.SpellTimeStart = null;
+                    _state.Combat.SpellTimeStartServerEpoch = 0;
+                }
                 else if (changed || _state.Combat.SpellTimeStart is null)
-                    _state.Combat.SpellTimeStart = DateTimeOffset.UtcNow;
+                {
+                    // Local stamp (no <spelltime> tag yet). The raw-epoch twin
+                    // gets the server-equivalent instant so $spellstarttime
+                    // stays composable with the raw $casttime even on this
+                    // fallback path; without a learned offset it degrades to
+                    // the local epoch — the pre-#261 behavior.
+                    var now = _utcNow();
+                    _state.Combat.SpellTimeStart = now;
+                    _state.Combat.SpellTimeStartServerEpoch =
+                        (_serverClockOffset is { } off ? now + off : now).ToUnixTimeSeconds();
+                }
                 break;
             }
 
@@ -130,7 +189,15 @@ public sealed class GameStateEngine : IDisposable
             {
                 var held = _state.Combat.PreparedSpell.Trim().Length > 0
                            && !_state.Combat.PreparedSpell.Equals("None", StringComparison.OrdinalIgnoreCase);
-                if (held) _state.Combat.SpellTimeStart = st.StartsAt;
+                // Server epoch → local instant (#261): $spelltime counts UP
+                // from this stamp, so a skewed clock bent it in the opposite
+                // direction from the RT count-downs. The raw-epoch twin keeps
+                // the tag's own value for $spellstarttime.
+                if (held)
+                {
+                    _state.Combat.SpellTimeStart = ToLocalInstant(st.StartsAt);
+                    _state.Combat.SpellTimeStartServerEpoch = st.StartsAt.ToUnixTimeSeconds();
+                }
                 break;
             }
 
@@ -175,6 +242,13 @@ public sealed class GameStateEngine : IDisposable
             // ── Prompt ────────────────────────────────────────────────────
             case PromptEvent prompt:
                 _state.LastPrompt = prompt.ServerTime;
+                // Learn the server-clock offset from every plausible prompt
+                // (#261). Last-prompt-wins, no smoothing — skew is stable and
+                // DR prompts arrive constantly, so jitter is bounded by one
+                // network round-trip, well under the 1s the RT display rounds
+                // to anyway. $gametime stays the RAW server epoch.
+                if (prompt.ServerTime >= MinPlausiblePrompt)
+                    _serverClockOffset = prompt.ServerTime - _utcNow();
                 break;
 
             // ── Main-window text (e.g. the `exp all` skill table) ─────────

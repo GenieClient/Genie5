@@ -172,13 +172,18 @@ public class VitalsViewModel : ReactiveObject
 
         core.GameEvents.OfType<RoundTimeEvent>()
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(e =>
+            .Subscribe(_ =>
             {
-                // RoundTimeOffset: extend the displayed RT by the configured
-                // margin so the badge matches the script-gating end (which the
-                // GameStateEngine also offsets). Read live; default 0 = no-op.
-                var rtOffset = core.Config?.RoundTimeOffset ?? 0;
-                _rtExpiresAt = rtOffset != 0 ? e.ExpiresAt.AddSeconds(rtOffset) : e.ExpiresAt;
+                // The event is only the TRIGGER — the value comes from
+                // GameState, where GameStateEngine has already converted the
+                // server instant to a local one via the prompt-learned clock
+                // offset (#261) AND applied the user's roundtimeoffset margin.
+                // Reading the raw event here reintroduced the PC-clock skew the
+                // engine just corrected, and duplicated the offset math.
+                // Ordering is safe: the engine applies events synchronously on
+                // the pipeline thread; this handler runs after the
+                // MainThreadScheduler hop.
+                _rtExpiresAt = core.State.Combat.RoundTimeEnd;
                 RecomputeRt();
                 StartTickerIfNeeded();
             });
@@ -191,9 +196,11 @@ public class VitalsViewModel : ReactiveObject
         // PromptEvent doesn't carry the matched-pair semantics.
         core.GameEvents.OfType<CastTimeEvent>()
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(e =>
+            .Subscribe(_ =>
             {
-                _castExpiresAt = e.ExpiresAt;
+                // Trigger-only, same as the RT handler above: the clock-offset-
+                // corrected instant lives in GameState (#261).
+                _castExpiresAt = core.State.Combat.CastTimeEnd;
                 // Seed both Total and Remaining with the same value so the
                 // bar starts at 100% full and ticks down from there. This
                 // mirrors ComponentRoundtime.SetRT(secondsRemaining) which

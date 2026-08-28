@@ -535,8 +535,11 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Scripts.RoundTimeRemainingSeconds = () => (int)Math.Ceiling(_state.Combat.RoundTimeRemaining);
         // $spelltime — seconds since the current spell was prepared (Genie 4).
         Scripts.SpellTimeSeconds          = () => (int)_state.Combat.SpellTimeSeconds;
-        // $spellstarttime — epoch seconds of when the spell was prepared, 0 if none (#151).
-        Scripts.SpellStartTimeEpoch       = () => _state.Combat.SpellTimeStart?.ToUnixTimeSeconds() ?? 0;
+        // $spellstarttime — RAW SERVER epoch of the prep start, 0 if none (#151).
+        // Deliberately the raw twin, not the clock-offset-converted
+        // SpellTimeStart: scripts compose it against the equally-raw $casttime
+        // (#261 — the server-minus-server difference must stay skew-immune).
+        Scripts.SpellStartTimeEpoch       = () => _state.Combat.SpellTimeStartServerEpoch;
         // $casttimeremaining — live countdown to fully-prepped (G4 Globals.cs:215:
         // spellpreptime − elapsed, clamped at 0; 0 with no spell held). Same
         // integer-epoch prepLen arithmetic as $spellpreptime (see
