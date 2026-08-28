@@ -1,3 +1,133 @@
+# Genie 5 — v5.0.0-beta.6
+
+Clockwork: the mapper tracks like it means it, every timer runs on the
+server's clock instead of yours, and the script engine is hardened against
+the crash that could take it down mid-hunt. Plus Alteration Buddy comes
+in-house as a top-level menu, and the experimental editor renderer reaches
+the Raw XML and Stream windows.
+
+## ✨ New
+- **Alterations.** Alteration Buddy is now built in, as a top-level
+  **Alterations** menu rather than a plugin — design item alterations against
+  the four length budgets, keep a shared library of designs, and import an
+  existing `alterations.csv`. Finished designs can be marked done: they sort
+  below your drafts, group separately in the Saved Designs menu, and nothing is
+  auto-removed, so a completed alteration stays as a record. With thanks to
+  Djordje, whose GPL-3.0 Alteration Buddy this is a port of, and to Bardolf for
+  the completed-designs request.
+
+- **Experimental editor renderer for the Raw XML and Stream windows.** The
+  AvaloniaEdit-backed renderer that already sat behind `#config
+  useeditorgamewindow` can now also drive the Raw XML window (`#config
+  useeditorrawxmlwindow on`) and all twelve Stream windows (`#config
+  useeditorstreamwindow on` — one switch for Logons, Talk, Whispers, Combat,
+  and the rest). All three settings default off and take effect on restart;
+  with them off, the classic renderer is exactly what it always was. Thanks
+  @simtel12 (#296).
+
+## 🐛 Fixes
+- **Roundtime survives a wrong PC clock.** Roundtime, cast time, and spell-prep
+  time arrive as absolute server timestamps, but Genie 5 compared them against
+  your PC's clock — so a machine a minute or two off turned `roundtime 3` into
+  a minutes-long stall (wedging `#send` and every RT-gated script), or read 0
+  and let scripts fire straight into roundtime. Genie 5 now learns the server
+  clock's offset from the game's own prompt stream and corrects every timer:
+  the RT badge, `#send`, `$roundtime`, `$spelltime`, and `$casttimeremaining`
+  are all true regardless of clock skew. Script-facing `$gametime`/`$casttime`/
+  `$spellstarttime` stay raw server values, so existing script math is
+  unchanged (#261).
+- **Multi-command lines pause again: `put health;-0.05 encumbrance`.** The `-N`
+  at the start of a `;`-chain segment is Genie 4's quick-send prefix — pause N
+  seconds (plus any roundtime), then send the rest. Genie 5 was sending those
+  segments to the game literally, which DR answered with "Please rephrase that
+  command." All the places a chain can come from now honor it — typed commands,
+  aliases, triggers, and script `put`/`send` lines — including Genie 4's glued
+  form (`-3knock concealed door`) and the bare `-verb` form (send when
+  roundtime clears). Also corrected: `send`'s `-N` previously fired with no
+  wait at all; it now pauses like Genie 4. Thanks Azothy for the exact repro
+  lines (#278).
+- **Starting a script can no longer crash the script engine.** Starting a
+  large script (the community automapper was the repro) at the exact moment
+  game text was streaming in could throw "Collection was modified" and take
+  the engine down — the engine was driven from two threads with almost nothing
+  guarding its state. Every entry into the script engine is now serialized, so
+  script starts, stops, pauses, and incoming game lines take their turn
+  instead of colliding. Verified with the original replay repro (10/10 clean
+  runs that crashed ~2 in 3 before) and five new concurrency tests (#242).
+- **An action's `goto` now breaks a script out of `pause` and `matchwait`.**
+  `action goto stats when ^report` firing while the script sat in a pause,
+  matchwait, waitfor, or waiteval moved the program counter and nothing else —
+  the script stayed parked forever. Genie 4 parity, verified against its
+  source: an action-dispatched goto abandons the block (including match
+  patterns armed before the matchwait) and resumes at the target label. A
+  normal `goto` still clears nothing — registering matches and jumping to a
+  shared `matchwait` label keeps working — and pausing a script from the
+  script bar still wins until you resume it. Thanks to the reporters for the
+  Genie 4 / Genie 5 side-by-side logs that pinned the behavior (#297).
+- **The `automapper` setting now does something.** It was written by the
+  toolbar toggle, by `#mapper record on`, and by your saved profile — and read
+  by none of them, so record mode always started from the engine's own default,
+  the toolbar toggle died with the session, and a saved preference never
+  applied. Both it and `automapperalpha` (ghost-floor opacity) now apply live.
+
+  **One behaviour change worth knowing about:** `automapper` was *declared*
+  with a default of `true` while the engine actually defaulted to off. Wiring it
+  up as declared would have silently switched map auto-recording on for
+  everyone, where a single wrong room match can mutate an imported community
+  map. **The default is now `false`**, matching how Genie 5 has actually
+  behaved to date — so nothing changes for you unless you ask for it. The flip
+  side: if your profile explicitly says `automapper = True` — including one
+  imported from a Genie 4 `settings.cfg`, where the automapper *did* record as
+  you walked — you will now genuinely start in record mode, which is what that
+  line always meant. Set it to `false`, or use the toolbar toggle, if you'd
+  rather it stayed off (#274, #275).
+- **Map recording no longer strands a session's first room in a nameless zone.**
+  With map recording on (`automapper`), the very first room of a session
+  skipped the cross-map auto-detect and quietly seeded your character into an
+  unnamed, unsaveable zone — even when a local map containing that exact room
+  was sitting right there. It could also lose a race against the map index
+  still building at connect, leaving "Waiting for zone index" up until you
+  moved. Both fixed: the first room now gets the same auto-detect shot that
+  lookup-only mode gets, and the index re-checks your room the moment it
+  finishes building. One behaviour change: recording in a genuinely unmapped
+  area now waits for you to pick "New Zone" (or for a map to match) instead of
+  recording into an invisible zone you could never save. Thanks @simtel12
+  (#295).
+- **Identical-looking rooms each keep their own map node.** Corridors of rooms
+  sharing one title, description, and exit set — the eleven "Segoltha River,
+  Midstream" rooms are the community maps' worst case, and Leth Deriel's twin
+  "Liyos Approach" rooms the subtlest — could freeze the map marker (and
+  `$roomid`) mid-crossing, or collapse two adjacent twins onto a single node
+  while recording. The mapper now uses DR's own room numbers as the "you
+  moved" signal, and a room it knows to be a *different* server room can never
+  steal a match on looks alone.
+- **The Astral Plane no longer pins the map marker to your departure room.**
+  Areas that send no room numbers at all (the astral is one) left the mapper
+  holding the last number it ever saw, matching every pillar and conduit back
+  to the room you entered from. A room change without a fresh room number now
+  marks the old one stale — the `mapperdebug` trace shows `STALE` beside it —
+  and the mapper falls back to matching by what it can actually see.
+- **Map recording follows you through teleports instead of polluting your map.**
+  With recording on, arriving somewhere you didn't walk — an astral exit, a
+  portal, a ferry docking — used to stitch the destination into whatever map
+  was loaded as a foreign room. Recording now only charts rooms you walked
+  into (which is also exactly when it can draw the connecting arc); a teleport
+  arrival instead asks the cross-map auto-detect first, so landing in a mapped
+  area switches to that map and keeps recording there. Genuinely uncharted
+  arrivals still get recorded — as a standalone room, with a status line
+  saying so. No more toggling record off to travel.
+- **Command history skips immediate repeats.** Submitting the same command
+  several times in a row (`attack`, `attack`, `attack`) now records one
+  recall-history entry instead of three, so Up-arrow reaches your earlier
+  commands without paging through the repeats. Non-consecutive repeats are
+  still recorded in full, and every submission still goes to the game
+  unchanged. Thanks @simtel12 (#308).
+- Corrected the settings reference: `automapperalpha` is ghost-floor opacity,
+  not window opacity; the missing `automapperscript` row is documented; and
+  `updatemapperscripts` is marked as not yet wired.
+
+---
+
 # Genie 5 — v5.0.0-beta.5.1
 
 Bearings: a fix-focused follow-up to the .NET 10 release, built almost

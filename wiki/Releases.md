@@ -4,7 +4,26 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.5.1 — Bearings
+## Latest: v5.0.0-beta.6 — Clockwork
+
+The mapper tracks like it means it, every timer runs on the server's clock instead of yours, and the script engine is hardened against the crash that could take it down mid-hunt. Plus Alteration Buddy comes in-house, and the experimental editor renderer reaches the Raw XML and Stream windows.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.6** as a delta from beta.5.1.
+
+- **Alterations menu** — Alteration Buddy built in: design against the four length budgets, keep a library, import your `alterations.csv`, and mark finished designs done (thanks Djordje for the original GPL tool, and Bardolf for the completed-designs request).
+- **Roundtime survives a wrong PC clock** — RT, cast, and spell-prep timers now correct for your clock's skew against the server, so `roundtime 3` is 3 seconds even when Windows drifts; `#send` and RT-gated scripts pace true (#261).
+- **Script engine hardened** — starting a big script while game text streamed in could crash the engine ("Collection was modified"); every entry is now serialized (#242).
+- **An action's `goto` breaks out of `pause`/`matchwait`** — Genie 4 parity for the stalled-script repro (#297).
+- **Quick-send pauses again** — `;-0.05 command` chain segments pause like Genie 4 instead of going out literally (#278 — thanks @Azothy).
+- **Mapper tracking batch** — identical-looking rooms each keep their node (Segoltha's eleven midstream rooms), the Astral Plane no longer pins the marker to your departure room, and record mode follows teleports instead of stitching foreign rooms into your map.
+- **`automapper` setting works** — and its default is now genuinely `false`; a profile that says `True` really starts in record mode now (#274, #275).
+- **Record mode finds your map on a session's first room** — no more phantom "(unsaved)" zone when a community map already covers where you're standing (#295 — thanks @simtel12).
+- **Experimental editor renderer for Raw XML + Stream windows** — `#config useeditorrawxmlwindow` / `useeditorstreamwindow`, default off (#296 — thanks @simtel12).
+- **Command history skips immediate repeats** — Up-arrow reaches earlier commands without paging through `attack`×3 (#308 — thanks @simtel12).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.6)
+
+## v5.0.0-beta.5.1 — Bearings
 
 A fix-focused follow-up to the .NET 10 release, built almost entirely from player reports. The mapper knows where you are again, four script behaviours match Genie 4 that quietly didn't, and out-of-character chatter finally has a window of its own.
 

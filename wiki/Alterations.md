@@ -9,9 +9,6 @@ If you used **Alteration Buddy** in Genie 4, this is that tool brought in-house 
 same four fields, same limits, same result line, and your existing
 `alterations.csv` imports straight in.
 
-> **Coming in the next release.** This isn't in the current build yet. Everything
-> below describes what ships next.
-
 Nothing here needs a connection. You can design alterations, save them, and
 browse your library without logging in at all.
 
