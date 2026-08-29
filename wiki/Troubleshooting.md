@@ -13,8 +13,13 @@ Beta builds aren't notarized. Right-click the app → **Open** → **Open** (mac
 **Windows SmartScreen blocks the exe.**
 Builds from before v5.0.0-alpha.10 are unsigned and always trigger the blue panel: **More info → Run anyway**. Since alpha.10, `Genie5.exe` is EV-signed by Shadow Realms LLC (the project's support partner); a brand-new signed build may still show the panel briefly while SmartScreen reputation accrues per file. See [Installation](Installation).
 
-**Linux: AppImage won't run / "FUSE not installed."**
-Make it executable first (`chmod +x 04-Linux-Genie5.AppImage`), then `./04-Linux-Genie5.AppImage`. For the FUSE error, install it — Debian/Ubuntu: `sudo apt install libfuse2` (Fedora usually works out of the box). If text renders oddly on a minimal distro, install `fontconfig`. For a desktop-menu entry, use [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher).
+**Linux: AppImage won't run / "FUSE not installed" / "Couldn't find a valid ICU package" / `libICE.so.6` error.**
+Make it executable first (`chmod +x 04-Linux-Genie5.AppImage`), then `./04-Linux-Genie5.AppImage`. The errors above all mean a system library is missing — common on minimal installs (WSL, containers, server spins), rare on desktop distros:
+- **FUSE** — Debian/Ubuntu: `sudo apt install libfuse2` (`libfuse2t64` on Ubuntu 24.04+); Fedora usually works out of the box.
+- **`libICE.so.6` / `XOpenDisplay failed`, or odd text rendering** — install the X11 client libs + fontconfig: `sudo apt install libx11-6 libice6 libsm6 libxext6 libxrandr2 libxcursor1 libxi6 libxrender1 libfontconfig1`.
+- **"Couldn't find a valid ICU package"** — only affects v5.0.0-beta.7 and earlier (newer releases bundle ICU): `sudo apt install libicu74`, or update Genie.
+
+For a desktop-menu entry, use [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher).
 
 **`dotnet` isn't recognized / build fails (building from source).**
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (the SDK, not just the runtime). Verify with `dotnet --version` (should be 10.x). See [Installation](Installation#build-from-source).

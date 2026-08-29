@@ -28,7 +28,17 @@ chmod +x 04-Linux-Genie5.AppImage
 ./04-Linux-Genie5.AppImage
 ```
 
-If you hit a **"FUSE not installed"** error, install FUSE (Debian/Ubuntu: `sudo apt install libfuse2`; Fedora generally works out of the box). On very minimal distros you may also need `fontconfig` for correct text rendering. For a desktop-menu entry, see [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher).
+If you hit a **"FUSE not installed"** error, install FUSE — Debian/Ubuntu: `sudo apt install libfuse2` (on Ubuntu 24.04 and newer the package is `libfuse2t64`); Fedora generally works out of the box. For a desktop-menu entry, see [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher).
+
+**Minimal installs** (server spins, containers, WSL, netinstalls) may also be missing the desktop libraries every GUI app needs. If the AppImage exits with a `libICE.so.6` / `XOpenDisplay` error or text renders oddly, install the X11 client libs and fontconfig — Debian/Ubuntu:
+
+```bash
+sudo apt install libx11-6 libice6 libsm6 libxext6 libxrandr2 libxcursor1 libxi6 libxrender1 libfontconfig1
+```
+
+Standard desktop distros (Ubuntu Desktop, Fedora Workstation, Mint, …) already have all of these.
+
+Releases **after v5.0.0-beta.7** bundle their own ICU, so no globalization packages are needed. On beta.7 and earlier, a minimal distro may also report *"Couldn't find a valid ICU package"* — fix with `sudo apt install libicu74` (or your release's `libicu` package), or just update to the latest release.
 
 ### 🍎 macOS
 
@@ -69,7 +79,7 @@ Windows release binaries are EV-signed by **Shadow Realms LLC**, so recent build
 
 ### Linux
 
-The AppImage just needs execute permission (`chmod +x`); see the [Linux download notes](#-linux) above for FUSE/fontconfig.
+The AppImage just needs execute permission (`chmod +x`); see the [Linux download notes](#-linux) above for FUSE and the minimal-install library notes.
 
 ## First launch
 
