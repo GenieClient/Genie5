@@ -5,7 +5,7 @@ Genie 5 ships all of Genie 4's **rule engines** — the pattern-driven helpers t
 - **The Configuration dialog** — **Edit → Configuration…** opens a tabbed, form-based editor. The tabs are **Layout** (with Windows and Settings sub-tabs), **Highlights**, **Triggers**, **Substitutes**, **Gags**, **Aliases**, **Scripts**, **Text-to-Speech**, **Macros**, **Variables**, and **Classes** — so it covers script settings and [Text-to-Speech](Text-to-Speech) alongside the rule engines. The list-based rule tabs each have a **type-to-filter box**, so a several-hundred-line trigger list stays navigable.
 - **The command bar** — `#`-prefixed commands add and remove rules on the fly, exactly as in Genie 4.
 
-Either way, rules are saved to plain-text `.cfg` files and reloaded automatically next launch. Command syntax follows the **Genie 4 dialect**; when in doubt about a specific option, the Configuration dialog is the reliable surface.
+Either way, rules are saved to disk automatically — a `.json` file per rule type, with a Genie 4-style `.cfg` twin kept in sync (see [Where rules are stored](#where-rules-are-stored)). Command syntax follows the **Genie 4 dialect**; when in doubt about a specific option, the Configuration dialog is the reliable surface.
 
 ![The Configuration dialog's Triggers tab with several pattern → action rules listed](images/config-dialog-triggers.png)
 
@@ -109,7 +109,7 @@ Variables hold values you can reuse, including inside scripts (where they read a
 #var weapon longsword
 ```
 
-- `#var` values **persist** to disk (`variables.cfg`).
+- `#var` values **persist** to disk (`variables.json`, with a `variables.cfg` twin).
 - `#tvar` sets a **temporary** variable for the session only.
 
 Genie also exposes ~40 live **game-state** variables (`$health`, `$stance`, `$righthand`, …) automatically — see [Scripting](Scripting#game-state-variables).
@@ -131,12 +131,14 @@ The whole client is themeable from the **Edit → Theme** submenu. Seven themes 
 
 ## Where rules are stored
 
-Each rule type saves to its own `.cfg` file (one entry per line, the commands that recreate the rule):
+Each rule type saves to its own **`.json` file** — `highlights.json`, `triggers.json`, `substitutes.json`, `gags.json`, `aliases.json`, `variables.json`, `classes.json` (plus `macros.json`) — with a Genie 4-format **`.cfg` twin** (one entry per line, the commands that recreate the rule) written alongside it so your rules still round-trip with the Genie 4 ecosystem:
 
-- **Shared baseline** — `Config/aliases.cfg`, `triggers.cfg`, `highlights.cfg`, `substitutes.cfg`, `gags.cfg`, `macros.cfg`, `variables.cfg`, `classes.cfg`.
+- **Shared baseline** — in `Config/`.
 - **Per-character** — a copy under `Profiles/<Character>-<Account>/`, seeded from the shared baseline the first time that character connects, then independent.
 
-These are Genie 4-format `.cfg` files (not JSON), so they round-trip with the Genie 4 ecosystem. See [Application Folders](Application-Folders) for the full layout. You can hand-edit them with a text editor while Genie is closed.
+See [Application Folders](Application-Folders) for the full layout.
+
+**Hand-editing is supported — even live.** External edits to the seven rule `.json` files apply to the running client **without a reconnect**: Genie watches them, reloads the engines, and prints a `[config] … reloaded` line in the game window. (A file with a syntax error is left alone — nothing is cleared until it parses.) Other config files — display settings, themes, layouts, macro keybindings — still load at startup/connect.
 
 ## Importing from Genie 4
 

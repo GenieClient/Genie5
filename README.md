@@ -35,16 +35,16 @@ The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern
 | DragonRealms XML parser (`<component>`, `<d>`, `<a href>`, `<container>`, `<roundTime>`, etc.) | ✅ Working |
 | Live game session — connect (Direct SGE / Lich proxy picker), play, type commands | ✅ Working |
 | Genie 4 `.cmd` script engine (labels, `MATCH`, `GOSUB`, `$variables`, `WAITFOR`, etc.) | ✅ Working |
-| Rules engines (`#alias`, `#trigger`, `#highlight`, `#substitute`, `#gag`, `#macro`, `#class`, `#var`) + per-engine master toggles (File menu / `#config`) | ✅ Working with `.cfg` persistence |
+| Rules engines (`#alias`, `#trigger`, `#highlight`, `#substitute`, `#gag`, `#macro`, `#class`, `#var`) + per-engine master toggles (File menu / `#config`) | ✅ Working — JSON persistence with Genie 4 `.cfg` twins; hand-edits to rule files hot-reload live |
 | Per-character profile storage with AES-GCM password encryption | ✅ Working |
-| Dockable UI panels (vitals, icon bar, room, mobs/players, inventory, mapper, experience, active spells, injuries, stream tabs) — named save/load layouts + MDI windowed mode | ✅ Working |
+| Dockable UI panels (vitals, icon bar, room, mobs/players, inventory, Inventory View, mapper, experience, analytics, active spells, injuries, stream tabs incl. OOC) — named save/load layouts + MDI windowed mode | ✅ Working |
 | Named script windows (`#window`, `#link`, `#log`, `#clear`, directed `#echo >window`) — Genie 4 menu scripts (`mm_train` et al.) run as-is | ✅ Working |
-| Mapper — click-to-goto, `#goto`/`#go2`, room/zone tags + `#goto @tag`, `$roomid`/`$zoneid`/`$zonename` script vars, zone fingerprinting, Less Obvious Paths | ✅ Working (auto-walk is a roadmap item) |
+| Mapper — click-to-walk, `#goto`/`#go2`, room/zone tags + `#goto @tag`, `$roomid`/`$zoneid`/`$zonename` script vars, zone fingerprinting, Less Obvious Paths, weighted cross-zone travel | ✅ Working |
 | Session Recorder for raw-XML capture | ✅ Working |
 | Lich 5 proxy mode (`ConnectionMode.LichProxy`) | ✅ Working |
 | Dev-replay mode (replay recorded sessions through the engine) | ✅ Working (via Console) |
 | ~~LAMP 2.0 cross-platform updater~~ | ❌ Canceled — superseded by the in-app updater below |
-| In-app updater (Velopack) — Core / Maps / Plugins / Scripts update tabs, per-kind auto-update policies (Update Settings), apply-on-close client updates, Help-menu badge, startup background check | ✅ Working (macOS/Linux Core packaging on the roadmap) |
+| In-app updater (Velopack) — Core / Maps / Plugins / Scripts update tabs, per-kind auto-update policies (Update Settings), apply-on-close client updates, Help-menu badge, startup background check | ✅ Working on all three platforms |
 | Plugin host — `IGeniePlugin`/`IPluginHost` contract, per-plugin assembly-load-context (load/unload/reload), Plugins menu + `#plugin` command, first external plugin (`Plugin_EXPTrackerV5`) | ✅ Working (marketplace + plugin signing/trust on the roadmap) |
 | JavaScript (`.js`) array scripts via Jint — `genie.*` API (put/waitFor/matchWait/pause/timers/vars), coexists with `.cmd`, memory + runaway-loop guards | ✅ Working |
 | `#connect` / `#reconnect` / `#lichconnect` — typed/scripted login (Genie 4 parity; saved-profile, explicit, and reconnect forms; password-masked) | ✅ Working |
@@ -55,6 +55,9 @@ The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern
 | Portrait panel — DR room/scene artwork (`#config showimages`), fetched from the play.net art CDN | ✅ Working |
 | Preset colouring — room descriptions / whispers / speech render in their palette colours (Configuration → Presets), plus MonsterBold creature highlighting | ✅ Working |
 | Sound — SFX on triggers/highlights + `#play` command (cross-platform: winmm / afplay / paplay) | ✅ Working |
+| Text-to-speech — `#speak` / `#tts`, per-stream auto-read with priorities, downloadable voices, TTS Configuration tab | ✅ Working |
+| Alterations designer — plan and track item alteration designs (the ported Alteration Buddy), top-level Alterations menu, CSV import/export | ✅ Working |
+| Themes — seven built-ins (Dark, Light, Genie 4 Classic, High Contrast, Solarized Dark/Light, Wrayth-style) + a theme editor; custom themes as shareable JSON | ✅ Working |
 | `#config` settings system (`settings.cfg`, 80+ settings across a dozen categories + Scripts tab); reserved/live `$variables` exposed and listed by `#var` | ✅ Working |
 | Visual trigger / flow designer | 🚧 Roadmap |
 | AI-assisted automation (advisor-only mode) | 🚧 Roadmap |
@@ -74,7 +77,7 @@ Grab the [latest release](https://github.com/GenieClient/Genie5/releases/latest)
 | **macOS (Intel)** | `03-macOS-Intel-Genie5.dmg` (or `.pkg`) | `03-macOS-Intel-Genie5-Portable.zip` |
 | **Linux (x64)** | `04-Linux-Genie5.AppImage` | — |
 
-The **Setup.exe** / **.pkg** / **AppImage** builds register for in-app updates; the **Portable** `.zip` builds don't. Windows release binaries are EV code-signed (see [Code signing policy](#code-signing-policy)); macOS and Linux builds are unsigned for now, so those platforms show a first-launch warning — the [Installation guide](https://github.com/GenieClient/Genie5/wiki/Installation) has the per-platform "unknown publisher" / Gatekeeper steps.
+All of these register for **in-app updates** — including the Windows **Portable** `.zip`, which is a Velopack bundle just like Setup.exe. Windows release binaries are EV code-signed (see [Code signing policy](#code-signing-policy)); macOS and Linux builds are unsigned for now, so those platforms show a first-launch warning — the [Installation guide](https://github.com/GenieClient/Genie5/wiki/Installation) has the per-platform "unknown publisher" / Gatekeeper steps.
 
 ### Build from source
 
@@ -124,7 +127,7 @@ Genie 5 plays nicely with [Lich 5](https://github.com/elanthia-online/lich-5). T
 
 Genie 5 aims to be a good DragonRealms frontend. DR's [Scripting Policy](https://elanthipedia.play.net/Policy:Scripting_policy) asks that you stay **responsive to the game** while you play — it does **not** require the client window to stay focused, and Genie doesn't try to police how you play. Staying within policy is the player's call. That said, a few design choices keep Genie firmly on the responsive side, and the client itself avoids unattended automation:
 
-- **No auto-reconnect.** If you disconnect, you reconnect by hand.
+- **Auto-reconnect is attendance-gated.** After a drop, Genie retries the connection a bounded number of times — but only if you were actively playing (it's skipped, with a message, when no commands were sent that session), and reconnecting restores only the socket: it never launches anything on its own. `#config reconnect off` disables it entirely.
 - **No agentive AI mode.** AI features (when they ship) are **advisor-only** — they surface suggestions in a panel you read, never drive game commands directly.
 - **No headless mode.** Genie is a UI client, not a background service.
 - **No shipping other players' speech to external services.** The AI context buffer filters out whisper / talk / thoughts / familiar / tells before any external API call.

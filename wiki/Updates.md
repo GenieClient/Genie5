@@ -21,15 +21,7 @@ The updater uses your system's default network settings, so OS-level proxy confi
 
 Application updates are delivered via [Velopack](https://velopack.io/): the updater fetches the new build from GitHub Releases and applies it in place, so the next launch is the new version. In-app Core updates work on all three platforms — Windows, macOS (Apple Silicon + Intel), and Linux (AppImage).
 
-Auto-update requires that you installed via an updater-aware package:
-
-| Platform | Auto-updates if installed via | Update by hand if you used |
-| --- | --- | --- |
-| Windows | `01-Windows-Genie5-Setup.exe` | `01-Windows-Genie5-Portable.zip` |
-| macOS | `02-macOS-Apple-Silicon-Genie5-Setup.pkg` / `03-macOS-Intel-Genie5-Setup.pkg` (or the matching `.dmg` drag-install) | the `*-Portable.zip` bundles |
-| Linux | `04-Linux-Genie5.AppImage` | — |
-
-The plain **Portable `.zip`** builds don't register for updates — re-download from [Releases](https://github.com/GenieClient/Genie5/releases/latest) to upgrade those. Once you're on an updater-aware install, new releases arrive as small **delta** downloads (only the bytes that changed). See [Installation](Installation) for which download to pick.
+Every official download is updater-aware — including the portable forms. The Windows **Portable `.zip`** is a Velopack bundle just like Setup.exe (that's why the app runs from a `current\` folder inside it, replaced wholesale on each update), and the macOS **Portable `.zip`**s contain the same updater-aware app bundle the `.pkg` installs. The one thing that can't self-update is a **source build** (`dotnet run` / a raw publish folder) — the Updates dialog says so instead of erroring. New releases arrive as small **delta** downloads (only the bytes that changed). See [Installation](Installation) for which download to pick.
 
 > **Signing:** **Windows** release binaries are EV code-signed (since v5.0.0-alpha.10) under **Shadow Realms LLC**, the project's support partner — see the [README's code-signing section](https://github.com/GenieClient/Genie5/blob/main/README.md#code-signing-policy). **macOS and Linux** builds are unsigned for now, so those platforms show a first-launch warning ([details](Installation#platform-first-launch-notes)).
 
@@ -39,7 +31,7 @@ The plain **Portable `.zip`** builds don't register for updates — re-download 
 
 ![The Maps, Plugins, and Scripts tabs — subscription rows for the official maps repo, an installed plugin, and a community script repository](images/updates-dialog-tabs.png)
 
-The Maps tab (equivalently **File → Update Maps from Official Repo…**) pulls the latest zone XML from the community repository and **merges** it with your local data — upstream layout fixes come down while your stamped room ids survive. This has its own page: [Updating Maps & Scripts](Updating-Maps-and-Scripts).
+The Maps tab (equivalently **Maps ▸ Update from Official Repo…**) pulls the latest zone XML from the community repository and **merges** it with your local data — upstream layout fixes come down while your stamped room ids survive. This has its own page: [Updating Maps & Scripts](Updating-Maps-and-Scripts).
 
 ## Plugins
 

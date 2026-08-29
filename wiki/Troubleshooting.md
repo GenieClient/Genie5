@@ -79,7 +79,7 @@ Cross-zone routing is built in — `#goto` a room in another zone (or click one 
 No network, a proxy/firewall blocking the repo host, or a badly-skewed system clock (which breaks TLS). Local maps are never corrupted by a failed update — failed files are skipped; re-run later. See [Updating Maps & Scripts](Updating-Maps-and-Scripts#troubleshooting).
 
 **The app updater didn't offer an update.**
-In-app **Core** updates work on all three platforms, but only if you installed an updater-aware package: `01-Windows-Genie5-Setup.exe` (Windows), a `.pkg` (macOS), or the `04-Linux-Genie5.AppImage` (Linux). The plain **Portable `.zip`** builds don't register for updates — re-download from [Releases](https://github.com/GenieClient/Genie5/releases/latest) to upgrade those. See [Keeping Up to Date](Updates#core-the-app).
+In-app **Core** updates work on all three platforms with any official download — Setup.exe and the Portable `.zip` alike are Velopack-aware. What *can't* self-update is a source build (`dotnet run` / a raw publish folder); the Updates dialog tells you so. Also check the **channel** selector in the Updates dialog (during the beta it should be on **beta** — the stable channel stays "up to date" until 5.0.0 ships). As a last resort, re-download from [Releases](https://github.com/GenieClient/Genie5/releases/latest). See [Keeping Up to Date](Updates#core-the-app).
 
 ## Resetting to a clean state
 

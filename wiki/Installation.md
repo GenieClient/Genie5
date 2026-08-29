@@ -79,7 +79,7 @@ Then head to [Quick Start](Quick-Start) to connect and play.
 
 ## Staying up to date
 
-If you installed via **`01-Windows-Genie5-Setup.exe`** (Windows) or the **`.pkg`** / **AppImage** (macOS / Linux), future releases arrive through the in-app updater — **Help → Check for Updates**, which shows a badge when something's available. Portable `.zip` builds don't auto-update; re-download to upgrade. Full details: [Keeping Up to Date](Updates).
+Every official download — **Setup.exe** and the **Portable `.zip`** alike on Windows, the **`.pkg`** on macOS, the **AppImage** on Linux — is updater-aware: future releases arrive through the in-app updater via **Help → Check for Updates**, which shows a badge when something's available. Full details: [Keeping Up to Date](Updates).
 
 ## Build from source
 
