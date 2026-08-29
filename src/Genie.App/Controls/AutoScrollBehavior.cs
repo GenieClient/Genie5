@@ -94,17 +94,29 @@ public sealed class AutoScrollState : ReactiveObject
     private bool _atBottom = true;
     private bool _paused;
 
-    // Trim anchor (#293): the scrollback cap trims lines from the TOP of the
-    // buffer, which slides the remaining content up under a numerically
+    // Trim compensation (#293): the scrollback cap trims lines from the TOP of
+    // the buffer, which slides the remaining content up under a numerically
     // unchanged Offset.Y — the reader's text drifts through a "held" viewport
     // (and the positional selection under it copies the wrong lines, #298).
-    // While the view is not following the tail, the line at the top of the
-    // viewport is captured before layout reacts to the removal and restored to
-    // the same viewport position after. Anchoring is by REFERENCE: TextLine is
-    // a record, and duplicate lines (repeated combat spam) are value-equal.
-    private object? _anchorItem;
-    private double  _anchorDelta;
-    private bool    _restorePending;
+    //
+    // The offset is compensated SYNCHRONOUSLY inside the CollectionChanged
+    // event, before any layout or render pass runs: the panel is a plain
+    // (non-virtualized) StackPanel, so at that instant every remaining
+    // container still carries its pre-trim Bounds, and the first remaining
+    // container's stale Y IS the height being removed above it. Subtracting
+    // that from Offset.Y means the offset change and the content shift land in
+    // the same layout pass — nothing to observe, no dispatcher/LayoutUpdated
+    // ordering to race (both event-based restores failed live: a Loaded post
+    // runs after the frame paints → one-frame blink; a LayoutUpdated hook can
+    // fire on a pass queued before the trim was measured → no hold at all).
+    //
+    // _trimComp accumulates the compensation applied since the last completed
+    // layout pass: when several trims land in one frame, the later removals
+    // still read STALE bounds that already include the earlier removals'
+    // heights, so each removal's height is (first remaining Y − _trimComp).
+    // Any LayoutUpdated marks bounds fresh again (a pass processes every
+    // pending invalidation, so bounds and offset are reconciled by then).
+    private double _trimComp;
 
     [Reactive] public bool IsScrolledUp { get; private set; }
 
@@ -145,71 +157,64 @@ public sealed class AutoScrollState : ReactiveObject
                 break;
 
             case NotifyCollectionChangedAction.Remove when e.OldStartingIndex == 0:
-                // Scrollback trim. Anchor only while the view holds still —
+                // Scrollback trim. Compensate only while the view holds still —
                 // when following the tail, the bottom pin already covers it.
                 if (!_paused && _atBottom) break;
-                CaptureAnchor(e.OldItems);
-                if (_anchorItem is not null && !_restorePending)
-                {
-                    _restorePending = true;
-                    Dispatcher.UIThread.Post(RestoreAnchor, DispatcherPriority.Loaded);
-                }
+                CompensateTrim(e.OldItems);
                 break;
 
             case NotifyCollectionChangedAction.Reset:
-                _anchorItem = null;   // buffer cleared — nothing left to hold
+                _trimComp = 0;   // buffer cleared — nothing left to hold
                 break;
         }
     }
 
-    // ── Trim anchor (#293) ─────────────────────────────────────────────────
+    // ── Trim compensation (#293) ───────────────────────────────────────────
 
     /// <summary>
-    /// Record which line sits at the top of the viewport, and where in it the
-    /// viewport top falls. Runs inside the CollectionChanged event, BEFORE the
-    /// layout pass reacts: container bounds still reflect the layout that
-    /// Offset.Y was last read against, so the pair is self-consistent. First
-    /// removal of a frame wins; the batched restore reuses it.
+    /// Runs inside the CollectionChanged event for a removal at index 0, before
+    /// any layout pass reacts. The first container that is NOT being removed
+    /// still carries pre-trim Bounds, so its Y (minus compensation already
+    /// applied this frame) is exactly the height about to vanish above the
+    /// content. Subtract it from Offset.Y now and the offset change rides the
+    /// same layout pass as the content shift — the held text never moves on
+    /// screen. First LayoutUpdated marks bounds fresh and zeroes the counter.
     /// </summary>
-    private void CaptureAnchor(IList? removedItems)
+    private void CompensateTrim(IList? removedItems)
     {
-        if (_anchorItem is not null) return;
         if (_sv.Content is not ItemsControl ic) return;
 
-        Control? top   = null;
-        var      bestY = double.MaxValue;
+        // First remaining container = smallest stale Y among survivors.
+        var firstY = double.MaxValue;
         foreach (var c in ic.GetRealizedContainers())
         {
-            var b = c.Bounds;
-            if (b.Y + b.Height <= _sv.Offset.Y) continue;   // fully above the viewport
-            if (b.Y >= bestY) continue;
             if (ContainsRef(removedItems, c.DataContext)) continue;   // being trimmed
-            bestY = b.Y;
-            top   = c;
+            if (c.Bounds.Y < firstY) firstY = c.Bounds.Y;
         }
-        if (top is null) return;
-        _anchorItem  = top.DataContext;
-        _anchorDelta = _sv.Offset.Y - bestY;
+        if (firstY == double.MaxValue) return;   // nothing left to hold against
+
+        var removedHeight = firstY - _trimComp;
+        if (removedHeight <= 0) return;          // stale/unlaid-out bounds — skip
+
+        if (!_boundsFreshHooked)
+        {
+            _boundsFreshHooked = true;
+            _sv.LayoutUpdated += OnBoundsFresh;
+        }
+        _trimComp += removedHeight;
+        _sv.Offset = _sv.Offset.WithY(Math.Max(0, _sv.Offset.Y - removedHeight));
     }
 
-    /// <summary>Post-layout: put the anchored line back at the same viewport
-    /// position. If the anchor itself got trimmed away (reader parked at the
-    /// very top of the buffer), there is nothing to hold — let the view clamp.</summary>
-    private void RestoreAnchor()
-    {
-        _restorePending = false;
-        var item = _anchorItem;
-        _anchorItem = null;
-        if (item is null) return;
-        if (!_paused && _atBottom) return;   // user returned to the tail meanwhile
-        if (_sv.Content is not ItemsControl ic) return;
+    private bool _boundsFreshHooked;
 
-        foreach (var c in ic.GetRealizedContainers())
-        {
-            if (!ReferenceEquals(c.DataContext, item)) continue;
-            _sv.Offset = _sv.Offset.WithY(Math.Max(0, c.Bounds.Y + _anchorDelta));
-            return;
-        }
+    /// <summary>Any completed layout pass reconciles bounds with the removals
+    /// (a pass processes every pending invalidation), so the stale-bounds
+    /// compensation counter resets and the hook detaches until the next trim.</summary>
+    private void OnBoundsFresh(object? sender, EventArgs e)
+    {
+        _sv.LayoutUpdated -= OnBoundsFresh;
+        _boundsFreshHooked = false;
+        _trimComp = 0;
     }
 
     private static bool ContainsRef(IList? items, object? candidate)
