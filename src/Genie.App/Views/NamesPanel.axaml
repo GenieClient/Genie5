@@ -24,6 +24,7 @@
                 x:CompileBindings="False"
                 SelectionChanged="OnSelectionChanged">
         <DataGrid.Columns>
+          <DataGridTextColumn Header="Scope" Binding="{Binding Scope}" Width="Auto" />
           <!-- Name cell renders in the rule's own fg/bg so the row previews
                what each player-name highlight will look like in-game. -->
           <DataGridTemplateColumn Header="Name" Width="*">
@@ -63,9 +64,14 @@
         </StackPanel>
 
         <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3"
-                    Orientation="Horizontal" Spacing="4" Margin="0,2,0,0">
+                    Orientation="Horizontal" Spacing="12" Margin="0,2,0,0">
           <Button Content="Save"  Click="OnSaveRule"/>
           <Button Content="Clear" Click="OnClear"/>
+          <StackPanel Name="ScopeGroup" Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Scope:" VerticalAlignment="Center"/>
+            <ComboBox Name="ScopeBox" MinWidth="130" VerticalAlignment="Center"
+                      ToolTip.Tip="This character = saved in this profile's config. All characters = saved in the shared global config every character loads."/>
+          </StackPanel>
         </StackPanel>
 
         <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3"

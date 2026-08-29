@@ -4,6 +4,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Genie.Core.Aliases;
 using Genie.Core.Import;
+using Genie.Core.Persistence;
 
 namespace Genie.App.Views;
 
@@ -14,18 +15,29 @@ namespace Genie.App.Views;
 /// </summary>
 public partial class AliasesPanel : UserControl
 {
-    public sealed record AliasRow(string EnabledGlyph, string Name, string Expansion, bool IsEnabled);
+    public sealed record AliasRow(string EnabledGlyph, string Scope, string Name, string Expansion, bool IsEnabled);
 
-    private AliasEngine? _engine;
-    private Action?      _onChanged;
-    private string       _filter = string.Empty;
+    private AliasEngine?         _engine;
+    private Action?              _onChanged;
+    private ScopeEditingContext? _scopeCtx;
+    private string               _filter = string.Empty;
 
-    public AliasesPanel() => InitializeComponent();
+    public AliasesPanel()
+    {
+        InitializeComponent();
+        ScopeBox.ItemsSource   = ScopeEditing.Labels;
+        ScopeBox.SelectedIndex = 0;   // new rules default to This character (#257)
+    }
 
-    public void Initialize(AliasEngine engine, Action? onChanged = null)
+    public void Initialize(AliasEngine engine, Action? onChanged = null,
+                           ScopeEditingContext? scopeContext = null)
     {
         _engine    = engine;
         _onChanged = onChanged;
+        _scopeCtx  = scopeContext;
+        var twoLayers = scopeContext?.TwoLayers == true;
+        ScopeGroup.IsVisible = twoLayers;
+        ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
         Refresh();
     }
 
@@ -34,7 +46,7 @@ public partial class AliasesPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as AliasRow)?.Name;
         ItemsList.ItemsSource = _engine.Aliases
-            .Select(a => new AliasRow(a.IsEnabled ? "✓" : "✗", a.Name, a.Expansion, a.IsEnabled))
+            .Select(a => new AliasRow(a.IsEnabled ? "✓" : "✗", ScopeEditing.RowLabel(a.Scope), a.Name, a.Expansion, a.IsEnabled))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Name, r.Expansion))
             .ToList();
         if (keep is not null)
@@ -50,6 +62,7 @@ public partial class AliasesPanel : UserControl
         NameBox.Text           = alias.Name;
         ExpansionBox.Text      = alias.Expansion;
         EnabledCheck.IsChecked = alias.IsEnabled;
+        ScopeBox.SelectedIndex = ScopeEditing.ToIndex(alias.Scope);
         StatusText.Text        = string.Empty;
     }
 
@@ -62,17 +75,39 @@ public partial class AliasesPanel : UserControl
 
         if (string.IsNullOrEmpty(name)) { StatusText.Text = "Name is required."; return; }
 
+        var existing = _engine.Aliases.FirstOrDefault(a => a.Name == name);
         _engine.RemoveAlias(name);
-        _engine.AddAlias(name, expansion, enabled);
+        var added = _engine.AddAlias(name, expansion, enabled);
+        added.Scope = _scopeCtx?.TwoLayers == true
+            ? ScopeEditing.FromIndex(ScopeBox.SelectedIndex)
+            : existing?.Scope ?? RuleScope.Character;
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = $"Saved '{name}'.";
     }
 
-    private void OnDelete(object? sender, RoutedEventArgs e)
+    private async void OnDelete(object? sender, RoutedEventArgs e)
     {
         if (_engine is null) return;
         if (ItemsList.SelectedItem is not AliasRow row) { StatusText.Text = "Select an alias to delete."; return; }
+        var alias = _engine.Aliases.FirstOrDefault(a => a.Name == row.Name);
+        if (alias is null) return;
+
+        // Deleting a shared (Global) alias affects every character (#257).
+        if (alias.Scope == RuleScope.Global && _scopeCtx?.TwoLayers == true)
+        {
+            if (this.GetVisualRoot() is not Window owner) return;
+            var choice = await ScopeDeleteDialog.Show(owner, alias.Name, allowOptOut: true);
+            if (choice == ScopeDeleteChoice.Cancel) return;
+            if (choice == ScopeDeleteChoice.LocalOptOut)
+            {
+                LocalOptOut(alias);
+                StatusText.Text = "Disabled for this character (still active for everyone else).";
+                return;
+            }
+            _scopeCtx.NoteGlobalDelete?.Invoke(alias.Name);
+        }
+
         _engine.RemoveAlias(row.Name);
         ClearForm();
         Refresh();
@@ -86,10 +121,32 @@ public partial class AliasesPanel : UserControl
         if (ItemsList.SelectedItem is not AliasRow row) { StatusText.Text = "Select an alias to toggle."; return; }
         var alias = _engine.Aliases.FirstOrDefault(a => a.Name == row.Name);
         if (alias is null) return;
+
+        // Toggling OFF a shared alias writes the reversible local opt-out (#257).
+        if (alias.Scope == RuleScope.Global && _scopeCtx?.TwoLayers == true && alias.IsEnabled)
+        {
+            LocalOptOut(alias);
+            StatusText.Text = "Disabled for this character (still active for everyone else).";
+            return;
+        }
+
         _engine.SetEnabled(alias.Name, !alias.IsEnabled);
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = $"'{alias.Name}' {(alias.IsEnabled ? "enabled" : "disabled")}.";
+    }
+
+    /// <summary>Shadow a shared alias with a disabled this-character copy; the
+    /// shared alias stays in the global file via the save merge (#257).</summary>
+    private void LocalOptOut(AliasRule alias)
+    {
+        if (_engine is null) return;
+        _engine.RemoveAlias(alias.Name);
+        _engine.AddAlias(alias.Name, alias.Expansion, isEnabled: false,
+                         alias.ClassName).Scope = RuleScope.Character;
+        ClearForm();
+        Refresh();
+        _onChanged?.Invoke();
     }
 
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();
@@ -107,6 +164,7 @@ public partial class AliasesPanel : UserControl
         NameBox.Text           = string.Empty;
         ExpansionBox.Text      = string.Empty;
         EnabledCheck.IsChecked = true;
+        ScopeBox.SelectedIndex = 0;   // new rules default to This character
         StatusText.Text        = string.Empty;
     }
 

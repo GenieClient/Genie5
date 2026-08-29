@@ -65,4 +65,38 @@ public static class ScopedRuleLoader
     public static (string ProfilePath, string GlobalPath) Paths(
         string profileDir, string globalDir, string fileName)
         => (Path.Combine(profileDir, fileName), Path.Combine(globalDir, fileName));
+
+    /// <summary>
+    /// The content the GLOBAL file should hold after a panel save (#257): the
+    /// engine's Global-scoped rules, plus every on-disk global entry whose key
+    /// the engine no longer carries at Global scope. A character override
+    /// shadows its global twin OUT of the live engine entirely, so a save
+    /// derived from the engine alone would silently drop the twin from the
+    /// shared file — the fully-forked-profile wipe. Only keys the user
+    /// explicitly deleted or renamed away at Global scope
+    /// (<paramref name="deletedKeys"/>) are excluded from preservation.
+    /// Keys compare case-insensitively.
+    /// </summary>
+    public static List<T> MergeGlobalForSave<T>(
+        IEnumerable<T>              engineGlobal,
+        IEnumerable<T>              diskGlobal,
+        Func<T, string>             key,
+        IReadOnlyCollection<string> deletedKeys)
+    {
+        var result = new List<T>();
+        var have   = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in engineGlobal)
+        {
+            result.Add(item);
+            have.Add(key(item) ?? string.Empty);
+        }
+        var deleted = deletedKeys as ISet<string>
+                   ?? new HashSet<string>(deletedKeys, StringComparer.OrdinalIgnoreCase);
+        foreach (var item in diskGlobal)
+        {
+            var k = key(item) ?? string.Empty;
+            if (!have.Contains(k) && !deleted.Contains(k)) result.Add(item);
+        }
+        return result;
+    }
 }

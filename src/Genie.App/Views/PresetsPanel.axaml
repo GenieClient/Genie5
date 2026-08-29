@@ -38,6 +38,7 @@
             </DataTemplate>
           </DataGridTemplateColumn.CellTemplate>
         </DataGridTemplateColumn>
+        <DataGridTextColumn Header="Scope" Binding="{Binding Scope}"          Width="Auto" />
         <DataGridTextColumn Header="Fg"   Binding="{Binding ForegroundColor}" Width="Auto" />
         <DataGridTextColumn Header="Bg"   Binding="{Binding BackgroundColor}" Width="Auto" />
         <DataGridTextColumn Header="Line" Binding="{Binding LineGlyph}"       Width="40" />
@@ -75,6 +76,11 @@
         </Border>
         <Button Content="Apply" Click="OnApply"/>
         <Button Content="Reset" Click="OnReset"/>
+        <StackPanel Name="ScopeGroup" Orientation="Horizontal" Spacing="6" Margin="8,0,0,0">
+          <TextBlock Text="Scope:" VerticalAlignment="Center"/>
+          <ComboBox Name="ScopeBox" MinWidth="130" VerticalAlignment="Center"
+                    ToolTip.Tip="This character = the colour override is saved in this profile's config. All characters = saved in the shared global config."/>
+        </StackPanel>
       </StackPanel>
 
       <TextBlock Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3"

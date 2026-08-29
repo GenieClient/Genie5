@@ -27,6 +27,7 @@
                 SelectionChanged="OnSelectionChanged">
         <DataGrid.Columns>
           <DataGridTextColumn Header="On"      Binding="{Binding EnabledGlyph}" Width="40"/>
+          <DataGridTextColumn Header="Scope"   Binding="{Binding Scope}"        Width="Auto"/>
           <DataGridTextColumn Header="Pattern" Binding="{Binding Pattern}"      Width="*"/>
           <DataGridTextColumn Header="Class"   Binding="{Binding ClassName}"    Width="Auto"/>
         </DataGrid.Columns>
@@ -48,6 +49,11 @@
                     Orientation="Horizontal" Spacing="16" Margin="0,2,0,4">
           <CheckBox Name="CaseSensitiveCheck" Content="Case sensitive"/>
           <CheckBox Name="EnabledCheck"       Content="Enabled" IsChecked="True"/>
+          <StackPanel Name="ScopeGroup" Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Scope:" VerticalAlignment="Center"/>
+            <ComboBox Name="ScopeBox" MinWidth="130" VerticalAlignment="Center"
+                      ToolTip.Tip="This character = saved in this profile's config. All characters = saved in the shared global config every character loads."/>
+          </StackPanel>
           <Button   Content="Save"  Click="OnSave"/>
           <Button   Content="Clear" Click="OnClear"/>
         </StackPanel>

@@ -118,4 +118,46 @@ public class ScopedRuleLoaderTests
         Assert.Equal(Path.Combine(@"C:\p", "highlights.json"), p);
         Assert.Equal(Path.Combine(@"C:\g", "highlights.json"), g);
     }
+
+    // ── MergeGlobalForSave — the shadowed-twin wipe guard ─────────────────────
+
+    private static readonly string[] NoDeletes = Array.Empty<string>();
+
+    [Fact]
+    public void MergeGlobalForSave_PreservesShadowedTwinsMissingFromEngine()
+    {
+        // Fully-forked profile: every global rule is shadowed, so the engine's
+        // Global subset is EMPTY — the save must still keep the disk set.
+        var merged = ScopedRuleLoader.MergeGlobalForSave(
+            engineGlobal: Array.Empty<R>(),
+            diskGlobal:   new[] { new R("a", "g1"), new R("b", "g2") },
+            key:          r => r.Key,
+            deletedKeys:  NoDeletes);
+        Assert.Equal(2, merged.Count);
+    }
+
+    [Fact]
+    public void MergeGlobalForSave_EngineVersionWinsOverDisk()
+    {
+        var merged = ScopedRuleLoader.MergeGlobalForSave(
+            engineGlobal: new[] { new R("a", "edited") },
+            diskGlobal:   new[] { new R("A", "stale"), new R("b", "kept") },
+            key:          r => r.Key,
+            deletedKeys:  NoDeletes);
+        Assert.Equal(2, merged.Count);
+        Assert.Equal("edited", merged[0].Value);
+        Assert.Equal("kept",   merged[1].Value);
+    }
+
+    [Fact]
+    public void MergeGlobalForSave_ExplicitDeletesAreNotResurrected()
+    {
+        var merged = ScopedRuleLoader.MergeGlobalForSave(
+            engineGlobal: Array.Empty<R>(),
+            diskGlobal:   new[] { new R("gone", "g"), new R("stays", "g2") },
+            key:          r => r.Key,
+            deletedKeys:  new[] { "GONE" });                  // case-insensitive
+        var item = Assert.Single(merged);
+        Assert.Equal("stays", item.Key);
+    }
 }

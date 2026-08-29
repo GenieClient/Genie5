@@ -27,6 +27,7 @@
                 SelectionChanged="OnSelectionChanged">
         <DataGrid.Columns>
           <DataGridTextColumn Header="On"        Binding="{Binding EnabledGlyph}" Width="40"/>
+          <DataGridTextColumn Header="Scope"     Binding="{Binding Scope}"        Width="Auto"/>
           <DataGridTextColumn Header="Name"      Binding="{Binding Name}"         Width="Auto"/>
           <DataGridTextColumn Header="Expansion" Binding="{Binding Expansion}"    Width="*"/>
         </DataGrid.Columns>
@@ -44,6 +45,11 @@
 
         <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="16" Margin="0,2,0,4">
           <CheckBox Name="EnabledCheck" Content="Enabled" IsChecked="True"/>
+          <StackPanel Name="ScopeGroup" Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Scope:" VerticalAlignment="Center"/>
+            <ComboBox Name="ScopeBox" MinWidth="130" VerticalAlignment="Center"
+                      ToolTip.Tip="This character = saved in this profile's config. All characters = saved in the shared global config every character loads."/>
+          </StackPanel>
           <Button   Content="Save"  Click="OnSave"/>
           <Button   Content="Clear" Click="OnClear"/>
         </StackPanel>

@@ -4,6 +4,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Genie.Core.Import;
+using Genie.Core.Persistence;
 using Genie.Core.Substitutes;
 
 namespace Genie.App.Views;
@@ -15,18 +16,29 @@ namespace Genie.App.Views;
 /// </summary>
 public partial class SubstitutesPanel : UserControl
 {
-    public sealed record SubstituteRow(string EnabledGlyph, string Pattern, string Replacement, string ClassName);
+    public sealed record SubstituteRow(string EnabledGlyph, string Scope, string Pattern, string Replacement, string ClassName);
 
-    private SubstituteEngine? _engine;
-    private Action?           _onChanged;
-    private string            _filter = string.Empty;
+    private SubstituteEngine?    _engine;
+    private Action?              _onChanged;
+    private ScopeEditingContext? _scopeCtx;
+    private string               _filter = string.Empty;
 
-    public SubstitutesPanel() => InitializeComponent();
+    public SubstitutesPanel()
+    {
+        InitializeComponent();
+        ScopeBox.ItemsSource   = ScopeEditing.Labels;
+        ScopeBox.SelectedIndex = 0;   // new rules default to This character (#257)
+    }
 
-    public void Initialize(SubstituteEngine engine, Action? onChanged = null)
+    public void Initialize(SubstituteEngine engine, Action? onChanged = null,
+                           ScopeEditingContext? scopeContext = null)
     {
         _engine    = engine;
         _onChanged = onChanged;
+        _scopeCtx  = scopeContext;
+        var twoLayers = scopeContext?.TwoLayers == true;
+        ScopeGroup.IsVisible = twoLayers;
+        ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
         Refresh();
     }
 
@@ -35,7 +47,7 @@ public partial class SubstitutesPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as SubstituteRow)?.Pattern;
         ItemsList.ItemsSource = _engine.Rules
-            .Select(r => new SubstituteRow(r.IsEnabled ? "✓" : "✗", r.Pattern, r.Replacement, r.ClassName))
+            .Select(r => new SubstituteRow(r.IsEnabled ? "✓" : "✗", ScopeEditing.RowLabel(r.Scope), r.Pattern, r.Replacement, r.ClassName))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Pattern, r.Replacement, r.ClassName))
             .ToList();
         if (keep is not null)
@@ -53,6 +65,7 @@ public partial class SubstitutesPanel : UserControl
         ClassBox.Text                = rule.ClassName;
         CaseSensitiveCheck.IsChecked = rule.CaseSensitive;
         EnabledCheck.IsChecked       = rule.IsEnabled;
+        ScopeBox.SelectedIndex       = ScopeEditing.ToIndex(rule.Scope);
         StatusText.Text              = string.Empty;
     }
 
@@ -70,17 +83,39 @@ public partial class SubstitutesPanel : UserControl
         try { _ = new Regex(pattern); }
         catch (RegexParseException ex) { StatusText.Text = $"Invalid regex: {ex.Message}"; return; }
 
+        var existing = _engine.Rules.FirstOrDefault(r => r.Pattern == pattern);
         _engine.RemoveRule(pattern);
-        _engine.AddRule(pattern, replacement, caseSensitive, enabled, className);
+        var added = _engine.AddRule(pattern, replacement, caseSensitive, enabled, className);
+        added.Scope = _scopeCtx?.TwoLayers == true
+            ? ScopeEditing.FromIndex(ScopeBox.SelectedIndex)
+            : existing?.Scope ?? RuleScope.Character;
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = "Saved.";
     }
 
-    private void OnDelete(object? sender, RoutedEventArgs e)
+    private async void OnDelete(object? sender, RoutedEventArgs e)
     {
         if (_engine is null) return;
         if (ItemsList.SelectedItem is not SubstituteRow row) { StatusText.Text = "Select a substitute to delete."; return; }
+        var rule = _engine.Rules.FirstOrDefault(r => r.Pattern == row.Pattern);
+        if (rule is null) return;
+
+        // Deleting a shared (Global) rule affects every character (#257).
+        if (rule.Scope == RuleScope.Global && _scopeCtx?.TwoLayers == true)
+        {
+            if (this.GetVisualRoot() is not Window owner) return;
+            var choice = await ScopeDeleteDialog.Show(owner, rule.Pattern, allowOptOut: true);
+            if (choice == ScopeDeleteChoice.Cancel) return;
+            if (choice == ScopeDeleteChoice.LocalOptOut)
+            {
+                LocalOptOut(rule);
+                StatusText.Text = "Disabled for this character (still active for everyone else).";
+                return;
+            }
+            _scopeCtx.NoteGlobalDelete?.Invoke(rule.Pattern);
+        }
+
         _engine.RemoveRule(row.Pattern);
         ClearForm();
         Refresh();
@@ -94,10 +129,32 @@ public partial class SubstitutesPanel : UserControl
         if (ItemsList.SelectedItem is not SubstituteRow row) { StatusText.Text = "Select a substitute to toggle."; return; }
         var rule = _engine.Rules.FirstOrDefault(r => r.Pattern == row.Pattern);
         if (rule is null) return;
+
+        // Toggling OFF a shared rule writes the reversible local opt-out (#257).
+        if (rule.Scope == RuleScope.Global && _scopeCtx?.TwoLayers == true && rule.IsEnabled)
+        {
+            LocalOptOut(rule);
+            StatusText.Text = "Disabled for this character (still active for everyone else).";
+            return;
+        }
+
         rule.IsEnabled = !rule.IsEnabled;
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = $"Substitute {(rule.IsEnabled ? "enabled" : "disabled")}.";
+    }
+
+    /// <summary>Shadow a shared substitute with a disabled this-character copy;
+    /// the shared rule stays in the global file via the save merge (#257).</summary>
+    private void LocalOptOut(SubstituteRule rule)
+    {
+        if (_engine is null) return;
+        _engine.RemoveRule(rule.Pattern);
+        _engine.AddRule(rule.Pattern, rule.Replacement, rule.CaseSensitive,
+                        isEnabled: false, rule.ClassName).Scope = RuleScope.Character;
+        ClearForm();
+        Refresh();
+        _onChanged?.Invoke();
     }
 
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();
@@ -145,6 +202,7 @@ public partial class SubstitutesPanel : UserControl
         ClassBox.Text                = string.Empty;
         CaseSensitiveCheck.IsChecked = false;
         EnabledCheck.IsChecked       = true;
+        ScopeBox.SelectedIndex       = 0;   // new rules default to This character
         StatusText.Text              = string.Empty;
     }
 }

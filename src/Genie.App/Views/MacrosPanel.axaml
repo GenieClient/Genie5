@@ -22,6 +22,7 @@
                 x:CompileBindings="False"
                 SelectionChanged="OnSelectionChanged">
         <DataGrid.Columns>
+          <DataGridTextColumn Header="Scope"  Binding="{Binding Scope}"  Width="Auto"/>
           <DataGridTextColumn Header="Key"    Binding="{Binding Key}"    Width="Auto"/>
           <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="*"/>
         </DataGrid.Columns>
@@ -43,9 +44,14 @@
         <TextBox   Grid.Row="1" Grid.Column="1" Name="ActionBox" Margin="0,0,0,4"
                    AcceptsReturn="True" TextWrapping="Wrap" Height="60"/>
 
-        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="0,2,0,4">
+        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="12" Margin="0,2,0,4">
           <Button Content="Save"  Click="OnSave"/>
           <Button Content="Clear" Click="OnClear"/>
+          <StackPanel Name="ScopeGroup" Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Scope:" VerticalAlignment="Center"/>
+            <ComboBox Name="ScopeBox" MinWidth="130" VerticalAlignment="Center"
+                      ToolTip.Tip="This character = saved in this profile's config. All characters = saved in the shared global config every character loads."/>
+          </StackPanel>
         </StackPanel>
 
         <TextBlock Grid.Row="3" Grid.Column="1" Name="StatusText" Margin="0,6,0,0"

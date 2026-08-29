@@ -4,6 +4,7 @@ using Avalonia.Media;
 using Genie.App.Controls;
 using Genie.App.Highlighting;
 using Genie.Core.Config;
+using Genie.Core.Persistence;
 using Genie.Core.Presets;
 
 namespace Genie.App.Views;
@@ -15,30 +16,39 @@ namespace Genie.App.Views;
 /// </summary>
 public partial class PresetsPanel : UserControl
 {
-    public sealed record PresetRow(string Id, string ForegroundColor, string BackgroundColor, string LineGlyph)
+    public sealed record PresetRow(string Scope, string Id, string ForegroundColor, string BackgroundColor, string LineGlyph)
     {
         public IBrush IdForeground => ColorPickerHelpers.ParseBrush(ForegroundColor) ?? Brushes.LightGray;
         public IBrush IdBackground => ColorPickerHelpers.ParseBrush(BackgroundColor) ?? Brushes.Transparent;
     }
 
-    private PresetEngine? _engine;
-    private Action?       _onChanged;
-    private GenieConfig?  _config;
-    private Action?       _onConfigChanged;
-    private bool          _suppressMonsterBold;   // guard the initial IsChecked set
+    private PresetEngine?        _engine;
+    private Action?              _onChanged;
+    private GenieConfig?         _config;
+    private Action?              _onConfigChanged;
+    private ScopeEditingContext? _scopeCtx;
+    private bool                 _suppressMonsterBold;   // guard the initial IsChecked set
 
     public PresetsPanel()
     {
         InitializeComponent();
+        ScopeBox.ItemsSource   = ScopeEditing.Labels;
+        ScopeBox.SelectedIndex = 1;   // preset overrides default to All characters —
+                                      // the palette is app-wide unless deliberately per-char
     }
 
     public void Initialize(PresetEngine engine, Action? onChanged = null,
-                           GenieConfig? config = null, Action? onConfigChanged = null)
+                           GenieConfig? config = null, Action? onConfigChanged = null,
+                           ScopeEditingContext? scopeContext = null)
     {
         _engine          = engine;
         _onChanged       = onChanged;
         _config          = config;
         _onConfigChanged = onConfigChanged;
+        _scopeCtx        = scopeContext;
+        var twoLayers    = scopeContext?.TwoLayers == true;
+        ScopeGroup.IsVisible = twoLayers;
+        ScopeEditing.SetColumnVisible(PresetList, "Scope", twoLayers);
 
         // #131 MonsterBold on/off. Reflect the persisted setting without firing
         // the change handler (which would re-persist + re-render on load). The
@@ -71,6 +81,7 @@ public partial class PresetsPanel : UserControl
         PresetList.ItemsSource = _engine.Presets
             .OrderBy(kv => kv.Key)
             .Select(kv => new PresetRow(
+                ScopeEditing.RowLabel(kv.Value.Scope),
                 kv.Key,
                 kv.Value.ForegroundColor,
                 kv.Value.BackgroundColor,
@@ -91,6 +102,7 @@ public partial class PresetsPanel : UserControl
         ColorPickerHelpers.LoadColor(FgColorPicker, FgDefaultCheck, rule.ForegroundColor, "Default");
         ColorPickerHelpers.LoadColor(BgColorPicker, BgNoneCheck,    rule.BackgroundColor, "");
         HighlightLineCheck.IsChecked = rule.HighlightLine;
+        ScopeBox.SelectedIndex       = ScopeEditing.ToIndex(rule.Scope);
         UpdatePreview(rule.ForegroundColor, rule.BackgroundColor);
         StatusText.Text = string.Empty;
     }
@@ -109,6 +121,9 @@ public partial class PresetsPanel : UserControl
             ForegroundColor = fg,
             BackgroundColor = bg,
             HighlightLine   = HighlightLineCheck.IsChecked == true,
+            Scope           = _scopeCtx?.TwoLayers == true
+                                  ? ScopeEditing.FromIndex(ScopeBox.SelectedIndex)
+                                  : RuleScope.Global,
         });
 
         UpdatePreview(fg, bg);

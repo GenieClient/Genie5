@@ -4,6 +4,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Genie.Core.Import;
+using Genie.Core.Persistence;
 using Genie.Core.Triggers;
 
 namespace Genie.App.Views;
@@ -15,18 +16,29 @@ namespace Genie.App.Views;
 /// </summary>
 public partial class TriggersPanel : UserControl
 {
-    public sealed record TriggerRow(string EnabledGlyph, string Pattern, string Action, string ClassName);
+    public sealed record TriggerRow(string EnabledGlyph, string Scope, string Pattern, string Action, string ClassName);
 
-    private TriggerEngineFinal? _engine;
-    private Action?             _onChanged;
-    private string              _filter = string.Empty;
+    private TriggerEngineFinal?  _engine;
+    private Action?              _onChanged;
+    private ScopeEditingContext? _scopeCtx;
+    private string               _filter = string.Empty;
 
-    public TriggersPanel() => InitializeComponent();
+    public TriggersPanel()
+    {
+        InitializeComponent();
+        ScopeBox.ItemsSource   = ScopeEditing.Labels;
+        ScopeBox.SelectedIndex = 0;   // new rules default to This character (#257)
+    }
 
-    public void Initialize(TriggerEngineFinal engine, Action? onChanged = null)
+    public void Initialize(TriggerEngineFinal engine, Action? onChanged = null,
+                           ScopeEditingContext? scopeContext = null)
     {
         _engine    = engine;
         _onChanged = onChanged;
+        _scopeCtx  = scopeContext;
+        var twoLayers = scopeContext?.TwoLayers == true;
+        ScopeGroup.IsVisible = twoLayers;
+        ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
         Refresh();
     }
 
@@ -35,7 +47,7 @@ public partial class TriggersPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as TriggerRow)?.Pattern;
         ItemsList.ItemsSource = _engine.Triggers
-            .Select(t => new TriggerRow(t.IsEnabled ? "✓" : "✗", t.Pattern, t.Action, t.ClassName))
+            .Select(t => new TriggerRow(t.IsEnabled ? "✓" : "✗", ScopeEditing.RowLabel(t.Scope), t.Pattern, t.Action, t.ClassName))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Pattern, r.Action, r.ClassName))
             .ToList();
         if (keep is not null)
@@ -55,6 +67,7 @@ public partial class TriggersPanel : UserControl
         EnabledCheck.IsChecked       = trigger.IsEnabled;
         EvalCheck.IsChecked          = trigger.Eval;
         MatchAllCheck.IsChecked      = trigger.MatchAll;
+        ScopeBox.SelectedIndex       = ScopeEditing.ToIndex(trigger.Scope);
         StatusText.Text              = string.Empty;
     }
 
@@ -79,17 +92,38 @@ public partial class TriggersPanel : UserControl
         // silently strip a #trigger-added sound/speak on every dialog save.
         var existing = _engine.Triggers.FirstOrDefault(t => t.Pattern == pattern);
         _engine.RemoveTrigger(pattern);
-        _engine.AddTrigger(pattern, action, caseSensitive, enabled, className,
+        var added = _engine.AddTrigger(pattern, action, caseSensitive, enabled, className,
                            existing?.SoundFile ?? "", existing?.Speak ?? "", eval, matchAll);
+        added.Scope = _scopeCtx?.TwoLayers == true
+            ? ScopeEditing.FromIndex(ScopeBox.SelectedIndex)
+            : existing?.Scope ?? RuleScope.Character;
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = "Saved.";
     }
 
-    private void OnDelete(object? sender, RoutedEventArgs e)
+    private async void OnDelete(object? sender, RoutedEventArgs e)
     {
         if (_engine is null) return;
         if (ItemsList.SelectedItem is not TriggerRow row) { StatusText.Text = "Select a trigger to delete."; return; }
+        var rule = _engine.Triggers.FirstOrDefault(t => t.Pattern == row.Pattern);
+        if (rule is null) return;
+
+        // Deleting a shared (Global) rule affects every character (#257).
+        if (rule.Scope == RuleScope.Global && _scopeCtx?.TwoLayers == true)
+        {
+            if (this.GetVisualRoot() is not Window owner) return;
+            var choice = await ScopeDeleteDialog.Show(owner, rule.Pattern, allowOptOut: true);
+            if (choice == ScopeDeleteChoice.Cancel) return;
+            if (choice == ScopeDeleteChoice.LocalOptOut)
+            {
+                LocalOptOut(rule);
+                StatusText.Text = "Disabled for this character (still active for everyone else).";
+                return;
+            }
+            _scopeCtx.NoteGlobalDelete?.Invoke(rule.Pattern);
+        }
+
         _engine.RemoveTrigger(row.Pattern);
         ClearForm();
         Refresh();
@@ -103,10 +137,33 @@ public partial class TriggersPanel : UserControl
         if (ItemsList.SelectedItem is not TriggerRow row) { StatusText.Text = "Select a trigger to toggle."; return; }
         var trigger = _engine.Triggers.FirstOrDefault(t => t.Pattern == row.Pattern);
         if (trigger is null) return;
+
+        // Toggling OFF a shared rule writes the reversible local opt-out (#257).
+        if (trigger.Scope == RuleScope.Global && _scopeCtx?.TwoLayers == true && trigger.IsEnabled)
+        {
+            LocalOptOut(trigger);
+            StatusText.Text = "Disabled for this character (still active for everyone else).";
+            return;
+        }
+
         _engine.SetEnabled(trigger.Pattern, !trigger.IsEnabled);
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = $"Trigger {(trigger.IsEnabled ? "enabled" : "disabled")}.";
+    }
+
+    /// <summary>Shadow a shared trigger with a disabled this-character copy;
+    /// the shared rule stays in the global file via the save merge (#257).</summary>
+    private void LocalOptOut(TriggerRule rule)
+    {
+        if (_engine is null) return;
+        _engine.RemoveTrigger(rule.Pattern);
+        _engine.AddTrigger(rule.Pattern, rule.Action, rule.CaseSensitive, isEnabled: false,
+                           rule.ClassName, rule.SoundFile, rule.Speak, rule.Eval,
+                           rule.MatchAll).Scope = RuleScope.Character;
+        ClearForm();
+        Refresh();
+        _onChanged?.Invoke();
     }
 
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();
@@ -156,6 +213,7 @@ public partial class TriggersPanel : UserControl
         EnabledCheck.IsChecked       = true;
         EvalCheck.IsChecked          = false;
         MatchAllCheck.IsChecked      = false;
+        ScopeBox.SelectedIndex       = 0;   // new rules default to This character
         StatusText.Text              = string.Empty;
     }
 }

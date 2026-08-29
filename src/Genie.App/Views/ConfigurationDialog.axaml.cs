@@ -45,14 +45,17 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
                 onNamesChanged:      vm.OnNamesChanged,
                 onPresetsChanged:    vm.OnPresetsChanged,
                 config:              vm.ScriptConfig,          // #131 MonsterBold toggle
-                onConfigChanged:     vm.OnScriptSettingsChanged);
+                onConfigChanged:     vm.OnScriptSettingsChanged,
+                highlightsScope:     vm.ScopeContextFor("highlights.json"),
+                namesScope:          vm.ScopeContextFor("names.json"),
+                presetsScope:        vm.ScopeContextFor("presets.json"));
         }
 
-        if (vm.TriggerEngine    is { } triggers)    TriggersPanelCtrl   .Initialize(triggers,    vm.OnTriggersChanged);
-        if (vm.SubstituteEngine is { } substitutes) SubstitutesPanelCtrl.Initialize(substitutes, vm.OnSubstitutesChanged);
-        if (vm.GagEngine        is { } gags)        GagsPanelCtrl       .Initialize(gags,        vm.OnGagsChanged);
-        if (vm.AliasEngine      is { } aliases)     AliasesPanelCtrl    .Initialize(aliases,     vm.OnAliasesChanged);
-        if (vm.MacroEngine      is { } macros)      MacrosPanelCtrl     .Initialize(macros,      vm.OnMacrosChanged);
+        if (vm.TriggerEngine    is { } triggers)    TriggersPanelCtrl   .Initialize(triggers,    vm.OnTriggersChanged,    vm.ScopeContextFor("triggers.json"));
+        if (vm.SubstituteEngine is { } substitutes) SubstitutesPanelCtrl.Initialize(substitutes, vm.OnSubstitutesChanged, vm.ScopeContextFor("substitutes.json"));
+        if (vm.GagEngine        is { } gags)        GagsPanelCtrl       .Initialize(gags,        vm.OnGagsChanged,        vm.ScopeContextFor("gags.json"));
+        if (vm.AliasEngine      is { } aliases)     AliasesPanelCtrl    .Initialize(aliases,     vm.OnAliasesChanged,     vm.ScopeContextFor("aliases.json"));
+        if (vm.MacroEngine      is { } macros)      MacrosPanelCtrl     .Initialize(macros,      vm.OnMacrosChanged,      vm.ScopeContextFor("macros.json"));
         if (vm.VariableStore    is { } variables)   VariablesPanelCtrl  .Initialize(variables,   vm.OnVariablesChanged);
         if (vm.ClassEngine      is { } classes)     ClassesPanelCtrl    .Initialize(classes,     vm.OnClassesChanged);
 

@@ -7,6 +7,7 @@ using Genie.App.Controls;
 using Genie.App.Highlighting;
 using Genie.Core.Highlights;
 using Genie.Core.Import;
+using Genie.Core.Persistence;
 
 namespace Genie.App.Views;
 
@@ -17,7 +18,7 @@ namespace Genie.App.Views;
 /// </summary>
 public partial class NamesPanel : UserControl
 {
-    public sealed record NameRow(string Name, string ForegroundColor, string BackgroundColor)
+    public sealed record NameRow(string Scope, string Name, string ForegroundColor, string BackgroundColor)
     {
         public IBrush NameForeground => ColorPickerHelpers.ParseBrush(ForegroundColor) ?? Brushes.LightGray;
         public IBrush NameBackground => ColorPickerHelpers.ParseBrush(BackgroundColor) ?? Brushes.Transparent;
@@ -25,18 +26,26 @@ public partial class NamesPanel : UserControl
 
     private NameHighlightEngine? _engine;
     private Action?              _onChanged;
+    private ScopeEditingContext? _scopeCtx;
 
     public NamesPanel()
     {
         InitializeComponent();
-        FgColorPicker.Color   = Colors.Yellow;
-        BgNoneCheck.IsChecked = true;
+        FgColorPicker.Color    = Colors.Yellow;
+        BgNoneCheck.IsChecked  = true;
+        ScopeBox.ItemsSource   = ScopeEditing.Labels;
+        ScopeBox.SelectedIndex = 0;   // new names default to This character (#257)
     }
 
-    public void Initialize(NameHighlightEngine engine, Action? onChanged = null)
+    public void Initialize(NameHighlightEngine engine, Action? onChanged = null,
+                           ScopeEditingContext? scopeContext = null)
     {
         _engine    = engine;
         _onChanged = onChanged;
+        _scopeCtx  = scopeContext;
+        var twoLayers = scopeContext?.TwoLayers == true;
+        ScopeGroup.IsVisible = twoLayers;
+        ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
         Refresh();
     }
 
@@ -45,7 +54,7 @@ public partial class NamesPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as NameRow)?.Name;
         ItemsList.ItemsSource = _engine.Rules
-            .Select(r => new NameRow(r.Name, r.ForegroundColor, r.BackgroundColor))
+            .Select(r => new NameRow(ScopeEditing.RowLabel(r.Scope), r.Name, r.ForegroundColor, r.BackgroundColor))
             .ToList();
         if (keep is not null)
             ItemsList.SelectedItem = ((IEnumerable<NameRow>)ItemsList.ItemsSource)
@@ -65,6 +74,7 @@ public partial class NamesPanel : UserControl
         NameBox.Text = rule.Name;
         ColorPickerHelpers.LoadColor(FgColorPicker, FgDefaultCheck, rule.ForegroundColor, "Default");
         ColorPickerHelpers.LoadColor(BgColorPicker, BgNoneCheck,    rule.BackgroundColor, "");
+        ScopeBox.SelectedIndex = ScopeEditing.ToIndex(rule.Scope);
         StatusText.Text = string.Empty;
     }
 
@@ -85,18 +95,37 @@ public partial class NamesPanel : UserControl
         var fg = ColorPickerHelpers.ReadColor(FgColorPicker, FgDefaultCheck, "Default");
         var bg = ColorPickerHelpers.ReadColor(BgColorPicker, BgNoneCheck,    "");
 
+        var existing = _engine.Rules.FirstOrDefault(
+            r => r.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
         _engine.Add(name, fg, bg);
+        var added = _engine.Rules.FirstOrDefault(
+            r => r.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (added is not null)
+            added.Scope = _scopeCtx?.TwoLayers == true
+                ? ScopeEditing.FromIndex(ScopeBox.SelectedIndex)
+                : existing?.Scope ?? RuleScope.Character;
         Refresh();
         _onChanged?.Invoke();
         UserHighlights.NotifyRulesChanged();
         StatusText.Text = $"Saved '{name}'.";
     }
 
-    private void OnRemove(object? sender, RoutedEventArgs e)
+    private async void OnRemove(object? sender, RoutedEventArgs e)
     {
         if (_engine is null) return;
         var rule = SelectedRule();
         if (rule is null) { StatusText.Text = "Select a name to remove."; return; }
+
+        // Removing a shared (Global) name affects every character; names have
+        // no enabled flag, so confirm the for-all removal (#257).
+        if (rule.Scope == RuleScope.Global && _scopeCtx?.TwoLayers == true)
+        {
+            if (this.GetVisualRoot() is not Window owner) return;
+            var choice = await ScopeDeleteDialog.Show(owner, rule.Name, allowOptOut: false);
+            if (choice != ScopeDeleteChoice.RemoveForAll) return;
+            _scopeCtx.NoteGlobalDelete?.Invoke(rule.Name);
+        }
+
         _engine.Remove(rule.Name);
         ClearForm();
         Refresh();
@@ -114,6 +143,7 @@ public partial class NamesPanel : UserControl
         FgColorPicker.Color      = Colors.Yellow;
         FgDefaultCheck.IsChecked = false;
         BgNoneCheck.IsChecked    = true;
+        ScopeBox.SelectedIndex   = 0;   // new names default to This character
         StatusText.Text          = string.Empty;
     }
 

@@ -9,6 +9,7 @@ using Genie.App.Controls;
 using Genie.App.Highlighting;
 using Genie.Core.Highlights;
 using Genie.Core.Import;
+using Genie.Core.Persistence;
 
 namespace Genie.App.Views;
 
@@ -22,7 +23,7 @@ namespace Genie.App.Views;
 public partial class HighlightStringsPanel : UserControl
 {
     public sealed record HighlightRow(
-        string EnabledGlyph, string MatchType, string ForegroundColor, string BackgroundColor,
+        string EnabledGlyph, string Scope, string MatchType, string ForegroundColor, string BackgroundColor,
         string Pattern, string ClassName, string Windows)
     {
         /// <summary>Brush parsed from <see cref="ForegroundColor"/> so the
@@ -37,9 +38,10 @@ public partial class HighlightStringsPanel : UserControl
     private static readonly string[] MatchTypes =
         ["String", "Line", "BeginsWith", "Regex"];
 
-    private HighlightEngine? _engine;
-    private Action?          _onRulesChanged;
-    private string           _filter = string.Empty;
+    private HighlightEngine?     _engine;
+    private Action?              _onRulesChanged;
+    private ScopeEditingContext? _scopeCtx;
+    private string               _filter = string.Empty;
 
     /// <summary>Pattern of the rule currently loaded in the editor, captured at
     /// selection time. Null when composing a brand-new entry. Save keys the
@@ -55,17 +57,26 @@ public partial class HighlightStringsPanel : UserControl
         MatchTypeBox.SelectedIndex = 0;
         FgColorPicker.Color        = Colors.Yellow;
         BgNoneCheck.IsChecked      = true;
+        ScopeBox.ItemsSource       = ScopeEditing.Labels;
+        ScopeBox.SelectedIndex     = 0;   // new rules default to This character (#257)
     }
 
     /// <summary>
     /// Wire the panel up to a live engine. <paramref name="onRulesChanged"/> is
     /// fired after every mutation (Save / Delete / Toggle / Import) so the host
     /// can repaint already-rendered text against the new rule set.
+    /// <paramref name="scopeContext"/> enables the #257 scope UI; null / single
+    /// layer hides it.
     /// </summary>
-    public void Initialize(HighlightEngine engine, Action? onRulesChanged = null)
+    public void Initialize(HighlightEngine engine, Action? onRulesChanged = null,
+                           ScopeEditingContext? scopeContext = null)
     {
         _engine         = engine;
         _onRulesChanged = onRulesChanged;
+        _scopeCtx       = scopeContext;
+        var twoLayers   = scopeContext?.TwoLayers == true;
+        ScopeGroup.IsVisible = twoLayers;
+        ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
         Refresh();
     }
 
@@ -76,6 +87,7 @@ public partial class HighlightStringsPanel : UserControl
         ItemsList.ItemsSource = _engine.Rules
             .Select(r => new HighlightRow(
                 r.IsEnabled ? "✓" : "✗",
+                ScopeEditing.RowLabel(r.Scope),
                 r.MatchType.ToString(),
                 r.ForegroundColor,
                 r.BackgroundColor,
@@ -106,6 +118,7 @@ public partial class HighlightStringsPanel : UserControl
             : string.Join(", ", rule.Windows.OrderBy(w => w, StringComparer.OrdinalIgnoreCase));
         CaseSensitiveCheck.IsChecked = rule.CaseSensitive;
         EnabledCheck.IsChecked       = rule.IsEnabled;
+        ScopeBox.SelectedIndex       = ScopeEditing.ToIndex(rule.Scope);
         StatusText.Text              = string.Empty;
     }
 
@@ -142,12 +155,20 @@ public partial class HighlightStringsPanel : UserControl
 
         // Remove the rule being edited, plus any rule that already uses the new
         // pattern (dedup — a rename must not leave two rules sharing a pattern).
+        // Renaming a Global rule must also drop the OLD key from the shared
+        // file explicitly, or the shadowed-twin save merge resurrects it (#257).
+        if (existing?.Scope == RuleScope.Global &&
+            !string.Equals(editKey, pattern, StringComparison.Ordinal))
+            _scopeCtx?.NoteGlobalDelete?.Invoke(editKey);
         _engine.RemoveRule(editKey);
         if (!string.Equals(editKey, pattern, StringComparison.Ordinal))
             _engine.RemoveRule(pattern);
 
-        _engine.AddRule(pattern, color, bgColor, matchType, caseSensitive, enabled, className,
+        var added = _engine.AddRule(pattern, color, bgColor, matchType, caseSensitive, enabled, className,
                         existing?.SoundFile ?? "", existing?.Speak ?? "", windows);
+        added.Scope = _scopeCtx?.TwoLayers == true
+            ? ScopeEditing.FromIndex(ScopeBox.SelectedIndex)
+            : existing?.Scope ?? RuleScope.Character;
         _editingPattern = pattern;   // keep the editor pointed at the saved rule
         Refresh();
         // Re-select the saved row so the editor stays consistent after a rename
@@ -159,10 +180,29 @@ public partial class HighlightStringsPanel : UserControl
         StatusText.Text = $"Saved “{pattern}” → {color}.";
     }
 
-    private void OnDelete(object? sender, RoutedEventArgs e)
+    private async void OnDelete(object? sender, RoutedEventArgs e)
     {
         if (_engine is null) return;
         if (ItemsList.SelectedItem is not HighlightRow row) { StatusText.Text = "Select a highlight to delete."; return; }
+        var rule = _engine.Rules.FirstOrDefault(r => r.Pattern == row.Pattern);
+        if (rule is null) return;
+
+        // Deleting a shared (Global) rule affects every character — prompt for
+        // a reversible local opt-out vs a real remove-for-all (#257).
+        if (rule.Scope == RuleScope.Global && _scopeCtx?.TwoLayers == true)
+        {
+            if (this.GetVisualRoot() is not Window owner) return;
+            var choice = await ScopeDeleteDialog.Show(owner, rule.Pattern, allowOptOut: true);
+            if (choice == ScopeDeleteChoice.Cancel) return;
+            if (choice == ScopeDeleteChoice.LocalOptOut)
+            {
+                LocalOptOut(rule);
+                StatusText.Text = "Disabled for this character (still active for everyone else).";
+                return;
+            }
+            _scopeCtx.NoteGlobalDelete?.Invoke(rule.Pattern);
+        }
+
         _engine.RemoveRule(row.Pattern);
         ClearForm();
         Refresh();
@@ -177,11 +217,38 @@ public partial class HighlightStringsPanel : UserControl
         if (ItemsList.SelectedItem is not HighlightRow row) { StatusText.Text = "Select a highlight to toggle."; return; }
         var rule = _engine.Rules.FirstOrDefault(r => r.Pattern == row.Pattern);
         if (rule is null) return;
+
+        // Toggling OFF a shared rule silently writes the reversible local
+        // opt-out — the shared rule keeps running for everyone else (#257).
+        if (rule.Scope == RuleScope.Global && _scopeCtx?.TwoLayers == true && rule.IsEnabled)
+        {
+            LocalOptOut(rule);
+            StatusText.Text = "Disabled for this character (still active for everyone else).";
+            return;
+        }
+
         rule.IsEnabled = !rule.IsEnabled;
         Refresh();
         _onRulesChanged?.Invoke();
         UserHighlights.NotifyRulesChanged();
         StatusText.Text = $"Highlight {(rule.IsEnabled ? "enabled" : "disabled")}.";
+    }
+
+    /// <summary>Replace a shared rule's live presence with a disabled
+    /// this-character copy: the copy shadows the global twin (which stays in
+    /// the shared file untouched, via the save merge) — delete the copy later
+    /// and the shared rule shows through again at the next connect/reload.</summary>
+    private void LocalOptOut(HighlightRule rule)
+    {
+        if (_engine is null) return;
+        _engine.RemoveRule(rule.Pattern);
+        _engine.AddRule(rule.Pattern, rule.ForegroundColor, rule.BackgroundColor, rule.MatchType,
+                        rule.CaseSensitive, isEnabled: false, rule.ClassName,
+                        rule.SoundFile, rule.Speak, rule.Windows).Scope = RuleScope.Character;
+        ClearForm();
+        Refresh();
+        _onRulesChanged?.Invoke();
+        UserHighlights.NotifyRulesChanged();
     }
 
     private void OnAdd(object? sender, RoutedEventArgs e) => ClearForm();
@@ -239,6 +306,7 @@ public partial class HighlightStringsPanel : UserControl
         WindowsBox.Text              = string.Empty;
         CaseSensitiveCheck.IsChecked = false;
         EnabledCheck.IsChecked       = true;
+        ScopeBox.SelectedIndex       = 0;   // new rules default to This character
         StatusText.Text              = string.Empty;
     }
 

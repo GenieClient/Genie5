@@ -15,17 +15,20 @@ public partial class HighlightsPanel : UserControl
     public HighlightsPanel() => InitializeComponent();
 
     public void Initialize(
-        HighlightEngine     highlights,
-        NameHighlightEngine names,
-        PresetEngine        presets,
-        Action?             onHighlightsChanged = null,
-        Action?             onNamesChanged      = null,
-        Action?             onPresetsChanged    = null,
-        GenieConfig?        config              = null,
-        Action?             onConfigChanged     = null)
+        HighlightEngine      highlights,
+        NameHighlightEngine  names,
+        PresetEngine         presets,
+        Action?              onHighlightsChanged = null,
+        Action?              onNamesChanged      = null,
+        Action?              onPresetsChanged    = null,
+        GenieConfig?         config              = null,
+        Action?              onConfigChanged     = null,
+        ScopeEditingContext? highlightsScope     = null,
+        ScopeEditingContext? namesScope          = null,
+        ScopeEditingContext? presetsScope        = null)
     {
-        StringsPanelCtrl.Initialize(highlights, onHighlightsChanged);
-        NamesPanelCtrl  .Initialize(names,      onNamesChanged);
-        PresetsPanelCtrl.Initialize(presets,    onPresetsChanged, config, onConfigChanged);
+        StringsPanelCtrl.Initialize(highlights, onHighlightsChanged, highlightsScope);
+        NamesPanelCtrl  .Initialize(names,      onNamesChanged,      namesScope);
+        PresetsPanelCtrl.Initialize(presets,    onPresetsChanged,    config, onConfigChanged, presetsScope);
     }
 }

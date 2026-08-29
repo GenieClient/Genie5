@@ -180,9 +180,10 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = HighlightEngine;
         if (engine is null) return;
-        SaveRuleJsonSplit("highlights.json", engine.Rules, r => r.Scope,
+        var mergedGlobal = SaveRuleJsonSplit("highlights.json", engine.Rules,
+            r => r.Scope, r => r.Pattern, DiskGlobal().Highlights.Rules,
             (path, subset) => _persistence.SaveHighlights(path, subset));
-        SyncCfgSplit("highlights.cfg", engine.Rules, r => r.Scope, CfgFormat.HighlightLines);
+        SyncCfgSplit("highlights.cfg", engine.Rules, r => r.Scope, mergedGlobal, CfgFormat.HighlightLines);
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
     }
 
@@ -190,7 +191,16 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = NameHighlightEngine;
         if (engine is null) return;
-        SaveRuleJsonSplit("names.json", engine.Rules, r => r.Scope,
+        List<NameRule> diskGlobal;
+        try
+        {
+            diskGlobal = _persistence.LoadNames(Path.Combine(_configRoot, "names.json"))
+                .Select(m => new NameRule(m.Name, m.ForegroundColor, m.BackgroundColor)
+                             { Scope = RuleScope.Global })
+                .ToList();
+        }
+        catch { diskGlobal = new(); }
+        SaveRuleJsonSplit("names.json", engine.Rules, r => r.Scope, r => r.Name, diskGlobal,
             (path, subset) => _persistence.SaveNames(path, subset));
         if (EditingConnected) UserHighlights.NotifyRulesChanged();   // #154 repaint visible lines
     }
@@ -199,8 +209,23 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = PresetEngine;
         if (engine is not null)
-            SaveRuleJsonSplit("presets.json", engine.Presets.Values, r => r.Scope,
-                (path, subset) => _persistence.SavePresets(path, subset));   // #149
+        {
+            List<PresetRule> diskGlobal;
+            try
+            {
+                diskGlobal = _persistence.LoadPresets(Path.Combine(_configRoot, "presets.json"))
+                    .Select(m => new PresetRule
+                    {
+                        Id = m.Id, ForegroundColor = m.ForegroundColor,
+                        BackgroundColor = m.BackgroundColor, HighlightLine = m.HighlightLine,
+                        Scope = RuleScope.Global,
+                    })
+                    .ToList();
+            }
+            catch { diskGlobal = new(); }
+            SaveRuleJsonSplit("presets.json", engine.Presets.Values, r => r.Scope, r => r.Id,
+                diskGlobal, (path, subset) => _persistence.SavePresets(path, subset));   // #149
+        }
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
     }
 
@@ -208,18 +233,20 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = TriggerEngine;
         if (engine is null) return;
-        SaveRuleJsonSplit("triggers.json", engine.Triggers, r => r.Scope,
+        var mergedGlobal = SaveRuleJsonSplit("triggers.json", engine.Triggers,
+            r => r.Scope, r => r.Pattern, DiskGlobal().Triggers.Triggers,
             (path, subset) => _persistence.SaveTriggers(path, subset));
-        SyncCfgSplit("triggers.cfg", engine.Triggers, r => r.Scope, CfgFormat.TriggerLines);
+        SyncCfgSplit("triggers.cfg", engine.Triggers, r => r.Scope, mergedGlobal, CfgFormat.TriggerLines);
     }
 
     public void OnSubstitutesChanged()
     {
         var engine = SubstituteEngine;
         if (engine is null) return;
-        SaveRuleJsonSplit("substitutes.json", engine.Rules, r => r.Scope,
+        var mergedGlobal = SaveRuleJsonSplit("substitutes.json", engine.Rules,
+            r => r.Scope, r => r.Pattern, DiskGlobal().Substitutes.Rules,
             (path, subset) => _persistence.SaveSubstitutes(path, subset));
-        SyncCfgSplit("substitutes.cfg", engine.Rules, r => r.Scope, CfgFormat.SubstituteLines);
+        SyncCfgSplit("substitutes.cfg", engine.Rules, r => r.Scope, mergedGlobal, CfgFormat.SubstituteLines);
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
     }
 
@@ -227,27 +254,30 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = GagEngine;
         if (engine is null) return;
-        SaveRuleJsonSplit("gags.json", engine.Rules, r => r.Scope,
+        var mergedGlobal = SaveRuleJsonSplit("gags.json", engine.Rules,
+            r => r.Scope, r => r.Pattern, DiskGlobal().Gags.Rules,
             (path, subset) => _persistence.SaveGags(path, subset));
-        SyncCfgSplit("gags.cfg", engine.Rules, r => r.Scope, CfgFormat.GagLines);
+        SyncCfgSplit("gags.cfg", engine.Rules, r => r.Scope, mergedGlobal, CfgFormat.GagLines);
     }
 
     public void OnAliasesChanged()
     {
         var engine = AliasEngine;
         if (engine is null) return;
-        SaveRuleJsonSplit("aliases.json", engine.Aliases, r => r.Scope,
+        var mergedGlobal = SaveRuleJsonSplit("aliases.json", engine.Aliases,
+            r => r.Scope, r => r.Name, DiskGlobal().Aliases.Aliases,
             (path, subset) => _persistence.SaveAliases(path, subset));
-        SyncCfgSplit("aliases.cfg", engine.Aliases, r => r.Scope, CfgFormat.AliasLines);
+        SyncCfgSplit("aliases.cfg", engine.Aliases, r => r.Scope, mergedGlobal, CfgFormat.AliasLines);
     }
 
     public void OnMacrosChanged()
     {
         var engine = MacroEngine;
         if (engine is null) return;
-        SaveRuleJsonSplit("macros.json", engine.Rules, r => r.Scope,
+        var mergedGlobal = SaveRuleJsonSplit("macros.json", engine.Rules,
+            r => r.Scope, r => r.Key, DiskGlobal().Macros.Rules,
             (path, subset) => _persistence.SaveMacros(path, subset));
-        SyncCfgSplit("macros.cfg", engine.Rules, r => r.Scope, CfgFormat.MacroLines);
+        SyncCfgSplit("macros.cfg", engine.Rules, r => r.Scope, mergedGlobal, CfgFormat.MacroLines);
     }
 
     public void OnVariablesChanged()
@@ -322,17 +352,62 @@ public class ConfigurationViewModel : ReactiveObject
         ScopedRuleLoader.SameDirectory(_profileDirResolver(SelectedProfile), _configRoot);
 
     /// <summary>
+    /// Keys the user explicitly deleted (or renamed away) at Global scope,
+    /// per rule .json file, since that file's last save (#257 Phase 2). The
+    /// live engine holds a LAYERED view — a character override shadows its
+    /// global twin out of the engine entirely — so the global file is written
+    /// as engine-Global-subset MERGED with the on-disk global entries the
+    /// engine doesn't carry. Without this set, deleting a global rule via the
+    /// panel would be silently resurrected by that merge; with it, only
+    /// intentional deletes stick. Panels report through
+    /// <see cref="NoteGlobalDelete"/>.
+    /// </summary>
+    private readonly Dictionary<string, HashSet<string>> _pendingGlobalDeletes =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>A panel deleted (or renamed away) a Global-scoped rule; make
+    /// the next save of <paramref name="fileName"/> drop <paramref name="key"/>
+    /// from the shared file instead of preserving it via the twin merge.</summary>
+    public void NoteGlobalDelete(string fileName, string key)
+    {
+        if (!_pendingGlobalDeletes.TryGetValue(fileName, out var set))
+            _pendingGlobalDeletes[fileName] = set = new(StringComparer.OrdinalIgnoreCase);
+        set.Add(key);
+    }
+
+    /// <summary>Build the per-panel #257 scope-editing handle: whether two
+    /// config layers exist for the current selection, and the explicit
+    /// global-delete channel bound to that panel's rule file.</summary>
+    public Views.ScopeEditingContext ScopeContextFor(string fileName) => new()
+    {
+        TwoLayers        = !SingleLayer,
+        NoteGlobalDelete = key => NoteGlobalDelete(fileName, key),
+    };
+
+    private IReadOnlyCollection<string> PendingDeletes(string fileName) =>
+        _pendingGlobalDeletes.TryGetValue(fileName, out var set)
+            ? set
+            : (IReadOnlyCollection<string>)Array.Empty<string>();
+
+    /// <summary>
     /// The #257 split-save: each rule goes back to the file its
     /// <see cref="RuleScope"/> names — Character rules to the profile copy,
     /// Global rules to the shared Config copy — so a panel edit never forks
-    /// the global set into the profile. A scope's file is only created when
-    /// it has rules to hold (an existing file is always rewritten, so
-    /// deletions apply). Single-layer editing writes everything to the one
-    /// file. Writes are marked so the RuleFileWatcher doesn't bounce them
-    /// back as external edits — it watches BOTH dirs.
+    /// the global set into the profile. The global side is the engine's
+    /// Global subset merged with <paramref name="diskGlobal"/> (on-disk
+    /// entries a character override shadows out of the engine), minus keys
+    /// explicitly deleted via <see cref="NoteGlobalDelete"/> — deriving it
+    /// from the engine alone wiped shadowed twins on fully-forked profiles.
+    /// A scope's file is only created when it has rules to hold (an existing
+    /// file is always rewritten, so deletions apply). Single-layer editing
+    /// writes everything to the one file. Writes are marked so the
+    /// RuleFileWatcher doesn't bounce them back as external edits — it
+    /// watches BOTH dirs. Returns the merged global list so the .cfg sync
+    /// writes the same content.
     /// </summary>
-    private void SaveRuleJsonSplit<T>(string fileName, IEnumerable<T> rules,
-        Func<T, RuleScope> scopeOf, Action<string, IReadOnlyList<T>> save)
+    private List<T> SaveRuleJsonSplit<T>(string fileName, IEnumerable<T> rules,
+        Func<T, RuleScope> scopeOf, Func<T, string> keyOf, IEnumerable<T> diskGlobal,
+        Action<string, IReadOnlyList<T>> save)
     {
         var all         = rules.ToList();
         var profilePath = PathFor(fileName);
@@ -340,11 +415,13 @@ public class ConfigurationViewModel : ReactiveObject
         {
             RuleFileWatcher.MarkAppWrite(profilePath);
             TrySave(() => save(profilePath, all));
-            return;
+            return all;
         }
         var globalPath = Path.Combine(_configRoot, fileName);
         var character  = all.Where(r => scopeOf(r) == RuleScope.Character).ToList();
-        var global     = all.Where(r => scopeOf(r) == RuleScope.Global).ToList();
+        var global     = ScopedRuleLoader.MergeGlobalForSave(
+            all.Where(r => scopeOf(r) == RuleScope.Global), diskGlobal, keyOf,
+            PendingDeletes(fileName));
         if (character.Count > 0 || File.Exists(profilePath))
         {
             RuleFileWatcher.MarkAppWrite(profilePath);
@@ -355,14 +432,19 @@ public class ConfigurationViewModel : ReactiveObject
             RuleFileWatcher.MarkAppWrite(globalPath);
             TrySave(() => save(globalPath, global));
         }
+        _pendingGlobalDeletes.Remove(fileName);   // applied — don't re-drop later
+        InvalidateDraftScopes();                  // disk changed under the cache
+        return global;
     }
 
-    /// <summary>Scope-split companion to <see cref="SyncCfg"/>: each dir's
-    /// coexisting .cfg is rewritten from ITS OWN scope's subset, so the .cfg
-    /// dual-write can't re-fork global rules through the back door. Same
+    /// <summary>Scope-split companion to <see cref="SyncCfg"/>: the profile
+    /// .cfg is rewritten from the Character subset and the global .cfg from
+    /// the SAME merged global content the .json save produced, so the .cfg
+    /// dual-write can't re-fork global rules or drop shadowed twins. Same
     /// only-rewrites-an-existing-file rule as ever.</summary>
     private void SyncCfgSplit<T>(string fileName, IEnumerable<T> rules,
-        Func<T, RuleScope> scopeOf, Func<IEnumerable<T>, IEnumerable<string>> lines)
+        Func<T, RuleScope> scopeOf, IReadOnlyList<T> mergedGlobal,
+        Func<IEnumerable<T>, IEnumerable<string>> lines)
     {
         var all        = rules.ToList();
         var profileCfg = Path.Combine(_profileDirResolver(SelectedProfile), fileName);
@@ -372,8 +454,19 @@ public class ConfigurationViewModel : ReactiveObject
             return;
         }
         SyncCfgAt(profileCfg, () => lines(all.Where(r => scopeOf(r) == RuleScope.Character)));
-        SyncCfgAt(Path.Combine(_configRoot, fileName),
-                  () => lines(all.Where(r => scopeOf(r) == RuleScope.Global)));
+        SyncCfgAt(Path.Combine(_configRoot, fileName), () => lines(mergedGlobal));
+    }
+
+    /// <summary>The on-disk global layer a panel save must not drop (twin
+    /// source for <see cref="SaveRuleJsonSplit"/>) — the cached effective
+    /// global scope, rebuilt lazily after every save.</summary>
+    private LayeredRuleLoad.EffectiveScope DiskGlobal() => DraftScopes().Glob;
+
+    private void InvalidateDraftScopes()
+    {
+        _draftGlobalScope  = null;
+        _draftProfileScope = null;
+        _draftScopesBuilt  = false;
     }
 
     private void SyncCfgAt(string path, Func<IEnumerable<string>> lines)

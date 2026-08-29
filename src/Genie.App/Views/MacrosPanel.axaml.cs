@@ -5,6 +5,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Genie.App.Controls;
 using Genie.Core.Import;
+using Genie.Core.Persistence;
 using Genie.Core.Macros;
 
 namespace Genie.App.Views;
@@ -15,17 +16,28 @@ namespace Genie.App.Views;
 /// </summary>
 public partial class MacrosPanel : UserControl
 {
-    public sealed record MacroRow(string Key, string Action);
+    public sealed record MacroRow(string Scope, string Key, string Action);
 
-    private MacroEngine? _engine;
-    private Action?      _onChanged;
+    private MacroEngine?         _engine;
+    private Action?              _onChanged;
+    private ScopeEditingContext? _scopeCtx;
 
-    public MacrosPanel() => InitializeComponent();
+    public MacrosPanel()
+    {
+        InitializeComponent();
+        ScopeBox.ItemsSource   = ScopeEditing.Labels;
+        ScopeBox.SelectedIndex = 0;   // new macros default to This character (#257)
+    }
 
-    public void Initialize(MacroEngine engine, Action? onChanged = null)
+    public void Initialize(MacroEngine engine, Action? onChanged = null,
+                           ScopeEditingContext? scopeContext = null)
     {
         _engine    = engine;
         _onChanged = onChanged;
+        _scopeCtx  = scopeContext;
+        var twoLayers = scopeContext?.TwoLayers == true;
+        ScopeGroup.IsVisible = twoLayers;
+        ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
         Refresh();
     }
 
@@ -34,7 +46,7 @@ public partial class MacrosPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as MacroRow)?.Key;
         ItemsList.ItemsSource = _engine.Rules
-            .Select(r => new MacroRow(r.Key, r.Action))
+            .Select(r => new MacroRow(ScopeEditing.RowLabel(r.Scope), r.Key, r.Action))
             .ToList();
         if (keep is not null)
             ItemsList.SelectedItem = ((IEnumerable<MacroRow>)ItemsList.ItemsSource)
@@ -51,9 +63,10 @@ public partial class MacrosPanel : UserControl
     {
         var rule = SelectedRule();
         if (rule is null) return;
-        KeyBox.Text     = rule.Key;
-        ActionBox.Text  = rule.Action;
-        StatusText.Text = string.Empty;
+        KeyBox.Text            = rule.Key;
+        ActionBox.Text         = rule.Action;
+        ScopeBox.SelectedIndex = ScopeEditing.ToIndex(rule.Scope);
+        StatusText.Text        = string.Empty;
     }
 
     private void OnSave(object? sender, RoutedEventArgs e)
@@ -63,17 +76,37 @@ public partial class MacrosPanel : UserControl
         var action = ActionBox.Text ?? string.Empty;
         if (string.IsNullOrEmpty(key)) { StatusText.Text = "Key is required."; return; }
 
+        var existing = _engine.Rules.FirstOrDefault(
+            r => r.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
         _engine.Add(key, action);
+        var added = _engine.Rules.FirstOrDefault(
+            r => r.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+        if (added is not null)
+            added.Scope = _scopeCtx?.TwoLayers == true
+                ? ScopeEditing.FromIndex(ScopeBox.SelectedIndex)
+                : existing?.Scope ?? RuleScope.Character;
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = $"Saved '{key}'.";
     }
 
-    private void OnDelete(object? sender, RoutedEventArgs e)
+    private async void OnDelete(object? sender, RoutedEventArgs e)
     {
         if (_engine is null) return;
         var rule = SelectedRule();
         if (rule is null) { StatusText.Text = "Select a macro to delete."; return; }
+
+        // Deleting a shared (Global) macro affects every character; macros
+        // have no enabled flag, so there is no local opt-out — confirm the
+        // for-all removal (#257).
+        if (rule.Scope == RuleScope.Global && _scopeCtx?.TwoLayers == true)
+        {
+            if (this.GetVisualRoot() is not Window owner) return;
+            var choice = await ScopeDeleteDialog.Show(owner, rule.Key, allowOptOut: false);
+            if (choice != ScopeDeleteChoice.RemoveForAll) return;
+            _scopeCtx.NoteGlobalDelete?.Invoke(rule.Key);
+        }
+
         _engine.Remove(rule.Key);
         ClearForm();
         Refresh();
@@ -138,6 +171,7 @@ public partial class MacrosPanel : UserControl
         ItemsList.SelectedItem = null;
         KeyBox.Text            = string.Empty;
         ActionBox.Text         = string.Empty;
+        ScopeBox.SelectedIndex = 0;   // new macros default to This character
         StatusText.Text        = string.Empty;
     }
 }
