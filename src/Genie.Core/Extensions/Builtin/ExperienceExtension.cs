@@ -303,10 +303,14 @@ public sealed class ExperienceExtension : IGameExtension
 
     /// <summary>Flush the accumulated pulse echoes as at most two lines —
     /// <c>Learned: Skill(+2), …</c> / <c>Pulsed: Skill(-1), …</c> — matching Genie 4
-    /// EXPTracker's EchoExp output shape (numbers are mindstate deltas). Goes through
-    /// <see cref="IExtensionHost.Echo"/>, which also feeds script actions/triggers —
-    /// the equivalent of G4's extra <c>#parse Learned: …</c> leg. While the toggle is
-    /// off the accumulators are discarded so turning it on doesn't replay a backlog.</summary>
+    /// EXPTracker's EchoExp output shape (numbers are mindstate deltas). DISPLAY-ONLY
+    /// by default: the G4-parity trigger/action feed (the <c>#parse Learned: …</c>
+    /// leg) is gated behind <c>#config experienceechoparse</c>, because in live
+    /// combat these synthetic lines hit the parse pipeline every prompt and a
+    /// running combat script whose match/action patterns brush against them fires
+    /// commands per pulse — the 2026-08-29 smoke walk flooded DR into a disconnect
+    /// that way (uber running). While the toggle is off the accumulators are
+    /// discarded so turning it on doesn't replay a backlog.</summary>
     private void FlushEchoExp()
     {
         List<string>? learned = null, pulsed = null;
@@ -317,8 +321,9 @@ public sealed class ExperienceExtension : IGameExtension
             _echoPulsedNames.Clear();
         }
         if (!EchoExp()) return;
-        if (learned is not null) _host.Echo("Learned: " + string.Join(", ", learned));
-        if (pulsed  is not null) _host.Echo("Pulsed: "  + string.Join(", ", pulsed));
+        var parse = EchoExpParse();
+        if (learned is not null) _host.EchoRouted("Learned: " + string.Join(", ", learned), display: true, parse: parse);
+        if (pulsed  is not null) _host.EchoRouted("Pulsed: "  + string.Join(", ", pulsed),  display: true, parse: parse);
     }
 
     /// <summary>Re-render the panel immediately (without waiting for the next prompt) —
@@ -510,6 +515,10 @@ public sealed class ExperienceExtension : IGameExtension
     /// <summary>Pulse echo toggle (public #272), read live from
     /// <c>#config experienceecho</c>.</summary>
     private bool EchoExp() => bool.TryParse(_host.GetConfig("experienceecho"), out var b) && b;
+
+    /// <summary><c>#config experienceechoparse</c> — opt-in trigger/action feed
+    /// for the pulse-echo lines (see <see cref="FlushEchoExp"/>).</summary>
+    private bool EchoExpParse() => bool.TryParse(_host.GetConfig("experienceechoparse"), out var b) && b;
 
     /// <summary>Rested-EXP summary line toggle (public #272), read live from
     /// <c>#config experiencerested</c>.</summary>

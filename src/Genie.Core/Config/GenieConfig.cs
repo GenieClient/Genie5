@@ -113,9 +113,17 @@ public sealed class GenieConfig
     /// <summary>Echo experience pulses to the game window (Genie 4 EXPTracker's
     /// <c>$ExpTracker.EchoExp</c>, public #272): each prompt flushes one
     /// <c>Learned: Skill(+2), …</c> line for mindstate gains and a
-    /// <c>Pulsed: Skill(-1), …</c> line for drains. The lines also feed script
-    /// actions/triggers, like Genie 4's <c>#parse</c> leg. Default off.</summary>
+    /// <c>Pulsed: Skill(-1), …</c> line for drains. Display-only unless
+    /// <see cref="ExperienceEchoParse"/> is also on. Default off.</summary>
     public bool ExperienceEcho { get; set; }
+    /// <summary>Feed the pulse-echo lines to script actions/triggers/matchwait
+    /// as well (Genie 4 EXPTracker's extra <c>#parse Learned: …</c> leg).
+    /// Deliberately a separate opt-in: in live combat the synthetic lines hit
+    /// the parse pipeline every prompt, and a running combat script whose
+    /// action/match patterns brush against them fires commands each pulse —
+    /// the 2026-08-29 smoke walk flooded DR into a disconnect this way with
+    /// uber running. Default off; display echo works without it.</summary>
+    public bool ExperienceEchoParse { get; set; }
     /// <summary>Show rested experience in the Experience window's summary
     /// (Genie 4 EXPTracker's <c>DisplayREXP</c>, public #272): the stored /
     /// usable / cycle-refresh times DR pushes in the <c>exp rexp</c> component.
@@ -697,6 +705,7 @@ public sealed class GenieConfig
         ("experiencesort", ExperienceSort.ToString()),
         ("experiencesortorder", ExperienceSortOrder),
         ("experienceecho", ExperienceEcho.ToString()),
+        ("experienceechoparse", ExperienceEchoParse.ToString()),
         ("experiencerested", ExperienceRested.ToString()),
         ("showtimetracker", ShowTimeTracker.ToString()),
         ("autolog", AutoLog.ToString()),
@@ -826,7 +835,7 @@ public sealed class GenieConfig
         ("Connection",       new[] { "activitytimeout", "classicconnect", "conndebug", "connectscript", "flagscheck", "frontend", "reconnect" }),
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
-        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
+        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug" }),
@@ -882,6 +891,7 @@ public sealed class GenieConfig
                 case "experiencesort": ExperienceSort = Math.Clamp(UtilityCore.StringToInteger(value), 0, 3); Notify(ConfigFieldUpdated.Trackers); break;
                 case "experiencesortorder": ExperienceSortOrder = value.Trim(); Notify(ConfigFieldUpdated.Trackers); break;
                 case "experienceecho": ExperienceEcho = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
+                case "experienceechoparse": ExperienceEchoParse = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "experiencerested": ExperienceRested = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "showtimetracker": ShowTimeTracker = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "autolog": AutoLog = ToBool(value); Notify(ConfigFieldUpdated.Autolog); break;

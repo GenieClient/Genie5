@@ -22,9 +22,15 @@ public class ExperienceSortEchoRestedTests
         public IDictionary<string, string> Globals { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> Config { get; } = new(StringComparer.OrdinalIgnoreCase);
         public List<string> Echoed { get; } = new();
+        public List<bool> EchoedParseFlags { get; } = new();
         public string? Window { get; private set; }
 
         public void Echo(string text) => Echoed.Add(text);
+        public void EchoRouted(string text, bool display, bool parse)
+        {
+            Echoed.Add(text);
+            EchoedParseFlags.Add(parse);
+        }
         public void SendCommand(string command) { }
         public void SetWindow(string window, string content) => Window = content;
         public string ConfigDir => "";
@@ -169,6 +175,30 @@ public class ExperienceSortEchoRestedTests
         host.Config["experienceecho"] = "True";
         ext.OnPrompt();
         Assert.Empty(host.Echoed);
+    }
+
+    [Fact]
+    public void EchoExp_DefaultIsDisplayOnly_ParseLegOff()
+    {
+        // The 2026-08-29 flood: echo lines fed the parse pipeline every combat
+        // prompt and a running script's actions fired per pulse until DR
+        // disconnected for flooding. The trigger feed is opt-in now.
+        var (ext, host) = NewTracker(("experienceecho", "True"));
+        Pulse(ext, "Evasion", 100, 10, "learning");
+        ext.OnPrompt();
+        Assert.Single(host.Echoed);
+        Assert.All(host.EchoedParseFlags, p => Assert.False(p));
+    }
+
+    [Fact]
+    public void EchoExp_ParseLegOn_WithExperienceEchoParse()
+    {
+        var (ext, host) = NewTracker(("experienceecho", "True"),
+                                     ("experienceechoparse", "True"));
+        Pulse(ext, "Evasion", 100, 10, "learning");
+        ext.OnPrompt();
+        Assert.Single(host.Echoed);
+        Assert.All(host.EchoedParseFlags, p => Assert.True(p));
     }
 
     [Fact]
