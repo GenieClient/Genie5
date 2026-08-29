@@ -188,13 +188,21 @@ jobs:
         # First release will fail this step (no prior assets) — that's OK,
         # the resulting full.nupkg is still valid. Subsequent releases get
         # binary-diff deltas pulled from the most recent assets.
+        # --token authenticates the GitHub API calls (#311): the anonymous
+        # rate limit 403'd on the beta.6 osx-x64 lane and silently shipped it
+        # full-only. The warning keeps any residual failure loud in the run.
         shell: pwsh
         continue-on-error: true
         run: |
           vpk download github `
             --repoUrl https://github.com/GenieClient/Genie5 `
             --outputDir velopack-releases `
+            --token ${{ secrets.GITHUB_TOKEN }} `
             --pre
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::warning::Delta-base download failed - this lane ships a FULL-ONLY package (no delta). See #311."
+            exit 1
+          }
 
       - name: Velopack pack
         shell: pwsh
@@ -290,12 +298,16 @@ jobs:
         # version lower than the latest downloaded release, so plumbing tests
         # build a standalone full package with no delta instead.
         if: ${{ !startsWith(github.ref_name, 'v0.0.') }}
+        # --token authenticates the GitHub API calls (#311) — anonymous rate
+        # limits 403 and silently ship a full-only lane.
         continue-on-error: true
         run: |
           vpk download github \
             --repoUrl https://github.com/GenieClient/Genie5 \
             --outputDir velopack-releases \
-            --pre
+            --token "${{ secrets.GITHUB_TOKEN }}" \
+            --pre \
+          || { echo "::warning::Delta-base download failed - this lane ships a FULL-ONLY package (no delta). See #311."; exit 1; }
 
       - name: Velopack pack
         run: |
@@ -368,12 +380,16 @@ jobs:
         # version lower than the latest downloaded release, so plumbing tests
         # build a standalone full package with no delta instead.
         if: ${{ !startsWith(github.ref_name, 'v0.0.') }}
+        # --token authenticates the GitHub API calls (#311) — anonymous rate
+        # limits 403 and silently ship a full-only lane.
         continue-on-error: true
         run: |
           vpk download github \
             --repoUrl https://github.com/GenieClient/Genie5 \
             --outputDir velopack-releases \
-            --pre
+            --token "${{ secrets.GITHUB_TOKEN }}" \
+            --pre \
+          || { echo "::warning::Delta-base download failed - this lane ships a FULL-ONLY package (no delta). See #311."; exit 1; }
 
       - name: Velopack pack
         run: |
@@ -476,13 +492,18 @@ jobs:
         # Silicon). Without it this job pulls the arm64 packages, so Intel
         # deltas are diffed against the wrong base or skipped entirely. Must
         # match the `--channel osx-x64` used by the pack step below.
+        # --token authenticates the GitHub API calls (#311) — anonymous rate
+        # limits 403'd exactly here on beta.6 and silently shipped Intel-Mac
+        # full-only.
         continue-on-error: true
         run: |
           vpk download github \
             --repoUrl https://github.com/GenieClient/Genie5 \
             --outputDir velopack-releases \
+            --token "${{ secrets.GITHUB_TOKEN }}" \
             --pre \
-            --channel osx-x64
+            --channel osx-x64 \
+          || { echo "::warning::Delta-base download failed - this lane ships a FULL-ONLY package (no delta). See #311."; exit 1; }
 
       - name: Velopack pack
         run: |
