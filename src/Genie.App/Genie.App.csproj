@@ -113,6 +113,21 @@
     <None Include="FodyWeavers.xsd" Condition="Exists('FodyWeavers.xsd')" />
   </ItemGroup>
 
+  <!-- ── App-local ICU — Linux publishes only (public #314) ─────────────── -->
+  <!-- .NET on Linux dlopens the OS libicu at first globalization use, so on
+       distros without it (minimal/WSL/container spins) the AppImage FailFasts
+       before any UI exists. Bundling MS-ICU makes the AppImage genuinely
+       self-contained. The AppLocalIcu value must EXACTLY match the package
+       version — the runtime probes libicuuc.so.<value> (etc.) in the
+       native-lib search path, and the single-file self-extract dir is on
+       that path. Windows and macOS keep using their OS ICU: the condition
+       keeps these 38 MB of natives out of every other RID's publish, and
+       out of plain RID-less builds (tests, dotnet run). -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+    <PackageReference Include="Microsoft.ICU.ICU4C.Runtime.linux-x64" Version="72.1.0.3" />
+    <RuntimeHostConfigurationOption Include="System.Globalization.AppLocalIcu" Value="72.1.0.3" />
+  </ItemGroup>
+
   <!-- ── Icon set assets ──────────────────────────────────────────────── -->
   <!-- App icon (rendered genie lamp with "Genie 5" badge), status indicator
        glyphs (bleeding / dead / hidden / kneeling / prone / standing / …)
