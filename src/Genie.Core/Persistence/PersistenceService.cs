@@ -201,8 +201,13 @@ public sealed class PersistenceService
     }
 
     public void SavePresets(string path, PresetEngine engine)
+        => SavePresets(path, engine.Presets.Values);
+
+    /// <summary>Subset overload for the #257 split-save: writes exactly the
+    /// given rules (one scope's share of the engine).</summary>
+    public void SavePresets(string path, IEnumerable<PresetRule> rules)
     {
-        var data = engine.Presets.Values.Select(r => new PresetPersistenceModel
+        var data = rules.Select(r => new PresetPersistenceModel
         {
             Id              = r.Id,
             ForegroundColor = r.ForegroundColor,

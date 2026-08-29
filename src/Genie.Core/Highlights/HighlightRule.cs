@@ -36,6 +36,10 @@ public sealed class HighlightRule
     /// Genie 4-imported rules apply everywhere). Case-insensitive.</summary>
     public IReadOnlySet<string> Windows { get; private set; }
 
+    /// <summary>Config layer this rule lives in (public #257) — which file it
+    /// saves back to. Not serialized: scope IS the file it came from.</summary>
+    public Persistence.RuleScope Scope { get; set; } = Persistence.RuleScope.Character;
+
     /// <summary>Replace the window scope (from the config panel). Empty clears
     /// it back to "every window".</summary>
     public void SetWindows(IEnumerable<string>? windows) => Windows = NormalizeWindows(windows);

@@ -1,0 +1,121 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Genie.Core.Persistence;
+using Xunit;
+
+namespace Genie.Core.Tests;
+
+/// <summary>
+/// Pins the #257 two-layer precedence rule: Character entries first, then
+/// Global entries whose key isn't shadowed. Order is load-bearing — the
+/// pattern engines are first-match-wins and AddRule appends.
+/// </summary>
+public class ScopedRuleLoaderTests
+{
+    private sealed record R(string Key, string Value);
+
+    private static List<(R Item, RuleScope Scope)> Layer(
+        IEnumerable<R> character, IEnumerable<R> global)
+        => ScopedRuleLoader.Layer(character, global, r => r.Key);
+
+    [Fact]
+    public void CharacterEntriesComeFirst_ThenUnshadowedGlobals()
+    {
+        var result = Layer(
+            character: new[] { new R("a", "char-a") },
+            global:    new[] { new R("b", "glob-b"), new R("c", "glob-c") });
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(("a", RuleScope.Character), (result[0].Item.Key, result[0].Scope));
+        Assert.Equal(("b", RuleScope.Global),    (result[1].Item.Key, result[1].Scope));
+        Assert.Equal(("c", RuleScope.Global),    (result[2].Item.Key, result[2].Scope));
+    }
+
+    [Fact]
+    public void CharacterEntryShadowsSameKeyGlobal()
+    {
+        var result = Layer(
+            character: new[] { new R("kill", "char-version") },
+            global:    new[] { new R("kill", "glob-version"), new R("other", "g") });
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("char-version", result[0].Item.Value);
+        Assert.Equal("other",        result[1].Item.Key);
+    }
+
+    [Fact]
+    public void ShadowingIsCaseInsensitive()
+    {
+        var result = Layer(
+            character: new[] { new R("Kill Rat", "c") },
+            global:    new[] { new R("kill rat", "g") });
+
+        Assert.Single(result);
+        Assert.Equal(RuleScope.Character, result[0].Scope);
+    }
+
+    [Fact]
+    public void DisabledCharacterEntryStillShadows_TheOptOutMechanism()
+    {
+        // The design's per-character opt-out: a same-key Character entry with
+        // IsEnabled=false hides the Global rule. The loader only sees keys —
+        // the entry's disabled state rides along and the engine skips it.
+        var result = Layer(
+            character: new[] { new R("noisy global", "disabled-local-copy") },
+            global:    new[] { new R("noisy global", "enabled-global") });
+
+        Assert.Single(result);
+        Assert.Equal("disabled-local-copy", result[0].Item.Value);
+    }
+
+    [Fact]
+    public void DuplicateKeysWithinOneLayerAreAllKept()
+    {
+        var result = Layer(
+            character: new[] { new R("x", "c1"), new R("x", "c2") },
+            global:    new[] { new R("x", "g"), new R("y", "g2") });
+
+        Assert.Equal(3, result.Count);                       // both character x's + global y
+        Assert.All(result.Take(2), r => Assert.Equal(RuleScope.Character, r.Scope));
+        Assert.Equal("y", result[2].Item.Key);
+    }
+
+    [Fact]
+    public void EmptyCharacterLayer_AllGlobalsPassThrough()
+    {
+        var result = Layer(character: Array.Empty<R>(),
+                           global: new[] { new R("a", "g1"), new R("b", "g2") });
+        Assert.Equal(2, result.Count);
+        Assert.All(result, r => Assert.Equal(RuleScope.Global, r.Scope));
+    }
+
+    [Fact]
+    public void EmptyGlobalLayer_AllCharacterPassThrough()
+    {
+        var result = Layer(character: new[] { new R("a", "c1") }, global: Array.Empty<R>());
+        Assert.Single(result);
+        Assert.Equal(RuleScope.Character, result[0].Scope);
+    }
+
+    [Theory]
+    [InlineData(@"C:\cfg\Profiles\Ren-MONIL", @"C:\cfg", false)]
+    [InlineData(@"C:\cfg", @"C:\cfg", true)]
+    [InlineData(@"C:\cfg\", @"C:\CFG", true)]                 // trailing sep + case
+    [InlineData(@"C:\cfg\Profiles\..\", @"C:\cfg", true)]     // normalized
+    public void SameDirectory_NormalizesBeforeComparing(string a, string b, bool same)
+        => Assert.Equal(same, ScopedRuleLoader.SameDirectory(a, b));
+
+    [Fact]
+    public void SameDirectory_BlankProfileDirCountsAsSingleLayer()
+        => Assert.True(ScopedRuleLoader.SameDirectory("", @"C:\cfg"));
+
+    [Fact]
+    public void Paths_ProfileFirst()
+    {
+        var (p, g) = ScopedRuleLoader.Paths(@"C:\p", @"C:\g", "highlights.json");
+        Assert.Equal(Path.Combine(@"C:\p", "highlights.json"), p);
+        Assert.Equal(Path.Combine(@"C:\g", "highlights.json"), g);
+    }
+}

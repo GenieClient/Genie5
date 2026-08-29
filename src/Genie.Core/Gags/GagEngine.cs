@@ -21,6 +21,9 @@ public sealed class GagRule
     public bool   CaseSensitive { get; }
     public bool   IsEnabled     { get; set; }
     public string ClassName     { get; }
+    /// <summary>Config layer this rule lives in (public #257) — which file it
+    /// saves back to. Not serialized: scope IS the file it came from.</summary>
+    public Persistence.RuleScope Scope { get; set; } = Persistence.RuleScope.Character;
 
     public bool Matches(string line)
     {

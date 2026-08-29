@@ -9,6 +9,10 @@ public sealed class NameRule
     public string Name            { get; }
     public string ForegroundColor { get; }
     public string BackgroundColor { get; }
+
+    /// <summary>Config layer this rule lives in (public #257) — which file it
+    /// saves back to. Not serialized: scope IS the file it came from.</summary>
+    public Persistence.RuleScope Scope { get; set; } = Persistence.RuleScope.Character;
 }
 
 public sealed class NameHighlightEngine

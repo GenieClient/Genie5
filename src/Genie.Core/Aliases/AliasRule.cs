@@ -16,4 +16,8 @@ public sealed class AliasRule
     /// before the Classes-scope wiring was added.
     /// </summary>
     public string ClassName { get; set; } = "default";
+
+    /// <summary>Config layer this rule lives in (public #257) — which file it
+    /// saves back to. Not serialized: scope IS the file it came from.</summary>
+    public Persistence.RuleScope Scope { get; set; } = Persistence.RuleScope.Character;
 }

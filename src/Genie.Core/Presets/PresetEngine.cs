@@ -54,7 +54,13 @@ public sealed class PresetEngine
     }
 
     private void Set(string id, string fg, string bg = "", bool highlightLine = false)
-        => _presets[id] = new PresetRule { Id = id, ForegroundColor = fg, BackgroundColor = bg, HighlightLine = highlightLine };
+        => _presets[id] = new PresetRule
+        {
+            Id = id, ForegroundColor = fg, BackgroundColor = bg, HighlightLine = highlightLine,
+            // Seeded defaults are app-wide: tag Global so a #257 split-save
+            // writes them to the shared file, not into every profile.
+            Scope = Persistence.RuleScope.Global,
+        };
 
     public void Apply(PresetRule rule)      => _presets[rule.Id] = rule;
     public void ResetToDefaults()           { _presets.Clear(); SetDefaults(); }

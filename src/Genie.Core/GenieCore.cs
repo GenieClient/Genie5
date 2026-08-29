@@ -134,6 +134,13 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// <summary>Loaded configuration. Survives across sessions.</summary>
     public GenieConfig Config { get; }
 
+    /// <summary>Set by the App host (public #257): it performs the entire
+    /// two-layer rule load (global + profile, .json + .cfg, Character-over-
+    /// Global) itself, so <see cref="ConnectAsync"/> must skip its own
+    /// profile-dir .cfg auto-load — that replay clears each engine and would
+    /// wipe the layered Global rules. Headless hosts leave this false.</summary>
+    public bool HostOwnsRuleLoad { get; set; }
+
     // ── Command pipeline ───────────────────────────────────────────────────────
     private readonly CommandQueue _commandQueue;
     private readonly EventQueue   _eventQueue;
@@ -974,7 +981,14 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // passes reloadRules=false so a running script's runtime-added rules survive
         // (issue #88 / #46 Phase 3). The host's own .json rule load is gated the
         // same way, so both formats stay in lockstep.
-        if (reloadRules)
+        //
+        // Also gated by !HostOwnsRuleLoad (public #257): the App host performs
+        // the ENTIRE two-layer load itself — global + profile, .json + .cfg,
+        // with Character-over-Global layering — BEFORE this connect runs.
+        // Replaying the profile .cfg here on top would clear each engine and
+        // wipe the layered Global rules. Headless hosts (TestHarness, REPLAY)
+        // leave the flag false and keep this Genie 4-parity load.
+        if (reloadRules && !HostOwnsRuleLoad)
         {
             var profileDir = Config.ConfigProfileDir;
             if (File.Exists(Path.Combine(profileDir, "classes.cfg")))

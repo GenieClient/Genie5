@@ -178,4 +178,65 @@ public class RuleFileLiveReloadSmokeTests : IDisposable
         Assert.Throws<ArgumentException>(() =>
             RuleFileLiveReload.Reload("display.json", _profileDir, _globalDir));
     }
+
+    [Fact]
+    public void BothLayersPresent_ReloadLayersCharacterOverGlobal()
+    {
+        // #257: an edit to EITHER copy re-reads both — profile rules first,
+        // then unshadowed globals, scope-tagged.
+        var triggers = new TriggerEngineFinal();
+        File.WriteAllText(Path.Combine(_globalDir, "triggers.json"),
+            """[{"Pattern":"shared","Action":"#echo global"},{"Pattern":"global only","Action":"#echo g"}]""");
+        File.WriteAllText(Path.Combine(_profileDir, "triggers.json"),
+            """[{"Pattern":"shared","Action":"#echo mine"}]""");
+
+        var count = RuleFileLiveReload.Reload("triggers.json", _profileDir, _globalDir, triggers: triggers);
+
+        Assert.Equal(2, count);
+        Assert.Equal("#echo mine", triggers.Triggers[0].Action);            // profile copy, first
+        Assert.Equal(RuleScope.Character, triggers.Triggers[0].Scope);
+        Assert.Equal("global only", triggers.Triggers[1].Pattern);
+        Assert.Equal(RuleScope.Global, triggers.Triggers[1].Scope);
+    }
+
+    [Fact]
+    public void ScopedCfgSync_EachDirGetsItsOwnSubset()
+    {
+        // Both dirs carry a triggers.cfg: after a reload each is rewritten
+        // from its own scope's rules — the dual-write can't cross-pollinate.
+        var triggers = new TriggerEngineFinal();
+        File.WriteAllText(Path.Combine(_globalDir,  "triggers.cfg"), "#trigger {old} {stale}");
+        File.WriteAllText(Path.Combine(_profileDir, "triggers.cfg"), "#trigger {old} {stale}");
+        File.WriteAllText(Path.Combine(_globalDir, "triggers.json"),
+            """[{"Pattern":"global rule","Action":"#echo g"}]""");
+        File.WriteAllText(Path.Combine(_profileDir, "triggers.json"),
+            """[{"Pattern":"profile rule","Action":"#echo p"}]""");
+
+        RuleFileLiveReload.Reload("triggers.json", _profileDir, _globalDir, triggers: triggers);
+
+        var profileCfg = File.ReadAllText(Path.Combine(_profileDir, "triggers.cfg"));
+        var globalCfg  = File.ReadAllText(Path.Combine(_globalDir,  "triggers.cfg"));
+        Assert.Contains("profile rule", profileCfg);
+        Assert.DoesNotContain("global rule", profileCfg);
+        Assert.Contains("global rule", globalCfg);
+        Assert.DoesNotContain("profile rule", globalCfg);
+    }
+
+    [Fact]
+    public void DeletingProfileCopy_FallsBackToGlobalSet()
+    {
+        var aliases = new AliasEngine();
+        File.WriteAllText(Path.Combine(_globalDir, "aliases.json"),
+            """[{"Name":"gg","Expansion":"goodbye"}]""");
+        File.WriteAllText(Path.Combine(_profileDir, "aliases.json"),
+            """[{"Name":"gg","Expansion":"mine"}]""");
+        RuleFileLiveReload.Reload("aliases.json", _profileDir, _globalDir, aliases: aliases);
+        Assert.Equal("mine", aliases.Aliases.Single(a => a.Name == "gg").Expansion);
+
+        File.Delete(Path.Combine(_profileDir, "aliases.json"));
+        RuleFileLiveReload.Reload("aliases.json", _profileDir, _globalDir, aliases: aliases);
+        var rule = Assert.Single(aliases.Aliases);
+        Assert.Equal("goodbye", rule.Expansion);                            // global shows through
+        Assert.Equal(RuleScope.Global, rule.Scope);
+    }
 }

@@ -31,6 +31,9 @@ public sealed class TriggerRule
     public bool   CaseSensitive { get; }
     public bool   IsEnabled     { get; set; }
     public string ClassName     { get; set; }
+    /// <summary>Config layer this rule lives in (public #257) — which file it
+    /// saves back to. Not serialized: scope IS the file it came from.</summary>
+    public Persistence.RuleScope Scope { get; set; } = Persistence.RuleScope.Character;
     /// <summary>Opt-in script-expression evaluation of the action (#150). When
     /// true, <c>{…}</c> expression blocks in the action are evaluated (math /
     /// functions / string ops, via the same evaluator as <c>#eval</c>) after

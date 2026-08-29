@@ -10,14 +10,21 @@ using Genie.App.Docking;
 using Genie.App.Highlighting;
 using Genie.App.Settings;
 using Genie.Core;
+using Genie.Core.Aliases;
 using Genie.Core.Capture;
+using Genie.Core.Classes;
 using Genie.Core.Connection;
 using Genie.Core.Events;
+using Genie.Core.Gags;
 using Genie.Core.Highlights;
 using Genie.Core.Layout;
+using Genie.Core.Macros;
 using Genie.Core.Persistence;
 using Genie.Core.Profiles;
 using Genie.Core.Runtime;
+using Genie.Core.Substitutes;
+using Genie.Core.Triggers;
+using Genie.Core.Variables;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
 
@@ -3464,114 +3471,53 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         var profileDir = GetProfileConfigDir(ConnectedProfile);
         var globalDir  = _configDir;
 
-        // Resolve a rule file with profile-over-global precedence: the connected
-        // profile's own copy wins when present, otherwise fall back to the shared
-        // global Config dir. This lets per-profile configs override the shared
-        // set while legacy / pre-per-profile configs (e.g. imported Genie 4 or
-        // earlier-prototype files that live in the global Config dir) still load
-        // for a profile that hasn't customised that rule type yet. Returns null
-        // when neither location has the file. For a profile-less (ad-hoc)
-        // connection profileDir == globalDir, so this is a plain "load if present".
-        string? Pick(string fileName)
-        {
-            var profilePath = Path.Combine(profileDir, fileName);
-            if (File.Exists(profilePath)) return profilePath;
-            var globalPath = Path.Combine(globalDir, fileName);
-            return File.Exists(globalPath) ? globalPath : null;
-        }
+        // Two-layer load (public #257). Each rule type first resolves an
+        // EFFECTIVE per-scope set — the dir's .json with any coexisting .cfg
+        // replayed on top through the real loaders (the .cfg stays the
+        // persisted truth for its dir, exactly as the old single-dir chain
+        // behaved) — then Character entries layer over Global: profile rules
+        // first (the pattern engines are first-match-wins), then every global
+        // rule whose key no profile rule shadows. Each applied rule carries
+        // its RuleScope so panel saves write it back to the file it came from
+        // instead of forking the whole global set into the profile (the #257
+        // bug). A profile-less connection (profileDir == globalDir) is a
+        // single layer tagged Global. Core's own .cfg auto-load is suppressed
+        // via HostOwnsRuleLoad — replaying it here would clear the engines
+        // and wipe the layered Global rules.
+        var single = ScopedRuleLoader.SameDirectory(profileDir, globalDir);
 
-        // Classes first so Ensure() calls from the rule loaders below don't
-        // clobber persisted active/inactive state (matches Genie5.Kzin ordering).
-        SafeLoad(Pick("classes.json"), path =>
-        {
-            foreach (var m in p.LoadClasses(path))
-                core.Classes.Set(m.Name, m.IsActive);
-        });
+        // Shared #257 machinery: per-scope effective engines (json + cfg-over-
+        // json via CfgReplay), then Character-over-Global layering into the
+        // live engines, every rule tagged with its RuleScope. Classes apply
+        // first inside ApplyLayered so Ensure() calls from the rule loaders
+        // don't clobber persisted active/inactive state.
+        var glob = LayeredRuleLoad.BuildEffectiveScope(globalDir, p);
+        var prof = single ? null : LayeredRuleLoad.BuildEffectiveScope(profileDir, p);
 
-        SafeLoad(Pick("highlights.json"), path =>
-        {
-            foreach (var m in p.LoadHighlights(path))
-            {
-                core.Highlights.RemoveRule(m.Pattern);
-                core.Highlights.AddRule(
-                    m.Pattern, m.ForegroundColor, m.BackgroundColor,
-                    Enum.TryParse<HighlightMatchType>(m.MatchType, out var mt) ? mt : HighlightMatchType.String,
-                    m.CaseSensitive, m.IsEnabled, m.ClassName, m.SoundFile, m.Speak, m.Windows);
-            }
-        });
+        LayeredRuleLoad.ApplyLayered(glob, prof,
+            highlights:  core.Highlights,
+            triggers:    core.Triggers,
+            substitutes: core.Substitutes,
+            gags:        core.Gags,
+            aliases:     core.Aliases,
+            macros:      core.Macros,
+            classes:     core.Classes,
+            variables:   core.Variables.Store);
 
-        SafeLoad(Pick("names.json"), path =>
-        {
-            foreach (var m in p.LoadNames(path))
-                core.NameHighlights.Add(m.Name, m.ForegroundColor, m.BackgroundColor);   // Add upserts (#154/#148)
-        });
+        LoadLayeredNames(core, p, profileDir, globalDir, single);
+        LoadLayeredPresets(core, p, profileDir, globalDir, single);
 
-        SafeLoad(Pick("presets.json"), path =>
+        var hadAnyMacros = glob.Macros.Rules.Count > 0 || (prof?.Macros.Rules.Count ?? 0) > 0;
+        if (hadAnyMacros)
         {
-            foreach (var m in p.LoadPresets(path))   // #149 — override the seeded default for each saved token
-                core.Presets.Apply(new Genie.Core.Presets.PresetRule
-                {
-                    Id = m.Id, ForegroundColor = m.ForegroundColor,
-                    BackgroundColor = m.BackgroundColor, HighlightLine = m.HighlightLine,
-                });
-        });
-
-        SafeLoad(Pick("triggers.json"), path =>
-        {
-            foreach (var m in p.LoadTriggers(path))
-            {
-                core.Triggers.RemoveTrigger(m.Pattern);
-                core.Triggers.AddTrigger(m.Pattern, m.Action, m.CaseSensitive, m.IsEnabled, m.ClassName,
-                                         m.SoundFile, m.Speak, m.Eval, m.MatchAll);
-            }
-        });
-
-        SafeLoad(Pick("substitutes.json"), path =>
-        {
-            foreach (var m in p.LoadSubstitutes(path))
-            {
-                core.Substitutes.RemoveRule(m.Pattern);
-                core.Substitutes.AddRule(m.Pattern, m.Replacement, m.CaseSensitive, m.IsEnabled, m.ClassName);
-            }
-        });
-
-        SafeLoad(Pick("gags.json"), path =>
-        {
-            foreach (var m in p.LoadGags(path))
-            {
-                core.Gags.RemoveRule(m.Pattern);
-                core.Gags.AddRule(m.Pattern, m.CaseSensitive, m.IsEnabled, m.ClassName);
-            }
-        });
-
-        SafeLoad(Pick("aliases.json"), path =>
-        {
-            foreach (var m in p.LoadAliases(path))
-            {
-                core.Aliases.RemoveAlias(m.Name);
-                core.Aliases.AddAlias(m.Name, m.Expansion, m.IsEnabled);
-            }
-        });
-
-        var macrosPath = Pick("macros.json");
-        if (macrosPath is not null)
-        {
-            SafeLoad(macrosPath, path =>
-            {
-                foreach (var m in p.LoadMacros(path))
-                    core.Macros.Add(m.Key, m.Action);
-            });
-
             // #140 migration: profiles seeded before the numpad OPERATOR
             // hotkeys existed get just those four filled in — but only when
-            // NONE of them are bound. A profile with even one operator
-            // binding has seen the feature, so a deliberately-deleted key
-            // stays deleted; rebinds always win because the seeder never
-            // touches a bound key.
-            // Save back to the file we loaded (profile OR global) so the
-            // migration doesn't fork a profile-local copy of global macros.
+            // NONE of them are bound (a deliberately-deleted key stays
+            // deleted; rebinds always win). Seeded keys default to Character
+            // scope, so the write-back below touches only the profile file —
+            // global macros are never forked.
             if (SeedOperatorHotkeys(core.Macros))
-                try { p.SaveMacros(macrosPath, core.Macros.Rules); } catch { /* best-effort */ }
+                SaveMacrosSplit(p, core.Macros, profileDir, globalDir, single);
         }
         else
         {
@@ -3583,16 +3529,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             try { p.SaveMacros(Path.Combine(profileDir, "macros.json"), core.Macros.Rules); } catch { /* best-effort seed */ }
         }
 
-        SafeLoad(Pick("variables.json"), path =>
+        // windows.json is a LIST keyed by window Id, not a monolithic layout
+        // doc — global entries first, profile entries override per Id.
         {
-            foreach (var m in p.LoadVariables(path))
-                core.Variables.Store.Set(m.Name, m.Value);
-        });
-
-        SafeLoad(Pick("windows.json"), path =>
-        {
-            foreach (var m in p.LoadWindowSettings(path))
-                WindowSettings.Apply(m);
+            try { foreach (var m in p.LoadWindowSettings(Path.Combine(globalDir, "windows.json"))) WindowSettings.Apply(m); } catch { }
+            if (!single)
+                try { foreach (var m in p.LoadWindowSettings(Path.Combine(profileDir, "windows.json"))) WindowSettings.Apply(m); } catch { }
 
             // The dock (StreamTools + their right-click window menus) was built
             // in the constructor, before this connect-time load, so each menu
@@ -3611,16 +3553,72 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 foreach (var s in WindowSettings.All.Values)
                     s.NotifyChanged();
             });
-        });
+        }
     }
 
-    /// <summary>Run a load callback against <paramref name="path"/> when it's
-    /// non-null and present, swallowing exceptions (corrupt JSON shouldn't block
-    /// connect). Pair with the profile-over-global path resolver in the caller.</summary>
-    private static void SafeLoad(string? path, Action<string> load)
+    /// <summary>Layered names.json load (#257): profile names first, then
+    /// global names not shadowed. Add() upserts, so order alone decides.</summary>
+    private void LoadLayeredNames(GenieCore core, PersistenceService p,
+                                  string profileDir, string globalDir, bool single)
     {
-        if (path is null || !File.Exists(path)) return;
-        try { load(path); } catch { /* corrupt JSON shouldn't block connect */ }
+        List<Genie.Core.Persistence.NamePersistenceModel> Load(string dir)
+        {
+            try { return p.LoadNames(Path.Combine(dir, "names.json")); }
+            catch { return new(); }
+        }
+        var character = single ? new() : Load(profileDir);
+        foreach (var (m, scope) in ScopedRuleLoader.Layer(character, Load(globalDir), x => x.Name))
+        {
+            core.NameHighlights.Add(m.Name, m.ForegroundColor, m.BackgroundColor);   // Add upserts (#154/#148)
+            var added = core.NameHighlights.Rules.FirstOrDefault(
+                r => r.Name.Equals(m.Name, StringComparison.OrdinalIgnoreCase));
+            if (added is not null) added.Scope = scope;
+        }
+    }
+
+    /// <summary>Layered presets.json load (#257/#149): each saved token
+    /// overrides the seeded default; a profile token overrides a global one.</summary>
+    private void LoadLayeredPresets(GenieCore core, PersistenceService p,
+                                    string profileDir, string globalDir, bool single)
+    {
+        List<Genie.Core.Persistence.PresetPersistenceModel> Load(string dir)
+        {
+            try { return p.LoadPresets(Path.Combine(dir, "presets.json")); }
+            catch { return new(); }
+        }
+        var character = single ? new() : Load(profileDir);
+        foreach (var (m, scope) in ScopedRuleLoader.Layer(character, Load(globalDir), x => x.Id))
+            core.Presets.Apply(new Genie.Core.Presets.PresetRule
+            {
+                Id = m.Id, ForegroundColor = m.ForegroundColor,
+                BackgroundColor = m.BackgroundColor, HighlightLine = m.HighlightLine,
+                Scope = scope,
+            });
+    }
+
+    /// <summary>Split-save the merged macro set by scope (#257): Character
+    /// rules to the profile macros.json, Global rules to the shared one.
+    /// Single-layer connections write everything to the one file. A scope's
+    /// file is only created when it has rules to hold (or already exists, so
+    /// deletions apply).</summary>
+    private static void SaveMacrosSplit(PersistenceService p, Genie.Core.Macros.MacroEngine engine,
+                                        string profileDir, string globalDir, bool single)
+    {
+        try
+        {
+            if (single)
+            {
+                p.SaveMacros(Path.Combine(globalDir, "macros.json"), engine.Rules);
+                return;
+            }
+            var character = engine.Rules.Where(r => r.Scope == RuleScope.Character).ToList();
+            var global    = engine.Rules.Where(r => r.Scope == RuleScope.Global).ToList();
+            var profPath  = Path.Combine(profileDir, "macros.json");
+            var globPath  = Path.Combine(globalDir, "macros.json");
+            if (character.Count > 0 || File.Exists(profPath)) p.SaveMacros(profPath, character);
+            if (global.Count    > 0 || File.Exists(globPath)) p.SaveMacros(globPath, global);
+        }
+        catch { /* best-effort */ }
     }
 
     // ── Live reload of externally edited rule .json files ────────────────────
@@ -4196,6 +4194,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             dataDirectoryOverride: string.IsNullOrEmpty(_sessionDataRoot) ? null : _sessionDataRoot,
             aiConfig:              null,
             loggerFactory:         null);
+
+        // This host owns the whole two-layer rule load (#257): global +
+        // profile, .json + .cfg, layered in LoadSavedConfiguration. Core's own
+        // profile-cfg auto-load must not replay on top (it clears each engine,
+        // wiping the layered Global rules).
+        _core.HostOwnsRuleLoad = true;
 
         // A profile Data Directory override repoints Core's whole data root
         // away from the session default the startup [data] line announced —

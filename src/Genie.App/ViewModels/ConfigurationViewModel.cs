@@ -180,8 +180,9 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = HighlightEngine;
         if (engine is null) return;
-        SaveRuleJson("highlights.json", path => _persistence.SaveHighlights(path, engine.Rules));
-        SyncCfg("highlights.cfg", () => CfgFormat.HighlightLines(engine.Rules));
+        SaveRuleJsonSplit("highlights.json", engine.Rules, r => r.Scope,
+            (path, subset) => _persistence.SaveHighlights(path, subset));
+        SyncCfgSplit("highlights.cfg", engine.Rules, r => r.Scope, CfgFormat.HighlightLines);
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
     }
 
@@ -189,7 +190,8 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = NameHighlightEngine;
         if (engine is null) return;
-        TrySave(() => _persistence.SaveNames(PathFor("names.json"), engine.Rules));
+        SaveRuleJsonSplit("names.json", engine.Rules, r => r.Scope,
+            (path, subset) => _persistence.SaveNames(path, subset));
         if (EditingConnected) UserHighlights.NotifyRulesChanged();   // #154 repaint visible lines
     }
 
@@ -197,7 +199,8 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = PresetEngine;
         if (engine is not null)
-            TrySave(() => _persistence.SavePresets(PathFor("presets.json"), engine));   // #149
+            SaveRuleJsonSplit("presets.json", engine.Presets.Values, r => r.Scope,
+                (path, subset) => _persistence.SavePresets(path, subset));   // #149
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
     }
 
@@ -205,16 +208,18 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = TriggerEngine;
         if (engine is null) return;
-        SaveRuleJson("triggers.json", path => _persistence.SaveTriggers(path, engine.Triggers));
-        SyncCfg("triggers.cfg", () => CfgFormat.TriggerLines(engine.Triggers));
+        SaveRuleJsonSplit("triggers.json", engine.Triggers, r => r.Scope,
+            (path, subset) => _persistence.SaveTriggers(path, subset));
+        SyncCfgSplit("triggers.cfg", engine.Triggers, r => r.Scope, CfgFormat.TriggerLines);
     }
 
     public void OnSubstitutesChanged()
     {
         var engine = SubstituteEngine;
         if (engine is null) return;
-        SaveRuleJson("substitutes.json", path => _persistence.SaveSubstitutes(path, engine.Rules));
-        SyncCfg("substitutes.cfg", () => CfgFormat.SubstituteLines(engine.Rules));
+        SaveRuleJsonSplit("substitutes.json", engine.Rules, r => r.Scope,
+            (path, subset) => _persistence.SaveSubstitutes(path, subset));
+        SyncCfgSplit("substitutes.cfg", engine.Rules, r => r.Scope, CfgFormat.SubstituteLines);
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
     }
 
@@ -222,24 +227,27 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var engine = GagEngine;
         if (engine is null) return;
-        SaveRuleJson("gags.json", path => _persistence.SaveGags(path, engine.Rules));
-        SyncCfg("gags.cfg", () => CfgFormat.GagLines(engine.Rules));
+        SaveRuleJsonSplit("gags.json", engine.Rules, r => r.Scope,
+            (path, subset) => _persistence.SaveGags(path, subset));
+        SyncCfgSplit("gags.cfg", engine.Rules, r => r.Scope, CfgFormat.GagLines);
     }
 
     public void OnAliasesChanged()
     {
         var engine = AliasEngine;
         if (engine is null) return;
-        SaveRuleJson("aliases.json", path => _persistence.SaveAliases(path, engine.Aliases));
-        SyncCfg("aliases.cfg", () => CfgFormat.AliasLines(engine.Aliases));
+        SaveRuleJsonSplit("aliases.json", engine.Aliases, r => r.Scope,
+            (path, subset) => _persistence.SaveAliases(path, subset));
+        SyncCfgSplit("aliases.cfg", engine.Aliases, r => r.Scope, CfgFormat.AliasLines);
     }
 
     public void OnMacrosChanged()
     {
         var engine = MacroEngine;
         if (engine is null) return;
-        TrySave(() => _persistence.SaveMacros(PathFor("macros.json"), engine.Rules));
-        SyncCfg("macros.cfg", () => CfgFormat.MacroLines(engine.Rules));
+        SaveRuleJsonSplit("macros.json", engine.Rules, r => r.Scope,
+            (path, subset) => _persistence.SaveMacros(path, subset));
+        SyncCfgSplit("macros.cfg", engine.Rules, r => r.Scope, CfgFormat.MacroLines);
     }
 
     public void OnVariablesChanged()
@@ -308,6 +316,72 @@ public class ConfigurationViewModel : ReactiveObject
         TrySave(() => save(path));
     }
 
+    /// <summary>True when the selected profile's dir IS the global Config dir
+    /// (profile-less / legacy-global editing) — a single config layer.</summary>
+    private bool SingleLayer =>
+        ScopedRuleLoader.SameDirectory(_profileDirResolver(SelectedProfile), _configRoot);
+
+    /// <summary>
+    /// The #257 split-save: each rule goes back to the file its
+    /// <see cref="RuleScope"/> names — Character rules to the profile copy,
+    /// Global rules to the shared Config copy — so a panel edit never forks
+    /// the global set into the profile. A scope's file is only created when
+    /// it has rules to hold (an existing file is always rewritten, so
+    /// deletions apply). Single-layer editing writes everything to the one
+    /// file. Writes are marked so the RuleFileWatcher doesn't bounce them
+    /// back as external edits — it watches BOTH dirs.
+    /// </summary>
+    private void SaveRuleJsonSplit<T>(string fileName, IEnumerable<T> rules,
+        Func<T, RuleScope> scopeOf, Action<string, IReadOnlyList<T>> save)
+    {
+        var all         = rules.ToList();
+        var profilePath = PathFor(fileName);
+        if (SingleLayer)
+        {
+            RuleFileWatcher.MarkAppWrite(profilePath);
+            TrySave(() => save(profilePath, all));
+            return;
+        }
+        var globalPath = Path.Combine(_configRoot, fileName);
+        var character  = all.Where(r => scopeOf(r) == RuleScope.Character).ToList();
+        var global     = all.Where(r => scopeOf(r) == RuleScope.Global).ToList();
+        if (character.Count > 0 || File.Exists(profilePath))
+        {
+            RuleFileWatcher.MarkAppWrite(profilePath);
+            TrySave(() => save(profilePath, character));
+        }
+        if (global.Count > 0 || File.Exists(globalPath))
+        {
+            RuleFileWatcher.MarkAppWrite(globalPath);
+            TrySave(() => save(globalPath, global));
+        }
+    }
+
+    /// <summary>Scope-split companion to <see cref="SyncCfg"/>: each dir's
+    /// coexisting .cfg is rewritten from ITS OWN scope's subset, so the .cfg
+    /// dual-write can't re-fork global rules through the back door. Same
+    /// only-rewrites-an-existing-file rule as ever.</summary>
+    private void SyncCfgSplit<T>(string fileName, IEnumerable<T> rules,
+        Func<T, RuleScope> scopeOf, Func<IEnumerable<T>, IEnumerable<string>> lines)
+    {
+        var all        = rules.ToList();
+        var profileCfg = Path.Combine(_profileDirResolver(SelectedProfile), fileName);
+        if (SingleLayer)
+        {
+            SyncCfgAt(profileCfg, () => lines(all));
+            return;
+        }
+        SyncCfgAt(profileCfg, () => lines(all.Where(r => scopeOf(r) == RuleScope.Character)));
+        SyncCfgAt(Path.Combine(_configRoot, fileName),
+                  () => lines(all.Where(r => scopeOf(r) == RuleScope.Global)));
+    }
+
+    private void SyncCfgAt(string path, Func<IEnumerable<string>> lines)
+    {
+        if (!File.Exists(path)) return;
+        TrySave(() => ConfigPersistence.WriteLines(path, lines()));
+    }
+
     /// <summary>
     /// Keep a coexisting Genie 4-style .cfg in lockstep with the .json we just
     /// wrote. The connect sequence replays .cfg files AFTER the host's .json
@@ -325,31 +399,28 @@ public class ConfigurationViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// Replay the selected profile's .cfg files over freshly built draft
-    /// engines — the same thing the connect sequence does after the .json
-    /// load, via the same CommandEngine loaders (<see cref="CfgReplay"/>).
-    /// Without this the draft shows a json-only view that hides every
-    /// cfg-only rule — and a <see cref="SyncCfg"/> from such a draft would
-    /// drop those rules from the .cfg. Best-effort: on any failure the json
-    /// view remains usable.
+    /// Cached per-scope effective sets backing the draft engines — the same
+    /// <see cref="LayeredRuleLoad"/> machinery the connect-time load uses
+    /// (json + cfg-over-json per dir, then Character-over-Global layering),
+    /// so the dialog and a live connect always agree. Rebuilt lazily after
+    /// every <see cref="ClearDrafts"/>. Profile side is null in single-layer
+    /// (profile-less) editing.
     /// </summary>
-    private void OverlayDraftCfg(
-        ClassEngine?        classes     = null,
-        AliasEngine?        aliases     = null,
-        VariableStore?      variables   = null,
-        HighlightEngine?    highlights  = null,
-        TriggerEngineFinal? triggers    = null,
-        SubstituteEngine?   substitutes = null,
-        GagEngine?          gags        = null,
-        MacroEngine?        macros      = null)
+    private LayeredRuleLoad.EffectiveScope? _draftGlobalScope;
+    private LayeredRuleLoad.EffectiveScope? _draftProfileScope;
+    private bool _draftScopesBuilt;
+
+    private (LayeredRuleLoad.EffectiveScope Glob, LayeredRuleLoad.EffectiveScope? Prof) DraftScopes()
     {
-        try
+        if (!_draftScopesBuilt)
         {
-            CfgReplay.LoadInto(_profileDirResolver(SelectedProfile),
-                classes, aliases, variables, highlights,
-                triggers, substitutes, gags, macros);
+            _draftGlobalScope  = LayeredRuleLoad.BuildEffectiveScope(_configRoot, _persistence);
+            _draftProfileScope = SingleLayer
+                ? null
+                : LayeredRuleLoad.BuildEffectiveScope(_profileDirResolver(SelectedProfile), _persistence);
+            _draftScopesBuilt = true;
         }
-        catch { /* draft overlay is best-effort */ }
+        return (_draftGlobalScope!, _draftProfileScope);
     }
 
     /// <summary>Path inside the currently-selected profile's config directory,
@@ -359,24 +430,6 @@ public class ConfigurationViewModel : ReactiveObject
         var dir = _profileDirResolver(SelectedProfile);
         Directory.CreateDirectory(dir);
         return Path.Combine(dir, fileName);
-    }
-
-    /// <summary>
-    /// Read path with profile-over-global precedence: the selected profile's
-    /// own copy when present, otherwise the shared global Config file (so a
-    /// profile that hasn't customised a rule type still shows the global set,
-    /// including legacy / earlier-prototype configs). Saves always go to the
-    /// profile dir via <see cref="PathFor"/>, so the first edit promotes a
-    /// global config into a per-profile override. Returns the profile path
-    /// (which may not exist) when neither location has the file, so callers'
-    /// existing <c>File.Exists</c> guards still work.
-    /// </summary>
-    private string ReadPathFor(string fileName)
-    {
-        var profilePath = PathFor(fileName);
-        if (File.Exists(profilePath)) return profilePath;
-        var globalPath = Path.Combine(_configRoot, fileName);
-        return File.Exists(globalPath) ? globalPath : profilePath;
     }
 
     // ── Draft engines (cleared whenever SelectedProfile changes) ─────────────
@@ -404,6 +457,9 @@ public class ConfigurationViewModel : ReactiveObject
         _draftMacros      = null;
         _draftClasses     = null;
         _draftVariables   = null;
+        _draftGlobalScope  = null;
+        _draftProfileScope = null;
+        _draftScopesBuilt  = false;
         // Tell every panel "your engine ref changed" so they re-Initialize.
         this.RaisePropertyChanged(nameof(HighlightEngine));
         this.RaisePropertyChanged(nameof(NameHighlightEngine));
@@ -421,20 +477,8 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftHighlights is not null) return _draftHighlights;
         _draftHighlights = new HighlightEngine();
-        var path = ReadPathFor("highlights.json");
-        if (File.Exists(path))
-        {
-            try
-            {
-                foreach (var m in _persistence.LoadHighlights(path))
-                    _draftHighlights.AddRule(
-                        m.Pattern, m.ForegroundColor, m.BackgroundColor,
-                        Enum.TryParse<HighlightMatchType>(m.MatchType, out var mt) ? mt : HighlightMatchType.String,
-                        m.CaseSensitive, m.IsEnabled, m.ClassName, m.SoundFile, m.Speak, m.Windows);
-            }
-            catch { }
-        }
-        OverlayDraftCfg(highlights: _draftHighlights);
+        try { var (g, c) = DraftScopes(); LayeredRuleLoad.ApplyLayered(g, c, highlights: _draftHighlights); }
+        catch { /* draft stays usable empty */ }
         return _draftHighlights;
     }
 
@@ -445,18 +489,8 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftTriggers is not null) return _draftTriggers;
         _draftTriggers = new TriggerEngineFinal();
-        var path = ReadPathFor("triggers.json");
-        if (File.Exists(path))
-        {
-            try
-            {
-                foreach (var m in _persistence.LoadTriggers(path))
-                    _draftTriggers.AddTrigger(m.Pattern, m.Action, m.CaseSensitive, m.IsEnabled, m.ClassName,
-                                              m.SoundFile, m.Speak, m.Eval, m.MatchAll);
-            }
-            catch { }
-        }
-        OverlayDraftCfg(triggers: _draftTriggers);
+        try { var (g, c) = DraftScopes(); LayeredRuleLoad.ApplyLayered(g, c, triggers: _draftTriggers); }
+        catch { }
         return _draftTriggers;
     }
 
@@ -464,17 +498,8 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftSubstitutes is not null) return _draftSubstitutes;
         _draftSubstitutes = new SubstituteEngine();
-        var path = ReadPathFor("substitutes.json");
-        if (File.Exists(path))
-        {
-            try
-            {
-                foreach (var m in _persistence.LoadSubstitutes(path))
-                    _draftSubstitutes.AddRule(m.Pattern, m.Replacement, m.CaseSensitive, m.IsEnabled, m.ClassName);
-            }
-            catch { }
-        }
-        OverlayDraftCfg(substitutes: _draftSubstitutes);
+        try { var (g, c) = DraftScopes(); LayeredRuleLoad.ApplyLayered(g, c, substitutes: _draftSubstitutes); }
+        catch { }
         return _draftSubstitutes;
     }
 
@@ -482,17 +507,8 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftGags is not null) return _draftGags;
         _draftGags = new GagEngine();
-        var path = ReadPathFor("gags.json");
-        if (File.Exists(path))
-        {
-            try
-            {
-                foreach (var m in _persistence.LoadGags(path))
-                    _draftGags.AddRule(m.Pattern, m.CaseSensitive, m.IsEnabled, m.ClassName);
-            }
-            catch { }
-        }
-        OverlayDraftCfg(gags: _draftGags);
+        try { var (g, c) = DraftScopes(); LayeredRuleLoad.ApplyLayered(g, c, gags: _draftGags); }
+        catch { }
         return _draftGags;
     }
 
@@ -500,17 +516,8 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftAliases is not null) return _draftAliases;
         _draftAliases = new AliasEngine();
-        var path = ReadPathFor("aliases.json");
-        if (File.Exists(path))
-        {
-            try
-            {
-                foreach (var m in _persistence.LoadAliases(path))
-                    _draftAliases.AddAlias(m.Name, m.Expansion, m.IsEnabled);
-            }
-            catch { }
-        }
-        OverlayDraftCfg(aliases: _draftAliases);
+        try { var (g, c) = DraftScopes(); LayeredRuleLoad.ApplyLayered(g, c, aliases: _draftAliases); }
+        catch { }
         return _draftAliases;
     }
 
@@ -518,17 +525,8 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftMacros is not null) return _draftMacros;
         _draftMacros = new MacroEngine();
-        var path = ReadPathFor("macros.json");
-        if (File.Exists(path))
-        {
-            try
-            {
-                foreach (var m in _persistence.LoadMacros(path))
-                    _draftMacros.Add(m.Key, m.Action);
-            }
-            catch { }
-        }
-        OverlayDraftCfg(macros: _draftMacros);
+        try { var (g, c) = DraftScopes(); LayeredRuleLoad.ApplyLayered(g, c, macros: _draftMacros); }
+        catch { }
         return _draftMacros;
     }
 
@@ -536,17 +534,8 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftClasses is not null) return _draftClasses;
         _draftClasses = new ClassEngine();
-        var path = ReadPathFor("classes.json");
-        if (File.Exists(path))
-        {
-            try
-            {
-                foreach (var m in _persistence.LoadClasses(path))
-                    _draftClasses.Set(m.Name, m.IsActive);
-            }
-            catch { }
-        }
-        OverlayDraftCfg(classes: _draftClasses);
+        try { var (g, c) = DraftScopes(); LayeredRuleLoad.ApplyLayered(g, c, classes: _draftClasses); }
+        catch { }
         return _draftClasses;
     }
 
@@ -554,17 +543,8 @@ public class ConfigurationViewModel : ReactiveObject
     {
         if (_draftVariables is not null) return _draftVariables;
         _draftVariables = new VariableStore();
-        var path = ReadPathFor("variables.json");
-        if (File.Exists(path))
-        {
-            try
-            {
-                foreach (var m in _persistence.LoadVariables(path))
-                    _draftVariables.Set(m.Name, m.Value);
-            }
-            catch { }
-        }
-        OverlayDraftCfg(variables: _draftVariables);
+        try { var (g, c) = DraftScopes(); LayeredRuleLoad.ApplyLayered(g, c, variables: _draftVariables); }
+        catch { }
         return _draftVariables;
     }
 }
