@@ -173,6 +173,19 @@ jobs:
           name: genie-win-x64-signed
           path: publish/win-x64
 
+      # The sign handoff carries ONLY Genie5.exe, so the loose content files
+      # dotnet publish laid beside it (built-in layout presets — "Strongbox",
+      # "Shadowveil") never reach this job. Restore them from the checkout
+      # before packing, or installed builds ship without Layouts/ and the
+      # "(Built-in)" presets and the factory default layout silently vanish
+      # (every Windows release through beta.7 had this). Linux/macOS lanes
+      # publish and pack in one job and don't need this.
+      - name: Restore built-in layout presets into pack dir
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse -Force src/Genie.App/Layouts publish/win-x64/Layouts
+          Get-ChildItem publish/win-x64/Layouts
+
       - name: Strip leading 'v' from tag name
         id: ver
         shell: bash
