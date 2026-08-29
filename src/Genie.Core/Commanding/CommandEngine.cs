@@ -794,7 +794,7 @@ public sealed class CommandEngine
                 break;
             case "var":
             case "variable":
-                HandleVar(parts);
+                HandleVar(command, parts);
                 break;
             case "eval":
             case "evalmath":
@@ -806,7 +806,7 @@ public sealed class CommandEngine
                 if (parts.Count > 1)
                 {
                     var evalResult = ResolveValueCommand(
-                        "#" + parts[0].ToLowerInvariant() + " " + string.Join(" ", parts.Skip(1)));
+                        "#" + parts[0].ToLowerInvariant() + " " + ValueTail(command, parts, 1));
                     _host.Echo(evalResult);
                 }
                 break;
@@ -828,7 +828,7 @@ public sealed class CommandEngine
                 if (parts.Count >= 3)
                 {
                     var tname  = parts[1];
-                    var tvalue = ResolveValueCommand(string.Join(" ", parts.Skip(2)));
+                    var tvalue = ResolveValueCommand(ValueTail(command, parts, 2));
                     _host.SetGlobalVariable(tname, tvalue);
                     _userTvars.Add(tname);
                     if (_processInputDepth == 1 && _interactive)
@@ -1415,7 +1415,7 @@ public sealed class CommandEngine
     /// </list>
     /// Reference: Genie 4 <c>Core/Command.cs:854-952</c>.
     /// </summary>
-    private void HandleVar(IReadOnlyList<string> parts)
+    private void HandleVar(string command, IReadOnlyList<string> parts)
     {
         if (Variables is null) { _host.Echo("#var is unavailable."); return; }
 
@@ -1437,7 +1437,7 @@ public sealed class CommandEngine
         {
             if (parts.Count < 4) { _host.Echo("Usage: #var set <name> <value>"); return; }
             var setName  = parts[2];
-            var setValue = ResolveValueCommand(string.Join(" ", parts.Skip(3)));
+            var setValue = ResolveValueCommand(ValueTail(command, parts, 3));
             SetVarValue(setName, setValue);
             if (_processInputDepth == 1 && _interactive)
                 EchoRule($"Variable set: {setName}={setValue}");
@@ -1468,7 +1468,7 @@ public sealed class CommandEngine
         if (sub == "add" && parts.Count >= 4)
         {
             var name  = parts[2];
-            var value = ResolveValueCommand(string.Join(" ", parts.Skip(3)));
+            var value = ResolveValueCommand(ValueTail(command, parts, 3));
             SetVarValue(name, value);
             if (_processInputDepth == 1 && _interactive)
                 EchoRule($"Variable set: {name}={value}");
@@ -1476,7 +1476,7 @@ public sealed class CommandEngine
         }
 
         var implicitName  = parts[1];
-        var implicitValue = ResolveValueCommand(string.Join(" ", parts.Skip(2)));
+        var implicitValue = ResolveValueCommand(ValueTail(command, parts, 2));
         SetVarValue(implicitName, implicitValue);
         if (_processInputDepth == 1 && _interactive)
             EchoRule($"Variable set: {implicitName}={implicitValue}");
@@ -1498,6 +1498,22 @@ public sealed class CommandEngine
         else
             Variables!.Store.Set(name, value);
     }
+
+    /// <summary>
+    /// Value-position text for a command (public #300). A single (final) token
+    /// keeps its historical grouping strip — <c>#var x {#eval …}</c> stores the
+    /// brace CONTENT, the mm_train idiom. A multi-token value is sliced RAW
+    /// from the original command instead of rejoined from parsed tokens:
+    /// ParseArgs strips quotes per token, so the rejoin turned
+    /// <c>#eval replacere("$1"," ","_")</c> into <c>#eval replacere($1, ,_)</c>
+    /// — an unevaluatable expression that then stored as its literal text
+    /// (the reporter's trigger). Raw slicing also matches Genie 4, whose
+    /// command args never treated quotes as grouping.
+    /// </summary>
+    private static string ValueTail(string command, IReadOnlyList<string> parts, int skip)
+        => parts.Count - skip == 1
+            ? parts[skip]
+            : Parsing.ArgumentParser.RawTail(command, skip);
 
     /// <summary>
     /// Genie 4 <c>ParseAllArgs</c> parity (Core/Command.cs:2883): a command's

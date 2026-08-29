@@ -83,6 +83,55 @@ public static class ArgumentParser
     }
 
     /// <summary>
+    /// The RAW text of everything from the (<paramref name="skipTokens"/>+1)-th
+    /// token onward — quoting and bracing intact (public #300).
+    /// <see cref="ParseArgs"/> strips quote/brace grouping per token, so
+    /// rebuilding a value with <c>string.Join(" ", parts.Skip(n))</c> destroys
+    /// the quotes an embedded <c>#eval replacere("a b"," ","_")</c> needs to
+    /// evaluate; value-position callers slice the original text instead.
+    /// Tokenization mirrors <see cref="ParseArgs"/> exactly (quotes group,
+    /// braces nest, whitespace separates). Returns "" when the text has no
+    /// further tokens.
+    /// </summary>
+    public static string RawTail(string text, int skipTokens)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+        var inQuotes   = false;
+        var braceDepth = 0;
+        var inToken    = false;
+        var tokens     = 0;
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            var ch = text[i];
+            if (inQuotes)
+            {
+                if (ch == '"') inQuotes = false;
+                continue;
+            }
+            if (braceDepth > 0)
+            {
+                if      (ch == '{') braceDepth++;
+                else if (ch == '}') braceDepth--;
+                continue;
+            }
+            if (ch == ' ' || ch == '\t')
+            {
+                if (inToken) { tokens++; inToken = false; }
+                continue;
+            }
+            if (!inToken)
+            {
+                if (tokens == skipTokens) return text[i..].TrimEnd();
+                inToken = true;
+            }
+            if      (ch == '"') inQuotes   = true;
+            else if (ch == '{') braceDepth = 1;
+        }
+        return string.Empty;
+    }
+
+    /// <summary>
     /// Split a command line on <paramref name="separator"/> (default <c>;</c>) the
     /// way Genie 4's <c>Utility.SafeSplit</c> does (#132): a separator delimits a
     /// command only when it is NOT escaped by a preceding backslash and NOT inside
