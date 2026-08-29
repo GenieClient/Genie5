@@ -326,13 +326,43 @@ public sealed class SgeAuthClient(ILogger<SgeAuthClient> logger)
 
                 var ssl = new SslStream(tcp.GetStream(), leaveInnerStreamOpen: false, ValidateSgeCertificate);
                 var hsStart = swT.ElapsedMilliseconds;
+
+                var tlsOptions = new SslClientAuthenticationOptions
+                {
+                    TargetHost          = cfg.SgeHost,
+                    EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                };
+
+                // eaccess accepts EXACTLY ONE cipher suite (probed 2026-08-29):
+                // TLS 1.2 TLS_RSA_WITH_AES_128_GCM_SHA256 — static-RSA key
+                // exchange, no forward secrecy — and closes with a bare EOF (no
+                // handshake alert) on any ClientHello that doesn't offer it.
+                // .NET's default cipher list on Linux/macOS excludes all
+                // non-PFS suites, so without this policy the handshake EOFs
+                // and every off-Windows user silently falls back to the
+                // XOR-obfuscated plaintext port. Windows Schannel still offers
+                // the suite by default — and CipherSuitesPolicy throws
+                // PlatformNotSupportedException there, hence the gate. The
+                // modern suites stay in the offer so a future server upgrade
+                // negotiates something better without a client change; the
+                // certificate pin (ValidateSgeCertificate) is what defends
+                // against MITM either way.
+                if (!OperatingSystem.IsWindows())
+                {
+                    tlsOptions.CipherSuitesPolicy = new CipherSuitesPolicy(new[]
+                    {
+                        TlsCipherSuite.TLS_AES_256_GCM_SHA384,
+                        TlsCipherSuite.TLS_AES_128_GCM_SHA256,
+                        TlsCipherSuite.TLS_CHACHA20_POLY1305_SHA256,
+                        TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+                        TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+                        TlsCipherSuite.TLS_RSA_WITH_AES_128_GCM_SHA256,
+                    });
+                }
+
                 try
                 {
-                    await ssl.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
-                    {
-                        TargetHost          = cfg.SgeHost,
-                        EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
-                    }, ct);
+                    await ssl.AuthenticateAsClientAsync(tlsOptions, ct);
                 }
                 catch { ssl.Dispose(); throw; }
                 if (VerboseDiag) Diag?.Invoke($"[conn]   TLS handshake done (+{swT.ElapsedMilliseconds - hsStart}ms)");

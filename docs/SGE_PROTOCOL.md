@@ -31,6 +31,28 @@ Genie tries TLS first and falls back to plaintext.
   and retries the whole login on 7900. A bad password does **not** trigger
   fallback (it would just fail again).
 
+### ⚠️ The server accepts exactly ONE cipher suite — Linux/macOS need an explicit offer
+
+Probed 2026-08-29 (`openssl s_client`, suite by suite): 7910 negotiates **only**
+`TLS_RSA_WITH_AES_128_GCM_SHA256` — TLS 1.2, static-RSA key exchange, no
+forward secrecy. Everything else — every ECDHE/DHE suite, every CBC suite,
+AES-256-GCM, all of TLS 1.3 — is answered by **closing the connection with a
+bare EOF, no handshake alert**. The client-visible symptom is
+`IOException: Received an unexpected EOF or 0 bytes from the transport stream`
+roughly one RTT after the ClientHello.
+
+That interacts badly with .NET's platform defaults: **Windows Schannel still
+offers static-RSA suites, but .NET on Linux/macOS uses a restricted default
+cipher list with only forward-secrecy suites** — so the same build that shows
+🔒 on Windows always EOF'd on Linux and silently fell back to plaintext 7900.
+Fix: on non-Windows platforms `SgeAuthClient` sets an explicit
+`CipherSuitesPolicy` — the modern TLS 1.3/ECDHE suites (so a future server
+upgrade negotiates something better with no client change) plus
+`TLS_RSA_WITH_AES_128_GCM_SHA256` (what today's server actually takes). The
+API throws `PlatformNotSupportedException` on Windows, hence the OS gate.
+Losing PFS is acceptable here: the alternative transport is XOR-obfuscated
+plaintext, and MITM is defended by the certificate pin, not the key exchange.
+
 ### ⚠️ Framing differs between the two ports — this is not cosmetic
 
 This bit silently broke TLS login and is the single most important thing to
