@@ -4,7 +4,24 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.6 — Clockwork
+## Latest: v5.0.0-beta.7 — Steadfast
+
+Scrolled-back reading finally holds dead still under combat spam — Pause Scrolling included — and copy copies exactly what you highlighted. The Experience window learns the classic EXPTracker sort, echo, and rested-EXP options, and a batch of live-play fixes lands with it.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.7** as a delta from beta.6.
+
+- **Scrollback holds still — and copy is honest** — past the scrollback cap (`#config scrollbacklines`), every incoming line used to slide the whole window up under a stationary scrollbar, and drag a selection's text out from under it. The view now stays glued to the line you're reading (Pause Scrolling too), and Ctrl+C copies exactly what you highlighted (#293, #298 — thanks @SaragosDR and @alanpatton).
+- **Experience window: classic EXPTracker options** — a Sort dropdown (A to Z / Left to Right with reorderable category order / Learning Rate both ways), a pulse Echo (`Learned: Athletics(+2)` lines each prompt — display-only by default; `#config experienceechoparse` feeds them to triggers like the classic parse leg), and a Rested toggle with `$RestedEXP.*` globals (#272 — thanks @Azothy).
+- **`matchwait` no longer misses responses to a script's earlier `put`s** — lines arriving while a command is queued behind the one-per-prompt send gate are replayed the moment `matchwait`/`waitfor` starts listening, matching Genie 4 timing (#309).
+- **Per-window fonts apply to the tracker panels** — Experience, Active Spells, Time Tracker, and plugin windows now honour Configuration ▸ Layout font settings, live on Apply (#233, #292 — thanks @SaragosDR).
+- **`$connected` no longer looks stuck at 1** — leftover saved `connected` rows purge themselves, `#var connected` writes the live flag, and `$connected` is 0 from launch until a connect actually completes (#294 — thanks @Azothy).
+- **Tab-strip overflow arrows** — ◀ ▶ appear exactly while tabs overflow, and activating an off-screen tab scrolls its header into view (#312).
+- **No window twitch on `#statusbar` updates** — the slot row keeps its height through clear-then-rewrite cycles.
+- **Delta updates can't be silently skipped** — the release pipeline authenticates its delta-base download; the rate-limit failure that shipped beta.6's Intel-Mac lane full-only can't recur quietly (#311).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.7)
+
+## v5.0.0-beta.6 — Clockwork
 
 The mapper tracks like it means it, every timer runs on the server's clock instead of yours, and the script engine is hardened against the crash that could take it down mid-hunt. Plus Alteration Buddy comes in-house, and the experimental editor renderer reaches the Raw XML and Stream windows.
 

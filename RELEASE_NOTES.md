@@ -1,3 +1,111 @@
+# Genie 5 — v5.0.0-beta.7
+
+**"Steadfast"** — scrolled-back reading finally holds dead still under combat
+spam, copy copies exactly what you highlighted, and the Experience window
+learns the classic EXPTracker tricks. Every fix in this build was found or
+verified in live play.
+
+## ✨ New
+- **Experience window: classic EXPTracker sorting, pulse echo, and rested EXP.**
+  A new **Sort** dropdown on the Experience panel brings back Genie 4
+  EXPTracker's orders — A to Z, Left to Right (Armor / Weapons / Magic /
+  Survival / Lore, with the category order reorderable via `#config
+  experiencesortorder`), and Learning Rate in either direction (`#config
+  experiencesort`; the default is the order Genie 5 has always used). An
+  **Echo** toggle flushes each experience pulse to the game window —
+  `Learned: Athletics(+2), Perception(+1)` / `Pulsed: Evasion(-1)`
+  (`#config experienceecho`). The echo is display-only by default; to also
+  feed those lines to script triggers/actions like the classic plugin's parse
+  leg, additionally set `#config experienceechoparse on` — it's a separate
+  opt-in because combat scripts with broad match patterns can end up reacting
+  to every pulse. A **Rested** toggle shows DR's rested-EXP
+  stored / usable / cycle-refresh times under the panel summary, and the
+  `$RestedEXP.Stored` / `.Usable` / `.Refresh` globals populate for scripts
+  whether or not the line is shown (`#config experiencerested`). Thanks
+  @Azothy for pinning down the classic sort modes from memory (#272).
+
+## 🐛 Fixes
+- **Per-window fonts finally apply to Experience, Active Spells, Time
+  Tracker, and plugin windows.** Configuration ▸ Layout saved a font size or
+  family for these four panels and reported it applied — but the panels never
+  read the value back, so nothing changed on screen. They now follow the same
+  rules as every other window, including applying immediately on **Apply**
+  with no reconnect. Plugin windows also now appear in the Layout list once
+  their plugin has opened them (their font settings currently last for the
+  session). One small default change: these panels previously hard-rendered
+  at 12px no matter what; they now share the standard 13px default like the
+  rest of the dock. Thanks @SaragosDR for reporting it — twice, which is fair
+  (#233, #292).
+- **`$connected` no longer looks stuck at 1.** The live flag always flipped
+  correctly on disconnect — but a leftover *saved* `connected` row in the
+  variables file (imported from Genie 4, where any `#var connected …` quietly
+  converts the reserved variable into a saved one, or typed here) sat in the
+  Configuration ▸ Variables panel showing 1 forever, and answered a stale "1"
+  to any script started before the session's first connect — exactly how a
+  reconnect watcher runs. Reserved connection state can no longer enter the
+  saved variable store (existing profiles clean themselves up at the next
+  load + save), `#var connected …` now updates the live variable the way
+  Genie 4's single list did, and `$connected` exists from launch as 0 —
+  staying 0 while a connect attempt is still dialing, so a reconnect loop
+  polling right after `#connect` can't read a false "connected" before the
+  link is actually up. Thanks @Azothy for the precise echo-vs-panel repro
+  (#294).
+
+- **Scrolled-back windows hold still — and copy copies what you highlighted.**
+  Scrolling up in the Game window (or any stream window) only held until the
+  scrollback buffer reached its cap (2,000 lines by default,
+  `#config scrollbacklines`): past that point every incoming line trims one
+  off the top of the buffer, and the whole window slid up beneath a
+  stationary scrollbar — in combat, a steady crawl that made reading back
+  impossible even with the ↓ Bottom button showing. The view now anchors to
+  the line you're reading whenever it isn't following the newest text (Pause
+  Scrolling holds rock-steady too), and ↓ Bottom resumes the auto-follow as
+  before. The same buffer slide was pulling text out from under a selection,
+  so copying highlighted text pasted lines from further down; a selection now
+  follows its text as the buffer trims — both the visible highlight and what
+  Ctrl+C copies. Thanks @SaragosDR (#293) and @alanpatton, whose "it scrolls
+  even when the bottom link appears" pinned it (#298).
+
+- **`matchwait` no longer misses responses to a script's earlier `put`s.** The
+  classic idiom — arm `match` patterns, `put look shard`, `put look`,
+  `matchwait` — could fall through to its error label: Genie 5 pipelines
+  script commands one-per-prompt (so scripts can't blast past roundtime), and
+  the first put's response landed while the second put was still queued,
+  before `matchwait` was listening. Genie 4 never had that window, because its
+  `put` sends instantly. Lines that arrive during that internal queueing are
+  now kept and checked the moment `matchwait` (or `waitfor`) starts listening
+  — exactly what Genie 4 would have matched, and nothing more (text arriving
+  during a script's own `pause`/`wait` is still ignored, as in Genie 4). Found
+  with the astral-travel script `ap.cmd`, which exited "You are not at a known
+  Grazhir shard" while standing at one. An action's `goto` firing mid-wait
+  discards that held text along with the wait itself, and debug mode now
+  reports which match fired and on what line (#309).
+- **No more window twitch on `#statusbar` updates.** When a script cleared and
+  rewrote its status slots (uber.cmd does this on every status change), the
+  bottom slot row measured zero height for a frame and the whole window
+  reflowed ~19px before snapping back — a visible full-screen twitch. The row
+  now keeps its one-line height while its cells are momentarily empty, the
+  same fix the posture chip strip got in beta.6 (#259), and both floors are
+  now guarded by tests.
+- **Overflowing tab strips are now scrollable — with visible arrows.** Stack
+  more tabbed windows than the panel is wide and the extra tabs were simply
+  clipped, with no indication they existed and no way to reach them short of
+  an undocumented mouse-wheel scroll. Now ◀ ▶ arrows appear at the strip's
+  edges exactly while tabs overflow (click or hold to scroll; the mouse wheel
+  still works over the tabs), and activating a tab that sits past the edge —
+  including at layout restore — scrolls its header into view automatically.
+  Applies to docked panels, floated windows, and tabbed documents alike (#312).
+
+## 🔧 Build
+- **Delta updates can no longer be silently skipped.** The release pipeline's
+  download of prior packages (the base for binary-diff delta updates) ran
+  against the anonymous GitHub API and could hit its rate limit — which is how
+  the beta.6 Intel-Mac lane quietly shipped without a delta, forcing a full
+  download on update. The download is authenticated now, and any residual
+  failure is flagged loudly on the run instead of passing unnoticed (#311).
+
+---
+
 # Genie 5 — v5.0.0-beta.6
 
 Clockwork: the mapper tracks like it means it, every timer runs on the

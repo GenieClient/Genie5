@@ -21,20 +21,21 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.5.1 "Bearings"
+## Where we are — v5.0.0-beta.7 "Steadfast"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
-last parity gaps. Since this roadmap was rebuilt: beta.3 shipped If-Closed
-stream routing (#211), Hide Title Bar on floating windows (#181), and
-crtrStatus handling (#202); beta.4 shipped the opt-in AvaloniaEdit game window
-(#200), File ▸ Open Log In Editor (#89), and the `send` eager-dash marker;
-**beta.5 moved the whole solution to .NET 10**; and beta.5.1 was built almost
-entirely from player reports — the OOC stream window, the `$roomid` browse-hold
-and `$roundtime` countdown fixes, `action` body branching, Genie 4 parity for
-`timer` / `%t`, angle-bracket literals (#238), the triple-printed OOC whisper
-(#256), and MonsterBold colour precedence (#235, #236). Highlights of what
-works today:
+last parity gaps. Recent releases: **beta.5** moved the whole solution to
+.NET 10; beta.5.1 was built almost entirely from player reports (OOC window,
+`timer`/`%t` parity, MonsterBold precedence, and more); **beta.6** put every
+timer on the server's clock (#261), hardened the script engine against the
+mid-hunt collection crash (#242), landed the mapper-tracking batch, and
+brought Alteration Buddy in-house; and **beta.7** makes scrolled-back reading
+hold still at the scrollback cap with copy that copies what you highlighted
+(#293, #298), teaches the Experience window the classic EXPTracker sort/echo/
+rested options (#272), fixes per-window fonts on the tracker panels (#233),
+replays send-gated lines into `matchwait` (#309), and adds tab-strip overflow
+arrows (#312). Highlights of what works today:
 
 - **Connection** — SGE direct auth (TLS on 7910 by default, plaintext 7900
   fallback), Lich 5 proxy (with owned-Lich auto-launch and `#config lichdebug`
@@ -88,12 +89,12 @@ others, but all should land before we cut a stable `5.0.0` off the beta channel.
 **Rough order of attack.** The tracks are independent, but if you're looking for
 where the next commit does the most good:
 
-1. **The P1 script-correctness bugs first** — roundtime against the local clock
-   ([#261](https://github.com/GenieClient/Genie5/issues/261)), script-engine
-   thread safety ([#242](https://github.com/GenieClient/Genie5/issues/242)), and
-   profile-vs-global rule layering
-   ([#257](https://github.com/GenieClient/Genie5/issues/257)). These break
-   working scripts in the field, mostly silently, and they're each a few days.
+1. **The P1 script-correctness bugs first** — profile-vs-global rule layering
+   ([#257](https://github.com/GenieClient/Genie5/issues/257)) and eval in
+   trigger actions ([#300](https://github.com/GenieClient/Genie5/issues/300)).
+   These break working scripts in the field, mostly silently. (The other two
+   that led this list — roundtime on the server clock and script-engine
+   thread safety — shipped in beta.6.)
 2. **Track A (security)** — the actual gate, and the one with the longest tail.
 3. **The script validator**
    ([#239](https://github.com/GenieClient/Genie5/issues/239)) before the in-app
@@ -159,18 +160,10 @@ Tracked as [#27](https://github.com/GenieClient/Genie5/issues/27).
 Burn down real-user reports on the beta builds before we call it stable. The
 current set, all P1/P2 and all sourced from player reports:
 
-- Roundtime computed against the local PC clock rather than the server's, so
-  clock skew breaks the RT badge, `#send`, and every RT-gated script
-  ([#261](https://github.com/GenieClient/Genie5/issues/261)).
-- Script engine isn't thread-safe — a "Collection was modified" crash when game
-  lines arrive mid-execution
-  ([#242](https://github.com/GenieClient/Genie5/issues/242)).
 - Profile rule files replace the global set instead of layering on it
   ([#257](https://github.com/GenieClient/Genie5/issues/257)).
-- Transport disembark race — `%offtransport` unset, so `put go %offtransport`
-  goes out literal ([#241](https://github.com/GenieClient/Genie5/issues/241)).
-- Experience window font size doesn't apply
-  ([#233](https://github.com/GenieClient/Genie5/issues/233)).
+- `eval` doesn't evaluate inside some trigger actions
+  ([#300](https://github.com/GenieClient/Genie5/issues/300)).
 - Astral Plane: seven missing Map999 conduit nodes, plus a pathfinder guard so
   the built-in walker never routes through `script X` arcs it can't execute
   ([#253](https://github.com/GenieClient/Genie5/issues/253)).
@@ -243,10 +236,10 @@ are filed beneath it — Crutch
 console, and the largest of them), Combat Tracker
 ([#265](https://github.com/GenieClient/Genie5/issues/265)), Bank Tracker
 ([#266](https://github.com/GenieClient/Genie5/issues/266)), SpellInfo
-([#267](https://github.com/GenieClient/Genie5/issues/267)), ExpEcho
-([#268](https://github.com/GenieClient/Genie5/issues/268)), BestiaryQuery
+([#267](https://github.com/GenieClient/Genie5/issues/267)), BestiaryQuery
 ([#269](https://github.com/GenieClient/Genie5/issues/269)), and per-window
-logging ([#270](https://github.com/GenieClient/Genie5/issues/270)).
+logging ([#270](https://github.com/GenieClient/Genie5/issues/270)). ExpEcho
+retired: its behaviour shipped built-in with the beta.7 Experience window.
 
 Several carry a `design-question` label rather than a spec: the Genie 5 plugin
 contract is deliberately UI-free, so a plugin whose whole value is a clickable
@@ -254,8 +247,8 @@ window needs a decision on built-in panel vs. plugin before code. **If you used
 one of these in Genie 4, saying so on its issue is the most useful input we can
 get** — a few are open questions about whether anyone still wants them at all.
 
-Related: ExpTracker sorting and the other Genie 4 ExpTracker options
-([#272](https://github.com/GenieClient/Genie5/issues/272)).
+Related: the classic ExpTracker sort/echo/rested options shipped built-in on
+the Experience window in beta.7.
 
 ### Multi-line regex matching (per-rule opt-in)
 
