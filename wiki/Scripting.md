@@ -27,8 +27,9 @@ Output: `Hello, world!` — `%1` was filled in by the argument you passed.
 ## The vocabulary at a glance
 
 ```
-# A comment is a # followed by whitespace or end-of-line.
-# Lines starting with #command are meta-commands (#echo, #put, #stop, ...).
+# A comment is any script line whose first non-whitespace character is #.
+# That includes lines like "#echo foo" — meta-commands never run as bare
+# script lines; a script runs one by sending it, e.g.:  put #echo done
 
 # Variables:
 #   $name  reads a global / live game-state value
@@ -111,8 +112,8 @@ are rejected.
 editor. Genie resolves which editor to use in this order, falling back to the
 next rung if one isn't set or fails to launch:
 
-1. **Display Settings → Editor Path** — *Edit → Configuration → Display
-   Settings*. A full path, e.g. `C:\Program Files\Notepad++\notepad++.exe`.
+1. **Display Settings → Editor Path** — *Edit → Display Settings*. A full
+   path, e.g. `C:\Program Files\Notepad++\notepad++.exe`.
 2. **`#config editor <path>`** — the Genie 4-parity command, stored in
    `settings.cfg`. Accepts a full path or a bare executable on your `PATH`
    (e.g. `code`, `notepad++.exe`).
@@ -125,10 +126,12 @@ A **Script Bar** above the command bar shows what's running, with stop/edit cont
 
 A few intentional divergences:
 
-- **Comments** — `#` is a comment only when followed by whitespace or end-of-line. `#put north` is a meta-command, not a comment.
 - **`gosub` for reusable routines** — jumping into a nested/indented block isn't reliable; use `gosub` for sub-routines.
 
-And a compatibility note: an undefined `$var` expands to empty (Genie 4-compatible) — it never aborts the script. When it matters, guard explicitly with `if def(name)`.
+And two compatibility notes (both Genie 4 parity, worth spelling out because they're common misconceptions):
+
+- **Comments** — a script line starting with `#` is *always* a comment, including `#put north` (which does nothing). Meta-commands run from a script only by sending them: `put #echo done`.
+- **Undefined `$var` stays literal** — an unresolved `$name` is left in the text verbatim; it never aborts the script and never silently expands to empty. When it matters, guard explicitly with `if def(name)`.
 
 ## Example scripts to study
 

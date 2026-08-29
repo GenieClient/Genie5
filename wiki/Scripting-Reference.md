@@ -42,7 +42,7 @@ When a script loads, it's transformed in a few passes: `include foo` is expanded
 
 | Statement | Notes |
 | --- | --- |
-| `put text` / `send text` | Send a command to the server. `;`-chained commands drain one per tick. `send` (unlike `put`) additionally parses an optional leading numeric delay, and a leading `-` on the command is a "fire eagerly" marker (dash stripped, send-queue wait bypassed). `put` sends its text as-is. |
+| `put text` / `send text` | Send a command to the server. `;`-chained commands drain one per tick. A leading `-` on a command segment (`-cast`, `-0.05 cast`) is Genie 4's **quick-send** form — a positive, roundtime-gated pause before the send (applies to `put`, `send`, and `#send` alike). `send` additionally parses an optional leading numeric delay. |
 | `put #cmd` | A meta-command (`#var`, `#echo`, …) — handled by Genie, not sent to the server. |
 | `#send N cmd` / `#send clear` | Queue `cmd` to fire in N seconds; `clear` drops any pending queued sends. Works typed at the command bar or from a script via `put #send …`. |
 | `put .script args` | Launch `script.cmd` as a sub-script (doesn't consume type-ahead). |
@@ -88,6 +88,8 @@ Regex captures from `matchre` / `waitforre` / actions land in the current `$0..$
 | `action body when pattern` / `whenre pattern` | Register a reaction; on a matching line, run `body` (captures land in a pushed `$`-frame). |
 | `action body when eval expr` | Fires on the rising edge of `expr` becoming true. |
 | `action (label) on` / `off` / `remove`; `action on` / `off` / `clear` | Enable/disable/drop actions by label or globally. |
+
+A `goto` run from an action body redirects the whole script, Genie 4 style — it abandons whatever the script is blocked on (`pause`, `matchwait`), clears the armed match patterns, and resumes at the target label. (A normal in-line `goto` clears nothing — the register-matches-then-goto-to-a-shared-`matchwait` idiom depends on that asymmetry.)
 
 Text you **send to the game** (typed or scripted) also runs through actions and triggers, Genie 4 style (`#config triggeroninput`, default on) — this is how menu scripts capture typed input with a pattern like `when ~(.*)` and a `~value` convention. Pair it with `#config mycommandchar ~` (Genie 4's parse-but-don't-send prefix, default `/`) and the `~value` reply fires the action **without reaching the game**, so the server never answers "Please rephrase that command."
 
@@ -163,14 +165,13 @@ Commands you `put` to the game contribute to an in-flight counter that's decreme
 ## Diagnostics
 
 - **Per-script tracing** — `debug 5` traces a script's reactions; `debug 10` traces every line. Output goes to the echo channel, and each running-script chip on the Script Bar shows the script's live trace level (`dbg:N`).
-- **Scripts panel** — script output (`[script]`, `[dbg:N]`, in-script `#echo`) is forked to its own panel with separate scrollback.
+- **Script Manager** — script output (`[script]`, `[dbg:N]`, in-script `#echo`) is forked to the Script Manager's log view (script library + running-script list + output log), toggled from the **Scripts** menu.
 
 ## Differences from Genie 4
 
 - **`gosub` for reusable routines** — jumping into a nested/indented label isn't reliable.
-- **Comment rule** — `#` is a comment only before whitespace/end-of-line; `#put north` is a meta-command.
 
-Compatibility notes: an undefined `$var` expands to empty (Genie 4-compatible) — it never aborts the script; guard explicitly with `if def(name)` when it matters. Scripts live in one shared `Scripts/` folder at the data root, used by every character (see [Application Folders](Application-Folders)).
+Compatibility notes (all Genie 4 parity): a script line starting with `#` is *always* a comment — `#put north` does nothing; meta-commands run from a script only via `put #cmd`. An undefined `$var` is left **literal** in the text (never aborts the script, never expands to empty); guard explicitly with `if def(name)` when it matters. Scripts live in one shared `Scripts/` folder at the data root, used by every character (see [Application Folders](Application-Folders)).
 
 ## Related
 

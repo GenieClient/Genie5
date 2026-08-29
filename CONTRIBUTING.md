@@ -56,9 +56,9 @@ Genie5/
 └── .github/workflows/      # CI / release pipelines
 ```
 
-### Running the test harness
+### Running the Console
 
-The `Genie.Core` test harness exposes several useful dev modes — see `src/Genie.Core/TestHarness.cs` for the full list, but quick highlights:
+The `Genie.Core` Console (the dev-only CLI harness) exposes several useful dev modes — see `src/Genie.Core/TestHarness.cs` for the full list, but quick highlights:
 
 ```sh
 # Live session, capture raw XML to test_results/raw_session_*.xml
@@ -77,7 +77,7 @@ dotnet run --project src/Genie.Core -- FE_DIFF <file-a> <file-b>
 dotnet run --project src/Genie.Core -- VERBS
 ```
 
-Test-harness output lands in `test_results/`. That directory is gitignored — your captures stay local.
+Console output lands in `test_results/`. That directory is gitignored — your captures stay local.
 
 ## Code style
 
@@ -136,11 +136,13 @@ tour.
 
 ### Where scripts live
 
-Per-character profile dir at `{AppData}/Genie5/Profiles/{Character}-{Account}/Scripts/`,
-or the shared `{AppData}/Genie5/Scripts/` if you haven't logged in yet.
-On Windows that's `%APPDATA%\Genie5\…`; on macOS it's `~/Library/Application Support/Genie5/…`;
-on Linux it's `~/.local/share/Genie5/…`. Drop `.cmd` files there, no
-restart needed.
+All scripts live in a single shared folder at the data root:
+`{AppData}/Genie5/Scripts/`. On Windows that's `%APPDATA%\Genie5\Scripts\`;
+on macOS it's `~/Library/Application Support/Genie5/Scripts/`; on Linux
+it's `~/.local/share/Genie5/Scripts/`. Drop `.cmd` files there, no
+restart needed. (Scripts are deliberately *not* per-character — what's
+per-character is rule files and saved variables, under
+`Profiles/{Character}-{Account}/`.)
 
 ### Hello world
 
@@ -161,17 +163,19 @@ Output: `Hello, world!`.
 ### The vocabulary at a glance
 
 ```
-# This is a comment (a # followed by whitespace or end-of-line).
-# Lines starting with #command are meta-commands (e.g. #echo, #put, #stop).
+# This is a comment. Any script line whose first non-whitespace
+# character is # is ALWAYS a comment — including lines like "#echo foo".
+# Meta-commands never run as bare script lines; a script runs one by
+# sending it to the command line, e.g.:  put #echo done
 
 # Variables: $name is read from globals (live game state + #var values).
 #            %1, %2, ... are script arguments.
-#            Set a local: var foo = bar
-#            Read it back: echo $foo
+#            Set a local: var foo bar
+#            Read it back: echo %foo
 
 # Send a command to the game:
 put look
-#put north                    # synonym; same thing
+put north
 
 # Wait for game text matching a label / regex:
 match RoundtimeEnd You take time to focus your mind.
@@ -180,13 +184,12 @@ matchwait
 # Or block on a substring:
 waitfor You can move again
 
-# Pause for a number of seconds:
+# Pause for a number of seconds (pure timer, default 1):
 pause 2.5
-waitpause                     # sleep until current roundtime expires
 
 # Conditionals on live game state:
-if_health < 50 then put cast 1101
-if_stunned then echo I'm stunned, doing nothing
+if $health < 50 then put cast 1101
+if $stunned = 1 then echo I'm stunned, doing nothing
 if def(myAlias) then echo Have a named alias
 
 # Loops via labels + goto:
@@ -200,9 +203,12 @@ LOOP:
 
 Scripts are RT-aware: by default a script call to `put` while you're in
 roundtime queues, retries, and respects type-ahead budget. You don't
-need to write `waitpause; put north` — the engine handles it. Use
-`waitpause` explicitly when you need to *gate* on RT expiry before
-proceeding past the line (e.g., before computing a derived value).
+need to guard every `put` yourself — the engine handles it. When you do
+need to explicitly wait out roundtime before proceeding past a line
+(e.g., before computing a derived value), use the Genie 4 idiom
+`if ($roundtime > 0) then pause $roundtime`. Note that `waitpause` is a
+plain alias of `pause` (a pure timer, one second by default) — it does
+**not** wait for roundtime.
 
 ### Game-state variables
 
@@ -211,12 +217,12 @@ Every game-state field is exposed as a `$variable`. Common ones:
 | Variable | What it holds |
 |---|---|
 | `$health`, `$mana`, `$spirit`, `$concentration`, `$fatigue` | Current vital %s (0-100) |
-| `$roomtitle`, `$roomdesc`, `$compass` | Current room info |
-| `$righthand`, `$lefthand` | Held item nouns |
+| `$roomname`, `$roomdesc`, `$roomexits` | Current room info (plus per-direction booleans like `$north`, `$out`) |
+| `$righthand`, `$lefthand` | Held item display names ("razor-edged scimitar"); the bare nouns are `$righthandnoun` / `$lefthandnoun` |
 | `$preparedspell` | Spell name + slots (or empty) |
-| `$stance` | `off` / `adv` / `fwd` / `neu` / `grd` / `def` |
+| `$stance` | Full lowercase words: `offensive` / `neutral` / `defensive` / … |
 | `$kneeling`, `$prone`, `$sitting`, `$stunned`, `$webbed`, etc. | Status booleans |
-| `$char` | Your character's first name |
+| `$charactername` | Your character's first name |
 
 Type `#vars` at the command bar to see the full list at any time.
 
@@ -224,7 +230,8 @@ Type `#vars` at the command bar to see the full list at any time.
 
 A few intentional divergences and gotchas:
 
-- **Per-character profile dirs**: rule files (`.cfg`) and saved variables
+- **Per-character profile dirs**: rule files (`.json`, with Genie 4-style
+  `.cfg` twins kept in sync) and saved variables
   live per character under `Profiles/{Character}-{Account}/`, so two
   characters keep separate highlights, triggers, and `#var save` state.
   `Scripts/` is a single shared folder at the data root — scripts are not
@@ -232,11 +239,14 @@ A few intentional divergences and gotchas:
 - **No `goto` into a deeper-indented label**: while we accept Genie 4's
   syntax, jumping into a nested block isn't reliable. Use `gosub` for
   reusable sub-routines.
-- **Comments**: `#` only counts as a comment when followed by whitespace
-  or end-of-line. `#put north` is a meta-command, not a comment.
-- **Undefined `$var` aborts the script**: rather than expanding to empty
-  silently (a common source of bugs in Genie 4), Genie 5 aborts the
-  script with a clear reason. Use `if def(name)` to test first.
+- **Comments** (a gotcha, not a divergence): a script line starting with
+  `#` is *always* a comment, exactly as in Genie 4 — `#put north` in a
+  script does nothing. Meta-commands run from a script only by sending
+  them (`put #echo done`).
+- **Undefined `$var` stays literal** (also Genie 4 parity): an
+  unresolved `$name` is left in the text verbatim — it never aborts the
+  script and never silently expands to empty. Use `if def(name)` to
+  test before relying on one.
 
 ### Example scripts to study
 
