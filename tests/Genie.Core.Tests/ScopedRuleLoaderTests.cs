@@ -99,11 +99,25 @@ public class ScopedRuleLoaderTests
         Assert.Equal(RuleScope.Character, result[0].Scope);
     }
 
+    // Built at runtime, not InlineData: drive-letter literals don't normalize
+    // on Linux (broke ubuntu CI), and the case-folding expectation is
+    // per-platform — Windows/macOS filesystems fold case, Linux doesn't.
+    public static IEnumerable<object[]> SameDirectoryCases()
+    {
+        var root = OperatingSystem.IsWindows() ? @"C:\" : "/";
+        var cfg  = Path.Combine(root, "cfg");
+        var foldsCase = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
+
+        yield return new object[] { Path.Combine(cfg, "Profiles", "Ren-MONIL"), cfg, false };
+        yield return new object[] { cfg, cfg, true };
+        yield return new object[] { cfg + Path.DirectorySeparatorChar, cfg, true };            // trailing sep
+        yield return new object[] { cfg, Path.Combine(root, "CFG"), foldsCase };               // case
+        yield return new object[]
+            { Path.Combine(cfg, "Profiles", "..") + Path.DirectorySeparatorChar, cfg, true };  // normalized
+    }
+
     [Theory]
-    [InlineData(@"C:\cfg\Profiles\Ren-MONIL", @"C:\cfg", false)]
-    [InlineData(@"C:\cfg", @"C:\cfg", true)]
-    [InlineData(@"C:\cfg\", @"C:\CFG", true)]                 // trailing sep + case
-    [InlineData(@"C:\cfg\Profiles\..\", @"C:\cfg", true)]     // normalized
+    [MemberData(nameof(SameDirectoryCases))]
     public void SameDirectory_NormalizesBeforeComparing(string a, string b, bool same)
         => Assert.Equal(same, ScopedRuleLoader.SameDirectory(a, b));
 

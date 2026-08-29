@@ -48,16 +48,23 @@ public static class ScopedRuleLoader
     {
         if (string.IsNullOrWhiteSpace(profileDir) || string.IsNullOrWhiteSpace(globalDir))
             return true;
+
+        // Case-folding must match the platform's filesystem semantics: on
+        // Linux /cfg and /CFG are two different directories, and treating
+        // them as one would silently drop the profile layer.
+        var cmp = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
         try
         {
             return string.Equals(
                 Path.GetFullPath(profileDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
                 Path.GetFullPath(globalDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
-                StringComparison.OrdinalIgnoreCase);
+                cmp);
         }
         catch
         {
-            return string.Equals(profileDir, globalDir, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(profileDir, globalDir, cmp);
         }
     }
 
