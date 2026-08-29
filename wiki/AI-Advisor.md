@@ -18,7 +18,7 @@ The single most important rule: the AI **must not drive the game**. It does not 
 
 ## How it's isolated
 
-The AI path hangs off a **separate, toggleable branch** of the raw game stream. It can be turned on or off without touching the parser, and a slow response can never block the game loop — analysis runs fully asynchronously. There is currently **no way to enable it at all** — no setting, checkbox, or `#config` key exposes it in any build, so the rolling context buffer never feeds an external service. When it does ship, enabling it will be an explicit opt-in behind a plain-language disclosure.
+The AI path hangs off a **separate, toggleable branch** of the raw game stream. It can be turned on or off without touching the parser, and a slow response can never block the game loop — analysis runs fully asynchronously. There is currently **no way to enable it in the app** — no setting, checkbox, or `#config` key exposes it in any released build, so the rolling context buffer never feeds an external service. (Developers building from source can exercise the analysis pipe from the Console, which is a separate, never-shipped tool.) When it does ship, enabling it will be an explicit opt-in behind a plain-language disclosure.
 
 ```
 raw game stream

@@ -123,7 +123,8 @@ that replaces user input.
 
 - **Click-to-walk** via the AutoMapper: a click is direct user intent;
   the step-by-step walker is *responsive* to that intent. Esc / typed
-  commands / window unfocus all interrupt cleanly.
+  commands / disconnect all cancel cleanly (and the separate opt-in
+  unfocus backstop, §3 above, pauses with a Resume button).
 - **`.cmd` scripts:** the script engine is faithful to Genie 4's
   interpreter. Scripts that worked in Genie 4 work here. Scripts you
   consciously start are responsive to your intent; scripts that auto-start

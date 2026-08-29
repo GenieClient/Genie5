@@ -27,7 +27,7 @@ Each plugin loads in its own isolated assembly context, so it can be enabled, di
 
 ## The Experience tracker — the contract in action
 
-The **Experience** tracker (a port of Genie 4's `EXPTracker`, now a built-in Core extension) shows what the contract can do. It watches the live experience stream and your `exp` output, tracks each skill's rank and mindstate, and renders a formatted panel — sortable, grouped by category (Armor / Weapon / Magic / Survival / Lore), with a "Learning: N" counter, session gain, and TDPs. It exercises the whole plugin-shaped surface: reading the raw stream, reading parsed text, and emitting to its own window. The other four built-in trackers (Spell Timer, Time Tracker, Circle Calculator, Inventory View) are built the same way.
+The **Experience** tracker (a port of Genie 4's `EXPTracker`, now a built-in Core extension) shows what the contract can do. It watches the live experience stream and your `exp` output, tracks each skill's rank and mindstate, and renders a formatted panel — sortable, grouped by category (Armor / Weapon / Magic / Survival / Lore), with a "Learning Skills: N" counter, session gain, and TDPs. It exercises the whole plugin-shaped surface: reading the raw stream, reading parsed text, and emitting to its own window. The other four built-in trackers (Spell Timer, Time Tracker, Circle Calculator, Inventory View) are built the same way.
 
 ## How plugins work (for developers)
 

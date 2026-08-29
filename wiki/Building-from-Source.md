@@ -21,21 +21,26 @@ dotnet run --project src/Genie.App
 ```
 Genie5/
 ├── src/
-│   ├── Genie.Core/         # Pure class library — no UI deps
-│   │   ├── Connection/     # GameConnection, SgeAuthClient
-│   │   ├── Parser/         # DrXmlParser
-│   │   ├── GameState/      # Live game-state engine
-│   │   ├── Scripting/      # .cmd script interpreter
+│   ├── Genie.Core/         # Pure class library — no UI deps.
+│   │   │                   # The original pipeline files live flat at the root:
+│   │   │                   # GameConnection.cs, SgeAuthClient.cs, DrXmlParser.cs,
+│   │   │                   # GameState.cs, GameStateEngine.cs, AiContextBuffer.cs
+│   │   ├── Scripting/      # .cmd script interpreter + Jint .js runtime
+│   │   ├── Commanding/     # #commands (CommandEngine)
 │   │   ├── Triggers/  Highlights/  …   # Rule engines
 │   │   ├── Mapper/         # Zone map + pathfinding
 │   │   ├── Profiles/       # Per-character encrypted credential store
-│   │   ├── Update/         # Integrated updater (Core/Maps/Plugins)
-│   │   └── AI/             # AI context buffer (off by default)
-│   └── Genie.App/          # Avalonia GUI host (Views / ViewModels / Controls)
+│   │   ├── Update/         # Integrated updater (Core/Maps/Plugins/Scripts)
+│   │   └── …               # Config, Extensions, Plugins, Persistence, and more
+│   ├── Genie.App/          # Avalonia GUI host (Views / ViewModels / Controls)
+│   └── Genie.Plugins.Abstractions/  # Public plugin contract (IGeniePlugin, IPluginHost)
+├── tests/                  # Genie.Core.Tests + Genie.App.Tests (dotnet test)
 ├── docs/                   # Developer docs (architecture, protocol, scripting, mapper)
 ├── wiki/                   # This wiki's source (end-user docs)
 └── .github/workflows/      # CI / release pipelines
 ```
+
+CI builds `Genie.slnx` and runs `dotnet test` over both test projects on every platform leg — run the same locally before a PR.
 
 See [Architecture](Architecture) for why `Genie.Core` is kept UI-free.
 

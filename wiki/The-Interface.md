@@ -24,21 +24,22 @@ Out of the box you get a three-column arrangement:
 | --- | --- |
 | **Game** | The main scrolling game text. Supports clickable links and per-tag visibility (below). |
 | **Room** | Current room title, description, and obvious paths — split out from the game text so it's always glanceable. Creature names honor MonsterBold coloring. |
-| **Mobs / Players** | The creatures and the other players in the room, as their own glanceable lists. |
-| **Inventory / Backpack** | What you're carrying. |
+| **Mobs**, **Players** | The creatures and the other players in the room, as two separate glanceable lists. |
+| **Inventory** | What you're carrying. |
+| **Vitals** | Health / mana / spirit / fatigue / concentration bars as a dockable panel (the same numbers as the bottom vitals strip). |
 | **Inventory View** | A searchable catalog of everything your characters own — person, vault, deed register, home, and Trader storage — with item weight/size columns and a player-shop price search. See [the Inventory View window](#the-inventory-view-window) below. |
 | **Mapper** | The zone map with your current room highlighted; click a room to walk there. Starts **floating** in its own window; dock it by dragging. A top-level **Maps** menu collects the mapper actions — show/float the Mapper, AutoMapper settings, map updates, and the cross-zone connection editor. See [The Mapper](Mapper). |
-| **Experience** | Live skill learning states. A **Density** slider on the panel condenses each skill line to taste (**Full → No count → Numbers only → Short names → Brief**); the same setting is scriptable as `#config experiencedensity`. A **Sort** dropdown picks the classic EXPTracker orders — A to Z, Left to Right (Armor / Weapons / Magic / Survival / Lore, reorderable via `#config experiencesortorder`), or by learning rate (`#config experiencesort`). **Echo** flushes each pulse to the game window as `Learned: Skill(+2)` / `Pulsed: Skill(-1)` lines that also feed triggers (`#config experienceecho`), and **Rested** shows stored / usable / cycle-refresh rested EXP under the summary (`#config experiencerested` — the `$RestedEXP.*` globals populate either way). |
+| **Experience** | Live skill learning states. A **Density** slider on the panel condenses each skill line to taste (**Full → No count → Numbers only → Short names → Brief**); the same setting is scriptable as `#config experiencedensity`. A **Sort** dropdown picks the classic EXPTracker orders — A to Z, Left to Right (Armor / Weapons / Magic / Survival / Lore, reorderable via `#config experiencesortorder`), or by learning rate in either direction (`#config experiencesort`). **Echo** flushes each pulse to the game window as `Learned: Skill(+2)` / `Pulsed: Skill(-1)` lines (`#config experienceecho` — display-only; to also feed those lines to your triggers/actions, opt in with `#config experienceechoparse`), and **Rested** shows stored / usable / cycle-refresh rested EXP under the summary (`#config experiencerested` — the `$RestedEXP.*` globals populate either way). |
 | **Active Spells** | Your running spell effects with time remaining. |
 | **Time Tracker** | Elanthian date, moon/sun rise-set countdowns, and the observed sky, tracked by the built-in Time Tracker (`/tt help`). |
 | **Analytics** | Charts over your experience history — session gain bars, a long-horizon rank curve per skill, and session-vs-session comparison. See [the Analytics panel](#the-analytics-panel) below. |
-| **Scripts** | A separate scrollback for script output (`[script]` lines, `#echo`, debug traces), so a busy hunt script doesn't clutter the main window. |
+| **Script Manager** | Your script library, the running-script list with pause/abort controls, and a separate scrollback for script output (`[script]` lines, `#echo`, debug traces) — so a busy hunt script doesn't clutter the main window. Toggled from the top-level **Scripts** menu (not Window), which also has List / Pause All / Resume All / Abort All and external-editor entries. |
 | **Injuries** | A body silhouette showing per-region wounds and scars from the game's injury data, colour-coded by severity, with a text list alongside. An opt-in auto-refresh (`#config injuriespoll N`) can poll `health` every *N* seconds to refine the nervous-system reading while the panel is open. |
 | **Portrait** | DragonRealms room/scene artwork for the current area (`#config showimages`) — the panel Genie 4 called Portrait. |
 | **Raw XML** | The unparsed server stream, for debugging and parser spelunking. |
-| **Stream tabs** | DragonRealms routes certain text to named streams. Genie surfaces **Talk**, **Whispers**, **Thoughts**, **Combat**, **Logons**, **Familiar**, **Deaths**, **Assess**, **Atmospherics**, **Log**, and **Item Log** as their own windows so they each keep a clean scrollback. (Speech and whispers also appear in the main window — DragonRealms sends them to both by design.) |
+| **Stream tabs** | DragonRealms routes certain text to named streams. Genie surfaces **Talk**, **Whispers**, **Thoughts**, **OOC**, **Combat**, **Logons**, **Familiar**, **Deaths**, **Assess**, **Atmospherics**, **Log**, and **Item Log** as their own windows so they each keep a clean scrollback. (Speech and whispers also appear in the main window — DragonRealms sends them to both by design.) |
 
-Toggle any panel from the **Window** menu. Drag a panel's tab to re-dock it; drag it out to **float** it in its own window, and drag it back to re-dock. A floated window's title-bar menu has a **Hide Title Bar** option for a leaner look. For a picture-by-picture guide to the dock targets — docking **as a tab** vs. splitting off a **new section** — see [Docking Windows](Docking-Windows).
+Toggle panels from the **Window** menu (two exceptions: the Mapper toggle lives on the **Maps** menu, the Script Manager on the **Scripts** menu). Drag a panel's tab to re-dock it; drag it out to **float** it in its own window, and drag it back to re-dock. A floated window's title-bar menu has a **Hide Title Bar** option for a leaner look. When a section holds more tabs than fit, **◀ ▶ overflow arrows** appear on the tab strip, and activating an off-screen tab scrolls it into view. For a picture-by-picture guide to the dock targets — docking **as a tab** vs. splitting off a **new section** — see [Docking Windows](Docking-Windows).
 
 ![The Experience panel shown five times, once per Density stop from Brief at the top to Full at the bottom](images/interface-experience-density.png)
 
@@ -92,7 +93,7 @@ Not every tool belongs in the layout. **Alterations** is its own top-level menu 
 - **Icon Bar** — Genie 4's status strip: colour-coded chips below the vitals bar for your posture (dead / standing / kneeling / sitting / prone) plus **STUNNED**, **BLEEDING**, **HIDDEN**, **INVISIBLE**, **WEBBED**, **JOINED** — and two Genie 4 never had: **POISONED** and **DISEASED**. It dims while disconnected. Hide it via **Layout → Icon Bar**.
 - **Hands strip** — what's in your **left** and **right** hands, your **prepared spell** (with a cast-time bar), and your **stance**. Its position (top or bottom) is set via **Layout → Hands Strip Position**, and **Layout → Enhanced Hands Strip** adds icon widgets (compass rose, posture sprite, status-effect strip).
 - **Command bar** — where you type. A **roundtime** indicator shows here (or on the hands strip — pick via **Layout → Roundtime Position**) so you can see when you can act again.
-- **Status slots** — scripts can write a Genie 4-style ten-slot status row just above the vitals bar with `#statusbar [N] text` (`#statusbar clearall` empties it); it stays hidden while every slot is empty.
+- **Status slots** — scripts can write a Genie 4-style ten-slot status row just below the vitals bar (between it and the Icon Bar) with `#statusbar [N] text` (`#statusbar clearall` empties it); it stays hidden while every slot is empty.
 
 ## Notices
 
@@ -151,7 +152,7 @@ Genie ships **seven built-in themes** under **Edit → Theme** — **Dark** (the
 
 ## Display settings
 
-**Edit → Display Settings…** controls fonts, colors, the roundtime indicator's position, the hands-strip position, and the external editor used by `#edit`.
+**Edit → Display Settings…** controls fonts, game-text and echo colors, theme selection, and the external editor used by `#edit`. (The roundtime indicator's position and the hands-strip position are set from the **Layout** menu.)
 
 A few more odds and ends:
 

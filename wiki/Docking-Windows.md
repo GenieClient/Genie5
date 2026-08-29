@@ -22,7 +22,7 @@ Drop a window on the **▣ centre** target and it joins that pane's **tab group*
 
 ![Before and after diagram of tab docking — the Thoughts window is dragged onto the stream pane's centre target, then appears as a fourth tab beside Logons, Talk, and Whispers](images/docking-as-tab.png)
 
-Tab docking is the space-saver: use it for windows you check on demand rather than watch constantly. One thing to know: a background tab quietly collects its text until you click it — if you'd rather never miss a stream, give it its own section instead, or turn on that stream's *"Also show this stream in the Main window"* toggle (Configuration → **Layout** tab).
+Tab docking is the space-saver: use it for windows you check on demand rather than watch constantly. When a pane holds more tabs than fit its width, **◀ ▶ overflow arrows** appear on the tab strip to scroll through them, and activating an off-screen tab (from the Window menu or by keyboard) scrolls it into view automatically. One thing to know: a background tab quietly collects its text until you click it — if you'd rather never miss a stream, give it its own section instead, or turn on that stream's *"Also show this stream in the Main window"* toggle (Configuration → **Layout** tab).
 
 ## Docking as a new section
 

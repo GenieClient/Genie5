@@ -12,7 +12,7 @@ Everything is **opt-in**: nothing is spoken until you turn it on.
 ```
 #tts install          install the default voice (a one-time ~60 MB download)
 #speak hello there     read a line aloud
-#tts read on           auto-read whispers, talk, thoughts, and deaths
+#tts read on           auto-read whispers, talk, thoughts, and death
 ```
 
 ## Installing voices
@@ -58,11 +58,13 @@ Turn on per-stream read-aloud to have Genie announce game text automatically.
 | `#tts mute <stream>` | Stop reading a stream |
 | `#tts priority <stream> <low\|normal\|high\|default>` | Set a stream's speaking priority — high barges in, low yields; `default` removes the override. Bare `#tts priority` lists them |
 
-Default streams are **whispers, talk, thoughts, deaths** — the "someone's
-talking to me / something important happened" set. The chatty streams (combat,
-atmospherics) and `main` are left off by default; add them if you want them.
+Default streams are **whispers, talk, thoughts, death** — the "someone's
+talking to me / something important happened" set. (The stream *id* is
+`death`, singular, even though the dock window is labeled Deaths.) The chatty
+streams (combat, atmospherics) and `main` are left off by default; add them if
+you want them.
 
-Urgent lines (whispers, deaths) are spoken first and can interrupt ongoing
+Urgent lines (whispers, death) are spoken first and can interrupt ongoing
 chatter, so you never miss a tell behind a wall of room text.
 
 ## Speaking alerts (triggers & highlights)

@@ -24,7 +24,7 @@ If a zone file ever gets corrupted by bad edits, delete it from the Maps folder 
 
 ### Auto-update on launch
 
-The `updatemapperscripts` setting (see `#config` / **Configuration…**) controls whether helper map scripts are refreshed as part of updates. Repo URLs are configurable via the `maprepo` and `scriptrepo` settings if you point Genie at a fork or mirror. **Help → Update Settings…** decides whether the silent startup check covers Maps and Scripts at all, and whether found updates install by themselves.
+The `updatemapperscripts` setting (see `#config` / **Configuration…**) controls whether helper map scripts are refreshed as part of updates. To point Genie at a fork or mirror, edit the subscription rows in the **Updates** dialog (stored in `update-feeds.json` in your Config folder — each row is an owner/repo pair). **Help → Update Settings…** decides whether the silent startup check covers Maps and Scripts at all, and whether found updates install by themselves.
 
 ## Updating scripts from community repositories
 
