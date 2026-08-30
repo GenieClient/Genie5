@@ -69,6 +69,24 @@ public class StreamTool : Tool, IWindowMenuHost, IFindHost, ITextEditorHost
             ApplySettings(settings);
             settings.Changed += () => ApplySettings(settings);
         }
+
+        // Unread-activity flash: a line arriving while this tab sits behind
+        // another one raises IsModified (blinking tab title) until viewed.
+        // Trim/Clear (Remove/Reset) don't count as activity.
+        Buffer.Lines.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add)
+                TabActivity.NotifyContentAdded(this);
+        };
+    }
+
+    /// <summary>Dock calls this on every activation path (tab click, window
+    /// cycling, SetActiveDockable) — the tab is now in front, so the unread
+    /// flash stops.</summary>
+    public override void OnSelected()
+    {
+        IsModified = false;
+        base.OnSelected();
     }
 
     private void ApplySettings(WindowSettings s)

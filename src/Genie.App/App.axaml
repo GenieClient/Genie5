@@ -47,13 +47,39 @@
          TextEditor, so these styles match no control. -->
     <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml"/>
 
-    <!-- Tool header: just the title -->
+    <!-- Tool header: the title, plus the unread-activity flash. IsModified is
+         Dock's per-dockable dirty flag, repurposed as "text arrived while this
+         tab was behind another" (set in TabActivity.NotifyContentAdded, cleared
+         in the tools' OnSelected overrides). It lives on core:IDockable itself,
+         so the compiled binding stays typed and tools that never set it are
+         silent. The .unread class drives the blink style below. -->
     <Style Selector="ToolControl">
       <Setter Property="HeaderTemplate">
         <DataTemplate DataType="core:IDockable">
-          <TextBlock Text="{Binding Title}" Padding="2"/>
+          <TextBlock Text="{Binding Title}" Padding="2"
+                     Classes.unread="{Binding IsModified}"/>
         </DataTemplate>
       </Setter>
+    </Style>
+
+    <!-- Unread-activity blink for background tabs: pulse the tab title in the
+         attention colour until the tab is brought to front. Scoped to tab-strip
+         items so a stray .unread class elsewhere can't start animating. -->
+    <Style Selector="ToolTabStripItem TextBlock.unread">
+      <Setter Property="Foreground" Value="{DynamicResource Theme.Warning}"/>
+      <Style.Animations>
+        <Animation Duration="0:0:1" IterationCount="Infinite">
+          <KeyFrame Cue="0%">
+            <Setter Property="Opacity" Value="1.0"/>
+          </KeyFrame>
+          <KeyFrame Cue="50%">
+            <Setter Property="Opacity" Value="0.25"/>
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="Opacity" Value="1.0"/>
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
     </Style>
 
     <!-- Document header: title -->

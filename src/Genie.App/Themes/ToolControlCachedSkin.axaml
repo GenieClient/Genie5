@@ -56,17 +56,24 @@
       </DataTemplate>
     </Setter>
 
+    <!-- NOTE: App.axaml's ToolControl style overrides this HeaderTemplate
+         (app-level Style priority outranks ControlTheme setters — same
+         mechanism the tab-overflow fix there relies on). Kept in sync with it,
+         including the unread-activity flash class, in case the app style is
+         ever removed. -->
     <Setter Property="HeaderTemplate">
       <DataTemplate DataType="core:IDockable">
-        <TextBlock Text="{Binding Title}" Padding="{DynamicResource DockHeaderContentPadding}" />
+        <TextBlock Text="{Binding Title}" Padding="{DynamicResource DockHeaderContentPadding}"
+                   Classes.unread="{Binding IsModified}" />
       </DataTemplate>
     </Setter>
 
+    <!-- IsModified is repurposed as the unread-activity flag (TabActivity):
+         the blinking title IS the indicator, so the stock "*" dirty marker
+         next to it is suppressed. -->
     <Setter Property="ModifiedTemplate">
       <DataTemplate DataType="core:IDockable">
-        <TextBlock VerticalAlignment="Center"
-                   Text="*"
-                   Margin="{DynamicResource DockModifiedIndicatorMargin}" />
+        <Panel />
       </DataTemplate>
     </Setter>
 

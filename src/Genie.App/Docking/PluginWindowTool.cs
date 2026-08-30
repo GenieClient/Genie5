@@ -58,6 +58,25 @@ public class PluginWindowTool : Tool, IWindowMenuHost, IFindHost
             ApplyFonts(settings);
             settings.Changed += () => ApplyFonts(settings);
         }
+
+        // Unread-activity flash: plugin output landing while this tab sits
+        // behind another one raises IsModified (blinking tab title) until
+        // viewed. Add only — SetContent's Clear+refill still counts via its
+        // Add events; plain Clear does not.
+        vm.Lines.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add)
+                TabActivity.NotifyContentAdded(this);
+        };
+    }
+
+    /// <summary>Dock calls this on every activation path (tab click, window
+    /// cycling, SetActiveDockable) — the tab is now in front, so the unread
+    /// flash stops.</summary>
+    public override void OnSelected()
+    {
+        IsModified = false;
+        base.OnSelected();
     }
 
     private void ApplyFonts(Genie.Core.Layout.WindowSettings s)
