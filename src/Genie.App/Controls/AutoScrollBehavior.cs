@@ -185,10 +185,15 @@ public sealed class AutoScrollState : ReactiveObject
         if (_sv.Content is not ItemsControl ic) return;
 
         // First remaining container = smallest stale Y among survivors.
+        // A line ADDED this same frame already has a realized container but no
+        // layout yet — default (0,0,0,0) Bounds. Its Y=0 is not a position, and
+        // AddLine always trims in the same call as the Add, so without this
+        // skip the zero poisons the min-scan and the compensation never fires.
         var firstY = double.MaxValue;
         foreach (var c in ic.GetRealizedContainers())
         {
             if (ContainsRef(removedItems, c.DataContext)) continue;   // being trimmed
+            if (c.Bounds.Height <= 0) continue;                       // not yet laid out
             if (c.Bounds.Y < firstY) firstY = c.Bounds.Y;
         }
         if (firstY == double.MaxValue) return;   // nothing left to hold against
