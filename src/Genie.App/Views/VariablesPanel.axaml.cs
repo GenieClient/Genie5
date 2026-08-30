@@ -31,15 +31,21 @@ public partial class VariablesPanel : UserControl
     private void Refresh()
     {
         if (_store is null) return;
-        var keep = (ItemsList.SelectedItem as VariableRow)?.Name;
+        var keep = ItemsList.SelectedItems?.Cast<VariableRow>()
+            .Select(r => r.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
         ItemsList.ItemsSource = _store.GetAll().Values
-            .OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
             .Select(v => new VariableRow(v.Name, v.Value))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Name, r.Value))
+            .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        if (keep is not null)
-            ItemsList.SelectedItem = ((IEnumerable<VariableRow>)ItemsList.ItemsSource)
-                .FirstOrDefault(r => r.Name == keep);
+        // Restore the whole multi-selection, not just the focused row — this
+        // grid is Extended-mode with a multi-row Copy (#97), and Refresh now
+        // also runs on every Find keystroke.
+        if (ItemsList.SelectedItems is { } selection)
+            foreach (var row in (IEnumerable<VariableRow>)ItemsList.ItemsSource)
+                if (keep.Contains(row.Name))
+                    selection.Add(row);
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)

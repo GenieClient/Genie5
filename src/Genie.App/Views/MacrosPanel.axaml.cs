@@ -11,8 +11,9 @@ using Genie.Core.Macros;
 namespace Genie.App.Views;
 
 /// <summary>
-/// Macros editor — keyboard-shortcut → action mapping. Key strings follow the
-/// Avalonia gesture syntax (e.g. <c>F1</c>, <c>Control+F2</c>, <c>Alt+NumPad5</c>).
+/// Macros editor — keyboard-shortcut → action mapping. Key strings use the
+/// Genie 4 vocabulary emitted by <see cref="MacroKeyConverter"/>
+/// (e.g. <c>f1</c>, <c>ctrl+f2</c>, <c>alt+num5</c>).
 /// </summary>
 public partial class MacrosPanel : UserControl
 {

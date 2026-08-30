@@ -1,5 +1,7 @@
+using System;
 using Avalonia;
 using Avalonia.Headless;
+using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Themes.Fluent;
 using Dock.Avalonia.Themes.Fluent;
 using Genie.App.HeadlessTests;
@@ -28,5 +30,16 @@ public class HeadlessApp : Application
     {
         Styles.Add(new FluentTheme());
         Styles.Add(new DockFluentTheme());
+        // App.axaml also pulls in the DataGrid + ColorPicker control themes;
+        // without them the config-panel grids never template and selection
+        // behavior diverges from production.
+        Styles.Add(new StyleInclude(new Uri("avares://Genie.App"))
+        {
+            Source = new Uri("avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml")
+        });
+        Styles.Add(new StyleInclude(new Uri("avares://Genie.App"))
+        {
+            Source = new Uri("avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml")
+        });
     }
 }
