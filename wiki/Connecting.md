@@ -50,7 +50,7 @@ network is blocking the secure port; the connection trace below can confirm it.
 A **profile** is a saved connection so you don't retype next time. Save one from the Connect dialog; it stores the account, game, character, and (optionally) the password.
 
 - **Passwords are encrypted.** If you save a password, it's stored with **AES-256-GCM** using a machine-bound key — never plain text. That protects against casual reading of the file, but it isn't a substitute for OS account security: anyone who can run programs as you on your machine could recover it. If you'd rather not store it, save the profile without a password and type it at connect time.
-- **Per-character settings.** Each character gets its own profile directory (`Profiles/<Character>-<Account>/`) holding that character's aliases, triggers, highlights, and so on. Your combat triggers on one character don't follow you onto a shopping alt. See [Application Folders](Application-Folders) for the layout.
+- **Per-character settings.** Each character gets its own profile directory (`Profiles/<Character>-<Account>/`) holding the rules that belong to that character alone — they **layer over** your shared `Config/` rules, which keep applying underneath. Combat triggers saved to one character don't follow you onto a shopping alt, while shared rules work everywhere. See [Application Folders](Application-Folders) for the layout.
 - **Character-Account naming.** Characters are identified as `Character-Account` (for example `Renucci-MONIL`) so two accounts with a same-named character never collide.
 
 ## Lich proxy mode

@@ -58,7 +58,7 @@ Genie5/
 | Folder | What's in it | When to touch |
 | --- | --- | --- |
 | `Config/` | `settings.cfg` (app settings) and the shared rule files: a `.json` file per rule type (`aliases.json`, `triggers.json`, `highlights.json`, `substitutes.json`, `gags.json`, `macros.json`, `variables.json`, `classes.json`) plus a Genie 4-style `.cfg` twin of each (a plain-text list of the commands that recreate the rules), kept in sync. | Mostly managed via **Edit → Configuration…**. Hand-editable — external edits to the seven rule `.json` files apply **live, without a reconnect** (you'll see a `[config] … reloaded` line); other files load on next launch/connect. |
-| `Profiles/` | One subfolder per character (`<Char>-<Account>/`) holding that character's own copy of the rule files. The first time a character connects, the folder is seeded from your shared `Config/` files, then diverges independently. | Created automatically. Edit the per-character files here (rule `.json` edits hot-reload too), or via the GUI while that character is connected. |
+| `Profiles/` | One subfolder per character (`<Char>-<Account>/`) holding the rules that belong to **that character only**. They **layer over** the shared `Config/` set — the character's rules apply first, and shared rules show through unless the character has overridden them. | Created automatically. Edit the per-character files here (rule `.json` edits hot-reload too), or via the GUI while that character is connected. |
 | `Scripts/` | Your `.cmd` script files, plus any helper scripts you pull from the community repo. | Drop any script here to run it as `.scriptname` (or `put .scriptname`). |
 | `Maps/` | Zone files in Genie 4's XML format (`Map1_Crossing.xml`, …) and `ZoneConnections.xml` (the cross-zone transit graph). | Populated via **File → Import from Genie 4…** or **Maps ▸ Update from Official Repo…**. Jump there via **Maps ▸ Open Maps Folder**. |
 | `Logs/` | When AutoLog is on, each session writes a `<character>_<timestamp>` log of plain in/out text. Toggle it live with the **File → Auto Log** checkbox — it applies mid-session. | Read-only from the app's view. Safe to delete or archive. |
@@ -69,12 +69,12 @@ Genie5/
 
 ## Per-character profiles
 
-Settings split into two tiers:
+Settings come in two **layers**:
 
-- **Shared** (`Config/`) — the baseline, used by sessions without a character (LIST mode, dev replay).
-- **Per-character** (`Profiles/<Char>-<Account>/`) — each character gets its own aliases/triggers/etc., seeded once from the shared baseline. So your combat triggers on one character don't follow you onto a shopping alt.
+- **All characters** (`Config/`) — the shared set, and the one used by sessions without a character (LIST mode, dev replay).
+- **This character** (`Profiles/<Char>-<Account>/`) — rules that belong to one character. At connect, the character's rules load **over** the shared set: they win where the two overlap, and every shared rule the character hasn't overridden still applies. So combat triggers saved to one character don't follow you onto a shopping alt, while the highlights you share stay live everywhere.
 
-The active profile directory is chosen at connect time from the character + account names.
+Every rule editor has a **Scope** field choosing which layer a rule lives in (new rules default to "This character"), and deleting or toggling a shared rule while connected offers a reversible per-character opt-out instead of changing it for everyone. See [Configuration](Configuration#where-rules-are-stored) for the details. The active profile directory is chosen at connect time from the character + account names.
 
 ## Backups, syncing, multiple machines
 
