@@ -89,6 +89,13 @@ jobs:
       - name: Test (Genie.App.Tests)
         run: dotnet test tests/Genie.App.Tests -c Release --nologo -v minimal
 
+      # UI-behavior tests over real Avalonia/Dock control templates via
+      # Avalonia.Headless (#181 float title-bar). A separate project because
+      # booting the headless platform breaks Genie.App.Tests' platform-free
+      # [Fact]s (see that csproj's comment).
+      - name: Test (Genie.App.HeadlessTests)
+        run: dotnet test tests/Genie.App.HeadlessTests -c Release --nologo -v minimal
+
       # The Profiles/ folder was silently shadowed by an over-broad
       # .gitignore rule for five days before another clone surfaced it.
       # Belt-and-braces: assert the source folders we expect to exist

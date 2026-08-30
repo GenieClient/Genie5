@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <!-- Headless Avalonia: runs real control templates (Dock chrome, themes)
+         without a display. Version must track the Avalonia version pinned in
+         Genie.App.csproj. -->
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="11.3.18" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- SEPARATE project from Genie.App.Tests on purpose: booting the headless
+         Avalonia session initializes the platform + dispatcher for the whole
+         process, after which the plain [Fact] tests over view-models (which
+         construct AvaloniaObjects off the UI thread) start throwing thread
+         checks. UI-behavior tests live here behind [AvaloniaFact]; keep
+         platform-free unit tests in Genie.App.Tests. -->
+    <ProjectReference Include="..\..\src\Genie.App\Genie.App.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -69,11 +69,29 @@ public sealed class GenieHostWindow : HostWindow
             FollowMainWindowMinimize();
             // The chrome's template is applied by now, but give the visual
             // tree one more tick before searching it for the button strip.
-            Avalonia.Threading.Dispatcher.UIThread.Post(
-                () => { TryInjectMinimizeButton(); TryAddHideTitleBarToChromeFlyout(); },
-                Avalonia.Threading.DispatcherPriority.Loaded);
+            PostChromeInjection();
         };
-        Closed += (_, _) => { _mainStateSub?.Dispose(); _mainStateSub = null; };
+        Closed += (_, _) =>
+        {
+            _mainStateSub?.Dispose(); _mainStateSub = null;
+            // Don't let the shared-flyout target tracker outlive its window.
+            if (ReferenceEquals(_flyoutSourceWindow, this)) _flyoutSourceWindow = null;
+        };
+    }
+
+    /// <summary>Run the chrome injections (minimize button + flyout item) once the
+    /// visual tree can serve them. The chrome materializes on a layout pass that
+    /// can land AFTER the Opened-time Loaded dispatch, and a missed one-shot left
+    /// the flyout item absent for the whole session — so retry a few ticks.
+    /// <see cref="TryInjectMinimizeButton"/> is idempotent per window.</summary>
+    private void PostChromeInjection(int attempt = 0)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            TryInjectMinimizeButton();
+            if (!TryAddHideTitleBarToChromeFlyout() && attempt < 3)
+                PostChromeInjection(attempt + 1);
+        }, Avalonia.Threading.DispatcherPriority.Loaded);
     }
 
     /// <summary>
@@ -132,53 +150,90 @@ public sealed class GenieHostWindow : HostWindow
         strip.Children.Insert(idx < 0 ? 0 : idx, minimize);
     }
 
-    /// <summary>Guard: the "Hide Title Bar" item is added to Dock's SHARED
-    /// <c>ToolFlyout</c> once per process (the flyout is a single DynamicResource
-    /// instance reused by every chrome), so later floats must not re-add it.</summary>
-    private static bool _hideTitleBarFlyoutItemAdded;
+    /// <summary>The <see cref="GenieHostWindow"/> whose chrome the shared tool
+    /// flyout is currently (or was most recently) open over, captured from the
+    /// flyout's placement target on each open. The flyout's MenuItems live in a
+    /// popup whose visual root is the popup itself, so a click handler can't find
+    /// its window by visual search — and the previous "whichever float IsActive"
+    /// scan silently did nothing whenever no float held OS activation (the exact
+    /// field report: the item was there but "isn't working").</summary>
+    private static GenieHostWindow? _flyoutSourceWindow;
 
     /// <summary>#181 follow-up: also expose "Hide Title Bar" on the title-bar
     /// right-click menu (Dock's <see cref="ToolChromeControl"/> flyout), not only on
     /// our content menu — a user reaching to hide the bar naturally right-clicks the
     /// bar itself (field request). That flyout is Dock's own shared MenuFlyout
     /// (Float / Dock / Dock as Tabbed / Close), assigned to every chrome via the
-    /// theme, so we add ONE item to it, gated to floating chromes (mirroring Dock's
-    /// own AutoHide item, which uses the same <c>$parent[ToolChromeControl]</c>
-    /// binding). The item hides THIS window's bar via the active float — right-clicking
-    /// a float activates it, and a hidden bar can't be right-clicked, so the item is
-    /// always "hide" (restore stays the double-click-top-edge path).
-    /// Best-effort: if Dock's flyout shape changes, this quietly does nothing.</summary>
-    private void TryAddHideTitleBarToChromeFlyout()
+    /// theme, so we add ONE item to it, gated to floating chromes.
+    /// <para>The gate must bind through the LOGICAL tree: a popup's MenuItem has no
+    /// ToolChromeControl visual ancestor (its visual root is the PopupRoot), while
+    /// the logical chain runs MenuItem → MenuFlyoutPresenter → Popup → chrome.
+    /// Dock's own AutoHide item gates via XAML <c>$parent[ToolChromeControl]</c>,
+    /// which is logical-tree; a code-behind FindAncestor defaults to the VISUAL tree
+    /// and never matched — leaving the item visible on every docked chrome's menu,
+    /// where clicking it found no float to act on (public #181 "isn't working").
+    /// FallbackValue=false keeps it hidden in chrome-less hosts of the same shared
+    /// flyout (the MDI window's tool-menu button).</para>
+    /// The item hides the bar of the window hosting the chrome the flyout was
+    /// opened over (<see cref="_flyoutSourceWindow"/>); a hidden bar can't be
+    /// right-clicked, so the item is always "hide" (restore stays the
+    /// double-click-top-edge path).
+    /// Best-effort: returns false (for a bounded retry) while the chrome or its
+    /// flyout aren't materialized yet; if Dock's flyout shape changes, this
+    /// quietly does nothing.</summary>
+    private bool TryAddHideTitleBarToChromeFlyout()
     {
-        if (_hideTitleBarFlyoutItemAdded) return;
         if (_toolChrome is null || _toolChrome.GetVisualRoot() is null)
             _toolChrome = this.GetVisualDescendants().OfType<ToolChromeControl>().FirstOrDefault();
-        if (_toolChrome?.ToolFlyout is not MenuFlyout flyout) return;
+        if (_toolChrome?.ToolFlyout is not MenuFlyout flyout) return false;
+
+        // Idempotence by inspection, not a process-wide flag: the flyout is a
+        // shared theme resource reused by every chrome, but the INSTANCE can be
+        // recreated with the application styles — a static "already added" bit
+        // would then suppress re-injection forever and the item would silently
+        // vanish for the rest of the session.
+        if (flyout.Items.OfType<MenuItem>().Any(i => i.Name == "GenieHideTitleBarItem"))
+            return true;
+
+        // Remember which window's chrome the shared flyout opens over, so the
+        // click below acts on that window — not on a guess from IsActive.
+        flyout.Opened += (s, _) =>
+            _flyoutSourceWindow = (s as FlyoutBase)?.Target is Visual v
+                ? v.FindAncestorOfType<GenieHostWindow>(includeSelf: true)
+                : null;
+
+        static Binding FloatingChromeGate() => new()
+        {
+            Path           = "IsFloating",
+            FallbackValue  = false,
+            RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor)
+            {
+                AncestorType = typeof(ToolChromeControl),
+                Tree         = TreeType.Logical,
+            },
+        };
 
         var item = new MenuItem { Name = "GenieHideTitleBarItem", Header = "Hide Title Bar" };
         // Only on floating chromes — a docked tool has no separable title bar to hide.
-        item.Bind(IsVisibleProperty, new Binding
-        {
-            Path           = "IsFloating",
-            RelativeSource  = new RelativeSource(RelativeSourceMode.FindAncestor)
-            {
-                AncestorType = typeof(ToolChromeControl),
-            },
-        });
-        // The shared flyout has no per-window context, so act on the float the user
-        // just right-clicked = the active one.
+        item.Bind(IsVisibleProperty, FloatingChromeGate());
         item.Click += (_, _) =>
         {
-            if (Application.Current?.ApplicationLifetime is
+            var target = _flyoutSourceWindow;
+            if (target is null && Application.Current?.ApplicationLifetime is
                     IClassicDesktopStyleApplicationLifetime desktop)
-                desktop.Windows.OfType<GenieHostWindow>()
-                       .FirstOrDefault(w => w.IsActive)
-                       ?.SetTitleBarHidden(true);
+                target = desktop.Windows.OfType<GenieHostWindow>()
+                                .FirstOrDefault(w => w.IsActive);
+            target?.SetTitleBarHidden(true);
         };
 
-        flyout.Items.Add(new Separator());
+        // The separator only earns its place when the item under it shows —
+        // ungated it rendered as a dangling line on every docked chrome's menu.
+        var separator = new Separator();
+        separator.Bind(IsVisibleProperty, FloatingChromeGate());
+
+        flyout.Items.Add(separator);
         flyout.Items.Add(item);
-        _hideTitleBarFlyoutItemAdded = true;
+        return true;
     }
 
     private IDisposable? _mainStateSub;
