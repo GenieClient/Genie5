@@ -173,6 +173,12 @@ public class FloatTitleBarHeadlessTests
         var flyout = h.Flyout;
         var item = h.HideItem!;
 
+        // The gate reads IsFloating off the chrome. Dock only sets it on
+        // Windows/macOS (its Linux AttachToWindow branch skips it), so
+        // GenieHostWindow asserts it — pin that here, or the Linux CI leg
+        // fails the visibility check below with no hint at the cause.
+        Assert.True(h.Chrome.IsFloating);
+
         // Opened over the FLOAT's chrome (right-clicking its title bar).
         flyout.ShowAt(h.Chrome);
         FloatHarness.Pump(h.Float);

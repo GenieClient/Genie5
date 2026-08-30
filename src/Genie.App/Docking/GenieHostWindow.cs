@@ -185,6 +185,13 @@ public sealed class GenieHostWindow : HostWindow
     {
         if (_toolChrome is null || _toolChrome.GetVisualRoot() is null)
             _toolChrome = this.GetVisualDescendants().OfType<ToolChromeControl>().FirstOrDefault();
+        // Dock 11.3.11.x sets ToolChromeControl.IsFloating only on Windows/macOS
+        // (AttachToWindow's AttachGrip branch); its Linux branch uses a drag
+        // helper and never sets it, leaving the :floating pseudo-class and the
+        // FloatingChromeGate below dead on a genuinely floating chrome. A chrome
+        // hosted in this window IS floating by construction, on every OS.
+        if (_toolChrome is not null && !_toolChrome.IsFloating)
+            _toolChrome.SetCurrentValue(ToolChromeControl.IsFloatingProperty, true);
         if (_toolChrome?.ToolFlyout is not MenuFlyout flyout) return false;
 
         // Idempotence by inspection, not a process-wide flag: the flyout is a
