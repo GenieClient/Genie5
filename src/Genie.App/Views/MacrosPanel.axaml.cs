@@ -24,6 +24,12 @@ public partial class MacrosPanel : UserControl
     private ScopeEditingContext? _scopeCtx;
     private string               _filter = string.Empty;
 
+    /// <summary>Key of the macro currently loaded in the editor form. When a
+    /// Refresh restores the selection to this same macro (a Find… keystroke),
+    /// OnSelectionChanged skips the form rewrite so unsaved edits survive.
+    /// Null when composing a new entry.</summary>
+    private string?              _loadedKey;
+
     public MacrosPanel()
     {
         InitializeComponent();
@@ -40,6 +46,11 @@ public partial class MacrosPanel : UserControl
         var twoLayers = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        // A re-Initialize (profile switch) must not carry the previous
+        // profile's filter or form over — a stale filter renders the new
+        // profile's list empty for no visible reason.
+        ClearForm();
+        ResetFilter();
         Refresh();
     }
 
@@ -52,8 +63,14 @@ public partial class MacrosPanel : UserControl
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Key, r.Action))
             .ToList();
         if (keep is not null)
-            ItemsList.SelectedItem = ((IEnumerable<MacroRow>)ItemsList.ItemsSource)
+        {
+            var restored = ((IEnumerable<MacroRow>)ItemsList.ItemsSource)
                 .FirstOrDefault(r => r.Key == keep);
+            if (restored is not null) ItemsList.SelectedItem = restored;
+            // The filter hid the selected macro — clear the editor pane so it
+            // can't keep showing (and saving / deleting) an invisible macro.
+            else ClearForm();
+        }
     }
 
     private MacroRule? SelectedRule()
@@ -66,6 +83,8 @@ public partial class MacrosPanel : UserControl
     {
         var rule = SelectedRule();
         if (rule is null) return;
+        if (rule.Key == _loadedKey) return;   // restored selection — keep unsaved edits
+        _loadedKey             = rule.Key;
         KeyBox.Text            = rule.Key;
         ActionBox.Text         = rule.Action;
         ScopeBox.SelectedIndex = ScopeEditing.ToIndex(rule.Scope);
@@ -81,7 +100,10 @@ public partial class MacrosPanel : UserControl
 
         var existing = _engine.Rules.FirstOrDefault(
             r => r.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
-        _engine.Add(key, action);
+        // Preserve the class of a class-scoped macro through the edit (the form
+        // doesn't surface it) — the bare Add would reset it to "default", the
+        // same way Scope is carried over below.
+        _engine.Add(key, action, existing?.ClassName ?? "default");
         var added = _engine.Rules.FirstOrDefault(
             r => r.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
         if (added is not null)
@@ -126,6 +148,14 @@ public partial class MacrosPanel : UserControl
         Refresh();
     }
 
+    /// <summary>Drop any active Find… filter (profile switch / import) so the
+    /// list renders in full and status counts match what's visible.</summary>
+    private void ResetFilter()
+    {
+        _filter        = string.Empty;
+        FilterBox.Text = string.Empty;
+    }
+
     /// <summary>
     /// Capture the pressed key combo into <see cref="KeyBox"/>. The field
     /// is marked read-only on the XAML side so users can't type — focusing
@@ -168,6 +198,11 @@ public partial class MacrosPanel : UserControl
         if (string.IsNullOrEmpty(path)) return;
 
         var result = Genie4Importer.ImportMacros(path, _engine, ImportMode.Merge);
+        // Show the full post-import list — a still-active filter makes the
+        // status count look like a failed import; the merge may also have
+        // rewritten the macro loaded in the form, so drop that too.
+        ClearForm();
+        ResetFilter();
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = result.Skipped > 0
@@ -177,6 +212,7 @@ public partial class MacrosPanel : UserControl
 
     private void ClearForm()
     {
+        _loadedKey             = null;
         ItemsList.SelectedItem = null;
         KeyBox.Text            = string.Empty;
         ActionBox.Text         = string.Empty;

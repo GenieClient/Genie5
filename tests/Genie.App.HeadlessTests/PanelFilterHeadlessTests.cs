@@ -22,55 +22,8 @@ namespace Genie.App.HeadlessTests;
 /// </summary>
 public class PanelFilterHeadlessTests
 {
-    /// <summary>Shows the panel in a window; disposal closes the window even
-    /// when an assertion throws (the headless platform + dispatcher are shared
-    /// by the whole test assembly, so a leaked window outlives the test).</summary>
-    private sealed class Hosted<T> : IDisposable where T : Control
-    {
-        public Window Window { get; }
-        public T      Panel  { get; }
-
-        public Hosted(T panel)
-        {
-            Panel  = panel;
-            Window = new Window { Width = 800, Height = 600, Content = panel };
-            Window.Show();
-            Pump();
-        }
-
-        public void Pump()
-        {
-            Window.UpdateLayout();
-            Dispatcher.UIThread.RunJobs();
-            Window.UpdateLayout();
-        }
-
-        public void SetFilter(string text)
-        {
-            var box = Panel.FindControl<TextBox>("FilterBox");
-            Assert.NotNull(box);
-            box!.Text = text;
-            Pump();
-        }
-
-        public DataGrid Grid
-        {
-            get
-            {
-                var grid = Panel.FindControl<DataGrid>("ItemsList");
-                Assert.NotNull(grid);
-                return grid!;
-            }
-        }
-
-        public IReadOnlyList<TRow> Rows<TRow>() =>
-            (Grid.ItemsSource ?? Enumerable.Empty<object>()).Cast<TRow>().ToList();
-
-        public void Dispose()
-        {
-            try { Window.Close(); } catch { /* teardown */ }
-        }
-    }
+    // The Hosted<T> window harness lives in HostedPanel.cs — it's shared with
+    // PanelFilterFixesHeadlessTests.
 
     // ---------------------------------------------------------------- Variables
 

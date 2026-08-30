@@ -29,6 +29,12 @@ public partial class NamesPanel : UserControl
     private ScopeEditingContext? _scopeCtx;
     private string               _filter = string.Empty;
 
+    /// <summary>Name of the rule currently loaded in the editor form. When a
+    /// Refresh restores the selection to this same rule (a Find… keystroke),
+    /// OnSelectionChanged skips the form rewrite so unsaved edits survive.
+    /// Null when composing a new entry.</summary>
+    private string?              _loadedName;
+
     public NamesPanel()
     {
         InitializeComponent();
@@ -47,6 +53,11 @@ public partial class NamesPanel : UserControl
         var twoLayers = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        // A re-Initialize (profile switch) must not carry the previous
+        // profile's filter or form over — a stale filter renders the new
+        // profile's list empty for no visible reason.
+        ClearForm();
+        ResetFilter();
         Refresh();
     }
 
@@ -59,8 +70,14 @@ public partial class NamesPanel : UserControl
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Name))
             .ToList();
         if (keep is not null)
-            ItemsList.SelectedItem = ((IEnumerable<NameRow>)ItemsList.ItemsSource)
+        {
+            var restored = ((IEnumerable<NameRow>)ItemsList.ItemsSource)
                 .FirstOrDefault(r => r.Name == keep);
+            if (restored is not null) ItemsList.SelectedItem = restored;
+            // The filter hid the selected rule — clear the editor pane so it
+            // can't keep showing (and saving / removing) an invisible rule.
+            else ClearForm();
+        }
     }
 
     private NameRule? SelectedRule()
@@ -73,6 +90,8 @@ public partial class NamesPanel : UserControl
     {
         var rule = SelectedRule();
         if (rule is null) return;
+        if (rule.Name == _loadedName) return;   // restored selection — keep unsaved edits
+        _loadedName  = rule.Name;
         NameBox.Text = rule.Name;
         ColorPickerHelpers.LoadColor(FgColorPicker, FgDefaultCheck, rule.ForegroundColor, "Default");
         ColorPickerHelpers.LoadColor(BgColorPicker, BgNoneCheck,    rule.BackgroundColor, "");
@@ -144,8 +163,17 @@ public partial class NamesPanel : UserControl
         Refresh();
     }
 
+    /// <summary>Drop any active Find… filter (profile switch / import) so the
+    /// list renders in full and status counts match what's visible.</summary>
+    private void ResetFilter()
+    {
+        _filter        = string.Empty;
+        FilterBox.Text = string.Empty;
+    }
+
     private void ClearForm()
     {
+        _loadedName              = null;
         ItemsList.SelectedItem   = null;
         NameBox.Text             = string.Empty;
         FgColorPicker.Color      = Colors.Yellow;
@@ -177,6 +205,11 @@ public partial class NamesPanel : UserControl
         if (string.IsNullOrEmpty(path)) return;
 
         var result = Genie4Importer.ImportNames(path, _engine, ImportMode.Merge);
+        // Show the full post-import list — a still-active filter makes the
+        // status count look like a failed import; the merge may also have
+        // rewritten the rule loaded in the form, so drop that too.
+        ClearForm();
+        ResetFilter();
         Refresh();
         _onChanged?.Invoke();
         UserHighlights.NotifyRulesChanged();

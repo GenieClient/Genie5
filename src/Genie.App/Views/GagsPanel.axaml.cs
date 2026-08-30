@@ -22,6 +22,12 @@ public partial class GagsPanel : UserControl
     private ScopeEditingContext? _scopeCtx;
     private string               _filter = string.Empty;
 
+    /// <summary>Pattern of the rule currently loaded in the editor form. When a
+    /// Refresh restores the selection to this same rule (a Find… keystroke,
+    /// a toggle), OnSelectionChanged skips the form rewrite so unsaved edits
+    /// survive. Null when composing a new entry.</summary>
+    private string?              _loadedPattern;
+
     public GagsPanel()
     {
         InitializeComponent();
@@ -38,6 +44,11 @@ public partial class GagsPanel : UserControl
         var twoLayers = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        // A re-Initialize (profile switch) must not carry the previous
+        // profile's filter or form over — a stale filter renders the new
+        // profile's list empty for no visible reason.
+        ClearForm();
+        ResetFilter();
         Refresh();
     }
 
@@ -50,8 +61,14 @@ public partial class GagsPanel : UserControl
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Pattern, r.ClassName))
             .ToList();
         if (keep is not null)
-            ItemsList.SelectedItem = ((IEnumerable<GagRow>)ItemsList.ItemsSource)
+        {
+            var restored = ((IEnumerable<GagRow>)ItemsList.ItemsSource)
                 .FirstOrDefault(r => r.Pattern == keep);
+            if (restored is not null) ItemsList.SelectedItem = restored;
+            // The filter hid the selected rule — clear the editor pane so it
+            // can't keep showing (and saving / deleting) an invisible rule.
+            else ClearForm();
+        }
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -59,6 +76,8 @@ public partial class GagsPanel : UserControl
         if (_engine is null || ItemsList.SelectedItem is not GagRow row) return;
         var rule = _engine.Rules.FirstOrDefault(r => r.Pattern == row.Pattern);
         if (rule is null) return;
+        if (rule.Pattern == _loadedPattern) return;   // restored selection — keep unsaved edits
+        _loadedPattern               = rule.Pattern;
         PatternBox.Text              = rule.Pattern;
         ClassBox.Text                = rule.ClassName;
         CaseSensitiveCheck.IsChecked = rule.CaseSensitive;
@@ -137,6 +156,9 @@ public partial class GagsPanel : UserControl
 
         rule.IsEnabled = !rule.IsEnabled;
         Refresh();
+        // The restored selection skips the form rewrite (unsaved-edit guard),
+        // so sync the checkbox to the new state explicitly.
+        EnabledCheck.IsChecked = rule.IsEnabled;
         _onChanged?.Invoke();
         StatusText.Text = $"Gag {(rule.IsEnabled ? "enabled" : "disabled")}.";
     }
@@ -163,6 +185,14 @@ public partial class GagsPanel : UserControl
         Refresh();
     }
 
+    /// <summary>Drop any active Find… filter (profile switch / import) so the
+    /// list renders in full and status counts match what's visible.</summary>
+    private void ResetFilter()
+    {
+        _filter        = string.Empty;
+        FilterBox.Text = string.Empty;
+    }
+
     private async void OnImport(object? sender, RoutedEventArgs e)
     {
         if (_engine is null) return;
@@ -184,6 +214,11 @@ public partial class GagsPanel : UserControl
         if (string.IsNullOrEmpty(path)) return;
 
         var result = Genie4Importer.ImportGags(path, _engine, ImportMode.Merge);
+        // Show the full post-import list — a still-active filter makes the
+        // status count look like a failed import; the merge may also have
+        // rewritten the rule loaded in the form, so drop that too.
+        ClearForm();
+        ResetFilter();
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = result.Skipped > 0
@@ -193,6 +228,7 @@ public partial class GagsPanel : UserControl
 
     private void ClearForm()
     {
+        _loadedPattern               = null;
         ItemsList.SelectedItem       = null;
         PatternBox.Text              = string.Empty;
         ClassBox.Text                = string.Empty;

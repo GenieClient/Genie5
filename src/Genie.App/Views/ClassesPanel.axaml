@@ -10,6 +10,9 @@
       <Button Content="Deactivate All" Click="OnDeactivateAll"/>
       <Button Content="Remove"         Click="OnRemove"/>
       <Button Content="Import…"        Click="OnImport"/>
+      <TextBox Name="FilterBox" Width="220" Margin="12,0,0,0"
+               VerticalAlignment="Center" Watermark="Find… (name)"
+               TextChanged="OnFilterChanged"/>
     </StackPanel>
 
     <Grid Grid.Row="1" RowDefinitions="*,Auto" Margin="4">

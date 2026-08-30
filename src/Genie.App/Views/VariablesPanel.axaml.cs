@@ -19,12 +19,23 @@ public partial class VariablesPanel : UserControl
     private Action?        _onChanged;
     private string         _filter = string.Empty;
 
+    /// <summary>Name of the variable currently loaded in the editor form. When
+    /// a Refresh restores the selection to this same variable (a Find…
+    /// keystroke), OnSelectionChanged skips the form rewrite so unsaved edits
+    /// survive. Null when composing a new entry.</summary>
+    private string?        _loadedName;
+
     public VariablesPanel() => InitializeComponent();
 
     public void Initialize(VariableStore store, Action onChanged)
     {
         _store     = store;
         _onChanged = onChanged;
+        // A re-Initialize (profile switch) must not carry the previous
+        // profile's filter or form over — a stale filter renders the new
+        // profile's list empty for no visible reason.
+        ClearForm();
+        ResetFilter();
         Refresh();
     }
 
@@ -46,11 +57,17 @@ public partial class VariablesPanel : UserControl
             foreach (var row in (IEnumerable<VariableRow>)ItemsList.ItemsSource)
                 if (keep.Contains(row.Name))
                     selection.Add(row);
+        // The filter hid every selected variable — clear the editor pane so
+        // it can't keep showing (and saving / deleting) an invisible one.
+        if (keep.Count > 0 && (ItemsList.SelectedItems?.Count ?? 0) == 0)
+            ClearForm();
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_store is null || ItemsList.SelectedItem is not VariableRow row) return;
+        if (row.Name == _loadedName) return;   // restored selection — keep unsaved edits
+        _loadedName     = row.Name;
         NameBox.Text    = row.Name;
         ValueBox.Text   = row.Value;
         StatusText.Text = string.Empty;
@@ -94,7 +111,25 @@ public partial class VariablesPanel : UserControl
         Refresh();
     }
 
-    private void OnSelectAll(object? sender, RoutedEventArgs e) => ItemsList.SelectAll();
+    /// <summary>Drop any active Find… filter (profile switch / import) so the
+    /// list renders in full and status counts match what's visible.</summary>
+    private void ResetFilter()
+    {
+        _filter        = string.Empty;
+        FilterBox.Text = string.Empty;
+    }
+
+    private void OnSelectAll(object? sender, RoutedEventArgs e)
+    {
+        ItemsList.SelectAll();
+        // Select All only reaches the filtered rows — say so, or the #97 Copy
+        // silently exports a subset the user thinks is the whole list.
+        var visible = (ItemsList.ItemsSource as IEnumerable<VariableRow>)?.Count() ?? 0;
+        var total   = _store?.GetAll().Count ?? visible;
+        StatusText.Text = visible < total
+            ? $"Selected {visible} of {total} variables — the Find… filter hides the rest."
+            : string.Empty;
+    }
 
     /// <summary>
     /// Copy every selected row (not just the focused one — #97) to the clipboard
@@ -117,6 +152,7 @@ public partial class VariablesPanel : UserControl
 
     private void ClearForm()
     {
+        _loadedName            = null;
         ItemsList.SelectedItem = null;
         NameBox.Text           = string.Empty;
         ValueBox.Text          = string.Empty;
@@ -146,6 +182,11 @@ public partial class VariablesPanel : UserControl
 
         var result = Genie4Importer.ImportVariables(path, _store, ImportMode.Merge);
         _onChanged?.Invoke();
+        // Show the full post-import list — a still-active filter makes the
+        // status count look like a failed import; the merge may also have
+        // rewritten the variable loaded in the form, so drop that too.
+        ClearForm();
+        ResetFilter();
         Refresh();
         StatusText.Text = result.Skipped > 0
             ? $"Imported {result.Imported} variable(s), skipped {result.Skipped}."

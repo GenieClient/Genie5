@@ -22,6 +22,12 @@ public partial class AliasesPanel : UserControl
     private ScopeEditingContext? _scopeCtx;
     private string               _filter = string.Empty;
 
+    /// <summary>Name of the rule currently loaded in the editor form. When a
+    /// Refresh restores the selection to this same rule (a Find… keystroke,
+    /// a toggle), OnSelectionChanged skips the form rewrite so unsaved edits
+    /// survive. Null when composing a new entry.</summary>
+    private string?              _loadedName;
+
     public AliasesPanel()
     {
         InitializeComponent();
@@ -38,6 +44,11 @@ public partial class AliasesPanel : UserControl
         var twoLayers = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        // A re-Initialize (profile switch) must not carry the previous
+        // profile's filter or form over — a stale filter renders the new
+        // profile's list empty for no visible reason.
+        ClearForm();
+        ResetFilter();
         Refresh();
     }
 
@@ -50,8 +61,14 @@ public partial class AliasesPanel : UserControl
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Name, r.Expansion))
             .ToList();
         if (keep is not null)
-            ItemsList.SelectedItem = ((IEnumerable<AliasRow>)ItemsList.ItemsSource)
+        {
+            var restored = ((IEnumerable<AliasRow>)ItemsList.ItemsSource)
                 .FirstOrDefault(r => r.Name == keep);
+            if (restored is not null) ItemsList.SelectedItem = restored;
+            // The filter hid the selected rule — clear the editor pane so it
+            // can't keep showing (and saving / deleting) an invisible rule.
+            else ClearForm();
+        }
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -59,6 +76,8 @@ public partial class AliasesPanel : UserControl
         if (_engine is null || ItemsList.SelectedItem is not AliasRow row) return;
         var alias = _engine.Aliases.FirstOrDefault(a => a.Name == row.Name);
         if (alias is null) return;
+        if (alias.Name == _loadedName) return;   // restored selection — keep unsaved edits
+        _loadedName            = alias.Name;
         NameBox.Text           = alias.Name;
         ExpansionBox.Text      = alias.Expansion;
         EnabledCheck.IsChecked = alias.IsEnabled;
@@ -132,6 +151,9 @@ public partial class AliasesPanel : UserControl
 
         _engine.SetEnabled(alias.Name, !alias.IsEnabled);
         Refresh();
+        // The restored selection skips the form rewrite (unsaved-edit guard),
+        // so sync the checkbox to the new state explicitly.
+        EnabledCheck.IsChecked = alias.IsEnabled;
         _onChanged?.Invoke();
         StatusText.Text = $"'{alias.Name}' {(alias.IsEnabled ? "enabled" : "disabled")}.";
     }
@@ -158,8 +180,17 @@ public partial class AliasesPanel : UserControl
         Refresh();
     }
 
+    /// <summary>Drop any active Find… filter (profile switch / import) so the
+    /// list renders in full and status counts match what's visible.</summary>
+    private void ResetFilter()
+    {
+        _filter        = string.Empty;
+        FilterBox.Text = string.Empty;
+    }
+
     private void ClearForm()
     {
+        _loadedName            = null;
         ItemsList.SelectedItem = null;
         NameBox.Text           = string.Empty;
         ExpansionBox.Text      = string.Empty;
@@ -189,6 +220,11 @@ public partial class AliasesPanel : UserControl
         if (string.IsNullOrEmpty(path)) return;
 
         var result = Genie4Importer.ImportAliases(path, _engine, ImportMode.Merge);
+        // Show the full post-import list — a still-active filter makes the
+        // status count look like a failed import; the merge may also have
+        // rewritten the rule loaded in the form, so drop that too.
+        ClearForm();
+        ResetFilter();
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = $"Imported {result.Imported} alias(es).";

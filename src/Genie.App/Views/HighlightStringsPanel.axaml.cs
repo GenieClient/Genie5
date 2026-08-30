@@ -77,6 +77,11 @@ public partial class HighlightStringsPanel : UserControl
         var twoLayers   = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        // A re-Initialize (profile switch) must not carry the previous
+        // profile's filter or form over — a stale filter renders the new
+        // profile's list empty for no visible reason.
+        ClearForm();
+        ResetFilter();
         Refresh();
     }
 
@@ -98,8 +103,14 @@ public partial class HighlightStringsPanel : UserControl
                 _filter, r.Pattern, r.ForegroundColor, r.BackgroundColor, r.MatchType, r.ClassName))
             .ToList();
         if (keep is not null)
-            ItemsList.SelectedItem = ((IEnumerable<HighlightRow>)ItemsList.ItemsSource)
+        {
+            var restored = ((IEnumerable<HighlightRow>)ItemsList.ItemsSource)
                 .FirstOrDefault(r => r.Pattern == keep);
+            if (restored is not null) ItemsList.SelectedItem = restored;
+            // The filter hid the selected rule — clear the editor pane so it
+            // can't keep showing (and saving / deleting) an invisible rule.
+            else ClearForm();
+        }
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -107,6 +118,9 @@ public partial class HighlightStringsPanel : UserControl
         if (_engine is null || ItemsList.SelectedItem is not HighlightRow row) return;
         var rule = _engine.Rules.FirstOrDefault(r => r.Pattern == row.Pattern);
         if (rule is null) return;
+        // Selection restored to the rule already loaded (a Find… keystroke's
+        // Refresh, a toggle) — keep the form as-is so unsaved edits survive.
+        if (rule.Pattern == _editingPattern) return;
         _editingPattern              = rule.Pattern;
         PatternBox.Text              = rule.Pattern;
         ColorPickerHelpers.LoadColor(FgColorPicker, FgDefaultCheck, rule.ForegroundColor, "Default");
@@ -229,6 +243,9 @@ public partial class HighlightStringsPanel : UserControl
 
         rule.IsEnabled = !rule.IsEnabled;
         Refresh();
+        // The restored selection skips the form rewrite (unsaved-edit guard),
+        // so sync the checkbox to the new state explicitly.
+        EnabledCheck.IsChecked = rule.IsEnabled;
         _onRulesChanged?.Invoke();
         UserHighlights.NotifyRulesChanged();
         StatusText.Text = $"Highlight {(rule.IsEnabled ? "enabled" : "disabled")}.";
@@ -261,6 +278,14 @@ public partial class HighlightStringsPanel : UserControl
         Refresh();
     }
 
+    /// <summary>Drop any active Find… filter (profile switch / import) so the
+    /// list renders in full and status counts match what's visible.</summary>
+    private void ResetFilter()
+    {
+        _filter        = string.Empty;
+        FilterBox.Text = string.Empty;
+    }
+
     private async void OnImport(object? sender, RoutedEventArgs e)
     {
         if (_engine is null) return;
@@ -285,6 +310,11 @@ public partial class HighlightStringsPanel : UserControl
         if (string.IsNullOrEmpty(path)) return;
 
         var result = Genie4Importer.ImportHighlights(path, _engine, ImportMode.Merge);
+        // Show the full post-import list — a still-active filter makes the
+        // status count look like a failed import; the merge may also have
+        // rewritten the rule loaded in the form, so drop that too.
+        ClearForm();
+        ResetFilter();
         Refresh();
         _onRulesChanged?.Invoke();
         UserHighlights.NotifyRulesChanged();

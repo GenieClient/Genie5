@@ -18,6 +18,13 @@ public partial class ClassesPanel : UserControl
 
     private ClassEngine? _engine;
     private Action?      _onChanged;
+    private string       _filter = string.Empty;
+
+    /// <summary>Name of the class currently loaded in the editor form. When a
+    /// Refresh restores the selection to this same class (a Find… keystroke),
+    /// OnSelectionChanged skips the form rewrite so unsaved edits survive.
+    /// Null when composing a new entry.</summary>
+    private string?      _loadedName;
 
     public ClassesPanel() => InitializeComponent();
 
@@ -25,6 +32,11 @@ public partial class ClassesPanel : UserControl
     {
         _engine    = engine;
         _onChanged = onChanged;
+        // A re-Initialize (profile switch) must not carry the previous
+        // profile's filter or form over — a stale filter renders the new
+        // profile's list empty for no visible reason.
+        ClearForm();
+        ResetFilter();
         Refresh();
     }
 
@@ -34,15 +46,24 @@ public partial class ClassesPanel : UserControl
         var keep = (ItemsList.SelectedItem as ClassRow)?.Name;
         ItemsList.ItemsSource = _engine.GetAll()
             .Select(kv => new ClassRow(kv.Value ? "✓" : "✗", kv.Key, kv.Value))
+            .Where(r => PanelFilterHelpers.Matches(_filter, r.Name))
             .ToList();
         if (keep is not null)
-            ItemsList.SelectedItem = ((IEnumerable<ClassRow>)ItemsList.ItemsSource)
+        {
+            var restored = ((IEnumerable<ClassRow>)ItemsList.ItemsSource)
                 .FirstOrDefault(r => r.Name == keep);
+            if (restored is not null) ItemsList.SelectedItem = restored;
+            // The filter hid the selected class — clear the editor pane so it
+            // can't keep showing (and saving / removing) an invisible class.
+            else ClearForm();
+        }
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_engine is null || ItemsList.SelectedItem is not ClassRow row) return;
+        if (row.Name == _loadedName) return;   // restored selection — keep unsaved edits
+        _loadedName           = row.Name;
         NameBox.Text          = row.Name;
         ActiveCheck.IsChecked = row.IsActive;
         StatusText.Text       = string.Empty;
@@ -55,6 +76,9 @@ public partial class ClassesPanel : UserControl
         if (_engine is null) return;
         _engine.ActivateAll();
         Refresh();
+        // The restored selection skips the form rewrite (unsaved-edit guard),
+        // so sync the checkbox to the new state explicitly.
+        if (ItemsList.SelectedItem is not null) ActiveCheck.IsChecked = true;
         _onChanged?.Invoke();
         StatusText.Text = "Activated all classes.";
     }
@@ -64,8 +88,23 @@ public partial class ClassesPanel : UserControl
         if (_engine is null) return;
         _engine.DeactivateAll();
         Refresh();
+        if (ItemsList.SelectedItem is not null) ActiveCheck.IsChecked = false;
         _onChanged?.Invoke();
         StatusText.Text = "Deactivated all classes.";
+    }
+
+    private void OnFilterChanged(object? sender, TextChangedEventArgs e)
+    {
+        _filter = FilterBox.Text ?? string.Empty;
+        Refresh();
+    }
+
+    /// <summary>Drop any active Find… filter (profile switch / import) so the
+    /// list renders in full and status counts match what's visible.</summary>
+    private void ResetFilter()
+    {
+        _filter        = string.Empty;
+        FilterBox.Text = string.Empty;
     }
 
     private void OnRemove(object? sender, RoutedEventArgs e)
@@ -115,6 +154,7 @@ public partial class ClassesPanel : UserControl
 
     private void ClearForm()
     {
+        _loadedName            = null;
         ItemsList.SelectedItem = null;
         NameBox.Text           = string.Empty;
         ActiveCheck.IsChecked  = true;
@@ -143,6 +183,11 @@ public partial class ClassesPanel : UserControl
         if (string.IsNullOrEmpty(path)) return;
 
         var result = Genie4Importer.ImportClasses(path, _engine, ImportMode.Merge);
+        // Show the full post-import list — a still-active filter makes the
+        // status count look like a failed import; the merge may also have
+        // rewritten the class loaded in the form, so drop that too.
+        ClearForm();
+        ResetFilter();
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = result.Skipped > 0
