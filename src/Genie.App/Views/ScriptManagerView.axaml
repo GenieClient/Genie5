@@ -31,41 +31,41 @@
   <Grid RowDefinitions="Auto,*,Auto,110" Margin="4">
 
     <!-- ── Toolbar ─────────────────────────────────────────────────────── -->
-    <DockPanel Grid.Row="0" Margin="0,0,0,4" LastChildFill="True">
-      <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="4">
-        <Button Content="New" FontSize="11" Padding="8,2"
-                Command="{Binding NewScriptCommand}"
-                ToolTip.Tip="Create a new script (opens in your editor)"/>
-        <Button Content="Run" FontSize="11" Padding="8,2"
-                Command="{Binding RunSelectedCommand}"
-                ToolTip.Tip="Run the selected script (double-click or Enter also runs)"/>
-        <TextBox Watermark="args" FontSize="11" Width="90" MinHeight="0" Padding="6,3"
-                 Text="{Binding RunArgs}"
-                 ToolTip.Tip="Optional arguments passed to the script on Run (%1, %2, …)"/>
-        <Button Content="Edit" FontSize="11" Padding="8,2"
-                Command="{Binding EditSelectedCommand}"
-                ToolTip.Tip="Open the selected script in your editor"/>
-        <Button Content="Delete" FontSize="11" Padding="8,2"
-                Command="{Binding DeleteSelectedCommand}"
-                IsVisible="{Binding !ConfirmingDelete}"
-                ToolTip.Tip="Delete the selected script file"/>
-        <Button Content="Confirm?" FontSize="11" Padding="8,2"
-                Foreground="{DynamicResource Theme.Danger}"
-                Command="{Binding DeleteSelectedCommand}"
-                IsVisible="{Binding ConfirmingDelete}"
-                ToolTip.Tip="Click again to permanently delete"/>
-      </StackPanel>
-      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-        <Button Content="⌂" FontSize="11" Padding="6,2"
-                Command="{Binding OpenFolderCommand}"
-                ToolTip.Tip="Open the scripts folder"/>
-        <Button Content="⟳" FontSize="11" Padding="6,2"
-                Command="{Binding RefreshCommand}"
-                ToolTip.Tip="Rescan the scripts folder"/>
-      </StackPanel>
-      <TextBox Watermark="Filter scripts" FontSize="11" Margin="4,0"
+    <!-- WrapPanel, not DockPanel: at narrow widths the controls reflow to
+         extra rows instead of clipping off the right edge (same fix as the
+         Inventory View toolbar / Experience config bar). -->
+    <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4">
+      <Button Content="New" FontSize="11" Padding="8,2" Margin="0,0,4,2"
+              Command="{Binding NewScriptCommand}"
+              ToolTip.Tip="Create a new script (opens in your editor)"/>
+      <Button Content="Run" FontSize="11" Padding="8,2" Margin="0,0,4,2"
+              Command="{Binding RunSelectedCommand}"
+              ToolTip.Tip="Run the selected script (double-click or Enter also runs)"/>
+      <TextBox Watermark="args" FontSize="11" Width="90" MinHeight="0" Padding="6,3"
+               Margin="0,0,4,2"
+               Text="{Binding RunArgs}"
+               ToolTip.Tip="Optional arguments passed to the script on Run (%1, %2, …)"/>
+      <Button Content="Edit" FontSize="11" Padding="8,2" Margin="0,0,4,2"
+              Command="{Binding EditSelectedCommand}"
+              ToolTip.Tip="Open the selected script in your editor"/>
+      <Button Content="Delete" FontSize="11" Padding="8,2" Margin="0,0,4,2"
+              Command="{Binding DeleteSelectedCommand}"
+              IsVisible="{Binding !ConfirmingDelete}"
+              ToolTip.Tip="Delete the selected script file"/>
+      <Button Content="Confirm?" FontSize="11" Padding="8,2" Margin="0,0,4,2"
+              Foreground="{DynamicResource Theme.Danger}"
+              Command="{Binding DeleteSelectedCommand}"
+              IsVisible="{Binding ConfirmingDelete}"
+              ToolTip.Tip="Click again to permanently delete"/>
+      <TextBox Watermark="Filter scripts" FontSize="11" Width="140" Margin="0,0,4,2"
                Text="{Binding Filter}" MinHeight="0" Padding="6,3"/>
-    </DockPanel>
+      <Button Content="⌂" FontSize="11" Padding="6,2" Margin="0,0,4,2"
+              Command="{Binding OpenFolderCommand}"
+              ToolTip.Tip="Open the scripts folder"/>
+      <Button Content="⟳" FontSize="11" Padding="6,2" Margin="0,0,0,2"
+              Command="{Binding RefreshCommand}"
+              ToolTip.Tip="Rescan the scripts folder"/>
+    </WrapPanel>
 
     <!-- ── Library | Running split ─────────────────────────────────────── -->
     <Grid Grid.Row="1" ColumnDefinitions="2*,4,3*">
@@ -138,24 +138,22 @@
               BorderBrush="{DynamicResource Theme.Border}"
               BorderThickness="1" CornerRadius="3" Padding="2">
         <Grid RowDefinitions="Auto,*">
-          <DockPanel Grid.Row="0" Margin="4,2">
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-              <Button Content="⏸ All" Classes="rowaction"
-                      Command="{Binding PauseAllCommand}" ToolTip.Tip="Pause all scripts"/>
-              <Button Content="▶ All" Classes="rowaction"
-                      Command="{Binding ResumeAllCommand}" ToolTip.Tip="Resume all scripts"/>
-              <Button Content="Stop All" Classes="rowaction"
-                      Command="{Binding StopAllCommand}"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <TextBlock Text="RUNNING" FontSize="10"
-                         Foreground="{DynamicResource Theme.SectionHeader}"
-                         VerticalAlignment="Center"/>
-              <TextBlock Text="{Binding RunningScripts.Count}" FontSize="10"
-                         Foreground="{DynamicResource Theme.TextMuted}"
-                         VerticalAlignment="Center"/>
-            </StackPanel>
-          </DockPanel>
+          <!-- WrapPanel, not DockPanel: the Pause/Resume/Stop cluster reflows
+               below the header instead of clipping when the split narrows. -->
+          <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="4,2">
+            <TextBlock Text="RUNNING" FontSize="10" Margin="0,0,4,2"
+                       Foreground="{DynamicResource Theme.SectionHeader}"
+                       VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding RunningScripts.Count}" FontSize="10" Margin="0,0,8,2"
+                       Foreground="{DynamicResource Theme.TextMuted}"
+                       VerticalAlignment="Center"/>
+            <Button Content="⏸ All" Classes="rowaction" Margin="0,0,4,2"
+                    Command="{Binding PauseAllCommand}" ToolTip.Tip="Pause all scripts"/>
+            <Button Content="▶ All" Classes="rowaction" Margin="0,0,4,2"
+                    Command="{Binding ResumeAllCommand}" ToolTip.Tip="Resume all scripts"/>
+            <Button Content="Stop All" Classes="rowaction" Margin="0,0,0,2"
+                    Command="{Binding StopAllCommand}"/>
+          </WrapPanel>
           <ListBox Grid.Row="1" ItemsSource="{Binding RunningScripts}"
                    SelectedItem="{Binding SelectedRunning}"
                    Background="Transparent" Padding="0"

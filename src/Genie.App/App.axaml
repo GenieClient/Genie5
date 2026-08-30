@@ -1536,26 +1536,29 @@
         <!-- Header: character picker, refresh, and inline recording settings.  -->
         <!-- Settings write their #config values directly (density-slider idiom) -->
         <!-- so the panel, the command line, and settings.cfg stay in sync.      -->
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,2" Spacing="6">
-          <TextBlock Text="Character" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
-          <ComboBox Width="150" FontSize="11" VerticalAlignment="Center"
+        <!-- WrapPanel, not StackPanel: at narrow widths the controls reflow to
+             extra rows instead of clipping off the right edge (same fix as the
+             Experience config bar / Inventory View toolbar). -->
+        <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,2">
+          <TextBlock Text="Character" VerticalAlignment="Center" FontSize="11" Opacity="0.7" Margin="0,0,6,2"/>
+          <ComboBox Width="150" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,2"
                     AutomationProperties.Name="Analytics character"
                     ItemsSource="{Binding ViewModel.Characters}"
                     SelectedItem="{Binding ViewModel.SelectedCharacter, Mode=TwoWay}"/>
-          <Button Content="Refresh" FontSize="11" VerticalAlignment="Center"
+          <Button Content="Refresh" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,2"
                   AutomationProperties.Name="Refresh analytics"
                   Command="{Binding ViewModel.RefreshCommand}"/>
-          <CheckBox Content="Record" VerticalAlignment="Center" FontSize="11"
+          <CheckBox Content="Record" VerticalAlignment="Center" FontSize="11" Margin="0,0,6,2"
                     AutomationProperties.Name="Record skill history"
                     IsChecked="{Binding ViewModel.RecordingEnabled, Mode=TwoWay}"
                     ToolTip.Tip="Record skill history locally (#config analytics). Local-only — never uploaded."/>
-          <TextBlock Text="Keep raw" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
-          <NumericUpDown Width="110" FontSize="11" Minimum="0" Maximum="3650" Increment="30"
+          <TextBlock Text="Keep raw" VerticalAlignment="Center" FontSize="11" Opacity="0.7" Margin="0,0,6,2"/>
+          <NumericUpDown Width="110" FontSize="11" Minimum="0" Maximum="3650" Increment="30" Margin="0,0,6,2"
                          AutomationProperties.Name="Raw history retention days"
                          Value="{Binding ViewModel.RetentionDays, Mode=TwoWay}"
                          ToolTip.Tip="Days of raw snapshots to keep before folding into permanent daily rollups (0 = forever). #config analyticsretentiondays"/>
-          <TextBlock Text="days" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
-        </StackPanel>
+          <TextBlock Text="days" VerticalAlignment="Center" FontSize="11" Opacity="0.7" Margin="0,0,0,2"/>
+        </WrapPanel>
 
         <TabControl Margin="4,0,4,4">
           <TabItem Header="This Session" FontSize="12">
@@ -1570,13 +1573,13 @@
                                       AxisBrush="{DynamicResource GameBrush}"
                                       GridBrush="{DynamicResource Theme.AccentBg}"
                                       LabelBrush="{DynamicResource GameBrush}"/>
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="6" Margin="4,4">
-                  <TextBlock Text="Rank over time" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
-                  <ComboBox Width="180" FontSize="11"
+                <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="4,4">
+                  <TextBlock Text="Rank over time" VerticalAlignment="Center" FontSize="11" Opacity="0.7" Margin="0,0,6,2"/>
+                  <ComboBox Width="180" FontSize="11" Margin="0,0,0,2"
                             AutomationProperties.Name="Session chart skill"
                             ItemsSource="{Binding ViewModel.SessionSkills}"
                             SelectedItem="{Binding ViewModel.SelectedSessionSkill, Mode=TwoWay}"/>
-                </StackPanel>
+                </WrapPanel>
                 <controls:ChartCanvas Grid.Row="2" MinHeight="80" XIsTime="True"
                                       Series="{Binding ViewModel.SessionLine}"
                                       RenderTick="{Binding ViewModel.RenderTick}"
@@ -1590,14 +1593,14 @@
 
           <TabItem Header="History" FontSize="12">
             <DockPanel Margin="4">
-              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="4,2,4,6">
-                <TextBlock Text="Skill" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
-                <ComboBox Width="180" FontSize="11"
+              <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="4,2,4,6">
+                <TextBlock Text="Skill" VerticalAlignment="Center" FontSize="11" Opacity="0.7" Margin="0,0,6,2"/>
+                <ComboBox Width="180" FontSize="11" Margin="0,0,6,2"
                           AutomationProperties.Name="History skill"
                           ItemsSource="{Binding ViewModel.HistorySkills}"
                           SelectedItem="{Binding ViewModel.SelectedHistorySkill, Mode=TwoWay}"/>
-                <TextBlock Text="Range" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
-                <ComboBox Width="110" FontSize="11"
+                <TextBlock Text="Range" VerticalAlignment="Center" FontSize="11" Opacity="0.7" Margin="0,0,6,2"/>
+                <ComboBox Width="110" FontSize="11" Margin="0,0,0,2"
                           AutomationProperties.Name="History range"
                           SelectedIndex="{Binding ViewModel.HistoryRangeIndex, Mode=TwoWay}">
                   <ComboBoxItem Content="7 days"/>
@@ -1605,7 +1608,7 @@
                   <ComboBoxItem Content="90 days"/>
                   <ComboBoxItem Content="All"/>
                 </ComboBox>
-              </StackPanel>
+              </WrapPanel>
               <controls:ChartCanvas XIsDate="True"
                                     Series="{Binding ViewModel.HistorySeries}"
                                     RenderTick="{Binding ViewModel.RenderTick}"
@@ -1774,14 +1777,15 @@
     <DataTemplate DataType="docking:EditorRawXmlTool">
       <Grid RowDefinitions="Auto,*" Margin="4">
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6"
-                    Margin="0,0,0,4">
-          <Button Content="Clear" Command="{Binding ViewModel.ClearCommand}"
-                  FontSize="11" Padding="8,2"
+        <!-- DockPanel, not StackPanel: the fill-slot label gets a finite width,
+             so it wraps at narrow widths instead of clipping off the edge. -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,4" LastChildFill="True">
+          <Button DockPanel.Dock="Left" Content="Clear" Command="{Binding ViewModel.ClearCommand}"
+                  FontSize="11" Padding="8,2" Margin="0,0,6,0" VerticalAlignment="Top"
                   ToolTip.Tip="Clear the buffer"/>
-          <TextBlock Text="Live raw server XML — local view only."
+          <TextBlock Text="Live raw server XML — local view only." TextWrapping="Wrap"
                      Foreground="{DynamicResource Theme.SectionHeader}" FontSize="11" VerticalAlignment="Center"/>
-        </StackPanel>
+        </DockPanel>
 
         <Border Grid.Row="1" Background="{DynamicResource Theme.PanelBgDeep}" BorderBrush="{DynamicResource Theme.Border}"
                 BorderThickness="1" CornerRadius="3">
@@ -1798,14 +1802,15 @@
     <DataTemplate DataType="docking:RawXmlTool">
       <Grid RowDefinitions="Auto,*" Margin="4">
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6"
-                    Margin="0,0,0,4">
-          <Button Content="Clear" Command="{Binding ViewModel.ClearCommand}"
-                  FontSize="11" Padding="8,2"
+        <!-- DockPanel, not StackPanel: the fill-slot label gets a finite width,
+             so it wraps at narrow widths instead of clipping off the edge. -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,4" LastChildFill="True">
+          <Button DockPanel.Dock="Left" Content="Clear" Command="{Binding ViewModel.ClearCommand}"
+                  FontSize="11" Padding="8,2" Margin="0,0,6,0" VerticalAlignment="Top"
                   ToolTip.Tip="Clear the buffer"/>
-          <TextBlock Text="Live raw server XML — local view only."
+          <TextBlock Text="Live raw server XML — local view only." TextWrapping="Wrap"
                      Foreground="{DynamicResource Theme.SectionHeader}" FontSize="11" VerticalAlignment="Center"/>
-        </StackPanel>
+        </DockPanel>
 
         <Border Grid.Row="1" Background="{DynamicResource Theme.PanelBgDeep}" BorderBrush="{DynamicResource Theme.Border}"
                 BorderThickness="1" CornerRadius="3">
