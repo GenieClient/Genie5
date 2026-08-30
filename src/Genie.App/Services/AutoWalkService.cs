@@ -205,6 +205,17 @@ public sealed class AutoWalkService : ReactiveObject
     private int _searchAttempts;
     private const int MaxSearchAttempts = 4;
 
+    // Objsearch-directive arcs ("objsearch outcropping climb handholds" — Genie 4
+    // MOVE.OBJSEARCH): the hidden exit only opens after searching a NAMED object,
+    // and it always searches FIRST (live-verified 2026-08-30 on the Mistwood
+    // outcropping: bare `search` whiffs forever, `search outcropping` reveals the
+    // handholds deterministically, re-searching is a harmless "You notice …").
+    // Holds the targeted search command ("search outcropping") while such a step
+    // is in flight — non-null marks the step as objsearch, which tells the
+    // hidden-exit bounce handler NOT to send its own bare `search`: re-dispatch
+    // re-sends the whole search-then-move chain. Reset with _hiddenExitVerb.
+    private string? _hiddenExitSearch;
+
     /// <summary>
     /// Server responses meaning "that exit isn't there (yet)" — the bounce a
     /// hidden-exit go/climb gets before a successful search reveals the path.
@@ -403,6 +414,7 @@ public sealed class AutoWalkService : ReactiveObject
         _retreatCount          = 0;
         _searchAttempts        = 0;
         _hiddenExitVerb        = null;
+        _hiddenExitSearch      = null;
         _departureNodeId       = origin.Id;
         _departureServerRoomId = _mapEngine.CurrentServerRoomId;
 
@@ -428,6 +440,7 @@ public sealed class AutoWalkService : ReactiveObject
         _retreatCount = 0;
         _searchAttempts = 0;
         _hiddenExitVerb = null;
+        _hiddenExitSearch = null;
         _departureNodeId = null;
         _departureServerRoomId = null;
         IsCurrentPaused = false;
@@ -628,9 +641,10 @@ public sealed class AutoWalkService : ReactiveObject
 
         // Confirmed move landed — clear the per-step retreat counter (#130) and
         // the hidden-exit search budget so the next step starts fresh.
-        _retreatCount   = 0;
-        _searchAttempts = 0;
-        _hiddenExitVerb = null;
+        _retreatCount     = 0;
+        _searchAttempts   = 0;
+        _hiddenExitVerb   = null;
+        _hiddenExitSearch = null;
 
         // Any room-change implicitly clears a pending cross-zone wait —
         // either we arrived at the target zone, or we landed somewhere
@@ -761,12 +775,29 @@ public sealed class AutoWalkService : ReactiveObject
         // hidden-exit handler searches and re-dispatches this same step.
         if (Genie.Core.Mapper.MoveVerb.TryParseSearchDirective(verb, out var hiddenMove))
         {
-            _hiddenExitVerb = hiddenMove;
+            _hiddenExitVerb   = hiddenMove;
+            _hiddenExitSearch = null;
             verb = hiddenMove;
+        }
+        // Objsearch-directive arc ("objsearch outcropping climb handholds"): G4
+        // MOVE.OBJSEARCH searches the named object FIRST, waits out the search's
+        // roundtime, then sends the inner move — a bare `search` never reveals
+        // these exits (live-verified 2026-08-30). Dispatch as a chain: the
+        // targeted search goes on the wire now; the inner move rides the
+        // RT-gated #send queue with a 1s floor so the search's response (and any
+        // roundtime it carries) lands before the move fires. If the move still
+        // bounces, the hidden-exit handler re-dispatches this same step — the
+        // chain re-searches, so the handler skips its own bare `search`.
+        else if (Genie.Core.Mapper.MoveVerb.TryParseObjSearchDirective(verb, out var searchObj, out var objInner))
+        {
+            _hiddenExitVerb   = objInner;
+            _hiddenExitSearch = $"search {searchObj}";
+            verb = $"{_hiddenExitSearch};{_core.Config.CommandChar}send 1 {objInner}";
         }
         else
         {
-            _hiddenExitVerb = null;
+            _hiddenExitVerb   = null;
+            _hiddenExitSearch = null;
         }
 
         // Genie 4 quick-send chain segments — move="pull sconce;-1 go door":
@@ -864,7 +895,12 @@ public sealed class AutoWalkService : ReactiveObject
             $"Walking to {Current.Destination.Title} — searching for hidden exit{attemptNote} · Esc to cancel";
         _sessionChanges.OnNext(Current);
 
-        _core.Commands.ProcessInput("search");
+        // Objsearch steps (_hiddenExitSearch set) re-search via the re-dispatched
+        // chain itself — sending another search here would double it. Plain
+        // search-directive steps search here, then re-dispatch sends the inner
+        // move alone.
+        if (_hiddenExitSearch is null)
+            _core.Commands.ProcessInput("search");
 
         // Let the search (and its roundtime) resolve, then re-send the held move.
         // StepsCompleted was NOT advanced, so DispatchNextStep re-issues the same

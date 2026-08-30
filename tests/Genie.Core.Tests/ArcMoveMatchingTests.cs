@@ -30,6 +30,12 @@ public class ArcMoveMatchingTests
     [InlineData("search climb footholds", "climb footholds", true)]
     [InlineData("search go trampled path", "go faint trail", false)]
     [InlineData("search go trampled path", "search", false)]   // the search itself isn't the move
+    // Objsearch-directive arcs (named-object hidden exit) match the inner move.
+    [InlineData("objsearch outcropping climb handholds", "climb handholds", true)]              // Map33a → Alfren's Ford
+    [InlineData("objsearch outcropping climb handholds", "objsearch outcropping climb handholds", true)]  // exact still works
+    [InlineData("objsearch back.wall go narrow gap", "go narrow gap", true)]                    // Map150 Fang Cove
+    [InlineData("objsearch outcropping climb handholds", "search outcropping", false)]          // the search isn't the move
+    [InlineData("objsearch outcropping climb handholds", "climb crack", false)]
     // Semicolon-chain arcs match any individual segment.
     [InlineData("'grek;go door", "go door", true)]
     [InlineData("'grek;go door", "'grek", true)]

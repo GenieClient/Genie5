@@ -78,6 +78,49 @@ public class MoveVerbTests
         Assert.False(MoveVerb.TryParseSearchDirective(verb, out _));
     }
 
+    // ── Objsearch directive (named-object hidden exits) ─────────────────────
+    // Genie 4 map idiom: move="objsearch outcropping climb handholds" means the
+    // exit only opens after searching the NAMED object (automapper.cmd
+    // MOVE.OBJSEARCH: put search %searchObj, wait RT, then the inner move).
+    // Live-verified 2026-08-30 (Mistwood outcropping): bare `search` never
+    // reveals these exits — only the targeted search does.
+
+    [Theory]
+    [InlineData("objsearch outcropping climb handholds", "outcropping", "climb handholds")]  // Map33a → Alfren's Ford
+    [InlineData("objsearch outcrop climb handholds",     "outcrop",     "climb handholds")]  // Map33a return arc
+    [InlineData("objsearch rubble climb stairway",       "rubble",      "climb stairway")]   // Map34 Mistwood
+    [InlineData("objsearch ravine climb crack",          "ravine",      "climb crack")]      // Map34 Mistwood
+    [InlineData("objsearch back.wall go narrow gap",     "back.wall",   "go narrow gap")]    // Map150 — dot kept verbatim (G4 parity)
+    [InlineData("objsearch creeper go cave",             "creeper",     "go cave")]          // Map150 Fang Cove
+    [InlineData("OBJSEARCH Rubble CLIMB STAIRWAY",       "Rubble",      "CLIMB STAIRWAY")]   // case-insensitive prefix
+    [InlineData("  objsearch  rubble  climb stairway",   "rubble",      "climb stairway")]   // padding tolerated
+    public void TryParseObjSearchDirective_DirectiveForms_ReturnObjectAndInnerMove(
+        string verb, string expectedObj, string expectedMove)
+    {
+        Assert.True(MoveVerb.TryParseObjSearchDirective(verb, out var obj, out var inner));
+        Assert.Equal(expectedObj, obj);
+        Assert.Equal(expectedMove, inner);
+    }
+
+    [Theory]
+    [InlineData("objsearch outcropping")]        // object but no inner move
+    [InlineData("objsearch")]                    // bare verb
+    [InlineData("objsearches rubble climb x")]   // "objsearch" must be its own token
+    [InlineData("search go trampled path")]      // plain search directive, not objsearch
+    [InlineData("climb handholds")]              // plain move
+    [InlineData("")]
+    [InlineData(null)]
+    public void TryParseObjSearchDirective_NonDirectiveForms_ReturnFalse(string? verb)
+    {
+        Assert.False(MoveVerb.TryParseObjSearchDirective(verb, out _, out _));
+    }
+
+    [Fact]
+    public void IsMovementCommand_ObjSearchDirective_CountsAsMovement()
+    {
+        Assert.True(MoveVerb.IsMovementCommand("objsearch outcropping climb handholds"));
+    }
+
     // ── Quick-send chain segments ───────────────────────────────────────────
     // Genie 4 rewrites a ';'-segment starting with '-' to "#send <rest>"
     // (QuickSendChar, Core/Command.cs:254); #send peels leading digits/'.' as

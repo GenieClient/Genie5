@@ -1017,6 +1017,10 @@ public sealed class AutoMapperEngine
     ///   <item>Search directive — <c>move="search go trampled path"</c> (Genie 4
     ///         hidden-exit idiom): the walker sends <c>search</c> and the inner go
     ///         as separate commands; match the inner move.</item>
+    ///   <item>Objsearch directive — <c>move="objsearch outcropping climb
+    ///         handholds"</c> (named-object hidden exit): the walker sends the
+    ///         targeted search and the inner move separately; match the inner
+    ///         move.</item>
     ///   <item>Semicolon chain — <c>move="'grek;go door"</c> (say the password,
     ///         then go): the command pipeline splits on the separator and sends
     ///         each segment individually; match any segment. Segments are
@@ -1033,6 +1037,11 @@ public sealed class AutoMapperEngine
         var normalized = MoveVerb.Normalize(arcMove);
         if (MoveVerb.TryParseSearchDirective(normalized, out var inner)
             && inner.Equals(used, StringComparison.OrdinalIgnoreCase)) return true;
+        // Objsearch directive ("objsearch outcropping climb handholds"): the
+        // walker sends `search outcropping` and the inner move as separate
+        // commands; only the inner move changes rooms, so match that.
+        if (MoveVerb.TryParseObjSearchDirective(normalized, out _, out var objInner)
+            && objInner.Equals(used, StringComparison.OrdinalIgnoreCase)) return true;
         if (normalized.Contains(';'))
             foreach (var segment in normalized.Split(';'))
             {

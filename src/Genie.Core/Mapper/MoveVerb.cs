@@ -128,8 +128,9 @@ public static class MoveVerb
         var verb  = space < 0 ? v : v[..space];
 
         // "search go trampled path" — the directive form moves; "search bushes"
-        // does not.
+        // does not. Same for "objsearch outcropping climb handholds".
         if (TryParseSearchDirective(v, out _)) return true;
+        if (TryParseObjSearchDirective(v, out _, out _)) return true;
 
         return MovementVerbs.Contains(verb, StringComparer.OrdinalIgnoreCase);
     }
@@ -168,6 +169,50 @@ public static class MoveVerb
                 return true;
             }
         return false;
+    }
+
+    /// <summary>
+    /// Recognize the Genie 4 <b>objsearch directive</b> arc form:
+    /// <c>move="objsearch outcropping climb handholds"</c> — a hidden exit that
+    /// only opens after searching a NAMED in-room object. Unlike the bare
+    /// search directive (<see cref="TryParseSearchDirective"/>, go-first with
+    /// search-on-bounce), Genie 4's <c>.automapper</c> MOVE.OBJSEARCH always
+    /// searches FIRST — <c>put search %searchObj</c>, wait out the roundtime,
+    /// then send the inner move — and live testing (Mistwood outcropping,
+    /// 2026-08-30) shows why: a bare <c>search</c> never reveals these exits,
+    /// only the targeted object search does (and re-searching an already
+    /// revealed object is a harmless "You notice …" line). G4's parse is
+    /// <c>^(objsearch) (\S+) (.+)</c> — object is a single token (kept verbatim,
+    /// dots included: <c>back.wall</c> is sent exactly as authored, matching
+    /// G4), remainder is the inner move.
+    /// <para>Returns true with the object token and the inner move when
+    /// <paramref name="verb"/> is an objsearch directive. <c>objsearch</c> is
+    /// not a DR verb (it bounces with "Please rephrase that command."), so
+    /// there is no literal-command ambiguity to guard against.</para>
+    /// </summary>
+    public static bool TryParseObjSearchDirective(string? verb, out string searchObj, out string innerMove)
+    {
+        searchObj = string.Empty;
+        innerMove = string.Empty;
+        if (string.IsNullOrWhiteSpace(verb)) return false;
+        var v = verb.Trim();
+
+        const string prefix = "objsearch ";
+        if (v.Length <= prefix.Length ||
+            !v.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var rest = v[prefix.Length..].TrimStart();
+        var space = rest.IndexOf(' ');
+        if (space <= 0) return false;                      // need "<obj> <move…>"
+
+        var obj  = rest[..space];
+        var move = rest[(space + 1)..].TrimStart();
+        if (move.Length == 0) return false;
+
+        searchObj = obj;
+        innerMove = move;
+        return true;
     }
 
     /// <summary>
