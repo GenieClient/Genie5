@@ -23,12 +23,28 @@ namespace Genie.App.ViewModels;
 /// marshals onto the UI thread via <see cref="RxApp.MainThreadScheduler"/>
 /// because raw chunks arrive on the connection read-loop thread.
 /// </summary>
-public class RawXmlViewModel : ReactiveObject
+public class RawXmlViewModel : ReactiveObject, Controls.IScrollHoldSink
 {
     /// <summary>Rolling cap so a long session can't grow the buffer without
     /// bound. The raw stream is higher-volume than the parsed feeds, so this
     /// is generous but still finite.</summary>
     private const int MaxLines = 5000;
+
+    // Scroll-hold trim deferral (#293 follow-up) — see GameTextViewModel.ViewHeld.
+    private bool _viewHeld;
+    public bool ViewHeld
+    {
+        get => _viewHeld;
+        set
+        {
+            if (_viewHeld == value) return;
+            _viewHeld = value;
+            if (!value)
+                while (Lines.Count > MaxLines) Lines.RemoveAt(0);
+        }
+    }
+
+    private int TrimCap => _viewHeld ? MaxLines * 2 : MaxLines;
 
     /// <summary>One raw line per row, as a plain <c>TextLine</c> (Color =
     /// StreamColor.Main, no Links/BoldSpans/PresetSpans) — this is a verbatim
@@ -75,7 +91,7 @@ public class RawXmlViewModel : ReactiveObject
             if (line.Length == 0) continue;
 
             Lines.Add(new TextLine(line, StreamColor.Main));
-            if (Lines.Count > MaxLines)
+            if (Lines.Count > TrimCap)
                 Lines.RemoveAt(0);
         }
     }

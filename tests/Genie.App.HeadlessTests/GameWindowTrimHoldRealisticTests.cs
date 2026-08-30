@@ -41,6 +41,7 @@ public class GameWindowTrimHoldRealisticTests
             // XAML order: the ScrollViewer's attached ItemsSource binds (and
             // subscribes) before the child ItemsControl's own ItemsSource.
             AutoScrollBehavior.SetItemsSource(Sv, Vm.Lines);
+            AutoScrollBehavior.SetTrimHoldSink(Sv, Vm);
 
             Ic = new ItemsControl
             {
@@ -167,5 +168,94 @@ public class GameWindowTrimHoldRealisticTests
         }
 
         Assert.Equal(before, h.ScreenY(anchor), 1);
+    }
+
+    // ── Trim deferral while held (#293 follow-up) ──────────────────────────
+    // The compensation alone only holds until the reader's lines are trimmed
+    // out of the buffer — at the cap, spam eats the whole scrollback in
+    // seconds. While held, trims must DEFER (buffer grows past cap), and
+    // returning to the bottom catches them up.
+
+    [AvaloniaFact]
+    public void Held_view_survives_spam_far_beyond_the_cap()
+    {
+        using var h = new Harness(cap: 100);
+
+        for (var i = 0; i < 130; i++) { h.AddGameLine(); h.Pump(); }
+
+        h.Sv.Offset = h.Sv.Offset.WithY((h.Sv.Extent.Height - h.Sv.Viewport.Height) / 2);
+        h.Pump();
+        var anchor = h.TopVisibleLine();
+        var before = h.ScreenY(anchor);
+
+        // 400 lines — four times the whole cap. Without deferral the anchor
+        // line would have been trimmed out long ago and the view would scroll.
+        for (var burst = 0; burst < 80; burst++)
+        {
+            for (var i = 0; i < 5; i++) h.AddGameLine();
+            h.Pump();
+        }
+
+        Assert.True(h.Vm.Lines.Count > 100, "trims were not deferred while held");
+        Assert.Equal(before, h.ScreenY(anchor), 1);
+    }
+
+    [AvaloniaFact]
+    public void Returning_to_bottom_catches_up_deferred_trims()
+    {
+        using var h = new Harness(cap: 100);
+
+        for (var i = 0; i < 130; i++) { h.AddGameLine(); h.Pump(); }
+        h.Sv.Offset = h.Sv.Offset.WithY((h.Sv.Extent.Height - h.Sv.Viewport.Height) / 2);
+        h.Pump();
+        for (var i = 0; i < 200; i++) h.AddGameLine();
+        h.Pump();
+        Assert.True(h.Vm.Lines.Count > 100);
+
+        h.Sv.ScrollToEnd();
+        h.Pump();
+
+        Assert.Equal(100, h.Vm.Lines.Count);
+        var max = h.Sv.Extent.Height - h.Sv.Viewport.Height;
+        Assert.True(h.Sv.Offset.Y >= max - 1,
+            $"expected the view pinned at the bottom after catch-up (offset {h.Sv.Offset.Y} vs max {max})");
+    }
+
+    [AvaloniaFact]
+    public void Paused_at_bottom_defers_and_unpausing_catches_up()
+    {
+        using var h = new Harness(cap: 100);
+
+        for (var i = 0; i < 130; i++) { h.AddGameLine(); h.Pump(); }
+        AutoScrollBehavior.SetPaused(h.Sv, true);
+        h.Pump();
+        var anchor = h.TopVisibleLine();
+        var before = h.ScreenY(anchor);
+
+        for (var i = 0; i < 300; i++) h.AddGameLine();
+        h.Pump();
+
+        Assert.True(h.Vm.Lines.Count > 100, "trims were not deferred while paused");
+        Assert.Equal(before, h.ScreenY(anchor), 1);
+
+        AutoScrollBehavior.SetPaused(h.Sv, false);
+        h.Pump();
+        Assert.Equal(100, h.Vm.Lines.Count);
+    }
+
+    [AvaloniaFact]
+    public void Emergency_ceiling_bounds_an_extreme_hold()
+    {
+        using var h = new Harness(cap: 100);   // ceiling = max(200, 1100) = 1100
+
+        for (var i = 0; i < 130; i++) { h.AddGameLine(); h.Pump(); }
+        h.Sv.Offset = h.Sv.Offset.WithY((h.Sv.Extent.Height - h.Sv.Viewport.Height) / 2);
+        h.Pump();
+
+        for (var i = 0; i < 1300; i++) h.AddGameLine();
+        h.Pump();
+
+        Assert.True(h.Vm.Lines.Count <= 1100,
+            $"held buffer must stop at the emergency ceiling (count {h.Vm.Lines.Count})");
     }
 }

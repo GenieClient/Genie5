@@ -15,7 +15,7 @@ using ReactiveUI;
 
 namespace Genie.App.ViewModels;
 
-public class GameTextViewModel : ReactiveObject
+public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
 {
     // Scrollback cap — how many rendered lines to keep before trimming the
     // oldest. Set from GenieConfig.ScrollbackLines on Attach (default 2000);
@@ -348,6 +348,30 @@ public class GameTextViewModel : ReactiveObject
         _lastLineWasPrompt = isPrompt;
     }
 
+    // ── Scroll-hold trim deferral (#293 follow-up) ─────────────────────────
+    // The viewport compensation can hold the view still across trims, but only
+    // until the lines being READ are themselves trimmed — at the cap a busy
+    // stream eats the reader's scrollback in seconds. So while the game view
+    // is held (paused or rolled back — AutoScrollBehavior.TrimHoldSink sets
+    // this), trims defer: the buffer grows past the cap and nothing vanishes
+    // above the reader. An emergency ceiling (2× cap, at least cap+1000) still
+    // trims during an extreme hold so an AFK pause can't grow memory forever —
+    // those trims are viewport-compensated like any others. Returning to the
+    // bottom trims the excess back to the cap in one catch-up pass.
+    private bool _viewHeld;
+    public bool ViewHeld
+    {
+        get => _viewHeld;
+        set
+        {
+            if (_viewHeld == value) return;
+            _viewHeld = value;
+            if (!value) TrimScrollback();   // catch up; guarded for reentrancy below
+        }
+    }
+
+    private int TrimCap => _viewHeld ? Math.Max(_maxLines * 2, _maxLines + 1000) : _maxLines;
+
     /// <summary>
     /// Drop oldest lines when over the scrollback cap. Trimming is deferred when
     /// a <see cref="ObservableCollection{T}.CollectionChanged"/> is already in
@@ -356,10 +380,10 @@ public class GameTextViewModel : ReactiveObject
     /// </summary>
     private void TrimScrollback()
     {
-        if (Lines.Count <= _maxLines) return;
+        if (Lines.Count <= TrimCap) return;
         try
         {
-            while (Lines.Count > _maxLines)
+            while (Lines.Count > TrimCap)
                 Lines.RemoveAt(0);
         }
         catch (InvalidOperationException ex)
@@ -367,7 +391,7 @@ public class GameTextViewModel : ReactiveObject
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                while (Lines.Count > _maxLines)
+                while (Lines.Count > TrimCap)
                     Lines.RemoveAt(0);
             });
         }

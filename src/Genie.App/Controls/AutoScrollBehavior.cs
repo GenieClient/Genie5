@@ -10,6 +10,21 @@ using ReactiveUI.Fody.Helpers;
 namespace Genie.App.Controls;
 
 /// <summary>
+/// Implemented by line-buffer view-models whose scrollback trims should DEFER
+/// while a view of the buffer is held (#293 follow-up): the synchronous trim
+/// compensation can hold the viewport still, but only until the lines being
+/// read are themselves trimmed out of the buffer — at the cap, a busy stream
+/// eats the reader's text in seconds. While <see cref="ViewHeld"/> is true the
+/// buffer stops trimming at its normal cap (an emergency ceiling still
+/// applies), and setting it false trims the excess in one catch-up pass.
+/// </summary>
+public interface IScrollHoldSink
+{
+    /// <summary>True while the bound view is paused or rolled back.</summary>
+    bool ViewHeld { get; set; }
+}
+
+/// <summary>
 /// Attached behaviour that keeps a ScrollViewer scrolled to the newest item
 /// unless the user has manually scrolled up.
 ///
@@ -35,10 +50,19 @@ public static class AutoScrollBehavior
         AvaloniaProperty.RegisterAttached<ScrollViewer, bool>(
             "Paused", typeof(AutoScrollBehavior));
 
+    /// <summary>The buffer view-model (an <see cref="IScrollHoldSink"/>) told to
+    /// defer scrollback trims while this view is paused or rolled back. Bound in
+    /// the templates to the same view-model whose Lines feed the view; anything
+    /// else (or null) is ignored.</summary>
+    public static readonly AttachedProperty<object?> TrimHoldSinkProperty =
+        AvaloniaProperty.RegisterAttached<ScrollViewer, object?>(
+            "TrimHoldSink", typeof(AutoScrollBehavior));
+
     static AutoScrollBehavior()
     {
         ItemsSourceProperty.Changed.AddClassHandler<ScrollViewer>(OnItemsSourceChanged);
         PausedProperty.Changed.AddClassHandler<ScrollViewer>(OnPausedChanged);
+        TrimHoldSinkProperty.Changed.AddClassHandler<ScrollViewer>(OnTrimHoldSinkChanged);
     }
 
     public static IEnumerable? GetItemsSource(AvaloniaObject o)         => o.GetValue(ItemsSourceProperty);
@@ -46,6 +70,9 @@ public static class AutoScrollBehavior
 
     public static bool GetPaused(AvaloniaObject o)         => o.GetValue(PausedProperty);
     public static void SetPaused(AvaloniaObject o, bool v) => o.SetValue(PausedProperty, v);
+
+    public static object? GetTrimHoldSink(AvaloniaObject o)          => o.GetValue(TrimHoldSinkProperty);
+    public static void    SetTrimHoldSink(AvaloniaObject o, object? v) => o.SetValue(TrimHoldSinkProperty, v);
 
     private static void OnPausedChanged(ScrollViewer sv, AvaloniaPropertyChangedEventArgs e)
     {
@@ -58,6 +85,16 @@ public static class AutoScrollBehavior
             sv.Tag = state;
         }
         state.Paused = e.NewValue is true;
+    }
+
+    private static void OnTrimHoldSinkChanged(ScrollViewer sv, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (sv.Tag is not AutoScrollState state)
+        {
+            state  = new AutoScrollState(sv);
+            sv.Tag = state;
+        }
+        state.Sink = e.NewValue as IScrollHoldSink;
     }
 
     private static void OnItemsSourceChanged(
@@ -131,9 +168,33 @@ public sealed class AutoScrollState : ReactiveObject
         {
             if (_paused == value) return;
             _paused = value;
+            SyncHold();
+            // Pausing at the very bottom: step off the exact end so the
+            // presenter's end-pin can't drag the frozen view (see below).
+            if (value) NudgeOffExactEnd();
             // Resuming: catch up to whatever arrived while paused.
             if (!value) JumpToBottom();
         }
+    }
+
+    private IScrollHoldSink? _sink;
+
+    /// <summary>Buffer view-model deferring its trims while this view is held.
+    /// Assigned from the TrimHoldSink attached property; pushed the current
+    /// hold state immediately so a binding that resolves late doesn't leave the
+    /// buffer thinking it is held (or not) forever.</summary>
+    internal IScrollHoldSink? Sink
+    {
+        get => _sink;
+        set { _sink = value; SyncHold(); }
+    }
+
+    /// <summary>The view is "held" while paused or rolled back — the reader is
+    /// looking at scrollback, so the buffer must not trim it away underneath
+    /// them. Cheap to call redundantly; sinks no-op on an unchanged value.</summary>
+    private void SyncHold()
+    {
+        if (_sink is { } s) s.ViewHeld = _paused || !_atBottom;
     }
 
     public ICommand JumpToBottomCommand { get; }
@@ -237,6 +298,7 @@ public sealed class AutoScrollState : ReactiveObject
         var max = _sv.Extent.Height - _sv.Viewport.Height;
         _atBottom    = max <= 0 || _sv.Offset.Y >= max - 10;
         IsScrolledUp = !_atBottom;
+        SyncHold();
     }
 
     // ── Scroll helpers ─────────────────────────────────────────────────────
@@ -248,12 +310,31 @@ public sealed class AutoScrollState : ReactiveObject
         // (right after a line is added, or after an MDI relayout) — more
         // robust than computing Offset from Extent - Viewport.
         _sv.ScrollToEnd();
+        // "↓ Bottom" clicked while paused: show the newest line but do not
+        // re-engage the end-pin — the view stays frozen from here.
+        if (_paused) NudgeOffExactEnd();
+    }
+
+    /// <summary>
+    /// Avalonia's ScrollContentPresenter keeps the viewport pinned to the end
+    /// of the extent while Offset.Y sits EXACTLY at Extent − Viewport — extent
+    /// growth then drags the view down with it. Correct while following the
+    /// tail, wrong while paused: with trims deferred (#293 follow-up) the
+    /// extent grows on every line and the pin would scroll the "frozen" view.
+    /// Stepping half a pixel off the exact end is invisible but disengages it.
+    /// </summary>
+    private void NudgeOffExactEnd()
+    {
+        var max = _sv.Extent.Height - _sv.Viewport.Height;
+        if (max > 0 && _sv.Offset.Y >= max)
+            _sv.Offset = _sv.Offset.WithY(Math.Max(0, max - 0.5));
     }
 
     private void JumpToBottom()
     {
         _atBottom    = true;
         IsScrolledUp = false;
+        SyncHold();
         Dispatcher.UIThread.Post(ScrollToBottom, DispatcherPriority.Loaded);
     }
 }

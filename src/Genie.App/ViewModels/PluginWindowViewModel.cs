@@ -19,9 +19,24 @@ namespace Genie.App.ViewModels;
 /// link-capable pipeline the game/stream windows use — that's what lets a
 /// Genie 4 <c>#link</c> menu line be clickable here, not just in Main.</para>
 /// </summary>
-public class PluginWindowViewModel : ReactiveObject
+public class PluginWindowViewModel : ReactiveObject, Controls.IScrollHoldSink
 {
     private const int Max = 2000;
+
+    // Scroll-hold trim deferral (#293 follow-up) — see GameTextViewModel.ViewHeld.
+    private bool _viewHeld;
+    public bool ViewHeld
+    {
+        get => _viewHeld;
+        set
+        {
+            if (_viewHeld == value) return;
+            _viewHeld = value;
+            if (!value) Trim();
+        }
+    }
+
+    private int TrimCap => _viewHeld ? System.Math.Max(Max * 2, Max + 1000) : Max;
 
     public PluginWindowViewModel(string title)
     {
@@ -74,6 +89,6 @@ public class PluginWindowViewModel : ReactiveObject
 
     private void Trim()
     {
-        while (Lines.Count > Max) Lines.RemoveAt(0);
+        while (Lines.Count > TrimCap) Lines.RemoveAt(0);
     }
 }

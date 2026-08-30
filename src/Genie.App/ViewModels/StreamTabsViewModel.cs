@@ -247,9 +247,33 @@ public class StreamTabsViewModel : ReactiveObject
     };
 }
 
-public class StreamBuffer(string name) : ReactiveObject
+public class StreamBuffer(string name) : ReactiveObject, Controls.IScrollHoldSink
 {
     private const int Max = 500;
+
+    // Scroll-hold trim deferral (#293 follow-up) — while the panel's view is
+    // paused or rolled back, defer trims so the reader's scrollback isn't
+    // eaten underneath them; catch up when the view returns to the bottom.
+    // Ceiling bounds an extreme hold; see GameTextViewModel.ViewHeld.
+    private bool _viewHeld;
+    public bool ViewHeld
+    {
+        get => _viewHeld;
+        set
+        {
+            if (_viewHeld == value) return;
+            _viewHeld = value;
+            if (!value) Trim();
+        }
+    }
+
+    private int TrimCap => _viewHeld ? Math.Max(Max * 2, Max + 1000) : Max;
+
+    private void Trim()
+    {
+        while (Lines.Count > TrimCap)
+            Lines.RemoveAt(0);
+    }
 
     public string Name { get; } = name;
 
@@ -311,8 +335,7 @@ public class StreamBuffer(string name) : ReactiveObject
             presets = presets?.Select(s => s with { Start = s.Start + shift }).ToList();
         }
         Lines.Add(new TextLine(line, StreamColor.Main, links, bolds, presets, Window: Name));
-        while (Lines.Count > Max)
-            Lines.RemoveAt(0);
+        Trim();
     }
 }
 

@@ -328,7 +328,8 @@
                       controls:PageScroll.IsDefaultTarget="True"
                       controls:FindInWindow.ScrollModel="{Binding Find}"
                       controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}"
-                      controls:AutoScrollBehavior.Paused="{Binding IsScrollPaused}">
+                      controls:AutoScrollBehavior.Paused="{Binding IsScrollPaused}"
+                      controls:AutoScrollBehavior.TrimHoldSink="{Binding ViewModel}">
           <!-- Plain ItemsControl (keeps its default control-theme so it renders),
                with controls:LineSelection.Enabled adding browser-style selection
                ACROSS line items — Avalonia's per-control text selection can't
@@ -1415,7 +1416,8 @@
                       controls:PageScroll.IsTarget="True"
                       controls:FindInWindow.ScrollModel="{Binding Find}"
                       controls:AutoScrollBehavior.ItemsSource="{Binding Buffer.Lines}"
-                      controls:AutoScrollBehavior.Paused="{Binding IsScrollPaused}">
+                      controls:AutoScrollBehavior.Paused="{Binding IsScrollPaused}"
+                      controls:AutoScrollBehavior.TrimHoldSink="{Binding Buffer}">
           <ItemsControl ItemsSource="{Binding Buffer.Lines}"
                         FontFamily="{Binding ToolFontFamily}"
                         FontSize="{Binding ToolFontSize}"
@@ -1704,7 +1706,8 @@
         <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
                       controls:FindInWindow.ScrollModel="{Binding Find}"
-                      controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}">
+                      controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}"
+                      controls:AutoScrollBehavior.TrimHoldSink="{Binding ViewModel}">
           <ItemsControl ItemsSource="{Binding ViewModel.Lines}"
                         FontFamily="{Binding ToolFontFamily}"
                         FontSize="{Binding ToolFontSize}"
@@ -1816,7 +1819,8 @@
                 BorderThickness="1" CornerRadius="3">
           <ScrollViewer VerticalScrollBarVisibility="Auto"
                         HorizontalScrollBarVisibility="Auto"
-                        controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}">
+                        controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}"
+                        controls:AutoScrollBehavior.TrimHoldSink="{Binding ViewModel}">
             <ItemsControl ItemsSource="{Binding ViewModel.Lines}"
                           FontFamily="{Binding ToolFontFamily}"
                           FontSize="{Binding ToolFontSize}"
