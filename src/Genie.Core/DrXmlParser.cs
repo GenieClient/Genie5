@@ -154,6 +154,40 @@ public sealed class DrXmlParser : IDisposable
     // noise and stays dropped.
     private bool _inInjuriesDialog;
 
+    // ── Server dialog capture (public #156) ──────────────────────────────────
+    // While inside ANY <dialogData id=…> … </dialogData>, the Wrayth control
+    // vocabulary (label / cmdButton / editBox / …) is captured as typed
+    // DialogControls and the block's raw text is accumulated; one
+    // DialogDataEvent fires at the close tag. Outside a dialog those same tag
+    // names belong to the login settings dump and stay discarded. Injuries
+    // dual-emits: its <image> children still produce InjuryEvents (#18) AND
+    // the generic DialogDataEvent — consumers pick their feed.
+    private string? _dialogId;
+    private bool    _dialogClear;
+    private List<DialogControl>? _dialogControls;
+    private System.Text.StringBuilder? _dialogRaw;
+
+    /// <summary>Wrayth dialog-control tag names → their typed kind. Lowercase
+    /// (the parser lowercases element names).</summary>
+    private static readonly Dictionary<string, DialogControlType> _dialogControlTags =
+        new(StringComparer.Ordinal)
+        {
+            ["label"]          = DialogControlType.Label,
+            ["cmdbutton"]      = DialogControlType.CmdButton,
+            ["closebutton"]    = DialogControlType.CloseButton,
+            ["checkbox"]       = DialogControlType.CheckBox,
+            ["radio"]          = DialogControlType.Radio,
+            ["streambox"]      = DialogControlType.StreamBox,
+            ["dropdownbox"]    = DialogControlType.DropDownBox,
+            ["editbox"]        = DialogControlType.EditBox,
+            ["updowneditbox"]  = DialogControlType.UpDownEditBox,
+            ["progressbar"]    = DialogControlType.ProgressBar,
+            ["clearcontainer"] = DialogControlType.ClearContainer,
+            ["skin"]           = DialogControlType.Skin,
+            ["image"]          = DialogControlType.Image,
+            ["link"]           = DialogControlType.Link,
+        };
+
     // ── Silent `health` window (injuries auto-refresh) ───────────────────────
     // The dialog's Nsys image can't say wound vs scar; only the `health` verb's
     // text can. When the core issues an auto-refresh poll it arms this window
@@ -1025,17 +1059,16 @@ public sealed class DrXmlParser : IDisposable
         // carries the per-region injury <image> updates (issue #18), so both
         // are handled explicitly; non-injuries dialog content is still
         // discarded there.
-        "opendialog", "detach", "skin", "radio",
-        // ── Wrayth dialog-control vocabulary (pre-seeded, public #216) ──────
+        // "opendialog"/"closedialog"/"exposedialog" are NOT here either —
+        // the dialog lifecycle emits typed events now (public #156).
+        "detach", "skin", "radio",
+        // ── Wrayth dialog-control vocabulary (public #216 → #156) ──────────
         // Server-driven dialog controls (bank/store/spells/feats/profile-edit
-        // popups — the DynamicWindows-style vocabulary, public #156) plus the
-        // demeanor-menu <menuImage> observed live. Dropped today, but listed
-        // in _droppedDataTags below so `#audit xmlhunting` classifies them as
-        // DroppedData (a tracked coverage gap the server-dialog renderer will
-        // consume), not Unknown (which would draft a gap-report issue per
-        // tag). <progressBar>, <radio>, and <clearContainer> from the same
-        // vocabulary are already handled/skipped above.
-        "menuimage", "closedialog", "exposedialog",
+        // popups — the DynamicWindows-style vocabulary) plus the demeanor-menu
+        // <menuImage> observed live. INSIDE a <dialogData> block these are
+        // captured as typed DialogControls before this discard runs (#156);
+        // OUTSIDE one they belong to the login settings dump and drop here.
+        "menuimage",
         "label", "cmdbutton", "closebutton", "checkbox",
         "streambox", "dropdownbox", "editbox", "updowneditbox",
         // <switchQuickBar id='quick-simu'/> — Wrayth/StormFront quick-bar
@@ -1089,11 +1122,87 @@ public sealed class DrXmlParser : IDisposable
     //                       exp <compDef>, …). The hunt targets.
     //   • DroppedSetting  — the Wrayth settings dump; correctly discarded.
     //   • Unknown         — neither handled nor skipped → emits UnknownTagEvent.
+    // ── Server dialog capture helpers (public #156) ──────────────────────────
+
+    /// <summary>DR truthy attribute forms: <c>t</c> / <c>true</c> / <c>y</c> / <c>1</c>.</summary>
+    private static bool IsTruthy(string? v) =>
+        v is not null &&
+        (v.Equals("t", StringComparison.OrdinalIgnoreCase) ||
+         v.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+         v.Equals("y", StringComparison.OrdinalIgnoreCase) ||
+         v == "1");
+
+    /// <summary>Capture one control tag inside the open dialog context: strong
+    /// fields via the reader, the FULL attribute set via a raw-tag scan (the
+    /// reader shim only indexes known names), raw text appended for the
+    /// capture journal.</summary>
+    private void CaptureDialogControl(DialogControlType type, XmlReader r, string rawTag)
+    {
+        if (_dialogControls is null) return;
+        _dialogRaw?.Append(rawTag);
+        _dialogControls.Add(new DialogControl(
+            type,
+            r["id"] ?? "",
+            r["value"], r["text"], r["cmd"],
+            r["left"], r["top"], r["width"], r["height"], r["align"],
+            ParseRawAttributes(rawTag)));
+    }
+
+    /// <summary>All <c>name='value'</c> / <c>name="value"</c> pairs from a raw
+    /// tag string. DR emits both quote styles (single in live streams, double
+    /// in the login block); values never contain their own delimiter.</summary>
+    private static Dictionary<string, string> ParseRawAttributes(string rawTag)
+    {
+        var attrs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        int i = 0;
+        // Skip the element name.
+        while (i < rawTag.Length && !char.IsWhiteSpace(rawTag[i])) i++;
+        while (i < rawTag.Length)
+        {
+            while (i < rawTag.Length && (char.IsWhiteSpace(rawTag[i]) || rawTag[i] == '/')) i++;
+            int nameStart = i;
+            while (i < rawTag.Length && rawTag[i] != '=' && rawTag[i] != '>' && !char.IsWhiteSpace(rawTag[i])) i++;
+            if (i >= rawTag.Length || rawTag[i] != '=') break;
+            var name = rawTag[nameStart..i];
+            i++;                                             // past '='
+            if (i >= rawTag.Length) break;
+            var quote = rawTag[i];
+            if (quote != '\'' && quote != '"') break;       // malformed — stop scanning
+            i++;
+            int valStart = i;
+            while (i < rawTag.Length && rawTag[i] != quote) i++;
+            if (i >= rawTag.Length) break;
+            attrs[name] = System.Net.WebUtility.HtmlDecode(rawTag[valStart..i]);
+            i++;
+        }
+        return attrs;
+    }
+
+    /// <summary>Close the open dialog context: append the close tag to the raw
+    /// capture and fire the block's DialogDataEvent. Safe to call when no
+    /// context is open (defensive flush sites).</summary>
+    private void EmitDialogData()
+    {
+        if (_dialogId is null) return;
+        _dialogRaw?.Append("</dialogData>");
+        _events.OnNext(new DialogDataEvent(
+            _dialogId,
+            _dialogControls ?? (IReadOnlyList<DialogControl>)Array.Empty<DialogControl>(),
+            _dialogClear,
+            _dialogRaw?.ToString() ?? string.Empty));
+        _dialogId       = null;
+        _dialogClear    = false;
+        _dialogControls = null;
+        _dialogRaw      = null;
+    }
+
     // Keep <see cref="_handledTags"/> in sync with the HandleElement switch.
     private static readonly HashSet<string> _handledTags = new(StringComparer.OrdinalIgnoreCase)
     {
-        "a", "app", "b", "casttime", "cleardynastream", "clearstream", "compass", "component", "container",
-        "crtrstatus", "d", "dialogdata", "dir", "endsetup", "image", "indicator", "inv",
+        "a", "app", "b", "casttime", "cleardynastream", "clearstream",
+        "closedialog", "compass", "component", "container",
+        "crtrstatus", "d", "dialogdata", "dir", "endsetup", "exposedialog",
+        "image", "indicator", "inv", "opendialog",
         "left", "nav", "openwindow", "output", "popbold", "popstream",
         "preset", "progressbar", "prompt", "pushbold", "pushstream",
         "resource", "right", "roundtime", "settingsinfo", "spell", "spelltime",
@@ -1105,12 +1214,13 @@ public sealed class DrXmlParser : IDisposable
     // is unchanged; this set only drives classification.)
     private static readonly HashSet<string> _droppedDataTags = new(StringComparer.OrdinalIgnoreCase)
     {
-        "skin", "compdef", "opendialog",
+        "skin", "compdef",
         "radio", "detach", "playerid", "exposecontainer", "clearcontainer",
-        // Wrayth dialog-control vocabulary — pre-seeded as DroppedData so the
-        // first bank/store/spells dialog opened in Wrayth mode doesn't fire a
-        // gap-report issue per control (public #216; renderer is #156).
-        "menuimage", "closedialog", "exposedialog", "menulink",
+        // Wrayth dialog-control vocabulary — DroppedData ONLY outside a
+        // <dialogData> block (inside one they're captured as DialogControls,
+        // #156); pre-seeding keeps `#audit xmlhunting` from drafting a
+        // gap-report issue per control (public #216).
+        "menuimage", "menulink",
         "label", "cmdbutton", "closebutton", "checkbox",
         "streambox", "dropdownbox", "editbox", "updowneditbox",
     };
@@ -1139,6 +1249,15 @@ public sealed class DrXmlParser : IDisposable
         // bold) are harmless — the line carrying their text still emits and
         // re-sets the flag before any following blank.
         _emittedTextLine = false;
+
+        // Server dialog capture (#156): inside a <dialogData> block, control
+        // tags become typed DialogControls BEFORE the settings discard below
+        // can eat them (the login settings dump reuses these names OUTSIDE a
+        // dialog, where they still discard). No early return — progressBar
+        // and <image> fall through to their existing cases so the vitals bar
+        // and the injuries panel (#18) keep their feeds unchanged.
+        if (_dialogId is not null && _dialogControlTags.TryGetValue(name, out var controlType))
+            CaptureDialogControl(controlType, r, rawTag);
 
         if (_settingsTags.Contains(name)) return;
 
@@ -1545,9 +1664,51 @@ public sealed class DrXmlParser : IDisposable
             // context; any open tag for a DIFFERENT dialog closes it
             // defensively (DR never nests dialogData).
             case "dialogdata":
+            {
+                var dialogId    = r["id"] ?? "";
+                var selfClosing = rawTag.TrimEnd().EndsWith("/>", StringComparison.Ordinal);
+                var clear       = IsTruthy(r["clear"]);
+
                 _inInjuriesDialog =
-                    string.Equals(r["id"], "injuries", StringComparison.OrdinalIgnoreCase)
-                    && !rawTag.TrimEnd().EndsWith("/>", StringComparison.Ordinal);
+                    string.Equals(dialogId, "injuries", StringComparison.OrdinalIgnoreCase)
+                    && !selfClosing;
+
+                // #156 generic capture. DR never nests dialogData, but a new
+                // open while one is pending (dropped close tag at a TCP
+                // boundary) flushes the pending block first so nothing is lost.
+                if (_dialogId is not null) EmitDialogData();
+                if (dialogId.Length == 0) break;
+                if (selfClosing)
+                {
+                    // <dialogData id='x' clear='t'/> — a bare reset.
+                    _events.OnNext(new DialogDataEvent(
+                        dialogId, Array.Empty<DialogControl>(), clear, rawTag));
+                    break;
+                }
+                _dialogId       = dialogId;
+                _dialogClear    = clear;
+                _dialogControls = new List<DialogControl>();
+                _dialogRaw      = new System.Text.StringBuilder(rawTag);
+                break;
+            }
+
+            // ── Server dialog lifecycle (public #156) ────────────────────
+            // <openDialog> arrives in the login block for the stored Wrayth
+            // profile's windows, and situationally mid-session. It WRAPS a
+            // dialogData child, which the cases above handle normally.
+            case "opendialog":
+                _events.OnNext(new OpenDialogEvent(
+                    r["id"] ?? "", r["title"] ?? "", r["location"] ?? "",
+                    r["width"], r["height"], IsTruthy(r["resident"]),
+                    r["type"] ?? "", rawTag));
+                break;
+            case "closedialog":
+                if (r["id"] is { Length: > 0 } closeId)
+                    _events.OnNext(new CloseDialogEvent(closeId));
+                break;
+            case "exposedialog":
+                if (r["id"] is { Length: > 0 } exposeId)
+                    _events.OnNext(new ExposeDialogEvent(exposeId));
                 break;
 
             // ── Injury reading (one body region) ─────────────────────────────
@@ -1923,6 +2084,7 @@ public sealed class DrXmlParser : IDisposable
 
             case "dialogdata":
                 _inInjuriesDialog = false;
+                EmitDialogData();
                 break;
 
             case "b":

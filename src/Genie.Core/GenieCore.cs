@@ -141,6 +141,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// wipe the layered Global rules. Headless hosts leave this false.</summary>
     public bool HostOwnsRuleLoad { get; set; }
 
+    /// <summary>The #156 dialog capture journal — lazily created against
+    /// <see cref="GenieConfig.LogDir"/> on the first dialog event.</summary>
+    private Dialogs.DialogJournal? _dialogJournal;
+
     // ── Command pipeline ───────────────────────────────────────────────────────
     private readonly CommandQueue _commandQueue;
     private readonly EventQueue   _eventQueue;
@@ -867,6 +871,24 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                     // Connect-time `flags` probe result (issue #29): warn if any
                     // stream-affecting flag is in an untested state.
                     HandleFlagsReport(fr);
+                    break;
+
+                case OpenDialogEvent od:
+                    // #156 dialog capture journal: an unseen dialog's open tag
+                    // is logged so its geometry/title accompany the content
+                    // block below.
+                    (_dialogJournal ??= new Dialogs.DialogJournal(Config.LogDir))
+                        .ObserveOpen(od.Id, od.RawXml);
+                    break;
+
+                case DialogDataEvent dd:
+                    // First sighting of a dialog id → journal its raw block
+                    // (the renderer fixtures for #156 accrue from normal play)
+                    // and say so once.
+                    if ((_dialogJournal ??= new Dialogs.DialogJournal(Config.LogDir))
+                        .Observe(dd.DialogId, dd.RawXml))
+                        RaiseEchoLine(
+                            $"[dialogs] new server dialog '{dd.DialogId}' captured → Logs/{Dialogs.DialogJournal.FileName}");
                     break;
             }
         });

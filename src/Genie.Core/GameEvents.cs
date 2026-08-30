@@ -376,6 +376,65 @@ public sealed record FlagsReportEvent(IReadOnlyDictionary<string, bool> Flags) :
 /// </summary>
 public sealed record ContainerEvent(string LogicalId, string Title, string TargetId) : GameEvent;
 
+// ── Server-driven dialogs (public #156) ──────────────────────────────────────
+
+/// <summary>The Wrayth dialog-control vocabulary (see
+/// docs/internal/SERVER_DIALOGS_DESIGN.md). <see cref="Unknown"/> keeps a
+/// forward-compatible bag-only control instead of dropping new tags.</summary>
+public enum DialogControlType
+{
+    Label, CmdButton, CloseButton, CheckBox, Radio, StreamBox, DropDownBox,
+    EditBox, UpDownEditBox, ProgressBar, ClearContainer, Skin, Image, Link,
+    Unknown,
+}
+
+/// <summary>
+/// One control from a <c>&lt;dialogData&gt;</c> block. The common attributes
+/// surface as strong fields; EVERYTHING the tag carried (including those) is
+/// in <see cref="Attributes"/> so renderers and the capture journal lose
+/// nothing. Geometry stays string-typed — DR mixes pixel and percent forms
+/// (<c>left='20%'</c>, <c>top='160'</c>).
+/// </summary>
+public sealed record DialogControl(
+    DialogControlType Type,
+    string Id,
+    string? Value,
+    string? Text,
+    string? Cmd,
+    string? Left,
+    string? Top,
+    string? Width,
+    string? Height,
+    string? Align,
+    IReadOnlyDictionary<string, string> Attributes);
+
+/// <summary>
+/// One <c>&lt;dialogData id='…'&gt;</c> block — a DELTA against the dialog's
+/// current state (controls merge by id; see the minivitals captures), not a
+/// redraw. <see cref="Clear"/> maps the <c>clear='t'</c> attribute form —
+/// reset the dialog before applying <see cref="Controls"/> (which may be
+/// empty). <see cref="RawXml"/> is the verbatim block for the dialog capture
+/// journal and offline schema work.
+/// </summary>
+public sealed record DialogDataEvent(
+    string DialogId,
+    IReadOnlyList<DialogControl> Controls,
+    bool Clear,
+    string RawXml) : GameEvent;
+
+/// <summary>DR opens a dialog window — sent in the login block for the
+/// stored Wrayth profile's windows, and situationally mid-session.
+/// <c>location='detach'</c> means float; Width/Height are pixel strings.</summary>
+public sealed record OpenDialogEvent(
+    string Id, string Title, string Location, string? Width, string? Height,
+    bool Resident, string DialogType, string RawXml) : GameEvent;
+
+/// <summary>DR closes the dialog window with this id.</summary>
+public sealed record CloseDialogEvent(string Id) : GameEvent;
+
+/// <summary>DR brings the dialog window with this id to the front.</summary>
+public sealed record ExposeDialogEvent(string Id) : GameEvent;
+
 // ── Unknown ──────────────────────────────────────────────────────────────────
 
 /// <summary>Tag the parser doesn't recognise — forwarded raw to the AI for analysis.</summary>

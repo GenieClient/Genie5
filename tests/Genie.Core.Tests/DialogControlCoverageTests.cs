@@ -22,7 +22,11 @@ public class DialogControlCoverageTests
     public static IEnumerable<object[]> DialogControlTags() =>
         new[]
         {
-            "menuimage", "closedialog", "exposedialog", "menulink",
+            // "closedialog"/"exposedialog"/"opendialog" moved to Consumed —
+            // the dialog lifecycle emits typed events now (#156 Phase 0b);
+            // the CONTROL vocabulary below still drops outside a <dialogData>
+            // block (inside one it's captured as DialogControls).
+            "menuimage", "menulink",
             "label", "cmdbutton", "closebutton", "checkbox",
             "streambox", "dropdownbox", "editbox", "updowneditbox",
         }.Select(t => new object[] { t });
@@ -35,6 +39,13 @@ public class DialogControlCoverageTests
         // Case-insensitive — DR sends these camelCased (menuImage, cmdButton, …).
         Assert.Equal(DrXmlParser.TagFate.DroppedData, DrXmlParser.ClassifyTag(tag.ToUpperInvariant()));
     }
+
+    [Theory]
+    [InlineData("opendialog")]
+    [InlineData("closedialog")]
+    [InlineData("exposedialog")]
+    public void Dialog_lifecycle_classifies_as_consumed(string tag)
+        => Assert.Equal(DrXmlParser.TagFate.Consumed, DrXmlParser.ClassifyTag(tag));
 
     [Fact]
     public void MenuImage_live_sample_is_silently_discarded_between_game_lines()
