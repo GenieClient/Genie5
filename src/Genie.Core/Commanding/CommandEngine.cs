@@ -796,6 +796,9 @@ public sealed class CommandEngine
             case "variable":
                 HandleVar(command, parts);
                 break;
+            case "dialogs":
+                HandleDialogs(parts);
+                break;
             case "eval":
             case "evalmath":
             {
@@ -1497,6 +1500,96 @@ public sealed class CommandEngine
             _host.SetGlobalVariable(name, value);
         else
             Variables!.Store.Set(name, value);
+    }
+
+    // ── #dialogs (public #156 Phase 0c) ──────────────────────────────────────
+
+    /// <summary>Session dialog inventory — wired by GenieCore; null offline
+    /// (the command explains itself in that case).</summary>
+    public Dialogs.DialogSessionTracker? DialogTracker { get; set; }
+
+    /// <summary><c>#dialogs</c> / <c>#dialogs list</c> — the server dialogs
+    /// seen this session (DynamicWindows <c>/debugwindows</c> parity);
+    /// <c>#dialogs report &lt;id&gt;</c> — draft a redacted GitHub coverage
+    /// issue for one of them and open it in the browser for the user to
+    /// review and submit (same human-in-the-loop model as the xmlhunting
+    /// gap reporter). #307 lesson: a browser-launch failure is echoed on its
+    /// own line and the URL is always printed — never folded into the draft.</summary>
+    private void HandleDialogs(IReadOnlyList<string> parts)
+    {
+        var sub = parts.Count > 1 ? parts[1].ToLowerInvariant() : "list";
+        if (DialogTracker is null)
+        {
+            _host.Echo("#dialogs: no session dialog data (connect first).");
+            return;
+        }
+
+        if (sub == "list")
+        {
+            var rows = DialogTracker.Snapshot();
+            if (rows.Count == 0)
+            {
+                _host.Echo("#dialogs: no server dialogs seen this session.");
+                return;
+            }
+            _host.Echo("Server dialogs seen this session:");
+            foreach (var row in rows)
+            {
+                var census = row.ControlCounts.Count == 0
+                    ? "no controls"
+                    : string.Join(", ", row.ControlCounts
+                        .OrderByDescending(kv => kv.Value)
+                        .Select(kv => $"{kv.Key}×{kv.Value}"));
+                var title = string.IsNullOrEmpty(row.Title) ? "" : $" “{row.Title}”";
+                _host.Echo($"  {row.Id}{title} — {row.Blocks} block(s): {census}");
+            }
+            _host.Echo("First sightings are journaled to Logs/" +
+                       Dialogs.DialogJournal.FileName +
+                       "; report one with: #dialogs report <id>");
+            return;
+        }
+
+        if (sub == "report" && parts.Count > 2)
+        {
+            var id  = parts[2];
+            var row = DialogTracker.TryGet(id);
+            if (row is null)
+            {
+                _host.Echo($"#dialogs: no dialog '{id}' seen this session. #dialogs list shows what has been.");
+                return;
+            }
+            var draft = Dialogs.DialogGapReport.Build(row, BuildReportContext());
+            _host.Echo($"Drafted “{draft.Title}” — review it in the browser and submit if it looks right.");
+            _host.Echo($"If the browser didn't open: {draft.Url}");
+            try
+            {
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo(draft.Url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                _host.Echo($"#dialogs: could not open the browser ({ex.Message}) — use the link above.");
+            }
+            return;
+        }
+
+        _host.Echo("Usage: #dialogs [list] | #dialogs report <id>");
+    }
+
+    /// <summary>Version/OS/commit lines for gap-report drafts, from the entry
+    /// assembly's informational version (same derivation the App host uses).</summary>
+    private static Diagnostics.XmlGapReport.ReportContext BuildReportContext()
+    {
+        var asm  = System.Reflection.Assembly.GetEntryAssembly();
+        var info = (asm is null ? null : System.Reflection.CustomAttributeExtensions
+                       .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(asm)?.InformationalVersion)
+                   ?? "5.0.0";
+        var plus = info.IndexOf('+');
+        return new Diagnostics.XmlGapReport.ReportContext(
+            AppVersion: plus >= 0 ? info[..plus] : info,
+            Os:         System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+            Commit:     plus >= 0 ? info[(plus + 1)..] : "local",
+            Trigger:    "#dialogs report");
     }
 
     /// <summary>

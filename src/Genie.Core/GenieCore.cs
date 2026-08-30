@@ -145,6 +145,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// <see cref="GenieConfig.LogDir"/> on the first dialog event.</summary>
     private Dialogs.DialogJournal? _dialogJournal;
 
+    /// <summary>Session inventory of server dialogs (#156 Phase 0c) —
+    /// backs <c>#dialogs list</c> / <c>#dialogs report</c>.</summary>
+    private readonly Dialogs.DialogSessionTracker _dialogTracker = new();
+
     // ── Command pipeline ───────────────────────────────────────────────────────
     private readonly CommandQueue _commandQueue;
     private readonly EventQueue   _eventQueue;
@@ -477,6 +481,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Substitutes    = new SubstituteEngine();
         Substitutes.Classes = Classes;
         Commands.Substitutes = Substitutes;  // wire #substitute command → engine
+        Commands.DialogTracker = _dialogTracker;   // wire #dialogs → session inventory (#156)
 
         Gags           = new GagEngine();
         Gags.Classes   = Classes;
@@ -877,6 +882,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                     // #156 dialog capture journal: an unseen dialog's open tag
                     // is logged so its geometry/title accompany the content
                     // block below.
+                    _dialogTracker.Observe(od);
                     (_dialogJournal ??= new Dialogs.DialogJournal(Config.LogDir))
                         .ObserveOpen(od.Id, od.RawXml);
                     break;
@@ -885,6 +891,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                     // First sighting of a dialog id → journal its raw block
                     // (the renderer fixtures for #156 accrue from normal play)
                     // and say so once.
+                    _dialogTracker.Observe(dd);
                     if ((_dialogJournal ??= new Dialogs.DialogJournal(Config.LogDir))
                         .Observe(dd.DialogId, dd.RawXml))
                         RaiseEchoLine(
