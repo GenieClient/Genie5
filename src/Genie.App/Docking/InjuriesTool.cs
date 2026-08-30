@@ -10,7 +10,7 @@ namespace Genie.App.Docking;
 /// Window → Injuries. Only the title syncs from <see cref="WindowSettings"/>;
 /// the cells keep their own severity colour coding.
 /// </summary>
-public class InjuriesTool : Tool, IWindowMenuHost
+public class InjuriesTool : ActivityTool, IWindowMenuHost
 {
     public InjuriesViewModel ViewModel { get; }
 
@@ -28,6 +28,11 @@ public class InjuriesTool : Tool, IWindowMenuHost
             ApplyTitle(settings);
             settings.Changed += () => ApplyTitle(settings);
         }
+
+        // Unread-activity flash: a body part newly wounded/scarred. (Severity
+        // shifts on an already-listed part don't touch this collection and
+        // stay silent — good enough for a first cut.)
+        WireActivity(vm.Injured);
     }
 
     private void ApplyTitle(WindowSettings s) =>

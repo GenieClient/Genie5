@@ -10,7 +10,7 @@ namespace Genie.App.Docking;
 /// Dock panel for the Experience plugin's named-window output. Monospaced so
 /// the plugin's column-aligned skill rows line up.
 /// </summary>
-public class ExperienceTool : Tool, IWindowMenuHost
+public class ExperienceTool : ActivityTool, IWindowMenuHost
 {
     public ExperienceViewModel ViewModel { get; }
 
@@ -33,6 +33,11 @@ public class ExperienceTool : Tool, IWindowMenuHost
             ApplySettings(settings);
             settings.Changed += () => ApplySettings(settings);
         }
+
+        // Unread-activity flash: every exp push rebuilds Lines (Clear + Adds),
+        // so Add events mark real updates; the highlight-repaint path uses
+        // Replace and stays silent.
+        WireActivity(vm.Lines);
     }
 
     // Public #233: these were get-only constants — the Layout tab saved the

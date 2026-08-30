@@ -8,7 +8,7 @@ namespace Genie.App.Docking;
 /// AutoMapper dock tool. Shows current zone, current room, exits, and a toggle
 /// for auto-creating new rooms during exploration.
 /// </summary>
-public class MapperTool : Tool, IWindowMenuHost
+public class MapperTool : ActivityTool, IWindowMenuHost
 {
     public MapperViewModel ViewModel { get; }
 
@@ -26,6 +26,9 @@ public class MapperTool : Tool, IWindowMenuHost
             ApplyTitle(settings);
             settings.Changed += () => ApplyTitle(settings);
         }
+
+        // Unread-activity flash: position moved to a different room.
+        WireActivity(vm, nameof(MapperViewModel.CurrentRoomId));
     }
 
     private void ApplyTitle(WindowSettings s) =>

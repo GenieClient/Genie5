@@ -7,7 +7,7 @@ using Genie.Core.Layout;
 
 namespace Genie.App.Docking;
 
-public class BackpackTool : Tool, IWindowMenuHost, IFindHost
+public class BackpackTool : ActivityTool, IWindowMenuHost, IFindHost
 {
     public InventoryViewModel ViewModel { get; }
 
@@ -57,6 +57,9 @@ public class BackpackTool : Tool, IWindowMenuHost, IFindHost
             ApplySettings(settings);
             settings.Changed += () => ApplySettings(settings);
         }
+
+        // Unread-activity flash: the inventory list rebuilds on inv pushes.
+        WireActivity(vm.Items);
     }
 
     private void ApplySettings(WindowSettings s)

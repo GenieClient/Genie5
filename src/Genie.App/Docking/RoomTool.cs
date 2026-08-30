@@ -10,7 +10,7 @@ namespace Genie.App.Docking;
 /// foreground override would require restructuring the room view to lose the
 /// per-field colour coding.
 /// </summary>
-public class RoomTool : Tool, IWindowMenuHost
+public class RoomTool : ActivityTool, IWindowMenuHost
 {
     public RoomViewModel ViewModel { get; }
 
@@ -28,6 +28,16 @@ public class RoomTool : Tool, IWindowMenuHost
             ApplyTitle(settings);
             settings.Changed += () => ApplyTitle(settings);
         }
+
+        // Unread-activity flash: [Reactive] props raise only on real changes,
+        // so an unchanged `look` stays silent. Inlines twins are skipped —
+        // they change in lockstep with these.
+        WireActivity(vm,
+            nameof(RoomViewModel.Title),
+            nameof(RoomViewModel.Description),
+            nameof(RoomViewModel.Exits),
+            nameof(RoomViewModel.Players),
+            nameof(RoomViewModel.Objects));
     }
 
     private void ApplyTitle(WindowSettings s) =>

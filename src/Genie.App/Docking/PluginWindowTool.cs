@@ -19,7 +19,7 @@ namespace Genie.App.Docking;
 /// through saved layouts and the Window menu's visibility toggles just like a
 /// built-in tool.</para>
 /// </summary>
-public class PluginWindowTool : Tool, IWindowMenuHost, IFindHost
+public class PluginWindowTool : ActivityTool, IWindowMenuHost, IFindHost
 {
     public PluginWindowViewModel ViewModel { get; }
 
@@ -61,22 +61,9 @@ public class PluginWindowTool : Tool, IWindowMenuHost, IFindHost
 
         // Unread-activity flash: plugin output landing while this tab sits
         // behind another one raises IsModified (blinking tab title) until
-        // viewed. Add only — SetContent's Clear+refill still counts via its
-        // Add events; plain Clear does not.
-        vm.Lines.CollectionChanged += (_, e) =>
-        {
-            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add)
-                TabActivity.NotifyContentAdded(this);
-        };
-    }
-
-    /// <summary>Dock calls this on every activation path (tab click, window
-    /// cycling, SetActiveDockable) — the tab is now in front, so the unread
-    /// flash stops.</summary>
-    public override void OnSelected()
-    {
-        IsModified = false;
-        base.OnSelected();
+        // viewed. SetContent's Clear+refill still counts via its Add events;
+        // a plain Clear does not.
+        WireActivity(vm.Lines);
     }
 
     private void ApplyFonts(Genie.Core.Layout.WindowSettings s)

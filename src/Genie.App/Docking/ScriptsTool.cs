@@ -8,7 +8,7 @@ namespace Genie.App.Docking;
 /// Script Manager dock tool (id stays <c>"scripts"</c> so saved layouts keep
 /// working): script library browser + running-script management + output log.
 /// </summary>
-public class ScriptsTool : Tool, IWindowMenuHost
+public class ScriptsTool : ActivityTool, IWindowMenuHost
 {
     public ScriptsViewModel ViewModel { get; }
 
@@ -26,6 +26,10 @@ public class ScriptsTool : Tool, IWindowMenuHost
             ApplyTitle(settings);
             settings.Changed += () => ApplyTitle(settings);
         }
+
+        // Unread-activity flash: script output lines and scripts starting.
+        WireActivity(vm.Output);
+        WireActivity(vm.RunningScripts);
     }
 
     private void ApplyTitle(WindowSettings s) =>

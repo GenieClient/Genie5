@@ -9,7 +9,7 @@ namespace Genie.App.Docking;
 /// per-channel colours, so the per-window foreground/background isn't wired
 /// here. Only the title syncs from <see cref="WindowSettings"/> for now.
 /// </summary>
-public class VitalsTool : Tool, IWindowMenuHost
+public class VitalsTool : ActivityTool, IWindowMenuHost
 {
     public VitalsViewModel ViewModel { get; }
 
@@ -27,6 +27,16 @@ public class VitalsTool : Tool, IWindowMenuHost
             ApplyTitle(settings);
             settings.Changed += () => ApplyTitle(settings);
         }
+
+        // Unread-activity flash: only the five vitals values. The RT /
+        // cast-bar / type-ahead properties tick continuously and would blink
+        // this tab permanently; a vitals CHANGE is the actual signal.
+        WireActivity(vm,
+            nameof(VitalsViewModel.Health),
+            nameof(VitalsViewModel.Mana),
+            nameof(VitalsViewModel.Spirit),
+            nameof(VitalsViewModel.Stamina),
+            nameof(VitalsViewModel.Concentration));
     }
 
     private void ApplyTitle(WindowSettings s) =>

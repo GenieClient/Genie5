@@ -13,7 +13,7 @@ namespace Genie.App.Docking;
 /// Window → Raw XML. A dev/debug panel, grouped beside the other utility tabs
 /// (Scripts / Scene) in the default layout.
 /// </summary>
-public class RawXmlTool : Tool, IWindowMenuHost, ITextEditorHost
+public class RawXmlTool : ActivityTool, IWindowMenuHost, ITextEditorHost
 {
     public RawXmlViewModel ViewModel { get; }
 
@@ -63,6 +63,12 @@ public class RawXmlTool : Tool, IWindowMenuHost, ITextEditorHost
             ApplySettings(settings);
             settings.Changed += () => ApplySettings(settings);
         }
+
+        // Unread-activity flash. NB: while connected this stream is near-
+        // constant, so a backgrounded Raw XML tab blinks most of the time —
+        // consistent with "data arrived while hidden", and it is a debug
+        // panel that is rarely stacked behind anything.
+        WireActivity(vm.Lines);
     }
 
     private void ApplySettings(WindowSettings s)

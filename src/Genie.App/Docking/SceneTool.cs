@@ -12,7 +12,7 @@ namespace Genie.App.Docking;
 /// Window → Portrait. Only the title syncs from <see cref="WindowSettings"/>;
 /// the image fills the panel.
 /// </summary>
-public class SceneTool : Tool, IWindowMenuHost
+public class SceneTool : ActivityTool, IWindowMenuHost
 {
     public SceneViewModel ViewModel { get; }
 
@@ -30,6 +30,9 @@ public class SceneTool : Tool, IWindowMenuHost
             ApplyTitle(settings);
             settings.Changed += () => ApplyTitle(settings);
         }
+
+        // Unread-activity flash: a new scene picture arrived.
+        WireActivity(vm, nameof(SceneViewModel.Image));
     }
 
     private void ApplyTitle(WindowSettings s) =>

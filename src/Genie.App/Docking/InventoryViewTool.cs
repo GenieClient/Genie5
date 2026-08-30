@@ -12,7 +12,7 @@ namespace Genie.App.Docking;
 /// expand/collapse, wiki lookup, export, and per-character removal (the
 /// feature set of the Genie 4 plugin's WinForms window).
 /// </summary>
-public class InventoryViewTool : Tool, IWindowMenuHost
+public class InventoryViewTool : ActivityTool, IWindowMenuHost
 {
     public InventoryViewViewModel ViewModel { get; }
 
@@ -30,6 +30,10 @@ public class InventoryViewTool : Tool, IWindowMenuHost
             ApplyTitle(settings);
             settings.Changed += () => ApplyTitle(settings);
         }
+
+        // Unread-activity flash: catalog tree rebuilds (e.g. an `/iv scan`
+        // finishing while another tab is in front).
+        WireActivity(vm.Roots);
     }
 
     private void ApplyTitle(WindowSettings s) =>

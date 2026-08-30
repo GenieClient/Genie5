@@ -9,7 +9,7 @@ namespace Genie.App.Docking;
 /// re-open via Window → Mobs. Only the title syncs from
 /// <see cref="WindowSettings"/>; the list keeps its own colour coding.
 /// </summary>
-public class MobsTool : Tool, IWindowMenuHost
+public class MobsTool : ActivityTool, IWindowMenuHost
 {
     public MobsViewModel ViewModel { get; }
 
@@ -27,6 +27,9 @@ public class MobsTool : Tool, IWindowMenuHost
             ApplyTitle(settings);
             settings.Changed += () => ApplyTitle(settings);
         }
+
+        // Unread-activity flash: a creature arriving in the room.
+        WireActivity(vm.Mobs);
     }
 
     private void ApplyTitle(WindowSettings s) =>

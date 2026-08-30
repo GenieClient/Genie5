@@ -9,7 +9,7 @@ namespace Genie.App.Docking;
 /// default; re-open via Window → Players. Only the title syncs from
 /// <see cref="WindowSettings"/>; the list keeps its own colour coding.
 /// </summary>
-public class PlayersTool : Tool, IWindowMenuHost
+public class PlayersTool : ActivityTool, IWindowMenuHost
 {
     public PlayersViewModel ViewModel { get; }
 
@@ -27,6 +27,9 @@ public class PlayersTool : Tool, IWindowMenuHost
             ApplyTitle(settings);
             settings.Changed += () => ApplyTitle(settings);
         }
+
+        // Unread-activity flash: a player arriving in the room.
+        WireActivity(vm.Players);
     }
 
     private void ApplyTitle(WindowSettings s) =>

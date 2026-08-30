@@ -13,7 +13,7 @@ namespace Genie.App.Docking;
 /// is what gives it MDI decorations and stops it re-opening on every prompt
 /// after the user closes it (public #112).
 /// </summary>
-public class ActiveSpellsTool : Tool, IWindowMenuHost
+public class ActiveSpellsTool : ActivityTool, IWindowMenuHost
 {
     public ActiveSpellsViewModel ViewModel { get; }
 
@@ -36,6 +36,11 @@ public class ActiveSpellsTool : Tool, IWindowMenuHost
             ApplySettings(settings);
             settings.Changed += () => ApplySettings(settings);
         }
+
+        // Unread-activity flash. [Reactive] raises only on a REAL content
+        // change, so an unchanged re-push from the Spell Timer stays silent
+        // (duration ticks do change the text, and do count).
+        WireActivity(vm, nameof(ActiveSpellsViewModel.Content));
     }
 
     // Public #233 — see ExperienceTool.ApplySettings.

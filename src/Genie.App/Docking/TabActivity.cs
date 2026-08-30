@@ -1,4 +1,7 @@
+using System.Collections.Specialized;
+using System.ComponentModel;
 using Dock.Model.Core;
+using Dock.Model.Mvvm.Controls;
 
 namespace Genie.App.Docking;
 
@@ -37,5 +40,52 @@ internal static class TabActivity
         if (tool.Owner is IDock d && ReferenceEquals(d.ActiveDockable, tool))
             return; // tab is in front — the new line is already on screen
         tool.IsModified = true;
+    }
+}
+
+/// <summary>
+/// Base for every dock tool whose tab should flash on unread activity. Each
+/// tool wires its own data signal in its constructor via
+/// <see cref="WireActivity(INotifyCollectionChanged)"/> (line/row collections;
+/// Add events only, so trims, Clears, and the highlight-repaint Replace
+/// pattern don't count as activity) or
+/// <see cref="WireActivity(INotifyPropertyChanged, string[])"/> (Reactive/INPC
+/// view models whose properties only raise when the value actually changes).
+/// The <see cref="OnSelected"/> override clears the flag on every activation
+/// path — see <see cref="TabActivity"/> for the full design.
+///
+/// <para>Deliberately NOT wired: TimeTrackerTool (its content is a clock —
+/// re-rendered every second, it would blink forever) and AnalyticsTool (loads
+/// data only on user interaction; nothing arrives while it sits in the
+/// background).</para>
+/// </summary>
+public abstract class ActivityTool : Tool
+{
+    protected void WireActivity(INotifyCollectionChanged source) =>
+        source.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == NotifyCollectionChangedAction.Add)
+                TabActivity.NotifyContentAdded(this);
+        };
+
+    // A required first property keeps this overload unambiguous against the
+    // collection one — ObservableCollection implements BOTH interfaces.
+    protected void WireActivity(INotifyPropertyChanged source, string property, params string[] moreProperties)
+    {
+        var names = new HashSet<string>(moreProperties, StringComparer.Ordinal) { property };
+        source.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is not null && names.Contains(e.PropertyName))
+                TabActivity.NotifyContentAdded(this);
+        };
+    }
+
+    /// <summary>Dock calls this on every activation path (tab click, window
+    /// cycling, SetActiveDockable) — the tab is now in front, so the unread
+    /// flash stops.</summary>
+    public override void OnSelected()
+    {
+        IsModified = false;
+        base.OnSelected();
     }
 }

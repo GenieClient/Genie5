@@ -8,7 +8,7 @@ using Genie.Core.Layout;
 
 namespace Genie.App.Docking;
 
-public class StreamTool : Tool, IWindowMenuHost, IFindHost, ITextEditorHost
+public class StreamTool : ActivityTool, IWindowMenuHost, IFindHost, ITextEditorHost
 {
     public StreamBuffer Buffer { get; }
 
@@ -72,21 +72,7 @@ public class StreamTool : Tool, IWindowMenuHost, IFindHost, ITextEditorHost
 
         // Unread-activity flash: a line arriving while this tab sits behind
         // another one raises IsModified (blinking tab title) until viewed.
-        // Trim/Clear (Remove/Reset) don't count as activity.
-        Buffer.Lines.CollectionChanged += (_, e) =>
-        {
-            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add)
-                TabActivity.NotifyContentAdded(this);
-        };
-    }
-
-    /// <summary>Dock calls this on every activation path (tab click, window
-    /// cycling, SetActiveDockable) — the tab is now in front, so the unread
-    /// flash stops.</summary>
-    public override void OnSelected()
-    {
-        IsModified = false;
-        base.OnSelected();
+        WireActivity(Buffer.Lines);
     }
 
     private void ApplySettings(WindowSettings s)
