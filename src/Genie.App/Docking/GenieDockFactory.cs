@@ -1028,6 +1028,25 @@ public class GenieDockFactory : Factory
             configBarToggle = on => expTool.ViewModel.ShowConfigBar = on;
         }
 
+        // Flash on Activity — every window wired for the unread-tab flash
+        // (ActivityTool derivatives; TimeTracker / Analytics / the game
+        // document aren't, so their menus hide the item). Uses the tool's OWN
+        // ActivitySettings instance — the same one the flash gate reads — so
+        // the toggle applies live; ActivityTool also clears an in-progress
+        // flash when the setting turns off.
+        bool          flashInit   = true;
+        Action<bool>? flashToggle = null;
+        if (dockable is ActivityTool { ActivitySettings: { } flashSettings })
+        {
+            flashInit   = flashSettings.FlashOnActivity;
+            flashToggle = on =>
+            {
+                flashSettings.FlashOnActivity = on;
+                flashSettings.NotifyChanged();
+                _vm.SaveWindowSettings();
+            };
+        }
+
         // Time Stamp + Name List Only + Pause Scrolling only make sense for the
         // per-line text feeds; everything else gets Copy All / Save As (where
         // it has a buffer) + Find + Clear + Float + Close.
@@ -1046,13 +1065,19 @@ public class GenieDockFactory : Factory
                 onToggleTitleBar:  toggleTitleBar,
                 titleBarHiddenProbe: titleBarHidden,
                 configBarOn:        configBarInit,
-                onConfigBarToggled: configBarToggle);
+                onConfigBarToggled: configBarToggle,
+                flashOn:            flashInit,
+                onFlashToggled:     flashToggle);
 
             // Keep the checkmark honest when the visibility changes outside the
             // menu — the value seeded from settings.cfg on connect (Attach).
             if (dockable is ExperienceTool exSync)
                 exSync.ViewModel.WhenAnyValue(v => v.ShowConfigBar)
                     .Subscribe(v => toolMenu.SyncConfigBar(v));
+
+            // Same for Flash on Activity edited from the Layout tab.
+            if (dockable is ActivityTool { ActivitySettings: { } fsSync })
+                fsSync.Changed += () => toolMenu.SyncFlash(fsSync.FlashOnActivity);
 
             return toolMenu;
         }
@@ -1118,7 +1143,9 @@ public class GenieDockFactory : Factory
             echoToMainOn:          echoInit,
             onEchoToMainToggled:   echoToggle,
             onToggleTitleBar:      toggleTitleBar,
-            titleBarHiddenProbe:   titleBarHidden);
+            titleBarHiddenProbe:   titleBarHidden,
+            flashOn:               flashInit,
+            onFlashToggled:        flashToggle);
 
         // Keep the checkmarks in sync if the same settings are edited elsewhere
         // (e.g. the Configuration → Layout tab's Time Stamp checkbox).
@@ -1128,6 +1155,7 @@ public class GenieDockFactory : Factory
             menu.SyncNameListOnly(settings.NameListOnly);
             menu.SyncWordWrap(settings.WordWrap);
             menu.SyncEchoToMain(settings.EchoToMain);
+            menu.SyncFlash(settings.FlashOnActivity);
         };
 
         return menu;

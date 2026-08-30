@@ -29,6 +29,8 @@ public class RoomTool : ActivityTool, IWindowMenuHost
             settings.Changed += () => ApplyTitle(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: [Reactive] props raise only on real changes,
         // so an unchanged `look` stays silent. Inlines twins are skipped —
         // they change in lockstep with these.

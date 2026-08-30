@@ -103,6 +103,7 @@ public sealed class WindowSettingsStore
         s.NameListOnly = m.NameListOnly;
         s.EchoToMain = m.EchoToMain;
         s.WordWrap   = m.WordWrap;
+        s.FlashOnActivity = m.FlashOnActivity;
         if (m.HasIfClosed) s.IfClosed = m.IfClosed;
     }
 }

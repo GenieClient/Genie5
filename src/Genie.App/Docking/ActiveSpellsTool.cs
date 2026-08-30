@@ -37,6 +37,8 @@ public class ActiveSpellsTool : ActivityTool, IWindowMenuHost
             settings.Changed += () => ApplySettings(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash. [Reactive] raises only on a REAL content
         // change, so an unchanged re-push from the Spell Timer stays silent
         // (duration ticks do change the text, and do count).

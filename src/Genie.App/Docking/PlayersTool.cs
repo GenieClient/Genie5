@@ -28,6 +28,8 @@ public class PlayersTool : ActivityTool, IWindowMenuHost
             settings.Changed += () => ApplyTitle(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: a player arriving in the room.
         WireActivity(vm.Players);
     }

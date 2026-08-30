@@ -59,6 +59,8 @@ public class PluginWindowTool : ActivityTool, IWindowMenuHost, IFindHost
             settings.Changed += () => ApplyFonts(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: plugin output landing while this tab sits
         // behind another one raises IsModified (blinking tab title) until
         // viewed. SetContent's Clear+refill still counts via its Add events;

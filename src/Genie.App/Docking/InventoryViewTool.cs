@@ -31,6 +31,8 @@ public class InventoryViewTool : ActivityTool, IWindowMenuHost
             settings.Changed += () => ApplyTitle(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: catalog tree rebuilds (e.g. an `/iv scan`
         // finishing while another tab is in front).
         WireActivity(vm.Roots);

@@ -34,6 +34,8 @@ public class ExperienceTool : ActivityTool, IWindowMenuHost
             settings.Changed += () => ApplySettings(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: every exp push rebuilds Lines (Clear + Adds),
         // so Add events mark real updates; the highlight-repaint path uses
         // Replace and stays silent.

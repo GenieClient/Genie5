@@ -29,7 +29,7 @@
                   VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
     <Grid ColumnDefinitions="Auto,*,Auto,*"
-          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
           Margin="0,4,0,0">
 
       <TextBlock Grid.Row="0" Grid.Column="0" Text="Title:" VerticalAlignment="Center" Margin="0,0,8,4"/>
@@ -83,13 +83,17 @@
                 Name="EchoToMainCheck" Content="Also show this stream in the Main window" Margin="0,2,0,4"
                 ToolTip.Tip="When checked, lines for this stream are echoed into the main game window in addition to their own panel. Applies to the text stream windows (Combat, Talk, Whispers, Thoughts, Familiar, Deaths, Logons, Assess, Atmospherics, OOC, ItemLog); ignored for other windows. Leave it OFF for OOC — the game already sends every OOC line to the main window separately, so echoing it shows the line twice. Unlike 'Redirect if closed', this fires while the panel is still open."/>
 
-      <StackPanel Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="3"
+      <CheckBox Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="3"
+                Name="FlashCheck" Content="Flash tab title when data arrives while inactive" Margin="0,2,0,4"
+                ToolTip.Tip="When this window's tab sits behind another tab and new data lands in it, the tab title blinks until the tab is brought to front. Uncheck to keep this window quiet. Ignored for windows that aren't wired for activity (Time Tracker, Analytics, the main game window)."/>
+
+      <StackPanel Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="3"
                   Orientation="Horizontal" Spacing="4" Margin="0,2,0,4">
         <Button Content="Apply" Click="OnApply"/>
         <Button Content="Reset" Click="OnReset"/>
       </StackPanel>
 
-      <TextBlock Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="3"
+      <TextBlock Grid.Row="9" Grid.Column="1" Grid.ColumnSpan="3"
                  Name="StatusText" Margin="0,6,0,0"
                  Foreground="Gray" FontStyle="Italic"/>
 

@@ -83,6 +83,15 @@ public sealed class WindowSettings
     /// </summary>
     public bool    WordWrap     { get; set; } = true;
 
+    /// <summary>
+    /// Per-window unread-activity flash. On (the default) the window's tab
+    /// title pulses when data lands while the tab sits behind another one;
+    /// off, the window stays quiet. Consulted by the App's <c>ActivityTool</c>
+    /// at notify time, so the toggle applies live. Toggled from the window
+    /// right-click menu ("Flash on Activity") or the Layout tab.
+    /// </summary>
+    public bool    FlashOnActivity { get; set; } = true;
+
     public string? IfClosed     { get; set; }
     public event Action? Changed;
     public void NotifyChanged() => Changed?.Invoke();

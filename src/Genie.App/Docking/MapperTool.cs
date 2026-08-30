@@ -27,6 +27,8 @@ public class MapperTool : ActivityTool, IWindowMenuHost
             settings.Changed += () => ApplyTitle(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: position moved to a different room.
         WireActivity(vm, nameof(MapperViewModel.CurrentRoomId));
     }

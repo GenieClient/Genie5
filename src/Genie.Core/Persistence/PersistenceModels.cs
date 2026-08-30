@@ -178,6 +178,9 @@ public sealed class WindowSettingsPersistenceModel
     /// <summary>Defaults true so pre-#120 windows.json files (no field) keep
     /// the shipped always-wrap behaviour.</summary>
     public bool    WordWrap     { get; set; } = true;
+    /// <summary>Defaults true so windows.json files predating the toggle (no
+    /// field) keep the shipped flash-on-unread-activity behaviour.</summary>
+    public bool    FlashOnActivity { get; set; } = true;
     public string? IfClosed     { get; set; }
     public bool    HasIfClosed  { get; set; }
 }

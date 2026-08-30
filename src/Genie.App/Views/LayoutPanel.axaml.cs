@@ -99,6 +99,7 @@ public partial class LayoutPanel : UserControl
         ColorPickerHelpers.LoadColor(BgColorPicker, BgNoneCheck,    s.Background, "");
         TimestampCheck.IsChecked = s.Timestamp;
         EchoToMainCheck.IsChecked = s.EchoToMain;
+        FlashCheck.IsChecked = s.FlashOnActivity;
         IfClosedBox.SelectedItem = IfClosedToLabel(s.IfClosed);
     }
 
@@ -131,6 +132,7 @@ public partial class LayoutPanel : UserControl
         _current.Background   = ColorPickerHelpers.ReadColor(BgColorPicker, BgNoneCheck,    "");
         _current.Timestamp    = TimestampCheck.IsChecked == true;
         _current.EchoToMain   = EchoToMainCheck.IsChecked == true;
+        _current.FlashOnActivity = FlashCheck.IsChecked == true;
         _current.IfClosed     = LabelToIfClosed(IfClosedBox.SelectedItem as string);
         _current.NotifyChanged();
 
@@ -154,6 +156,7 @@ public partial class LayoutPanel : UserControl
         _current.Background   = fresh.Background;
         _current.Timestamp    = fresh.Timestamp;
         _current.EchoToMain   = fresh.EchoToMain;
+        _current.FlashOnActivity = fresh.FlashOnActivity;
         _current.IfClosed     = fresh.IfClosed;
         _current.NotifyChanged();
 

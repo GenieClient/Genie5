@@ -31,7 +31,9 @@ public sealed class WindowMenuModel : ReactiveObject
     private bool _isScrollPaused;
     private bool _isWordWrapOn;
     private bool _isConfigBarOn;
+    private bool _isFlashOn;
     private bool _isFloating;
+    private readonly Action<bool>? _onFlashToggled;
     private readonly Action<bool>? _onTimestampToggled;
     private readonly Action<bool>? _onNameListOnlyToggled;
     private readonly Action<bool>? _onEchoToMainToggled;
@@ -63,7 +65,9 @@ public sealed class WindowMenuModel : ReactiveObject
         Action?       onToggleTitleBar      = null,
         Func<bool>?   titleBarHiddenProbe   = null,
         bool          configBarOn           = true,
-        Action<bool>? onConfigBarToggled    = null)
+        Action<bool>? onConfigBarToggled    = null,
+        bool          flashOn               = true,
+        Action<bool>? onFlashToggled        = null)
     {
         ClearCommand           = clear;
         CloseCommand           = close;
@@ -82,6 +86,8 @@ public sealed class WindowMenuModel : ReactiveObject
         _onWordWrapToggled     = onWordWrapToggled;
         _isConfigBarOn         = configBarOn;
         _onConfigBarToggled    = onConfigBarToggled;
+        _isFlashOn             = flashOn;
+        _onFlashToggled        = onFlashToggled;
         _floatStateProbe       = floatStateProbe;
         _onToggleTitleBar      = onToggleTitleBar;
         _titleBarHiddenProbe   = titleBarHiddenProbe;
@@ -134,6 +140,9 @@ public sealed class WindowMenuModel : ReactiveObject
     /// <summary>"Show Config Bar" — panels with a settings strip across the top
     /// (currently the Experience window's Density / Track gain / G4 layout row).</summary>
     public bool ShowConfigBar    => _onConfigBarToggled   is not null;
+    /// <summary>"Flash on Activity" — windows wired for the unread-tab flash
+    /// (ActivityTool derivatives with settings).</summary>
+    public bool ShowFlash        => _onFlashToggled       is not null;
     public bool ShowFloat        => ToggleFloatCommand    is not null;
 
     /// <summary>#181: "Hide/Show Title Bar" applies only to a window that's floating
@@ -154,7 +163,7 @@ public sealed class WindowMenuModel : ReactiveObject
         ShowClose && (ShowCopyAll || ShowClear || ShowSaveAs || ShowFind
                       || ShowTimestamp || ShowNameListOnly || ShowEchoToMain
                       || ShowPauseScroll || ShowWordWrap || ShowConfigBar
-                      || ShowFloat || ShowHideTitleBar);
+                      || ShowFlash || ShowFloat || ShowHideTitleBar);
 
     /// <summary>Time Stamp checkbox state. Set by the TwoWay menu binding —
     /// flipping it runs the toggle handler (which updates the window's
@@ -240,6 +249,23 @@ public sealed class WindowMenuModel : ReactiveObject
         }
     }
 
+    /// <summary>"Flash on Activity" checkbox state — mirrors
+    /// <c>WindowSettings.FlashOnActivity</c>. On by default: the tab title
+    /// pulses when data lands while the tab is backgrounded. Flipping it runs
+    /// the toggle handler (which updates the setting + persists); turning it
+    /// off also stops an in-progress flash (ActivityTool clears on the
+    /// settings change). See <see cref="IsTimestampOn"/>.</summary>
+    public bool IsFlashOn
+    {
+        get => _isFlashOn;
+        set
+        {
+            if (_isFlashOn == value) return;
+            this.RaiseAndSetIfChanged(ref _isFlashOn, value);
+            _onFlashToggled?.Invoke(value);
+        }
+    }
+
     /// <summary>"Float" when the window is docked, "Re-dock" when it's already
     /// floating in its own top-level window. Refreshed by
     /// <see cref="RefreshFloatState"/> when the menu opens (the user can drag a
@@ -288,4 +314,9 @@ public sealed class WindowMenuModel : ReactiveObject
     /// re-invoking the toggle handler.</summary>
     public void SyncConfigBar(bool value) =>
         this.RaiseAndSetIfChanged(ref _isConfigBarOn, value, nameof(IsConfigBarOn));
+
+    /// <summary>Mirror an external "Flash on Activity" change (e.g. the Layout
+    /// tab) into the checkmark without re-invoking the toggle handler.</summary>
+    public void SyncFlash(bool value) =>
+        this.RaiseAndSetIfChanged(ref _isFlashOn, value, nameof(IsFlashOn));
 }

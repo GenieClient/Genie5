@@ -28,6 +28,8 @@ public class MobsTool : ActivityTool, IWindowMenuHost
             settings.Changed += () => ApplyTitle(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: a creature arriving in the room.
         WireActivity(vm.Mobs);
     }

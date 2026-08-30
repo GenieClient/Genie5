@@ -248,6 +248,7 @@ public sealed class PersistenceService
             NameListOnly = s.NameListOnly,
             EchoToMain   = s.EchoToMain,
             WordWrap     = s.WordWrap,
+            FlashOnActivity = s.FlashOnActivity,
             IfClosed     = s.IfClosed,
             HasIfClosed  = true,    // value above is authoritative
         });

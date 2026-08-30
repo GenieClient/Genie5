@@ -28,6 +28,8 @@ public class VitalsTool : ActivityTool, IWindowMenuHost
             settings.Changed += () => ApplyTitle(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: only the five vitals values. The RT /
         // cast-bar / type-ahead properties tick continuously and would blink
         // this tab permanently; a vitals CHANGE is the actual signal.

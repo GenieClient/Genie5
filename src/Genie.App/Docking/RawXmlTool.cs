@@ -64,6 +64,8 @@ public class RawXmlTool : ActivityTool, IWindowMenuHost, ITextEditorHost
             settings.Changed += () => ApplySettings(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash. NB: while connected this stream is near-
         // constant, so a backgrounded Raw XML tab blinks most of the time —
         // consistent with "data arrived while hidden", and it is a debug

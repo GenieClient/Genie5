@@ -70,6 +70,8 @@ public class StreamTool : ActivityTool, IWindowMenuHost, IFindHost, ITextEditorH
             settings.Changed += () => ApplySettings(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: a line arriving while this tab sits behind
         // another one raises IsModified (blinking tab title) until viewed.
         WireActivity(Buffer.Lines);

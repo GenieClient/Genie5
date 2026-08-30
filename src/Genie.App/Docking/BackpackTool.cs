@@ -58,6 +58,8 @@ public class BackpackTool : ActivityTool, IWindowMenuHost, IFindHost
             settings.Changed += () => ApplySettings(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: the inventory list rebuilds on inv pushes.
         WireActivity(vm.Items);
     }

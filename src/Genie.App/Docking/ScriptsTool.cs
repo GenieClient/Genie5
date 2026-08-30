@@ -27,6 +27,8 @@ public class ScriptsTool : ActivityTool, IWindowMenuHost
             settings.Changed += () => ApplyTitle(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: script output lines and scripts starting.
         WireActivity(vm.Output);
         WireActivity(vm.RunningScripts);

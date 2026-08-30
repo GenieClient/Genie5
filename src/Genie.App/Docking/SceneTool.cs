@@ -31,6 +31,8 @@ public class SceneTool : ActivityTool, IWindowMenuHost
             settings.Changed += () => ApplyTitle(settings);
         }
 
+        ActivitySettings = settings;
+
         // Unread-activity flash: a new scene picture arrived.
         WireActivity(vm, nameof(SceneViewModel.Image));
     }

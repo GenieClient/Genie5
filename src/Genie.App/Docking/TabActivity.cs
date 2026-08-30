@@ -2,6 +2,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using Dock.Model.Core;
 using Dock.Model.Mvvm.Controls;
+using Genie.Core.Layout;
 
 namespace Genie.App.Docking;
 
@@ -61,10 +62,35 @@ internal static class TabActivity
 /// </summary>
 public abstract class ActivityTool : Tool
 {
+    private WindowSettings? _activitySettings;
+
+    /// <summary>
+    /// The window's live settings, consulted for the per-window
+    /// <see cref="WindowSettings.FlashOnActivity"/> toggle. Assigned in each
+    /// tool's constructor (the same instance the Layout tab and the window
+    /// menu mutate, so the toggle applies live with no re-subscribe). Null —
+    /// e.g. a tool built before its settings registration — reads as
+    /// "flash on", matching the property's default.
+    /// </summary>
+    public WindowSettings? ActivitySettings
+    {
+        get => _activitySettings;
+        protected set
+        {
+            _activitySettings = value;
+            if (value is not null)
+                // Turning the toggle OFF also stops an already-running flash;
+                // other settings changes leave an active flash alone.
+                value.Changed += () => { if (!value.FlashOnActivity) IsModified = false; };
+        }
+    }
+
+    private bool FlashEnabled => _activitySettings?.FlashOnActivity != false;
+
     protected void WireActivity(INotifyCollectionChanged source) =>
         source.CollectionChanged += (_, e) =>
         {
-            if (e.Action == NotifyCollectionChangedAction.Add)
+            if (e.Action == NotifyCollectionChangedAction.Add && FlashEnabled)
                 TabActivity.NotifyContentAdded(this);
         };
 
@@ -75,7 +101,7 @@ public abstract class ActivityTool : Tool
         var names = new HashSet<string>(moreProperties, StringComparer.Ordinal) { property };
         source.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is not null && names.Contains(e.PropertyName))
+            if (e.PropertyName is not null && names.Contains(e.PropertyName) && FlashEnabled)
                 TabActivity.NotifyContentAdded(this);
         };
     }
