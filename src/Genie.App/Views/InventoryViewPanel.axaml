@@ -24,6 +24,11 @@
       <Setter Property="MinWidth" Value="0"/>
       <Setter Property="MinHeight" Value="0"/>
     </Style>
+    <!-- Spacing between toolbar buttons (the WrapPanel has no Spacing; the
+         bottom 2 doubles as line spacing when the toolbar wraps). -->
+    <Style Selector="WrapPanel > Button.ivaction">
+      <Setter Property="Margin" Value="0,0,4,2"/>
+    </Style>
     <Style Selector="TextBlock.ivmatch">
       <Setter Property="Foreground" Value="{DynamicResource Theme.Accent}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
@@ -66,30 +71,31 @@
   <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="4">
 
     <!-- ── Toolbar: search + tree/actions ─────────────────────────────────── -->
-    <DockPanel Grid.Row="0" Margin="0,0,0,4" LastChildFill="True">
-      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-        <Button Classes="ivaction" Content="Expand All"   Command="{Binding ExpandAllCommand}"/>
-        <Button Classes="ivaction" Content="Collapse All" Command="{Binding CollapseAllCommand}"/>
-        <Button Classes="ivaction" Content="Wiki Lookup"  Command="{Binding WikiCommand}"
-                ToolTip.Tip="Open the selected item's wiki page in your browser"/>
-        <Button Classes="ivaction" Content="Find in Shops" Command="{Binding FindInShopsCommand}"
-                ToolTip.Tip="Search player-shop listings for the selected item (DR Service Plaza data)"/>
-        <Button Classes="ivaction" Content="Export"       Command="{Binding ExportCommand}"
-                ToolTip.Tip="Export the whole catalog to a CSV file"/>
-        <Button Classes="ivaction" Content="Scan"         Command="{Binding ScanCommand}"
-                ToolTip.Tip="Scan the current character (person, vault, deeds, home, trader) — /iv scan"/>
-        <Button Classes="ivaction" Content="Reload"       Command="{Binding ReloadCommand}"
-                ToolTip.Tip="Reload InventoryView.xml from disk (after scanning on another instance)"/>
-        <Button Classes="ivaction" Content="{Binding RemoveHeader}" Command="{Binding RemoveCommand}"
-                ToolTip.Tip="Two-step: pick once to arm, again to remove the selected character's catalog"/>
-      </StackPanel>
-      <TextBlock DockPanel.Dock="Right" Text="{Binding CountText}"
-                 VerticalAlignment="Center" Margin="8,0"
-                 Foreground="{DynamicResource Theme.TextSecondary}"/>
+    <!-- WrapPanel, not DockPanel: at narrow widths the buttons reflow to extra
+         rows instead of clipping off the right edge / overlapping the search
+         box (same lesson as the Experience config bar, 2026-08-29 walk). -->
+    <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4">
       <TextBox Watermark="Search all characters…" FontSize="12"
                Text="{Binding SearchText, Mode=TwoWay}"
-               MinWidth="160"/>
-    </DockPanel>
+               Width="180" Margin="0,0,4,2"/>
+      <TextBlock Text="{Binding CountText}"
+                 VerticalAlignment="Center" Margin="4,0,8,2"
+                 Foreground="{DynamicResource Theme.TextSecondary}"/>
+      <Button Classes="ivaction" Content="Expand All"   Command="{Binding ExpandAllCommand}"/>
+      <Button Classes="ivaction" Content="Collapse All" Command="{Binding CollapseAllCommand}"/>
+      <Button Classes="ivaction" Content="Wiki Lookup"  Command="{Binding WikiCommand}"
+              ToolTip.Tip="Open the selected item's wiki page in your browser"/>
+      <Button Classes="ivaction" Content="Find in Shops" Command="{Binding FindInShopsCommand}"
+              ToolTip.Tip="Search player-shop listings for the selected item (DR Service Plaza data)"/>
+      <Button Classes="ivaction" Content="Export"       Command="{Binding ExportCommand}"
+              ToolTip.Tip="Export the whole catalog to a CSV file"/>
+      <Button Classes="ivaction" Content="Scan"         Command="{Binding ScanCommand}"
+              ToolTip.Tip="Scan the current character (person, vault, deeds, home, trader) — /iv scan"/>
+      <Button Classes="ivaction" Content="Reload"       Command="{Binding ReloadCommand}"
+              ToolTip.Tip="Reload InventoryView.xml from disk (after scanning on another instance)"/>
+      <Button Classes="ivaction" Content="{Binding RemoveHeader}" Command="{Binding RemoveCommand}"
+              ToolTip.Tip="Two-step: pick once to arm, again to remove the selected character's catalog"/>
+    </WrapPanel>
 
     <!-- ── Column header strip: click to sort, click again to flip ────────── -->
     <DockPanel Grid.Row="1" Margin="2,0,2,2" LastChildFill="True">
