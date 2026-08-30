@@ -17,6 +17,7 @@ public partial class VariablesPanel : UserControl
 
     private VariableStore? _store;
     private Action?        _onChanged;
+    private string         _filter = string.Empty;
 
     public VariablesPanel() => InitializeComponent();
 
@@ -34,6 +35,7 @@ public partial class VariablesPanel : UserControl
         ItemsList.ItemsSource = _store.GetAll().Values
             .OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
             .Select(v => new VariableRow(v.Name, v.Value))
+            .Where(r => PanelFilterHelpers.Matches(_filter, r.Name, r.Value))
             .ToList();
         if (keep is not null)
             ItemsList.SelectedItem = ((IEnumerable<VariableRow>)ItemsList.ItemsSource)
@@ -79,6 +81,12 @@ public partial class VariablesPanel : UserControl
 
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();
     private void OnClear(object? sender, RoutedEventArgs e) => ClearForm();
+
+    private void OnFilterChanged(object? sender, TextChangedEventArgs e)
+    {
+        _filter = FilterBox.Text ?? string.Empty;
+        Refresh();
+    }
 
     private void OnSelectAll(object? sender, RoutedEventArgs e) => ItemsList.SelectAll();
 

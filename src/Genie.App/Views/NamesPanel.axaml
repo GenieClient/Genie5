@@ -9,6 +9,9 @@
       <Button Content="Add"      Click="OnAdd" />
       <Button Content="Remove"   Click="OnRemove" />
       <Button Content="Import…"  Click="OnImport" />
+      <TextBox Name="FilterBox" Width="220" Margin="12,0,0,0"
+               VerticalAlignment="Center" Watermark="Find… (name)"
+               TextChanged="OnFilterChanged"/>
     </StackPanel>
 
     <!-- Top: name list. Bottom: editor pane. -->

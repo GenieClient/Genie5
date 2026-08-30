@@ -27,6 +27,7 @@ public partial class NamesPanel : UserControl
     private NameHighlightEngine? _engine;
     private Action?              _onChanged;
     private ScopeEditingContext? _scopeCtx;
+    private string               _filter = string.Empty;
 
     public NamesPanel()
     {
@@ -55,6 +56,7 @@ public partial class NamesPanel : UserControl
         var keep = (ItemsList.SelectedItem as NameRow)?.Name;
         ItemsList.ItemsSource = _engine.Rules
             .Select(r => new NameRow(ScopeEditing.RowLabel(r.Scope), r.Name, r.ForegroundColor, r.BackgroundColor))
+            .Where(r => PanelFilterHelpers.Matches(_filter, r.Name))
             .ToList();
         if (keep is not null)
             ItemsList.SelectedItem = ((IEnumerable<NameRow>)ItemsList.ItemsSource)
@@ -135,6 +137,12 @@ public partial class NamesPanel : UserControl
     }
 
     private void OnClear(object? sender, RoutedEventArgs e) => ClearForm();
+
+    private void OnFilterChanged(object? sender, TextChangedEventArgs e)
+    {
+        _filter = FilterBox.Text ?? string.Empty;
+        Refresh();
+    }
 
     private void ClearForm()
     {

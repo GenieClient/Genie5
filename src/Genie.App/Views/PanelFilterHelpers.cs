@@ -2,9 +2,10 @@ namespace Genie.App.Views;
 
 /// <summary>
 /// Shared case-insensitive substring filter used by the config editor panels
-/// (Aliases / Triggers / Highlights / Substitutes / Gags). After an import a
-/// panel can hold hundreds of rules, so each panel has a "Find…" box that runs
-/// its rows through <see cref="Matches"/> against the relevant text columns.
+/// (Aliases / Triggers / Highlights / Substitutes / Gags / Variables / Macros /
+/// Names). After an import a panel can hold hundreds of rules, so each panel
+/// has a "Find…" box that runs its rows through <see cref="Matches"/> against
+/// the relevant text columns.
 /// </summary>
 internal static class PanelFilterHelpers
 {

@@ -21,6 +21,7 @@ public partial class MacrosPanel : UserControl
     private MacroEngine?         _engine;
     private Action?              _onChanged;
     private ScopeEditingContext? _scopeCtx;
+    private string               _filter = string.Empty;
 
     public MacrosPanel()
     {
@@ -47,6 +48,7 @@ public partial class MacrosPanel : UserControl
         var keep = (ItemsList.SelectedItem as MacroRow)?.Key;
         ItemsList.ItemsSource = _engine.Rules
             .Select(r => new MacroRow(ScopeEditing.RowLabel(r.Scope), r.Key, r.Action))
+            .Where(r => PanelFilterHelpers.Matches(_filter, r.Key, r.Action))
             .ToList();
         if (keep is not null)
             ItemsList.SelectedItem = ((IEnumerable<MacroRow>)ItemsList.ItemsSource)
@@ -116,6 +118,12 @@ public partial class MacrosPanel : UserControl
 
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();
     private void OnClear(object? sender, RoutedEventArgs e) => ClearForm();
+
+    private void OnFilterChanged(object? sender, TextChangedEventArgs e)
+    {
+        _filter = FilterBox.Text ?? string.Empty;
+        Refresh();
+    }
 
     /// <summary>
     /// Capture the pressed key combo into <see cref="KeyBox"/>. The field
