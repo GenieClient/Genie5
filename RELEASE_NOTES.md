@@ -1,3 +1,81 @@
+# Genie 5 — v5.0.0-beta.8
+
+**"Field Notes"** — Genie starts keeping a journal of the server's dialog
+windows (and asks for your reports), shared config finally layers under each
+character's own rules, and inactive tabs light up when something happens in
+them. Behind the scenes, self-update is now verified end-to-end on all three
+platforms — Windows, macOS, and Linux.
+
+## ✨ New
+- **Groundwork for server-driven dialog windows — help us map them!** DR can
+  send fully-described UI windows (bank, store, feats, profile-edit, and
+  more). Genie now captures every dialog the server sends: the first time an
+  unknown one appears you'll see a one-time
+  `[dialogs] new server dialog '<id>' captured` line, and its raw form lands
+  in `Logs/dialog_journal.xml`. Two new commands: **`#dialogs`** lists the
+  dialogs seen this session, and **`#dialogs report <id>`** drafts a
+  pre-filled GitHub issue for one — nothing posts automatically; the draft
+  opens in your browser (already redacted) for you to review and submit.
+  **If you see a captured line during play, please report it** — every
+  report directly shapes the dialog-window renderer coming in a future
+  release (#156).
+- **Shared config works for multi-character players: profile rules layer over
+  the global set.** A character's rule files (highlights, triggers,
+  substitutes, gags, aliases, macros, names, presets, classes, variables,
+  window settings) used to *replace* the shared global set the moment they
+  existed — and the first Configuration edit silently copied the whole global
+  set into the profile, freezing it there. Now your character's rules apply
+  first and every global rule you haven't overridden shows through; edits save
+  back to the file each rule actually lives in, so the fork can't happen. Every
+  rule editor gains a **Scope** field ("This character" / "All characters" —
+  new rules default to this character), a Scope column, and shared-rule
+  safeguards: deleting a global rule asks whether to disable it just for this
+  character (a reversible local opt-out) or remove it for everyone, and the
+  Toggle button on a shared rule quietly writes the local opt-out. Profiles
+  forked by the old behaviour keep working identically — the global layer
+  simply starts showing through for anything the fork doesn't cover, and
+  hand-edits to either layer's files still live-reload (#257 — thanks
+  @SaragosDR).
+- **Inactive tabs blink when something happens in them.** A docked panel that
+  receives new text while it's the hidden tab now blinks its tab title until
+  you look — whispers landing in a backgrounded Whispers window no longer
+  vanish silently. Every data-bearing panel participates (streams, trackers,
+  Room, Mobs, Players, and friends), and a per-window **Flash on Activity**
+  toggle (right-click title menu, or Configuration ▸ Layout) turns it off
+  wherever you'd rather have quiet.
+
+## 🐛 Fixes
+- **SGE over TLS now works from Linux and macOS.** eaccess accepts exactly one
+  TLS cipher suite, and .NET's non-Windows defaults don't offer it — so every
+  Linux/macOS login silently fell back to plaintext port 7900. Genie now
+  offers that suite on those platforms, and the 🔒 padlock shows up off
+  Windows too (#316).
+- **Linux AppImage runs on minimal distros.** ICU is now bundled into the
+  linux-x64 build, so systems without `libicu` (fresh WSL2, slim containers,
+  minimal installs) no longer crash at startup; the remaining X11 first-run
+  packages are documented on the wiki (#314).
+- **Built-in layout presets ship in the Windows installer.** The Strongbox and
+  Shadowveil presets were missing from the Velopack package, so Layout ▸
+  Load Preset had nothing to offer on a fresh install.
+- **`#eval` with quoted arguments works in value position again.** The Genie 4
+  composition `#var tmp #eval replacere("$1"," ","_")` — in a trigger action
+  or typed directly — stored the literal `#eval replacere($1, ,_)` text
+  instead of the evaluated result: command values were rebuilt from parsed
+  tokens, which strips quotes, so the expression could no longer evaluate.
+  A command's value is now taken from the raw command text (quotes intact),
+  matching Genie 4; the braced form `#var x {#eval …}` behaves exactly as
+  before. Also applies to `#tvar` and standalone `#eval`/`#evalmath` (#300 —
+  thanks @alanpatton for the precise almanac-trigger repro).
+- **"Float" in a docked window's title-bar menu works.** The menu item was
+  visible on docked chromes but did nothing; it now pops the window out, same
+  as dragging it free (#181).
+- **Panel toolbars survive narrow windows.** The Inventory View, Script
+  Manager, Analytics, and Raw XML header controls used to clip off the right
+  edge when their panel got narrow; they now wrap onto extra rows so every
+  button stays reachable at any width.
+
+---
+
 # Genie 5 — v5.0.0-beta.7
 
 **"Steadfast"** — scrolled-back reading finally holds dead still under combat

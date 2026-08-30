@@ -4,7 +4,24 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.7 — Steadfast
+## Latest: v5.0.0-beta.8 — Field Notes
+
+Genie starts keeping a journal of the server's dialog windows — and asks for your reports. Shared config finally layers under each character's own rules, inactive tabs light up when something happens in them, and self-update is now verified end-to-end on Windows, macOS, and Linux.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.8** as a delta from beta.7.
+
+- **Server-dialog capture groundwork — help us map them!** The first time an unknown server dialog appears you'll see a one-time `[dialogs] new server dialog '<id>' captured` line, and its raw form lands in `Logs/dialog_journal.xml`. **`#dialogs`** lists what you've seen this session; **`#dialogs report <id>`** opens a pre-filled GitHub issue draft in your browser (already redacted — nothing posts automatically). Every report directly shapes the dialog-window renderer coming in a future release (#156).
+- **Profile rules layer over the shared global set** — a character's rule files used to *replace* the global set the moment they existed. Now the character's rules apply first and every global rule you haven't overridden shows through; every rule editor gains a **Scope** field ("This character" / "All characters"), and deleting or toggling a shared rule offers a reversible per-character opt-out instead of changing it for everyone (#257 — thanks @SaragosDR).
+- **Inactive tabs blink on activity** — a backgrounded panel that receives new text blinks its tab title until you look; a per-window **Flash on Activity** toggle (right-click title menu, or Configuration ▸ Layout) turns it off where you'd rather have quiet.
+- **SGE over TLS works from Linux and macOS** — eaccess accepts exactly one TLS cipher suite and .NET's non-Windows defaults don't offer it, so those logins silently fell back to plaintext; the 🔒 padlock now shows up off Windows too (#316).
+- **Linux AppImage runs on minimal distros** — ICU is bundled into the linux-x64 build, so systems without `libicu` no longer crash at startup (#314; see [Installation](Installation#platform-first-launch-notes) for the X11 first-run packages).
+- **Built-in layout presets ship in the Windows installer** — Strongbox and Shadowveil were missing from the installed package, so Layout ▸ Load Preset had nothing to offer on a fresh install.
+- **`#eval` with quoted arguments works in value position again** — `#var tmp #eval replacere("$1"," ","_")` stores the evaluated result instead of the literal expression text, matching Genie 4; also applies to `#tvar` and standalone `#eval`/`#evalmath` (#300 — thanks @alanpatton).
+- **"Float" works from a docked window's title-bar menu** (#181), and the **Inventory View / Script Manager / Analytics / Raw XML toolbars wrap** at narrow widths instead of clipping off the edge.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.8)
+
+## v5.0.0-beta.7 — Steadfast
 
 Scrolled-back reading finally holds dead still under combat spam — Pause Scrolling included — and copy copies exactly what you highlighted. The Experience window learns the classic EXPTracker sort, echo, and rested-EXP options, and a batch of live-play fixes lands with it.
 

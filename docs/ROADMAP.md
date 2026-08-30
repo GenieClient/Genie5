@@ -21,21 +21,22 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.7 "Steadfast"
+## Where we are — v5.0.0-beta.8 "Field Notes"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
 last parity gaps. Recent releases: **beta.5** moved the whole solution to
-.NET 10; beta.5.1 was built almost entirely from player reports (OOC window,
-`timer`/`%t` parity, MonsterBold precedence, and more); **beta.6** put every
-timer on the server's clock (#261), hardened the script engine against the
-mid-hunt collection crash (#242), landed the mapper-tracking batch, and
-brought Alteration Buddy in-house; and **beta.7** makes scrolled-back reading
-hold still at the scrollback cap with copy that copies what you highlighted
-(#293, #298), teaches the Experience window the classic EXPTracker sort/echo/
-rested options (#272), fixes per-window fonts on the tracker panels (#233),
-replays send-gated lines into `matchwait` (#309), and adds tab-strip overflow
-arrows (#312). Highlights of what works today:
+.NET 10; beta.5.1 was built almost entirely from player reports; **beta.6**
+put every timer on the server's clock (#261), hardened the script engine
+(#242), landed the mapper-tracking batch, and brought Alteration Buddy
+in-house; **beta.7** makes scrolled-back reading hold still with honest copy
+(#293, #298) and teaches the Experience window the classic EXPTracker options
+(#272); and **beta.8** lands the server-dialog capture groundwork with the
+`#dialogs` reporting flow (#156), layers per-character rules over the shared
+global set (#257), fixes `#eval` composition in value position (#300), brings
+SGE-over-TLS to Linux and macOS (#316), and blinks inactive tabs on activity.
+Self-update is now **verified end-to-end on all three platforms** (#27 —
+thanks @dylb0t for the macOS validation). Highlights of what works today:
 
 - **Connection** — SGE direct auth (TLS on 7910 by default, plaintext 7900
   fallback), Lich 5 proxy (with owned-Lich auto-launch and `#config lichdebug`
@@ -68,9 +69,9 @@ arrows (#312). Highlights of what works today:
 - **Runtime** — .NET 10, the current LTS (supported to November 2028). Shipped
   in beta.5; every download still bundles the runtime it needs.
 - **Updater** — in-process update system (Core via Velopack, Maps + Plugins via
-  GitHub feeds) with a beta channel. **Windows self-update is live**, and the
-  macOS / Linux packaging and per-platform feeds ship on every release — what's
-  outstanding there is verification, not build work (see Track C).
+  GitHub feeds) with a beta channel. Self-update is **live and verified
+  end-to-end on Windows, macOS, and Linux** (#27), including the AppImage
+  self-replace leg and delta feeds on all four platform channels.
 - **Code signing** — every tagged release is EV-signed under Shadow Realms LLC
   (the project's support partner) via SignPath, after per-release maintainer
   approval. First signed release: `v5.0.0-alpha.10`.
@@ -89,22 +90,20 @@ others, but all should land before we cut a stable `5.0.0` off the beta channel.
 **Rough order of attack.** The tracks are independent, but if you're looking for
 where the next commit does the most good:
 
-1. **The P1 script-correctness bugs first** — profile-vs-global rule layering
-   ([#257](https://github.com/GenieClient/Genie5/issues/257)) and eval in
-   trigger actions ([#300](https://github.com/GenieClient/Genie5/issues/300)).
-   These break working scripts in the field, mostly silently. (The other two
-   that led this list — roundtime on the server clock and script-engine
-   thread safety — shipped in beta.6.)
-2. **Track A (security)** — the actual gate, and the one with the longest tail.
-3. **The script validator**
+1. **Track A (security)** — the actual gate, and the one with the longest
+   tail. (The P1 script-correctness bugs that used to lead this list — rule
+   layering #257 and eval composition #300 — shipped in beta.8; roundtime on
+   the server clock and script-engine thread safety shipped in beta.6.)
+2. **The script validator**
    ([#239](https://github.com/GenieClient/Genie5/issues/239)) before the in-app
    editor (Track E). It's the cheaper half and a whole-corpus scan is a far
    better regression signal for the script engine than waiting for a specific
    line to execute.
-4. **Track B** (server-driven dialogs) and **Track E** (editor) — the two
-   multi-week builds.
-5. **Track C** in parallel throughout; it needs a tester more than it needs
-   developer time.
+3. **Track B** (server-driven dialogs) and **Track E** (editor) — the two
+   multi-week builds. Track B's capture groundwork shipped in beta.8; player
+   `#dialogs` reports during the soak feed the renderer design directly.
+4. **Track C is done** — self-update verified end-to-end on all three
+   platforms (#27).
 
 ### Track A — Security-hardening backlog 🔒
 
@@ -139,31 +138,33 @@ these panels renders without per-panel code. This is the **biggest remaining
 Genie 4 parity gap.** Tracked as
 [#156](https://github.com/GenieClient/Genie5/issues/156).
 
-### Track C — macOS / Linux self-update *(verification, not build work)*
+**Beta.8 shipped the capture half**: typed dialog events, a first-sighting
+journal (`Logs/dialog_journal.xml`), and the `#dialogs list` / `#dialogs
+report` flow that turns a sighting into a pre-filled GitHub issue. These
+dialogs are situational (profile `/edit`, feat removal, spell choices), so
+**player reports are how the renderer's fixture library gets built** — if you
+see a `[dialogs] … captured` line in play, reporting it is direct roadmap
+help.
 
-The packaging targets and per-platform feeds have **shipped**: `release.yml`
-builds win-x64, linux-x64 (AppImage), osx-arm64 and osx-x64, releases carry
-per-platform Velopack feeds, and the in-app updater routes each OS/arch to its
-channel. `Genie.Core.Runtime.AppPaths` already resolves per-platform data dirs
-(`~/Library/Application Support`, XDG `~/.local/share`).
+### Track C — macOS / Linux self-update ✅ *done*
 
-What remains is running the update loop **end-to-end off Windows** — install,
-then update N→N+1, and confirm the app relaunches on the new version with its
-data root intact — and fixing whatever falls out. The AppImage self-replace path
-is the least-exercised leg. This is the one Horizon 1 item that's blocked on
-hardware access rather than developer time: **macOS and Linux testers are the
-bottleneck, and volunteering on the issue genuinely unblocks a 1.0 gate.**
-Tracked as [#27](https://github.com/GenieClient/Genie5/issues/27).
+**Verified end-to-end on all three platforms** and closed
+([#27](https://github.com/GenieClient/Genie5/issues/27)). The Linux leg ran
+the full loop on a deliberately minimal environment — AppImage launch, live
+game session, delta update, self-replace in place, relaunch on the new
+version with the data root intact — and the macOS legs were validated by
+@dylb0t. Fallout fixed along the way: app-local ICU bundling for minimal
+distros (#314, shipped in beta.8) and the one-cipher-suite TLS handshake on
+Linux/macOS (#316, shipped in beta.8); per-distro first-run notes live on the
+wiki.
 
 ### Track D — Beta soak
 
 Burn down real-user reports on the beta builds before we call it stable. The
-current set, all P1/P2 and all sourced from player reports:
+current set, sourced from player reports (the two P1 script-correctness bugs
+that led this list — rule layering #257 and eval composition #300 — shipped
+in beta.8):
 
-- Profile rule files replace the global set instead of layering on it
-  ([#257](https://github.com/GenieClient/Genie5/issues/257)).
-- `eval` doesn't evaluate inside some trigger actions
-  ([#300](https://github.com/GenieClient/Genie5/issues/300)).
 - Astral Plane: seven missing Map999 conduit nodes, plus a pathfinder guard so
   the built-in walker never routes through `script X` arcs it can't execute
   ([#253](https://github.com/GenieClient/Genie5/issues/253)).
