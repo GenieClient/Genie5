@@ -5,6 +5,15 @@ namespace Genie.Core.Highlights;
 public sealed class HighlightEngine
 {
     private readonly List<HighlightRule> _rules = new();
+    // Copy-on-write iteration snapshot (#251): highlight matching runs on the
+    // UI render path per line while rule mutations can arrive on the game loop
+    // (`#highlight add` from a script). The hot paths iterate this stable
+    // array, rebuilt after every mutation.
+    private volatile HighlightRule[] _snapshot = Array.Empty<HighlightRule>();
+    private void Resnap() => _snapshot = _rules.ToArray();
+    /// <summary>Stable point-in-time rule array for lock-free iteration off the
+    /// owning thread (the App tokenizer reads this, not <see cref="Rules"/>).</summary>
+    public IReadOnlyList<HighlightRule> RuleSnapshot => _snapshot;
     public IReadOnlyList<HighlightRule> Rules => _rules;
     public ClassEngine? Classes { get; set; }
 
@@ -28,17 +37,24 @@ public sealed class HighlightEngine
     {
         var rule = new HighlightRule(pattern, foregroundColor, backgroundColor, matchType, caseSensitive, isEnabled, className, _safetyEnabled, soundFile, speak, windows);
         _rules.Add(rule);
+        Resnap();
         if (!string.IsNullOrEmpty(className)) Classes?.Ensure(className);
         return rule;
     }
 
-    public bool RemoveRule(string pattern) => _rules.RemoveAll(r => r.Pattern == pattern) > 0;
-    public void Clear() => _rules.Clear();
+    public bool RemoveRule(string pattern)
+    {
+        var removed = _rules.RemoveAll(r => r.Pattern == pattern) > 0;
+        if (removed) Resnap();
+        return removed;
+    }
+
+    public void Clear() { _rules.Clear(); Resnap(); }
 
     public HighlightRule? Match(string plainText)
     {
         if (!Enabled) return null;
-        foreach (var rule in _rules)
+        foreach (var rule in _snapshot)
             if (rule.IsEnabled && (Classes?.IsActive(rule.ClassName) ?? true) && rule.Matches(plainText))
                 return rule;
         return null;

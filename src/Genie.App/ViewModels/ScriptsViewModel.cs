@@ -395,7 +395,8 @@ public class ScriptsViewModel : ReactiveObject
         return row;
     }
 
-    private void Process(string command) => _core?.Commands.ProcessInput(command);
+    // PostCommand (#251): the command pipeline runs on the game thread.
+    private void Process(string command) => _core?.PostCommand(command);
 
     /// <summary>True when <paramref name="fullPath"/> lives under the active
     /// repo-scripts dir (#221) — null (feature off) always returns false.</summary>
@@ -431,7 +432,7 @@ public class ScriptsViewModel : ReactiveObject
             _core.Scripts.TryStartFile(f.FullPath,
                 args.Length > 0 ? Genie.Core.Parsing.ArgumentParser.ParseArgs(args) : null);
         else
-            _core.Commands.ProcessInput(
+            _core.PostCommand(
                 args.Length > 0 ? $".{f.RelativeName} {args}" : $".{f.RelativeName}");
     }
 

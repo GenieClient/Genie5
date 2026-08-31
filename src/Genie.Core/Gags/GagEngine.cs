@@ -47,6 +47,12 @@ public sealed class GagRule
 public sealed class GagEngine
 {
     private readonly List<GagRule> _rules = new();
+    // Copy-on-write iteration snapshot (#251): ShouldGag runs per line on the
+    // game loop AND on the UI render path while rule mutations can come from
+    // the other thread. The hot path iterates this stable array, rebuilt after
+    // every mutation.
+    private volatile GagRule[] _snapshot = Array.Empty<GagRule>();
+    private void Resnap() => _snapshot = _rules.ToArray();
     public IReadOnlyList<GagRule> Rules => _rules;
     public ClassEngine? Classes { get; set; }
 
@@ -67,17 +73,24 @@ public sealed class GagEngine
     {
         var rule = new GagRule(pattern, caseSensitive, isEnabled, className, _safetyEnabled);
         _rules.Add(rule);
+        Resnap();
         if (!string.IsNullOrEmpty(className)) Classes?.Ensure(className);
         return rule;
     }
 
-    public bool RemoveRule(string pattern) => _rules.RemoveAll(r => r.Pattern == pattern) > 0;
-    public void Clear() => _rules.Clear();
+    public bool RemoveRule(string pattern)
+    {
+        var removed = _rules.RemoveAll(r => r.Pattern == pattern) > 0;
+        if (removed) Resnap();
+        return removed;
+    }
+
+    public void Clear() { _rules.Clear(); Resnap(); }
 
     public bool ShouldGag(string line)
     {
         if (!Enabled) return false;
-        foreach (var rule in _rules)
+        foreach (var rule in _snapshot)
         {
             if (Classes is not null && !Classes.IsActive(rule.ClassName)) continue;
             if (rule.Matches(line)) return true;

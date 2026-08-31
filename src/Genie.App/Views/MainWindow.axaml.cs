@@ -867,7 +867,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
             if (ViewModel?.Core is { } core && core.Scripts.AnyRunning)
             {
-                core.Commands.ProcessInput("#stopall");
+                core.PostCommand("#stopall");
                 stopped = true;
             }
 

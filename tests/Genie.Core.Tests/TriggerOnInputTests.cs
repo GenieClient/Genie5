@@ -22,7 +22,7 @@ public class TriggerOnInputTests
         Directory.CreateDirectory(dir);
         try
         {
-            await using var core = new GenieCore(dataDirectoryOverride: dir);
+            await using var core = new GenieCore(dataDirectoryOverride: dir, gameThreadOverride: false);
             core.Config.TriggerOnInput = triggerOnInput;
 
             // mm_train's input-capture idiom, ending in a global we can read.
@@ -69,7 +69,7 @@ public class TriggerOnInputTests
         Directory.CreateDirectory(dir);
         try
         {
-            await using var core = new GenieCore(dataDirectoryOverride: dir);
+            await using var core = new GenieCore(dataDirectoryOverride: dir, gameThreadOverride: false);
             core.Config.MyCommandChar = '~';
 
             var scriptsDir = core.Config.ScriptDir;
@@ -100,7 +100,7 @@ public class TriggerOnInputTests
         Directory.CreateDirectory(dir);
         try
         {
-            await using var core = new GenieCore(dataDirectoryOverride: dir);
+            await using var core = new GenieCore(dataDirectoryOverride: dir, gameThreadOverride: false);
 
             core.ProcessInput("/notaplugin");                 // default mycommandchar '/'
             Assert.False(core.Scripts.Globals.TryGetValue("lastcommand", out var lc) && lc == "/notaplugin");

@@ -1402,7 +1402,13 @@ public sealed class ScriptEngine
                     if (rx is null) { fire = false; }
                     else
                     {
-                        var m = rx.Match(line);
+                        Match m;
+                        try { m = rx.Match(line); }
+                        catch (RegexMatchTimeoutException)
+                        {
+                            Diagnostics.RegexSafety.ReportTimeout(Diagnostics.PipelineStage.Scripts);
+                            continue;   // treat as no-match; the pattern is pathological
+                        }
                         fire = m.Success;
                         if (fire)
                         {
@@ -2884,7 +2890,10 @@ public sealed class ScriptEngine
         Regex? compiled = null;
         if (isRegex)
         {
-            try { compiled = new Regex(pattern, RegexOptions.Compiled); }
+            // Built with the RegexSafety match-timeout (deep-dive Phase 0): a
+            // catastrophic-backtracking action pattern must throw (caught at the
+            // match site) instead of wedging the pipeline for good.
+            try { compiled = Diagnostics.RegexSafety.Build(pattern, RegexOptions.Compiled, safe: true); }
             catch (ArgumentException) { /* bad regex — TryMatch will return false */ }
         }
 
@@ -3517,7 +3526,11 @@ public sealed class ScriptEngine
             if (_regexCache.TryGetValue(pattern, out var cached)) return cached;
             try
             {
-                var rx = new Regex(pattern, RegexOptions.Compiled);
+                // RegexSafety match-timeout (deep-dive Phase 0): waitfor/matchwait
+                // patterns come straight from user scripts; a catastrophic one
+                // must time out (caught in TryMatch) instead of hanging the
+                // pipeline uncatchably.
+                var rx = Diagnostics.RegexSafety.Build(pattern, RegexOptions.Compiled, safe: true);
                 if (_regexCache.Count >= RegexCacheLimit) _regexCache.Clear();
                 _regexCache[pattern] = rx;
                 return rx;
@@ -3538,7 +3551,13 @@ public sealed class ScriptEngine
 
         var rx = GetCompiledRegex(pattern);
         if (rx is null) return false;
-        var m = rx.Match(line);
+        Match m;
+        try { m = rx.Match(line); }
+        catch (RegexMatchTimeoutException)
+        {
+            Diagnostics.RegexSafety.ReportTimeout(Diagnostics.PipelineStage.Scripts);
+            return false;   // pathological pattern — treat as no-match
+        }
         if (!m.Success) return false;
         if (capture)
         {

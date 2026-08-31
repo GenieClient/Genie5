@@ -1740,11 +1740,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // ICommandHost. Going through ProcessInput keeps the audit trail
         // identical to a typed command, which matters for the alias / trigger
         // pipeline and the Game-window echo.
-        ListRunningScriptsCommand = ReactiveCommand.Create(() => _core?.Commands.ProcessInput("#scripts"));
-        PauseAllScriptsCommand    = ReactiveCommand.Create(() => _core?.Commands.ProcessInput("#pauseall"));
-        ResumeAllScriptsCommand   = ReactiveCommand.Create(() => _core?.Commands.ProcessInput("#resumeall"));
-        AbortAllScriptsCommand    = ReactiveCommand.Create(() => _core?.Commands.ProcessInput("#stopall"));
-        TraceAllScriptsCommand    = ReactiveCommand.Create<string>(level => _core?.Commands.ProcessInput($"#traceall {level ?? "0"}"));
+        ListRunningScriptsCommand = ReactiveCommand.Create(() => _core?.PostCommand("#scripts"));
+        PauseAllScriptsCommand    = ReactiveCommand.Create(() => _core?.PostCommand("#pauseall"));
+        ResumeAllScriptsCommand   = ReactiveCommand.Create(() => _core?.PostCommand("#resumeall"));
+        AbortAllScriptsCommand    = ReactiveCommand.Create(() => _core?.PostCommand("#stopall"));
+        TraceAllScriptsCommand    = ReactiveCommand.Create<string>(level => _core?.PostCommand($"#traceall {level ?? "0"}"));
 
         OpenScriptsFolderCommand = ReactiveCommand.Create(() =>
         {
@@ -4797,8 +4797,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _core.SpeakRequested += (text, urgent) =>
             _tts.Speak(text, urgent ? Services.TtsPriority.High : Services.TtsPriority.Normal);
 
-        // #tts install / voices / status — manage downloadable voices.
-        _core.TtsCommandRequested += HandleTtsCommand;
+        // #tts install / voices / status — manage downloadable voices. Marshaled:
+        // the handler mutates GameText and writes Config, and with the game
+        // thread on (#251) the event fires on the loop, not the UI thread.
+        _core.TtsCommandRequested += args =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => HandleTtsCommand(args));
 
         // Per-stream read-aloud (off by default): auto-speak text on enabled
         // streams. Config is read live so #tts read/mute applies immediately.
@@ -5050,17 +5053,32 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         // The script tick pump must run for the core's whole life — including while
         // disconnected — so offline scripts' time-based unblocks (PAUSE/delay/
-        // WAITFOR) still fire (issue #88). Wired once here and never stopped on
-        // disconnect. ScheduleTick gives RT-precise one-shot wakeups; the 100ms
-        // heartbeat covers the pause/delay/condition waits the engine doesn't
-        // self-schedule (#61).
-        _core.Scripts.ScheduleTick = delay =>
-            Avalonia.Threading.DispatcherTimer.RunOnce(() => _core?.Scripts.Tick(), delay);
-        _scriptHeartbeat ??= new Avalonia.Threading.DispatcherTimer
-            { Interval = TimeSpan.FromMilliseconds(100) };
-        _scriptHeartbeat.Tick -= OnScriptHeartbeat;
-        _scriptHeartbeat.Tick += OnScriptHeartbeat;
-        _scriptHeartbeat.Start();
+        // WAITFOR) still fire (issue #88). With the #251 game thread on (the
+        // default), GenieCore owns both the ScheduleTick wakeups and the 100ms
+        // heartbeat ON its loop — wiring a DispatcherTimer here would drag the
+        // tick back onto the UI thread. The legacy pump below is the `#config
+        // gamethread off` escape-hatch path only.
+        if (!_core.GameThreadEnabled)
+        {
+            _core.Scripts.ScheduleTick = delay =>
+                Avalonia.Threading.DispatcherTimer.RunOnce(() => _core?.Scripts.Tick(), delay);
+            _scriptHeartbeat ??= new Avalonia.Threading.DispatcherTimer
+                { Interval = TimeSpan.FromMilliseconds(100) };
+            _scriptHeartbeat.Tick -= OnScriptHeartbeat;
+            _scriptHeartbeat.Tick += OnScriptHeartbeat;
+            _scriptHeartbeat.Start();
+        }
+
+        // #251 watchdog: one game-loop item has been running > 5s — the pipeline
+        // is wedged (pathological script statement) but the UI is alive. Say so,
+        // and remind the user Esc/#stopall is queued and will land the moment the
+        // wedge ends. Fires from a watchdog thread → marshal.
+        _core.PipelineStalled += elapsed =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                GameText.AddSystemLine(
+                    $"[genie] the game pipeline has been stuck in one operation for {(int)elapsed.TotalSeconds}s " +
+                    "(a runaway script statement?). The app stays responsive; Esc / #stopall will take effect " +
+                    "as soon as the operation ends."));
     }
 
     // ── Command-line startup connect ──────────────────────────────────────────

@@ -249,6 +249,13 @@ public sealed class GenieConfig
     /// <c>#config activitytimeout</c>.</summary>
     public int ActivityTimeout { get; set; } = 300;
 
+    /// <summary>Run the game pipeline (read loop → parser → state → scripts →
+    /// triggers → plugins) on a dedicated game thread instead of the UI thread
+    /// (#251 / docs/internal/GAME_THREAD_DESIGN.md). Default ON. The loop is
+    /// core-lifetime, so a change takes effect at the next app launch —
+    /// <c>#config gamethread off</c> is the escape hatch if the beta misbehaves.</summary>
+    public bool GameThread { get; set; } = true;
+
     /// <summary>
     /// Optional safeguard for click-to-walk / <c>#goto</c> traversal: when
     /// <c>true</c>, an in-progress auto-walk pauses itself after the window
@@ -714,6 +721,7 @@ public sealed class GenieConfig
         ("automapperscript", AutoMapperScript.ToString()),
         ("conndebug", ConnDebug.ToString()),
         ("activitytimeout", ActivityTimeout.ToString()),
+        ("gamethread", GameThread.ToString()),
         ("editor", Editor),
         ("prompt", Prompt),
         ("promptbreak", PromptBreak.ToString()),
@@ -837,7 +845,7 @@ public sealed class GenieConfig
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
-        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
+        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "gamethread" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
         ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsstreampriority", "ttsrate", "ttsvolume" }),
@@ -965,6 +973,7 @@ public sealed class GenieConfig
                 case "automapperalpha": AutoMapperAlpha = ClampAlpha(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "automapperscript": AutoMapperScript = ToBool(value); break;
                 case "conndebug": ConnDebug = ToBool(value); break;
+                case "gamethread": GameThread = ToBool(value); break;
                 case "activitytimeout":
                     // 0 = watchdog off; anything else clamps to 60s–1h so a typo
                     // can't declare a healthy-but-quiet link dead (server heartbeat

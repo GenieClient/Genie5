@@ -125,7 +125,8 @@ public sealed class ScriptBarViewModel : ReactiveObject
         return item;
     }
 
-    private void Process(string command) => _core?.Commands.ProcessInput(command);
+    // PostCommand (#251): the command pipeline runs on the game thread.
+    private void Process(string command) => _core?.PostCommand(command);
 
     public void Attach(GenieCore core)
     {

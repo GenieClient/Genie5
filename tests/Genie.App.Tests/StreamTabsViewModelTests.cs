@@ -76,7 +76,7 @@ public class StreamTabsViewModelTests
         {
             _dir = Path.Combine(Path.GetTempPath(), "genie_app_tests_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_dir);
-            Core = new GenieCore(dataDirectoryOverride: _dir);
+            Core = new GenieCore(dataDirectoryOverride: _dir, gameThreadOverride: false);
 
             foreach (var id in StreamIds)
                 Store.Register(id, id);

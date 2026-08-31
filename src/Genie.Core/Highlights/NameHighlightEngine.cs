@@ -17,10 +17,14 @@ public sealed class NameRule
 
 public sealed class NameHighlightEngine
 {
-    private readonly Dictionary<string, NameRule> _rules = new(StringComparer.OrdinalIgnoreCase);
-    private Regex? _regex;
+    // Concurrent + volatile regex (#251): Match/MatchAll run on the UI render
+    // path per line while `#names add` from a script mutates the engine on the
+    // game thread. The combined regex is rebuilt as a fresh object and swapped
+    // by reference, so a reader always sees a coherent index.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, NameRule> _rules = new(StringComparer.OrdinalIgnoreCase);
+    private volatile Regex? _regex;
 
-    public IReadOnlyCollection<NameRule> Rules => _rules.Values;
+    public IReadOnlyCollection<NameRule> Rules => (IReadOnlyCollection<NameRule>)_rules.Values;
 
     public void Add(string name, string foregroundColor, string backgroundColor = "")
     {
@@ -29,7 +33,7 @@ public sealed class NameHighlightEngine
         RebuildIndex();
     }
 
-    public bool Remove(string name) { var r = _rules.Remove(name); if (r) RebuildIndex(); return r; }
+    public bool Remove(string name) { var r = _rules.TryRemove(name, out _); if (r) RebuildIndex(); return r; }
     public void Clear() { _rules.Clear(); _regex = null; }
     public NameRule? Get(string name) => _rules.TryGetValue(name, out var r) ? r : null;
 

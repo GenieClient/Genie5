@@ -109,12 +109,19 @@ internal sealed class JsScriptInstance
         lock (_gate) { var m = _matchedLine; _matchedLine = null; return m; }
     }
 
-    /// <summary>Game-event thread: offer a line to a parked waiter.</summary>
+    /// <summary>Game-event thread: offer a line to a parked waiter. A predicate
+    /// failure (notably a <see cref="System.Text.RegularExpressions.RegexMatchTimeoutException"/>
+    /// from a pathological <c>waitForRe</c> pattern under the RegexSafety
+    /// timeout) is treated as a no-match — the pipeline must never absorb an
+    /// exception from a script's pattern.</summary>
     public void FeedLine(string line)
     {
         lock (_gate)
         {
-            if (_linePredicate is { } p && p(line))
+            bool matched;
+            try { matched = _linePredicate is { } p && p(line); }
+            catch { matched = false; }
+            if (matched)
             {
                 _matchedLine = line;
                 _lineWake.Set();

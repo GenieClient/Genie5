@@ -122,14 +122,25 @@ public sealed class GameConnection : IAsyncDisposable
     /// </summary>
     public bool AiPipeEnabled { get; set; } = true;
 
+    /// <summary>When set, every chunk/state publication is marshaled onto this
+    /// loop (the #251 game thread) instead of firing inline on the read-loop
+    /// thread — so every subscriber (parser feed, plugin XML dispatch, relays,
+    /// recorders) runs on the game thread with unchanged FIFO ordering, because
+    /// the marshal happens upstream of the subjects rather than per-subscriber.
+    /// Null preserves the legacy inline publish (unit tests, `#config
+    /// gamethread off`).</summary>
+    private readonly Runtime.GameLoop? _loop;
+
     public GameConnection(
         ConnectionConfig cfg,
         SgeAuthClient sge,
-        ILogger<GameConnection> log)
+        ILogger<GameConnection> log,
+        Runtime.GameLoop? loop = null)
     {
-        _cfg = cfg;
-        _sge = sge;
-        _log = log;
+        _cfg  = cfg;
+        _sge  = sge;
+        _log  = log;
+        _loop = loop;
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
@@ -143,7 +154,7 @@ public sealed class GameConnection : IAsyncDisposable
         {
             if (attempt > 0)
             {
-                _stateSubject.OnNext(new ConnectionEvent(ConnectionEventKind.Reconnecting, attempt));
+                EmitState(new ConnectionEvent(ConnectionEventKind.Reconnecting, attempt));
                 _log.LogInformation("Reconnect attempt {Attempt}/{Max}",
                     attempt, _cfg.MaxReconnectAttempts);
                 await Task.Delay(_cfg.ReconnectDelayMs, ct);
@@ -170,8 +181,17 @@ public sealed class GameConnection : IAsyncDisposable
                         $"{_cfg.Mode} login server. Check your network/VPN and that the server is reachable. " +
                         "(Repeated bad-password attempts can briefly rate-limit the login server.)");
                 }
-                _stateSubject.OnNext(new ConnectionEvent(ConnectionEventKind.Connected, 0, _authTransport));
-                _readLoop = ReadLoopAsync(ct);
+                EmitState(new ConnectionEvent(ConnectionEventKind.Connected, 0, _authTransport));
+                // With a game loop, run the read loop on the thread pool so its
+                // continuations never recapture the caller's (UI) sync context —
+                // the pipeline then runs wherever Publish marshals it (the loop).
+                // Without one, keep the legacy inline start: continuations
+                // recapture the connect caller's context, which is what keeps
+                // the old single-threaded-on-UI behavior intact (`#config
+                // gamethread off`, unit tests).
+                _readLoop = _loop is null
+                    ? ReadLoopAsync(ct)
+                    : Task.Run(() => ReadLoopAsync(ct), CancellationToken.None);
                 // Server-activity watchdog (runs when ServerActivityTimeoutMs > 0;
                 // GenieCore defaults it from `#config activitytimeout`). TCP
                 // keepalive (configured in EstablishConnectionAsync) catches a
@@ -182,7 +202,9 @@ public sealed class GameConnection : IAsyncDisposable
                 // heartbeats at least every ~30s on a healthy link, so a
                 // minutes-scale silence window tells idle from dead safely.
                 if (_cfg.ServerActivityTimeoutMs > 0)
-                    _watchdogLoop = WatchdogLoopAsync(ct);
+                    _watchdogLoop = _loop is null
+                        ? WatchdogLoopAsync(ct)
+                        : Task.Run(() => WatchdogLoopAsync(ct), CancellationToken.None);
                 return;
             }
             catch (OperationCanceledException) { throw; }
@@ -196,13 +218,13 @@ public sealed class GameConnection : IAsyncDisposable
                 // a "character is currently in game" into ~50s of silent retries
                 // ending in a generic failure).
                 _log.LogWarning("SGE login refused (non-retryable): {Reason}", ex.Message);
-                _stateSubject.OnNext(new ConnectionEvent(ConnectionEventKind.Error, 0, ex.Message));
+                EmitState(new ConnectionEvent(ConnectionEventKind.Error, 0, ex.Message));
                 throw;
             }
             catch (Exception ex)
             {
                 _log.LogError(ex, "Connection attempt {Attempt} failed", attempt + 1);
-                _stateSubject.OnNext(new ConnectionEvent(ConnectionEventKind.Error, 0, ex.Message));
+                EmitState(new ConnectionEvent(ConnectionEventKind.Error, 0, ex.Message));
             }
         }
 
@@ -247,7 +269,7 @@ public sealed class GameConnection : IAsyncDisposable
             await _watchdogLoop.ConfigureAwait(false);
         Cleanup();
         if (!hadReadLoop)
-            _stateSubject.OnNext(new ConnectionEvent(ConnectionEventKind.Disconnected));
+            EmitState(new ConnectionEvent(ConnectionEventKind.Disconnected));
     }
 
     // ── Connection establishment ─────────────────────────────────────────────
@@ -432,11 +454,11 @@ public sealed class GameConnection : IAsyncDisposable
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             _log.LogError(ex, "Read loop error — will trigger reconnect");
-            _stateSubject.OnNext(new ConnectionEvent(ConnectionEventKind.Error, 0, ex.Message));
+            EmitState(new ConnectionEvent(ConnectionEventKind.Error, 0, ex.Message));
         }
         finally
         {
-            _stateSubject.OnNext(new ConnectionEvent(ConnectionEventKind.Disconnected));
+            EmitState(new ConnectionEvent(ConnectionEventKind.Disconnected));
         }
     }
 
@@ -468,7 +490,7 @@ public sealed class GameConnection : IAsyncDisposable
                 _log.LogWarning(
                     "Server-activity watchdog tripped: no data for {Idle}ms (>= {Timeout}ms) — declaring link dead.",
                     idleMs, timeoutMs);
-                _stateSubject.OnNext(new ConnectionEvent(ConnectionEventKind.Error, 0,
+                EmitState(new ConnectionEvent(ConnectionEventKind.Error, 0,
                     $"no data from the server for {idleMs / 1000}s — the connection appears to have dropped."));
                 await _cts.CancelAsync();   // unblocks ReadAsync → finally → Disconnected
                 break;
@@ -539,12 +561,44 @@ public sealed class GameConnection : IAsyncDisposable
     {
         _log.LogTrace("← {Chunk}", chunk.TrimEnd());
 
-        // Always publish to the parser stream
-        _rawXmlSubject.OnNext(chunk);
+        if (_loop is { } loop)
+        {
+            // Marshal to the game thread. This is the single choke point that
+            // puts the whole downstream pipeline on the loop; EmitChunks stays
+            // on the read-loop thread (it owns the `pending` StringBuilder).
+            loop.Post(() => PublishCore(chunk));
+        }
+        else
+        {
+            PublishCore(chunk);
+        }
+    }
 
-        // Conditionally publish to the AI stream
-        if (AiPipeEnabled)
-            _aiRawSubject.OnNext(chunk);
+    private void PublishCore(string chunk)
+    {
+        // A posted publish can land after DisposeAsync disposed the subjects
+        // (shutdown race) — swallowing is correct: the session is over.
+        try
+        {
+            // Always publish to the parser stream
+            _rawXmlSubject.OnNext(chunk);
+
+            // Conditionally publish to the AI stream
+            if (AiPipeEnabled)
+                _aiRawSubject.OnNext(chunk);
+        }
+        catch (ObjectDisposedException) { }
+    }
+
+    /// <summary>Publish a connection lifecycle event, marshaled to the game loop
+    /// when one exists. Connection events ride the same FIFO as data, so
+    /// Disconnected can never overtake the last data chunk.</summary>
+    private void EmitState(ConnectionEvent e)
+    {
+        if (_loop is { } loop)
+            loop.Post(() => { try { _stateSubject.OnNext(e); } catch (ObjectDisposedException) { } });
+        else
+            _stateSubject.OnNext(e);
     }
 
     // ── Cleanup ──────────────────────────────────────────────────────────────
@@ -562,6 +616,21 @@ public sealed class GameConnection : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await DisconnectAsync();
+
+        // With a game loop, the read loop's final publications (data chunks and
+        // the Disconnected event) are POSTED — DisconnectAsync only guarantees
+        // they are queued. Fence the loop so they flush through the subjects
+        // BEFORE the subjects are disposed: subscribers like GenieCore's
+        // $connected tracker depend on that last Disconnected actually firing
+        // (issue #87 — a stuck $connected=1 is exactly what it fixed). One-way
+        // post + await keeps the no-deadlock rule; the cap covers a wedged loop.
+        if (_loop is { } loop)
+        {
+            var fence = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            loop.Post(() => fence.TrySetResult());
+            await Task.WhenAny(fence.Task, Task.Delay(TimeSpan.FromSeconds(2))).ConfigureAwait(false);
+        }
+
         _rawXmlSubject.Dispose();
         _aiRawSubject.Dispose();
         _stateSubject.Dispose();

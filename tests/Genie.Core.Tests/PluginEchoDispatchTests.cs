@@ -60,7 +60,7 @@ public class PluginEchoDispatchTests
         Directory.CreateDirectory(dir);
         try
         {
-            await using var core = new GenieCore(dataDirectoryOverride: dir);
+            await using var core = new GenieCore(dataDirectoryOverride: dir, gameThreadOverride: false);
             plugin ??= new FakePlugin();
             Assert.True(core.Plugins.Register(plugin));
 

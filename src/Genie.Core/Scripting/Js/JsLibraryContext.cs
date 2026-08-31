@@ -25,12 +25,21 @@ internal sealed class JsLibraryContext
 {
     private readonly Engine           _engine;
     private readonly RunawayLoopGuard _guard;
+    private readonly WallClockGuard   _wallClock;
     private readonly Action<string>   _echo;
 
     /// <summary>Per-call statement cap: js/jscall run synchronously on the .cmd
     /// tick thread, so a runaway expression must not freeze the client. Reset
     /// before each Evaluate/LoadLibrary. Generous — real array ops are tiny.</summary>
     private const long MaxStatementsPerCall = 50_000_000;
+
+    /// <summary>Wall-clock caps (deep-dive Phase 0): the statement cap above
+    /// bounds a tight loop at ~1-2s of pipeline stall — these bound it in TIME.
+    /// A `js`/`jscall` body is a quick array op (250 ms is two orders of
+    /// magnitude of headroom); an `include` parses+executes a whole library
+    /// once, so it gets a wider budget.</summary>
+    private static readonly TimeSpan EvaluateBudget = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan IncludeBudget  = TimeSpan.FromMilliseconds(1000);
 
     public JsLibraryContext(
         Func<string, string>   getVar,
@@ -40,14 +49,16 @@ internal sealed class JsLibraryContext
         Action<string>         echo,
         Action<string>         put)
     {
-        _echo  = echo;
-        _guard = new RunawayLoopGuard(MaxStatementsPerCall);
+        _echo      = echo;
+        _guard     = new RunawayLoopGuard(MaxStatementsPerCall);
+        _wallClock = new WallClockGuard();
 
         _engine = new Engine(opts =>
         {
             opts.LimitRecursion(128);
             opts.LimitMemory(128L * 1024 * 1024);
             opts.Constraints.Constraints.Add(_guard);
+            opts.Constraints.Constraints.Add(_wallClock);
         });
 
         _engine.SetValue("__h", new Bridge(getVar, setVar, getGlobal, setGlobal, echo, put));
@@ -64,7 +75,7 @@ internal sealed class JsLibraryContext
         try { src = StripBom(File.ReadAllText(path)); }
         catch (Exception ex) { _echo($"[script] include: cannot read '{path}': {ex.Message}"); return false; }
 
-        return Run(() => _engine.Execute(MigrateLengthCalls(src)), $"include '{Path.GetFileName(path)}'");
+        return Run(() => _engine.Execute(MigrateLengthCalls(src)), $"include '{Path.GetFileName(path)}'", IncludeBudget);
     }
 
     /// <summary>Evaluate a JS expression in the context (a <c>js</c> / <c>jscall</c>
@@ -73,19 +84,25 @@ internal sealed class JsLibraryContext
     public string Evaluate(string expression)
     {
         string result = "";
-        Run(() => { result = JsToString(_engine.Evaluate(MigrateLengthCalls(expression))); }, "js");
+        Run(() => { result = JsToString(_engine.Evaluate(MigrateLengthCalls(expression))); }, "js", EvaluateBudget);
         return result;
     }
 
     /// <summary>Run a bounded engine action with the standard guards; report
     /// failures through the script echo (never throws to the .cmd tick loop).</summary>
-    private bool Run(Action action, string what)
+    private bool Run(Action action, string what, TimeSpan budget)
     {
         _guard.ResetCounter();
+        _wallClock.Arm(budget);
         try { action(); return true; }
         catch (RunawayLoopException)
         {
             _echo($"[script] {what}: aborted — JS ran {MaxStatementsPerCall:N0} statements (runaway loop?).");
+        }
+        catch (JsWallClockException)
+        {
+            _echo($"[script] {what}: aborted — JS exceeded the {budget.TotalMilliseconds:0} ms wall-clock budget " +
+                  "(js/jscall run inline on the game pipeline; move long work to a standalone .js script).");
         }
         catch (MemoryLimitExceededException) { _echo($"[script] {what}: aborted — JS memory limit (128 MB) exceeded."); }
         catch (JavaScriptException jse)       { _echo($"[script] {what}: JS error — {jse.Message}"); }
@@ -251,3 +268,31 @@ var game = genie;
         public void   Put(string c)               { if (!string.IsNullOrEmpty(c)) _put(c); }
     }
 }
+
+/// <summary>A Jint constraint that bounds one Execute/Evaluate by wall-clock
+/// time (deep-dive Phase 0). <see cref="Arm"/> sets the budget just before a
+/// call; Jint's own per-call <see cref="Reset"/> re-arms with the same budget,
+/// so nested Jint entry points can't extend the deadline.</summary>
+internal sealed class WallClockGuard : Jint.Constraint
+{
+    private TimeSpan _budget = TimeSpan.FromMilliseconds(250);
+    private long     _deadline = long.MaxValue;
+
+    public void Arm(TimeSpan budget)
+    {
+        _budget   = budget;
+        _deadline = Environment.TickCount64 + (long)budget.TotalMilliseconds;
+    }
+
+    public override void Check()
+    {
+        if (Environment.TickCount64 > _deadline) throw new JsWallClockException();
+    }
+
+    public override void Reset()
+        => _deadline = Environment.TickCount64 + (long)_budget.TotalMilliseconds;
+}
+
+/// <summary>Thrown by <see cref="WallClockGuard"/> when a synchronous js/jscall
+/// exceeds its wall-clock budget. Caught in <see cref="JsLibraryContext"/>.</summary>
+internal sealed class JsWallClockException : Exception { }

@@ -1,8 +1,14 @@
+using System.Collections.Concurrent;
+
 namespace Genie.Core.Variables;
 
 public sealed class VariableStore
 {
-    private readonly Dictionary<string, VariableValue> _variables = new(StringComparer.OrdinalIgnoreCase);
+    // Concurrent (#251): mutated on the game loop (`#var`, script `put #var`,
+    // rule-file live reload) while UserVarLookup reads it from script/JS paths
+    // and the Variables config panel enumerates it on the UI thread. Mirrors
+    // the ScriptEngine.Globals precedent.
+    private readonly ConcurrentDictionary<string, VariableValue> _variables = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Add or update a variable. Returns false (and stores nothing) for a
@@ -17,8 +23,8 @@ public sealed class VariableStore
     public bool Set(string name, string value, VariableScope scope = VariableScope.User)
     {
         if (ReservedConnectionVars.Contains(name)) return false;
-        if (_variables.ContainsKey(name))
-            _variables[name].Value = value;
+        if (_variables.TryGetValue(name, out var existing))
+            existing.Value = value;
         else
             _variables[name] = new VariableValue(name, value, scope);
         return true;
@@ -27,13 +33,13 @@ public sealed class VariableStore
     public string? Get(string name)
         => _variables.TryGetValue(name, out var v) ? v.Value : null;
 
-    public bool Remove(string name) => _variables.Remove(name);
+    public bool Remove(string name) => _variables.TryRemove(name, out _);
 
     public void ClearUserVariables()
     {
         var keys = _variables.Where(kv => kv.Value.Scope == VariableScope.User)
                              .Select(kv => kv.Key).ToList();
-        foreach (var k in keys) _variables.Remove(k);
+        foreach (var k in keys) _variables.TryRemove(k, out _);
     }
 
     public IReadOnlyDictionary<string, VariableValue> GetAll() => _variables;

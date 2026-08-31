@@ -47,7 +47,7 @@ public class MapperConfigSyncTests
         {
             _dir = Path.Combine(Path.GetTempPath(), "genie_app_tests_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_dir);
-            Core = new GenieCore(dataDirectoryOverride: _dir);
+            Core = new GenieCore(dataDirectoryOverride: _dir, gameThreadOverride: false);
 
             if (automapper is not null)
                 Core.Config.SetSetting("automapper", automapper.Value.ToString(), showException: false);

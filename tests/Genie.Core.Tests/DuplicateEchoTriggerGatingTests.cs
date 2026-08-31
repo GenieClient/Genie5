@@ -24,7 +24,7 @@ public class DuplicateEchoTriggerGatingTests
         Directory.CreateDirectory(dir);
         try
         {
-            await using var core = new GenieCore(dataDirectoryOverride: dir);
+            await using var core = new GenieCore(dataDirectoryOverride: dir, gameThreadOverride: false);
             var commands = new List<string>();
             core.Commands.CommandObserved = c => commands.Add(c);
             await body(core, commands);

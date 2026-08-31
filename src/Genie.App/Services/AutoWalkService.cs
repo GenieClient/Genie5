@@ -326,7 +326,9 @@ public sealed class AutoWalkService : ReactiveObject
     public void EmitAutomapperSignal(string line)
     {
         _core.Audit.Note("GOTO", line);   // visible in the Live Audit log
-        _core.Scripts.OnGameLine(line);
+        // Posted (#251) so the matchers — and the script statements a match
+        // unblocks — run on the game thread, not the UI thread.
+        _core.PostScriptGameLine(line);
     }
 
     /// <summary>
@@ -715,7 +717,7 @@ public sealed class AutoWalkService : ReactiveObject
                 Current.StatusMessage =
                     $"Walking to {Current.Destination.Title} — standing up to continue{attemptNote} · Esc to cancel";
                 _sessionChanges.OnNext(Current);
-                _core.Commands.ProcessInput("stand");
+                _core.PostCommand("stand");
                 ScheduleMovabilityRetry(TimeSpan.FromMilliseconds(750));  // let the stand (+ its RT) resolve
                 return;
             }
@@ -808,11 +810,12 @@ public sealed class AutoWalkService : ReactiveObject
         // survives the mixed immediate/queued dispatch.
         verb = Genie.Core.Mapper.MoveVerb.ExpandQuickSends(verb, _core.Config.CommandChar);
 
-        // Send through ProcessInput so the same alias / trigger / command
-        // pipeline runs as if the user typed it. Movement is paced by the
-        // confirmed room change above — one move per room — so it stays
-        // responsive to the game rather than bursting the whole path.
-        _core.Commands.ProcessInput(verb);
+        // Send through the command pipeline (posted to the game thread, #251)
+        // so the same alias / trigger / command handling runs as if the user
+        // typed it. Movement is paced by the confirmed room change above —
+        // one move per room — so it stays responsive to the game rather than
+        // bursting the whole path.
+        _core.PostCommand(verb);
 
         // Arm the watchdog — a confirmed room change (OnRoomChanged) restarts it
         // for the next step; no change in time means this move stuck.
@@ -851,7 +854,7 @@ public sealed class AutoWalkService : ReactiveObject
 
         // Retreat via the core command path (not the typed path) so it doesn't
         // trip the "typed command cancels the walk" guard, exactly like auto-stand.
-        _core.Commands.ProcessInput("retreat");
+        _core.PostCommand("retreat");
 
         // Let the retreat (and its roundtime) resolve, then re-send the held move.
         // StepsCompleted was NOT advanced, so DispatchNextStep re-issues the same verb.
@@ -900,7 +903,7 @@ public sealed class AutoWalkService : ReactiveObject
         // search-directive steps search here, then re-dispatch sends the inner
         // move alone.
         if (_hiddenExitSearch is null)
-            _core.Commands.ProcessInput("search");
+            _core.PostCommand("search");
 
         // Let the search (and its roundtime) resolve, then re-send the held move.
         // StepsCompleted was NOT advanced, so DispatchNextStep re-issues the same

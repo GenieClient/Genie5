@@ -341,7 +341,11 @@ public static class DefaultHighlights
         {
             void ApplyUserHighlights()
             {
-                foreach (var rule in engine.Rules)
+                // RuleSnapshot, not Rules (#251): this runs on the UI render
+                // path while `#highlight add` from a script mutates the engine
+                // on the game thread — the snapshot array is a stable
+                // point-in-time copy, never mutated in place.
+                foreach (var rule in engine.RuleSnapshot)
                 {
                     if (!rule.IsEnabled) continue;
                     if (engine.Classes is { } classes && !classes.IsActive(rule.ClassName)) continue;

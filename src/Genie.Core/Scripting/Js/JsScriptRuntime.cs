@@ -293,8 +293,12 @@ internal sealed class JsScriptRuntime
     public Regex GetRegex(string pattern) =>
         _regexCache.GetOrAdd(pattern, p =>
         {
-            try { return new Regex(p, RegexOptions.Compiled | RegexOptions.IgnoreCase); }
-            catch { return new Regex(Regex.Escape(p), RegexOptions.Compiled | RegexOptions.IgnoreCase); }
+            // RegexSafety match-timeout (deep-dive Phase 0): waitForRe patterns
+            // run inside FeedLine ON the game pipeline — a catastrophic pattern
+            // must time out (swallowed in JsScriptInstance.FeedLine) instead of
+            // wedging the pipeline.
+            try { return Diagnostics.RegexSafety.Build(p, RegexOptions.Compiled | RegexOptions.IgnoreCase, safe: true); }
+            catch { return Diagnostics.RegexSafety.Build(Regex.Escape(p), RegexOptions.Compiled | RegexOptions.IgnoreCase, safe: true); }
         });
 
     /// <summary>

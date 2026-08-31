@@ -740,7 +740,7 @@ public class MapperViewModel : ReactiveObject
         WalkLessObviousCommand = ReactiveCommand.Create<string>(cmd =>
         {
             if (string.IsNullOrWhiteSpace(cmd)) return;
-            _commands?.ProcessInput(cmd);
+            PostCommand(cmd);
         });
         WalkLessObviousCommand.ThrownExceptions.Subscribe(ex =>
             LoadStatus = $"Walk failed: {ex.Message}");
@@ -748,7 +748,7 @@ public class MapperViewModel : ReactiveObject
         WalkCompassCommand = ReactiveCommand.Create<string>(cmd =>
         {
             if (string.IsNullOrWhiteSpace(cmd)) return;
-            _commands?.ProcessInput(cmd);
+            PostCommand(cmd);
         });
         WalkCompassCommand.ThrownExceptions.Subscribe(ex =>
             LoadStatus = $"Walk failed: {ex.Message}");
@@ -769,8 +769,8 @@ public class MapperViewModel : ReactiveObject
         // to show the banner stays in Attach, where `core` is available.)
         FetchSkillsCommand = ReactiveCommand.Create(() =>
         {
-            _commands?.ProcessInput("info");      // guild + circle → class / level gating
-            _commands?.ProcessInput("exp all");   // all skill ranks → skill gating
+            PostCommand("info");      // guild + circle → class / level gating
+            PostCommand("exp all");   // all skill ranks → skill gating
             ShowSkillsPrompt = false;   // hide immediately; data will arrive shortly
         });
         FetchSkillsCommand.ThrownExceptions.Subscribe(ex =>
@@ -942,6 +942,15 @@ public class MapperViewModel : ReactiveObject
         AutoCreateEnabled = _core.Config.AutoMapper;
     }
 
+    /// <summary>Route a walk/probe verb into the command pipeline on the game
+    /// thread (#251). Falls back to the direct engine for a test harness that
+    /// attached a CommandEngine without a core.</summary>
+    private void PostCommand(string cmd)
+    {
+        if (_core is { } c) c.PostCommand(cmd);
+        else _commands?.ProcessInput(cmd);
+    }
+
     public void Attach(GenieCore core)
     {
         _core     = core;
@@ -1050,53 +1059,11 @@ public class MapperViewModel : ReactiveObject
             MaybeFollowZoneNote(n);
         });
         _engine.MapChanged         += () => Dispatcher.UIThread.Post(Refresh);
+        // #251: the engine fires this on the game thread; the handler mutates
+        // VM state (BrowsingZone, LoadStatus) and drives zone loads, so marshal
+        // the whole body to the UI thread — same as MapChanged above.
         _engine.RoomNotFoundInZone += (serverId, title, exits) =>
-        {
-            // A user-initiated zone load is IN PROGRESS: this miss is an
-            // artifact of loading a map the character isn't in, not of the
-            // character moving. Acting on it here (the by-title boundary-stub
-            // follow especially) snapped a fresh browse straight back to the
-            // character's map before the browse-hold even engaged.
-            if (_loadingZone) return;
-
-            // Browse-hold: the user is deliberately looking at a different map.
-            // Every live room event fires this handler while the loaded zone
-            // doesn't contain the character (a moving ferry fires one every few
-            // seconds), and the auto-load below would instantly yank the view
-            // back — which made cross-zone clicks look dead during travel
-            // (2026-08-04 smoke). Suspend following until the character shows
-            // up in the browsed zone or the user returns to their map.
-            if (BrowsingZone)
-            {
-                // Release the hold the moment the CHARACTER MOVES: the engine
-                // can only match rooms in the loaded zone, so keeping the
-                // suppression up while the character travels starves tracking
-                // completely — no auto-load, no match, $zoneid frozen stale,
-                // and travel.cmd's $roomid=0 branch starts MOVERANDOM
-                // (2026-08-06 ferry ping-pong). Browsing is a STATIONARY
-                // inspection mode; a new server room id means the character is
-                // going places, so follow them again.
-                if (!string.Equals(serverId, _browseHoldRoomId, StringComparison.OrdinalIgnoreCase))
-                {
-                    BrowsingZone = false;
-                    _audit?.Note("MISS", "browse-hold released — character moved; resuming auto-follow");
-                    // fall through to the normal auto-load below
-                }
-                else
-                {
-                    _audit?.Note("MISS", $"\"{title}\" not in browsed zone '{_engine?.ActiveZone?.Name}' — auto-load suspended (browsing)");
-                    return;
-                }
-            }
-            _audit?.Note("MISS", $"engine can't place \"{title}\" in '{_engine?.ActiveZone?.Name}' → trying auto-load");
-            // First: a boundary stub in THIS zone with this title may name the
-            // destination zone (the map's own cross-zone link) — definitive, no
-            // fingerprint ambiguity. Fall back to the server-id/fingerprint
-            // auto-detect only if there's no such note.
-            if (TryFollowZoneNoteByTitle(title)) return;
-            TryAutoLoadZoneFor(serverId, title, exits);
-        };
-
+            Dispatcher.UIThread.Post(() => OnRoomNotFoundInZone(serverId, title, exits));
         // Record mode ⇄ the `automapper` config key. The SAVED preference picks
         // the starting mode — seeding from the engine's own default (always
         // false) left the key inert: a profile with automapper=True still began
@@ -1145,6 +1112,56 @@ public class MapperViewModel : ReactiveObject
         // and JSON-parsing every zone file is non-trivial, so don't block
         // the UI thread — auto-detect will simply skip until the index lands.
         _ = RebuildServerIdIndexAsync();
+    }
+
+    /// <summary>Engine can't place the current room in the loaded zone — decide
+    /// whether to auto-load a zone for it. Runs on the UI thread (posted from
+    /// the RoomNotFoundInZone subscription in <see cref="Attach"/>).</summary>
+    private void OnRoomNotFoundInZone(string serverId, string title, IReadOnlyCollection<string> exits)
+    {
+        // A user-initiated zone load is IN PROGRESS: this miss is an
+        // artifact of loading a map the character isn't in, not of the
+        // character moving. Acting on it here (the by-title boundary-stub
+        // follow especially) snapped a fresh browse straight back to the
+        // character's map before the browse-hold even engaged.
+        if (_loadingZone) return;
+
+        // Browse-hold: the user is deliberately looking at a different map.
+        // Every live room event fires this handler while the loaded zone
+        // doesn't contain the character (a moving ferry fires one every few
+        // seconds), and the auto-load below would instantly yank the view
+        // back — which made cross-zone clicks look dead during travel
+        // (2026-08-04 smoke). Suspend following until the character shows
+        // up in the browsed zone or the user returns to their map.
+        if (BrowsingZone)
+        {
+            // Release the hold the moment the CHARACTER MOVES: the engine
+            // can only match rooms in the loaded zone, so keeping the
+            // suppression up while the character travels starves tracking
+            // completely — no auto-load, no match, $zoneid frozen stale,
+            // and travel.cmd's $roomid=0 branch starts MOVERANDOM
+            // (2026-08-06 ferry ping-pong). Browsing is a STATIONARY
+            // inspection mode; a new server room id means the character is
+            // going places, so follow them again.
+            if (!string.Equals(serverId, _browseHoldRoomId, StringComparison.OrdinalIgnoreCase))
+            {
+                BrowsingZone = false;
+                _audit?.Note("MISS", "browse-hold released — character moved; resuming auto-follow");
+                // fall through to the normal auto-load below
+            }
+            else
+            {
+                _audit?.Note("MISS", $"\"{title}\" not in browsed zone '{_engine?.ActiveZone?.Name}' — auto-load suspended (browsing)");
+                return;
+            }
+        }
+        _audit?.Note("MISS", $"engine can't place \"{title}\" in '{_engine?.ActiveZone?.Name}' → trying auto-load");
+        // First: a boundary stub in THIS zone with this title may name the
+        // destination zone (the map's own cross-zone link) — definitive, no
+        // fingerprint ambiguity. Fall back to the server-id/fingerprint
+        // auto-detect only if there's no such note.
+        if (TryFollowZoneNoteByTitle(title)) return;
+        TryAutoLoadZoneFor(serverId, title, exits);
     }
 
     /// <summary>

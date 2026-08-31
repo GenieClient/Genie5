@@ -478,7 +478,15 @@ internal sealed class ScriptExpression
                 var s   = A(0);
                 var pat = A(1);
                 Match m;
-                try { m = Regex.Match(s, pat); }
+                // RegexSafety match-timeout (deep-dive Phase 0): the pattern is
+                // user script text — a catastrophic one times out as a no-match
+                // instead of wedging the pipeline inside an eval.
+                try { m = Regex.Match(s, pat, RegexOptions.None, Diagnostics.RegexSafety.MatchTimeout); }
+                catch (RegexMatchTimeoutException)
+                {
+                    Diagnostics.RegexSafety.ReportTimeout(Diagnostics.PipelineStage.Scripts);
+                    return false;
+                }
                 catch (Exception ex) { throw new Exception($"matchre: bad regex: {ex.Message}"); }
                 if (!m.Success) return false;
                 // Captures land in $0..$9 on the current DollarStack frame —
@@ -550,7 +558,9 @@ internal sealed class ScriptExpression
             case "replace":
                 return A(0).Replace(A(1), A(2));
             case "replacere":
-                try { return Regex.Replace(A(0), A(1), A(2)); }
+                // Timeout-bounded like matchre; any failure (bad regex OR a
+                // catastrophic pattern timing out) returns the input unchanged.
+                try { return Regex.Replace(A(0), A(1), A(2), RegexOptions.None, Diagnostics.RegexSafety.MatchTimeout); }
                 catch { return A(0); }
             case "match":
                 // Genie4 parity: exact equality (Eval.cs:941 string.Equals with

@@ -20,7 +20,7 @@ public class ScriptPutTvarEvalTests
 {
     private static async Task<GenieCore> NewCoreWithScript(string dir, string body)
     {
-        var core = new GenieCore(dataDirectoryOverride: dir);
+        var core = new GenieCore(dataDirectoryOverride: dir, gameThreadOverride: false);
         var scriptsDir = core.Config.ScriptDir;
         Directory.CreateDirectory(scriptsDir);
         File.WriteAllText(Path.Combine(scriptsDir, "tvartest.cmd"), body);

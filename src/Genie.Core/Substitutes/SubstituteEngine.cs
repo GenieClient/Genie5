@@ -46,6 +46,14 @@ public sealed class SubstituteRule
 public sealed class SubstituteEngine
 {
     private readonly List<SubstituteRule> _rules = new();
+    // Copy-on-write iteration snapshot (#251): Apply runs per line on the game
+    // loop (and, until the display workstream moves it, on the UI render path)
+    // while rule mutations can come from the other thread (`#sub add` vs the
+    // config panel / rule-file live reload). Iterating the List during a
+    // mutation throws; the hot path iterates this stable array instead,
+    // rebuilt after every mutation.
+    private volatile SubstituteRule[] _snapshot = Array.Empty<SubstituteRule>();
+    private void Resnap() => _snapshot = _rules.ToArray();
     public IReadOnlyList<SubstituteRule> Rules => _rules;
     public ClassEngine? Classes { get; set; }
 
@@ -66,17 +74,24 @@ public sealed class SubstituteEngine
     {
         var rule = new SubstituteRule(pattern, replacement, caseSensitive, isEnabled, className, _safetyEnabled);
         _rules.Add(rule);
+        Resnap();
         if (!string.IsNullOrEmpty(className)) Classes?.Ensure(className);
         return rule;
     }
 
-    public bool RemoveRule(string pattern) => _rules.RemoveAll(r => r.Pattern == pattern) > 0;
-    public void Clear() => _rules.Clear();
+    public bool RemoveRule(string pattern)
+    {
+        var removed = _rules.RemoveAll(r => r.Pattern == pattern) > 0;
+        if (removed) Resnap();
+        return removed;
+    }
+
+    public void Clear() { _rules.Clear(); Resnap(); }
 
     public string Apply(string line)
     {
         if (!Enabled) return line;
-        foreach (var rule in _rules)
+        foreach (var rule in _snapshot)
         {
             if (Classes is not null && !Classes.IsActive(rule.ClassName)) continue;
             line = rule.Apply(line);

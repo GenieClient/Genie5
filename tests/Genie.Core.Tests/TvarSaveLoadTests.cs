@@ -22,7 +22,7 @@ public class TvarSaveLoadTests
         Directory.CreateDirectory(dir);
         try
         {
-            await using var core = new GenieCore(dataDirectoryOverride: dir);
+            await using var core = new GenieCore(dataDirectoryOverride: dir, gameThreadOverride: false);
             // The engine writes to its resolved ConfigProfileDir under the data
             // dir; locate the file wherever that landed rather than assuming.
             string FindCfg() =>

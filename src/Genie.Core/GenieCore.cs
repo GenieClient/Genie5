@@ -122,6 +122,52 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     private IDisposable? _rawXmlRelaySub;
     private IDisposable? _connStateRelaySub;
 
+    // ── Game loop (#251 — docs/internal/GAME_THREAD_DESIGN.md) ────────────────
+    /// <summary>The dedicated game thread. Null when <c>#config gamethread off</c>
+    /// (the escape hatch) — then the pipeline runs inline on whatever thread the
+    /// read loop resumes on (the legacy UI-thread behavior) and the App host
+    /// retains its DispatcherTimer pump. Core-lifetime, like the old heartbeat.</summary>
+    private readonly GameLoop? _loop;
+    private IDisposable? _heartbeat;
+
+    /// <summary>True when the #251 game thread is active. The App host reads
+    /// this to skip its legacy DispatcherTimer script pump (the core owns
+    /// <see cref="ScriptEngine.ScheduleTick"/> and the 100 ms heartbeat when
+    /// the loop exists).</summary>
+    public bool GameThreadEnabled => _loop is not null;
+
+    /// <summary>Raised (from a watchdog thread, NOT the UI or game thread) when
+    /// one game-loop work item has run longer than <see cref="GameLoop.StallThreshold"/>
+    /// — i.e. the game pipeline is wedged in a single statement. The UI stays
+    /// alive and should tell the user (and offer #stopall, which posts and takes
+    /// effect the moment the wedge ends). At most once per wedged item.</summary>
+    public event Action<TimeSpan>? PipelineStalled;
+
+    /// <summary>Run <paramref name="work"/> on the game loop: post when called
+    /// from any other thread, invoke inline when already on the loop (or when
+    /// the loop is off). Inline-on-loop keeps synchronous re-entrancy semantics
+    /// (#parse, trigger feedback) intact.</summary>
+    private void RunOnLoop(Action work)
+    {
+        if (_loop is { IsOnLoop: false } loop) loop.Post(work);
+        else work();
+    }
+
+    /// <summary>Post a programmatic command line into the command pipeline on
+    /// the game thread — the App-side entry point for everything that used to
+    /// call <c>Commands.ProcessInput</c> directly from the UI (menu items,
+    /// Script Bar chips, mapper walk verbs, Esc's #stopall). Fire-and-forget:
+    /// feedback arrives via the echo events, exactly as before.</summary>
+    public void PostCommand(string command)
+        => RunOnLoop(() => Commands.ProcessInput(command));
+
+    /// <summary>Feed a synthetic protocol line to running scripts' matchers on
+    /// the game thread — the automapper's <c>YOU HAVE ARRIVED!</c> /
+    /// <c>AUTOMAPPER MOVEMENT FAILED</c> signals (AutoWalkService), which
+    /// matchwait-driven scripts (travel.cmd, hunt.cmd) block on.</summary>
+    public void PostScriptGameLine(string line)
+        => RunOnLoop(() => Scripts.OnGameLine(line));
+
     // ── Configuration / runtime ────────────────────────────────────────────────
     private readonly LocalDirectoryService _localDir;
 
@@ -412,7 +458,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     public GenieCore(
         string?         dataDirectoryOverride = null,
         AiConfig?       aiConfig      = null,
-        ILoggerFactory? loggerFactory = null)
+        ILoggerFactory? loggerFactory = null,
+        bool?           gameThreadOverride = null)
     {
         _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
         _aiConfig      = aiConfig;
@@ -428,6 +475,20 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
         Config = new GenieConfig(_localDir);
         Config.Load();
+
+        // ── Game loop (#251) ───────────────────────────────────────────────────
+        // Created before anything that posts to it; lives for the core's whole
+        // life (spanning reconnects). `#config gamethread off` restores the
+        // legacy inline/UI-thread pipeline at the next app launch.
+        // gameThreadOverride bypasses the config: unit tests pass false so the
+        // pipeline stays inline/deterministic on the test thread.
+        if (gameThreadOverride ?? Config.GameThread)
+        {
+            _loop = new GameLoop();
+            _loop.ItemFailed = ex =>
+                RaiseEchoLine($"[genie] game-pipeline error (contained): {ex.Message}");
+            _loop.Stalled += elapsed => PipelineStalled?.Invoke(elapsed);
+        }
 
         // ── Persistent game state ───────────────────────────────────────────────
         // One instance for the core's whole life: the plugin state view, the script
@@ -524,10 +585,15 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // shows each script line once; EchoLine is reserved for user-typed
         // command echoes and system diagnostics. The Scripts panel also reads
         // ScriptOutputLine for its own scrollback.
+        // The send/echo delegates are wrapped in RunOnLoop: .cmd ticks already
+        // run on the game loop (inline invoke), but .js scripts call them from
+        // their own threads — posting marshals those host calls onto the loop,
+        // which fixes the pre-existing JS-thread races for free (non-atomic
+        // TypeAheadSession._inFlight, PluginManager.DispatchEcho concurrency).
         Scripts    = new ScriptEngine(
             scriptsDir:    Config.ScriptDir,
             typeAhead:     _typeAhead,
-            sendCommand:   cmd =>
+            sendCommand:   cmd => RunOnLoop(() =>
                            {
                                RaiseScriptOutput(cmd);
                                _typeAhead.NotifySent();
@@ -536,14 +602,34 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                                // toggle trigger classes and #connect (issue #88).
                                // Sends resume the moment a connection exists.
                                _ = _connection?.SendCommandAsync(cmd);
-                           },
-            echo:          msg => RaiseScriptOutput(msg),
-            handleHashCmd: cmd => Commands.ProcessInput(cmd, interactive: false),
-            injectGameLine: line => InjectParsedLine(line));
+                           }),
+            echo:          msg => RunOnLoop(() => RaiseScriptOutput(msg)),
+            handleHashCmd: cmd => RunOnLoop(() => Commands.ProcessInput(cmd, interactive: false)),
+            injectGameLine: line => RunOnLoop(() => InjectParsedLine(line)));
 
         // Live config for the runtime script settings (ScriptTimeout,
         // MaxGoSubDepth, AbortDupeScript, ScriptExtension).
         Scripts.Config = Config;
+
+        // ── Script pump (#251: the core owns it when the game loop is on) ──────
+        // ScheduleTick gives RT-precise one-shot wakeups; the 100 ms heartbeat
+        // covers pause/delay/condition waits the engine doesn't self-schedule,
+        // and pumps the #send/#event queues. Both run ON the loop, so
+        // Commands.Tick's live State reads stop being cross-thread. With the
+        // loop off, the App host wires its legacy DispatcherTimer pump instead
+        // (it checks GameThreadEnabled).
+        if (_loop is { } gameLoop)
+        {
+            Scripts.ScheduleTick = delay => gameLoop.PostDelayed(delay, () => Scripts.Tick());
+            _heartbeat = gameLoop.PostRepeating(TimeSpan.FromMilliseconds(100), () =>
+            {
+                Scripts.Tick();
+                Commands.Tick(
+                    _state.Combat.InRoundTime,
+                    _state.ActiveStatuses.Contains(Models.CharacterStatus.Webbed),
+                    _state.ActiveStatuses.Contains(Models.CharacterStatus.Stunned));
+            });
+        }
 
         // $connected exists from app launch, seeded "0" (Genie 4 parity:
         // Lists/Globals.cs:882 seeds the reserved var "0" at startup). Without
@@ -582,8 +668,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         };
         // #config ignorescriptwarnings — suppress non-fatal script parse advisories (#151).
         Scripts.WarningsSuppressed        = () => Config.IgnoreScriptWarnings;
-        Scripts.EchoTo                   = (msg, win, color) => RaiseEchoToWindow(msg, win, color);
-        Scripts.EchoStyled               = (msg, color, mono) => RaiseEchoStyled(msg, color, mono);
+        Scripts.EchoTo                   = (msg, win, color) => RunOnLoop(() => RaiseEchoToWindow(msg, win, color));
+        Scripts.EchoStyled               = (msg, color, mono) => RunOnLoop(() => RaiseEchoStyled(msg, color, mono));
         // Named-window seam for the built-in trackers (Spell Timer / Experience /
         // Time Tracker), which re-render a whole dock panel each prompt. Same event
         // the App's ExperienceViewModel + generic PluginWindowViewModel consume.
@@ -759,7 +845,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // ── Network stack (per connection) ───────────────────────────────────────
         var connection = new GameConnection(cfg,
             new SgeAuthClient(lf.CreateLogger<SgeAuthClient>()),
-            lf.CreateLogger<GameConnection>());
+            lf.CreateLogger<GameConnection>(),
+            _loop);
         var parser      = new DrXmlParser(lf.CreateLogger<DrXmlParser>());
         var stateEngine = new GameStateEngine(parser.GameEvents, _state,
             lf.CreateLogger<GameStateEngine>());
@@ -1019,23 +1106,29 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // leave the flag false and keep this Genie 4-parity load.
         if (reloadRules && !HostOwnsRuleLoad)
         {
-            var profileDir = Config.ConfigProfileDir;
-            if (File.Exists(Path.Combine(profileDir, "classes.cfg")))
-                Commands.ProcessInput("#class load");
-            if (File.Exists(Path.Combine(profileDir, "aliases.cfg")))
-                Commands.ProcessInput("#alias load");
-            if (File.Exists(Path.Combine(profileDir, "variables.cfg")))
-                Commands.ProcessInput("#var load");
-            if (File.Exists(Path.Combine(profileDir, "highlights.cfg")))
-                Commands.ProcessInput("#highlight load");
-            if (File.Exists(Path.Combine(profileDir, "triggers.cfg")))
-                Commands.ProcessInput("#trigger load");
-            if (File.Exists(Path.Combine(profileDir, "substitutes.cfg")))
-                Commands.ProcessInput("#substitute load");
-            if (File.Exists(Path.Combine(profileDir, "gags.cfg")))
-                Commands.ProcessInput("#gag load");
-            if (File.Exists(Path.Combine(profileDir, "macros.cfg")))
-                Commands.ProcessInput("#macro load");
+            // On the loop (#251): BuildConnection runs on the connect caller's
+            // thread while the heartbeat ticks the engines on the game thread.
+            // FIFO puts these loads ahead of any game data from the dial below.
+            RunOnLoop(() =>
+            {
+                var profileDir = Config.ConfigProfileDir;
+                if (File.Exists(Path.Combine(profileDir, "classes.cfg")))
+                    Commands.ProcessInput("#class load");
+                if (File.Exists(Path.Combine(profileDir, "aliases.cfg")))
+                    Commands.ProcessInput("#alias load");
+                if (File.Exists(Path.Combine(profileDir, "variables.cfg")))
+                    Commands.ProcessInput("#var load");
+                if (File.Exists(Path.Combine(profileDir, "highlights.cfg")))
+                    Commands.ProcessInput("#highlight load");
+                if (File.Exists(Path.Combine(profileDir, "triggers.cfg")))
+                    Commands.ProcessInput("#trigger load");
+                if (File.Exists(Path.Combine(profileDir, "substitutes.cfg")))
+                    Commands.ProcessInput("#substitute load");
+                if (File.Exists(Path.Combine(profileDir, "gags.cfg")))
+                    Commands.ProcessInput("#gag load");
+                if (File.Exists(Path.Combine(profileDir, "macros.cfg")))
+                    Commands.ProcessInput("#macro load");
+            });
         }
 
         // ── AI buffer (optional) ───────────────────────────────────────────────
@@ -1324,17 +1417,36 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// host). The argument arrives already <c>$</c>/<c>%</c>-expanded by the
     /// caller, matching Genie 4's <c>ParseGlobalVars</c> on the #parse argument.
     /// </summary>
+    /// <summary>Re-entry depth of <see cref="InjectParsedLine"/>: a #parse whose
+    /// injected line fires a trigger/action that #parses again nests
+    /// synchronously with a fresh tick budget each level — unbounded recursion
+    /// (deep-dive Phase 0). Single-threaded (loop/pipeline thread), so a plain
+    /// field suffices.</summary>
+    private int _parseDepth;
+    private const int MaxParseDepth = 16;
+
     public void InjectParsedLine(string line)
     {
         if (string.IsNullOrEmpty(line)) return;
-        // Treat as the main stream so the ParseGameOnly gate (below) always
-        // lets injected text reach triggers — Genie 4 fed #parse to triggers
-        // unconditionally.
-        var transformed = Plugins.DispatchGameText(line, "main");
-        if (transformed is null) return;                    // plugin gagged the injection
-        Scripts.OnGameLine(transformed);                    // scripts (waitfor/match) + built-in trackers + JS waiters
-        if (!(Config?.ParseGameOnly ?? false))
-            Triggers.ProcessLine(transformed);              // global user-defined triggers
+        if (_parseDepth >= MaxParseDepth)
+        {
+            RaiseEchoLine($"[genie] #parse: re-entry depth limit ({MaxParseDepth}) reached — " +
+                          $"dropped '{line}' (a #parse trigger loop?).");
+            return;
+        }
+        _parseDepth++;
+        try
+        {
+            // Treat as the main stream so the ParseGameOnly gate (below) always
+            // lets injected text reach triggers — Genie 4 fed #parse to triggers
+            // unconditionally.
+            var transformed = Plugins.DispatchGameText(line, "main");
+            if (transformed is null) return;                    // plugin gagged the injection
+            Scripts.OnGameLine(transformed);                    // scripts (waitfor/match) + built-in trackers + JS waiters
+            if (!(Config?.ParseGameOnly ?? false))
+                Triggers.ProcessLine(transformed);              // global user-defined triggers
+        }
+        finally { _parseDepth--; }
     }
 
     private void OnConnectReady(DrXmlParser? lichAttachParser = null)
@@ -1988,6 +2100,21 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// </summary>
     public void ProcessInput(string input, string? echoOverride = null)
     {
+        // #251: typed input runs on the game thread, interleaving with game
+        // traffic at line boundaries (the loop item is the serialization unit,
+        // as the dispatcher job used to be). Fire-and-forget is correct — the
+        // feedback (echo, errors) arrives via events; the App renders the local
+        // input echo itself at submit time, so typing feels instant under load.
+        if (_loop is { IsOnLoop: false } loop)
+        {
+            loop.Post(() => ProcessInputCore(input, echoOverride));
+            return;
+        }
+        ProcessInputCore(input, echoOverride);
+    }
+
+    private void ProcessInputCore(string input, string? echoOverride)
+    {
         // Console /commands owned by a built-in tracker (e.g. /spelltimer, /exp,
         // /tt) are handled client-side and never reach the game or the triggers.
         // Only offered at this genuine user-input boundary — programmatic sends go
@@ -2130,7 +2257,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // Per-connection layer first (connection, parser, subs, mapper adapter, AI).
         await TeardownConnectionAsync();
 
-        // Then the once-per-app layer.
+        // Then the once-per-app layer. The game loop drains and joins BEFORE the
+        // relay subjects are completed/disposed below, so a queued pipeline item
+        // can't land on a dead relay.
+        _heartbeat?.Dispose();
+        _heartbeat = null;
+        _loop?.Dispose();
         _injuriesPollTimer?.Dispose();
         _injuriesPollTimer = null;
         _liveAudit.Dispose();
