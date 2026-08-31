@@ -1,3 +1,38 @@
+# Genie 5 — v5.0.0-beta.8.2
+
+**"Spyglass"** — every list panel in Configuration gets a live search box,
+scrolled-back reading holds still under even heavier spam, and the
+automapper learns another hidden-exit idiom.
+
+## ✨ New
+- **Find… boxes on every Configuration list panel** — Variables, Macros,
+  Names, and Classes join the other rule panels with a live type-to-filter
+  box. Variables searches values too, so typing `off` finds every disabled
+  toggle. The whole filter family got hardened while we were in there:
+  filters reset cleanly on profile switch and import, hiding the selected
+  row clears the editor form instead of leaving it stale, a search keystroke
+  no longer discards unsaved edits or a multi-row selection, and Variables'
+  **Select All** tells you when a filter is hiding rows from the copy.
+- **Automapper: named-object hidden exits** — map arcs like
+  `objsearch outcropping climb handholds` now work: Genie searches the named
+  object first, waits out the reveal, then takes the move (Genie 4
+  `MOVE.OBJSEARCH` parity). Covers the Mistwood outcropping and friends.
+
+## 🐛 Fixes
+- **Scroll-hold holds under trimming again** — a regression let the view
+  crawl one line at a time while you were scrolled back at the scrollback
+  cap. The hold re-engages, and trims are now deferred entirely while
+  you're reading — the buffer catches up the moment you return to the
+  bottom (#293/#298 follow-up).
+- **Macros: re-saving a macro keeps its class** — saving over an existing
+  macro that belonged to a rule class no longer silently resets it to
+  `default`.
+- **Linux: floating windows get their title-bar menu features back** — the
+  dock never marked floats as floating on Linux, so float-only items like
+  Hide Title Bar didn't appear there.
+
+---
+
 # Genie 5 — v5.0.0-beta.8
 
 **"Field Notes"** — Genie starts keeping a journal of the server's dialog

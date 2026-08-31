@@ -4,7 +4,20 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.8 — Field Notes
+## Latest: v5.0.0-beta.8.2 — Spyglass
+
+Every list panel in Configuration gets a live search box, scrolled-back reading holds still under even heavier spam, and the automapper learns another hidden-exit idiom.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.8.2** as a delta from beta.8.
+
+- **Find… boxes on every Configuration list panel** — Variables, Macros, Names, and Classes join the other rule panels with a live type-to-filter box; Variables searches values too, so typing `off` finds every disabled toggle. The whole filter family got hardened: filters reset cleanly on profile switch and import, hiding the selected row clears the editor form, a search keystroke no longer discards unsaved edits or a multi-row selection, and Variables' Select All says when a filter is hiding rows from the copy.
+- **Automapper: named-object hidden exits** — map arcs like `objsearch outcropping climb handholds` now search the named object first, wait out the reveal, then take the move (Genie 4 `MOVE.OBJSEARCH` parity).
+- **Scroll-hold holds under trimming again** — a regression let the view crawl while scrolled back at the scrollback cap; the hold re-engages, and trims are deferred entirely while you're reading (#293/#298 follow-up).
+- **Macros: re-saving a macro keeps its class**, and **Linux floating windows get their title-bar menu features back**.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.8.2)
+
+## v5.0.0-beta.8 — Field Notes
 
 Genie starts keeping a journal of the server's dialog windows — and asks for your reports. Shared config finally layers under each character's own rules, inactive tabs light up when something happens in them, and self-update is now verified end-to-end on Windows, macOS, and Linux.
 
