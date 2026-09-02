@@ -16,6 +16,15 @@ public static class ScriptParser
         //    `if X then` + `{` + `stmt` + `}` so the unified block-form
         //    jump tables handle them correctly in all chain positions.
         //    Also translates `begin`/`end` → `{`/`}` aliases.
+        // 2a. Collapse inline `<% … %>` JavaScript blocks BEFORE the conditional
+        //     and label passes below. A JS body can contain a bare `default:` or
+        //     an unspaced object key that the label scanner would register as a
+        //     script label, and a `then` inside a string literal that
+        //     FindThenKeyword would split on. Extracting first makes all of that
+        //     unreachable. Runs after include expansion, so blocks inside an
+        //     included file are handled with no extra work.
+        raw = ExtractJsBlocks(raw, inst);
+
         raw = NormaliseInlineConditionals(raw);
 
         // 3. Build ScriptLine list with indent + label table.
@@ -38,6 +47,72 @@ public static class ScriptParser
         // 4. Build if/else jump maps for block-form conditionals.
         BuildIfMaps(inst);
         return inst;
+    }
+
+    /// <summary>
+    /// Collapses each inline <c>&lt;% … %&gt;</c> block to a single
+    /// <c>__jsblock N</c> line, stashing the body in
+    /// <see cref="ScriptInstance.JsBlocks"/> (public #322).
+    /// <para>Genie 4 parity (<c>Script/Script.cs:3686</c>): <c>&lt;%</c> opens a
+    /// block only when it starts the line; any text after it on that line is kept
+    /// as JS; the block closes on the first line ENDING with <c>%&gt;</c>. A block
+    /// left unterminated at end of file is still emitted, so it runs rather than
+    /// silently vanishing.</para>
+    /// </summary>
+    private static List<(string, int, string)> ExtractJsBlocks(
+        List<(string Origin, int LineNo, string Raw)> input, ScriptInstance inst)
+    {
+        var output = new List<(string, int, string)>(input.Count);
+        List<string>? body = null;
+        string blockOrigin = string.Empty, blockIndent = string.Empty;
+        int blockLineNo = 0;
+
+        void Close()
+        {
+            inst.JsBlocks.Add(string.Join("\n", body!));
+            output.Add((blockOrigin, blockLineNo,
+                        blockIndent + "__jsblock " + (inst.JsBlocks.Count - 1)));
+            body = null;
+        }
+
+        foreach (var (origin, lineNo, raw) in input)
+        {
+            if (body is null)
+            {
+                var trimmed = raw.TrimStart();
+                if (!trimmed.StartsWith("<%", StringComparison.Ordinal))
+                { output.Add((origin, lineNo, raw)); continue; }
+
+                body        = new List<string>();
+                blockOrigin = origin;
+                blockLineNo = lineNo;
+                blockIndent = LeadingIndent(raw);
+
+                // Text trailing `<%` on the opening line is JS. A one-line
+                // `<% … %>` opens and closes here.
+                var head = trimmed[2..];
+                if (head.TrimEnd().EndsWith("%>", StringComparison.Ordinal))
+                {
+                    var t = head.TrimEnd();
+                    body.Add(t[..^2]);
+                    Close();
+                }
+                else if (head.Length > 0) body.Add(head);
+                continue;
+            }
+
+            var tail = raw.TrimEnd();
+            if (tail.EndsWith("%>", StringComparison.Ordinal))
+            {
+                var inner = tail[..^2];
+                if (inner.Trim().Length > 0) body.Add(inner);
+                Close();
+            }
+            else body.Add(raw);
+        }
+
+        if (body is not null) Close();   // unterminated block: emit it anyway
+        return output;
     }
 
     /// <summary>

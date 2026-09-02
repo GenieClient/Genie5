@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Genie.Core.Config;
@@ -1592,7 +1592,8 @@ public sealed class ScriptEngine
         bool isJsStmt = t.StartsWith("js ", StringComparison.OrdinalIgnoreCase) ||
                         t.StartsWith("javascript ", StringComparison.OrdinalIgnoreCase) ||
                         t.StartsWith("jscall ", StringComparison.OrdinalIgnoreCase) ||
-                        t.StartsWith("__jsinclude ", StringComparison.OrdinalIgnoreCase);
+                        t.StartsWith("__jsinclude ", StringComparison.OrdinalIgnoreCase) ||
+                        t.StartsWith("__jsblock ",   StringComparison.OrdinalIgnoreCase);
 
         // Undefined vars never abort a line: Genie 4 leaves them literal in
         // the substituted text and the dispatch/eval layers treat the remnant
@@ -2388,6 +2389,17 @@ public sealed class ScriptEngine
                 EnsureJsLib(inst).LoadLibrary(rest.Trim());
                 return true;
 
+            case "__jsblock":     // parser-emitted by an inline `<% … %>` block
+            {
+                if (int.TryParse(rest.Trim(), out var jbi) &&
+                    jbi >= 0 && jbi < inst.JsBlocks.Count)
+                {
+                    DbgEcho(inst, 4, $"jsblock {jbi}");
+                    EnsureJsLib(inst).ExecuteBlock(inst.JsBlocks[jbi]);
+                }
+                return true;
+            }
+
             case "plugin":
             {
                 var (vn, _) = SplitCmd(rest);
@@ -3123,7 +3135,7 @@ public sealed class ScriptEngine
     /// script's normal output / game send.</summary>
     private Js.JsLibraryContext EnsureJsLib(ScriptInstance inst) =>
         inst.JsLib ??= new Js.JsLibraryContext(
-            getVar:    n => inst.Vars.TryGetValue(n, out var v) ? v : "",
+            getVar:    n => inst.Vars.TryGetValue(n, out var v) ? v : null,
             setVar:    (n, v) => inst.Vars[n] = v,
             getGlobal: n => Globals.TryGetValue(n, out var g) ? g : (UserVarLookup?.Invoke(n) ?? ""),
             setGlobal: (n, v) => Globals[n] = v,

@@ -27,6 +27,7 @@ internal sealed class JsLibraryContext
     private readonly RunawayLoopGuard _guard;
     private readonly WallClockGuard   _wallClock;
     private readonly Action<string>   _echo;
+    private readonly Bridge           _bridge;
 
     /// <summary>Per-call statement cap: js/jscall run synchronously on the .cmd
     /// tick thread, so a runaway expression must not freeze the client. Reset
@@ -42,7 +43,7 @@ internal sealed class JsLibraryContext
     private static readonly TimeSpan IncludeBudget  = TimeSpan.FromMilliseconds(1000);
 
     public JsLibraryContext(
-        Func<string, string>   getVar,
+        Func<string, string?>  getVar,
         Action<string, string> setVar,
         Func<string, string>   getGlobal,
         Action<string, string> setGlobal,
@@ -61,7 +62,8 @@ internal sealed class JsLibraryContext
             opts.Constraints.Constraints.Add(_wallClock);
         });
 
-        _engine.SetValue("__h", new Bridge(getVar, setVar, getGlobal, setGlobal, echo, put));
+        _bridge = new Bridge(getVar, setVar, getGlobal, setGlobal, echo, put);
+        _engine.SetValue("__h", _bridge);
         _engine.Execute(Prelude);
     }
 
@@ -88,12 +90,28 @@ internal sealed class JsLibraryContext
         return result;
     }
 
+    /// <summary>Execute an inline <c>&lt;% … %&gt;</c> block's statements (public
+    /// #322). Three deliberate differences from <see cref="Evaluate"/>:
+    /// a block is a STATEMENT body, not an expression; it runs with NO wall-clock
+    /// budget, because Genie 4 imposes no time limit on a block and blocks do
+    /// heavier one-shot work (sorts, table builds) than a `js` one-liner; and
+    /// <c>getVar</c> on an unset name yields the string <c>"undefined"</c>, which
+    /// is what Genie 4's <c>JsGetVariable</c> returns and what block bodies test
+    /// against. The statement-count runaway guard still applies, so a genuine
+    /// infinite loop aborts rather than wedging the tick thread unrecoverably.</summary>
+    public bool ExecuteBlock(string source)
+    {
+        _bridge.UndefinedOnMiss = true;
+        try { return Run(() => _engine.Execute(MigrateLengthCalls(source)), "<% %> block", null); }
+        finally { _bridge.UndefinedOnMiss = false; }
+    }
+
     /// <summary>Run a bounded engine action with the standard guards; report
     /// failures through the script echo (never throws to the .cmd tick loop).</summary>
-    private bool Run(Action action, string what, TimeSpan budget)
+    private bool Run(Action action, string what, TimeSpan? budget)
     {
         _guard.ResetCounter();
-        _wallClock.Arm(budget);
+        if (budget is { } b) _wallClock.Arm(b); else _wallClock.Disarm();
         try { action(); return true; }
         catch (RunawayLoopException)
         {
@@ -101,7 +119,7 @@ internal sealed class JsLibraryContext
         }
         catch (JsWallClockException)
         {
-            _echo($"[script] {what}: aborted — JS exceeded the {budget.TotalMilliseconds:0} ms wall-clock budget " +
+            _echo($"[script] {what}: aborted — JS exceeded the {budget?.TotalMilliseconds ?? 0:0} ms wall-clock budget " +
                   "(js/jscall run inline on the game pipeline; move long work to a standalone .js script).");
         }
         catch (MemoryLimitExceededException) { _echo($"[script] {what}: aborted — JS memory limit (128 MB) exceeded."); }
@@ -246,12 +264,20 @@ var game = genie;
     /// setGlobal → session globals / user #vars).</summary>
     private sealed class Bridge
     {
-        private readonly Func<string, string>   _getVar, _getGlobal;
+        /// <summary>When set, an unset local reads back as the string
+        /// "undefined" rather than "" — Genie 4's JsGetVariable behaviour, which
+        /// inline &lt;% %&gt; blocks are written against. Toggled around a block by
+        /// <see cref="JsLibraryContext.ExecuteBlock"/>; js/jscall keep "" so the
+        /// shipped #104 contract is unchanged.</summary>
+        public bool UndefinedOnMiss;
+
+        private readonly Func<string, string?>   _getVar;
+        private readonly Func<string, string>    _getGlobal;
         private readonly Action<string, string> _setVar, _setGlobal;
         private readonly Action<string>         _echo, _put;
 
         public Bridge(
-            Func<string, string> getVar, Action<string, string> setVar,
+            Func<string, string?> getVar, Action<string, string> setVar,
             Func<string, string> getGlobal, Action<string, string> setGlobal,
             Action<string> echo, Action<string> put)
         {
@@ -260,7 +286,7 @@ var game = genie;
             _echo = echo; _put = put;
         }
 
-        public string GetVar(string n)            => _getVar(n ?? "") ?? "";
+        public string GetVar(string n)            => _getVar(n ?? "") ?? (UndefinedOnMiss ? "undefined" : "");
         public void   SetVar(string n, string v)  { if (!string.IsNullOrEmpty(n)) _setVar(n, v ?? ""); }
         public string GetGlobal(string n)         => _getGlobal(n ?? "") ?? "";
         public void   SetGlobal(string n, string v){ if (!string.IsNullOrEmpty(n)) _setGlobal(n, v ?? ""); }
@@ -277,20 +303,33 @@ internal sealed class WallClockGuard : Jint.Constraint
 {
     private TimeSpan _budget = TimeSpan.FromMilliseconds(250);
     private long     _deadline = long.MaxValue;
+    private bool     _disabled;
 
     public void Arm(TimeSpan budget)
     {
+        _disabled = false;
         _budget   = budget;
         _deadline = Environment.TickCount64 + (long)budget.TotalMilliseconds;
     }
 
+    /// <summary>Run with no wall-clock cap (inline &lt;% %&gt; blocks, public #322).
+    /// <see cref="Reset"/> has to honour this too: Jint calls Reset at the start of
+    /// every Execute, which would otherwise silently re-arm the previous budget.</summary>
+    public void Disarm()
+    {
+        _disabled = true;
+        _deadline = long.MaxValue;
+    }
+
     public override void Check()
     {
-        if (Environment.TickCount64 > _deadline) throw new JsWallClockException();
+        if (!_disabled && Environment.TickCount64 > _deadline) throw new JsWallClockException();
     }
 
     public override void Reset()
-        => _deadline = Environment.TickCount64 + (long)_budget.TotalMilliseconds;
+        => _deadline = _disabled
+            ? long.MaxValue
+            : Environment.TickCount64 + (long)_budget.TotalMilliseconds;
 }
 
 /// <summary>Thrown by <see cref="WallClockGuard"/> when a synchronous js/jscall

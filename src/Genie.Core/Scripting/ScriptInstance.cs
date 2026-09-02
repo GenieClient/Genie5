@@ -25,6 +25,12 @@ public sealed class ScriptInstance
     /// Null until first use; lives for the script's run.</summary>
     internal Js.JsLibraryContext? JsLib;
 
+    /// <summary>Bodies of the inline <c>&lt;% … %&gt;</c> JavaScript blocks in this
+    /// script, in source order (public #322). The parser replaces each block with a
+    /// single <c>__jsblock N</c> line indexing into this list, so a block's JS never
+    /// reaches the label / conditional passes that follow.</summary>
+    public List<string> JsBlocks = new();
+
     // $0..$9 are a SEPARATE scope from %0..%9. They hold gosub arguments or
     // the most recent regex capture groups, and are pushed/popped with the
     // gosub stack — unlike script args (%N), which live in Vars for the
