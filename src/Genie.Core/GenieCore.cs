@@ -1787,8 +1787,11 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     /// <summary>
     /// Raised by <c>#config</c> / <c>#set</c> / <c>#setting</c> / <c>#settings</c>.
-    /// The App handles the bare-form (open Configuration dialog) and the
-    /// save / load / edit / get / set subforms against <c>DisplaySettings</c>.
+    /// The App handles the bare form (open Configuration dialog) plus the
+    /// <c>save</c> / <c>load</c> (alias <c>reload</c>) / <c>list</c> /
+    /// <c>edit</c> subforms and the default <c>#config &lt;key&gt; [value]</c>
+    /// read/set form — all against settings.cfg (<c>GenieConfig</c>), not
+    /// display.json.
     /// </summary>
     public event Action<string>? ConfigCommandRequested;
 
