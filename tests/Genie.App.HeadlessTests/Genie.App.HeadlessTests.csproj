@@ -28,4 +28,10 @@
     <ProjectReference Include="..\..\src\Genie.App\Genie.App.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The real menu markup, copied next to the test binary so the source
+         guard in MasterToggleMenuHeadlessTests can read it. -->
+    <None Include="..\..\src\Genie.App\Views\MainWindow.axaml" Link="MainWindow.axaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

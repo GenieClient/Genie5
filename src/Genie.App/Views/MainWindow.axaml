@@ -30,7 +30,7 @@
         <Separator/>
         <MenuItem Header="_Auto Log"
                   ToggleType="CheckBox"
-                  IsChecked="{Binding AutoLogEnabled}"
+                  IsChecked="{Binding AutoLogEnabled, Mode=TwoWay}"
                   ToolTip.Tip="Automatically write the rendered game text (what you see in the Game window) to AppData/Genie5/Logs/ — one file per character per day; same-day sessions append. Same as `#config autolog`; saved to settings.cfg. Takes effect immediately, even mid-session."/>
         <MenuItem Header="_Record Session (raw XML)"
                   ToggleType="CheckBox"
@@ -69,20 +69,29 @@
                   Command="{Binding ToggleMuteCommand}"
                   ToolTip.Tip="Silence all sound effects — trigger/highlight sounds and #play. Same as `#config muted true`; saved to settings.cfg so it persists across sessions. Does not affect #speak text-to-speech."/>
         <Separator/>
+        <!-- Every ToggleType="CheckBox" MenuItem in this menu bar binds
+             IsChecked Mode=TwoWay ON PURPOSE. Avalonia registers IsChecked with
+             defaultBindingMode OneWay (unlike ToggleButton.IsChecked, which is
+             TwoWay), so a plain "{Binding Foo}" ticks the checkmark on click —
+             MenuItem.Toggle sets the property locally — and never writes back
+             to the view-model: the toggle looks like it worked and does
+             nothing. Items that carry their own Command/Click keep the OneWay
+             binding (the command does the write; the binding just mirrors it).
+             Guarded by MasterToggleMenuHeadlessTests. -->
         <MenuItem Header="Master _Toggles"
                   ToolTip.Tip="Turn whole features on or off without touching their rules or data — rules stay loaded and editable, they just stop applying. Genie 4 File-menu parity. Saved to settings.cfg; same as `#config triggers off` etc. Rule toggles apply to new lines — already-rendered text is unchanged.">
-          <MenuItem Header="_Highlights"  ToggleType="CheckBox" IsChecked="{Binding HighlightsEnabled}"
+          <MenuItem Header="_Highlights"  ToggleType="CheckBox" IsChecked="{Binding HighlightsEnabled, Mode=TwoWay}"
                     ToolTip.Tip="User highlight rules — colours and highlight sounds (built-in default highlights and Names are unaffected)."/>
-          <MenuItem Header="_Triggers"    ToggleType="CheckBox" IsChecked="{Binding TriggersEnabled}"
+          <MenuItem Header="_Triggers"    ToggleType="CheckBox" IsChecked="{Binding TriggersEnabled, Mode=TwoWay}"
                     ToolTip.Tip="User triggers — no trigger fires while off."/>
-          <MenuItem Header="_Substitutes" ToggleType="CheckBox" IsChecked="{Binding SubstitutesEnabled}"
+          <MenuItem Header="_Substitutes" ToggleType="CheckBox" IsChecked="{Binding SubstitutesEnabled, Mode=TwoWay}"
                     ToolTip.Tip="Substitute rules — lines render exactly as the game sent them while off."/>
-          <MenuItem Header="_Gags"        ToggleType="CheckBox" IsChecked="{Binding GagsEnabled}"
+          <MenuItem Header="_Gags"        ToggleType="CheckBox" IsChecked="{Binding GagsEnabled, Mode=TwoWay}"
                     ToolTip.Tip="Gag rules — nothing is hidden while off."/>
-          <MenuItem Header="_Aliases"     ToggleType="CheckBox" IsChecked="{Binding AliasesEnabled}"
+          <MenuItem Header="_Aliases"     ToggleType="CheckBox" IsChecked="{Binding AliasesEnabled, Mode=TwoWay}"
                     ToolTip.Tip="Alias expansion — typed commands go to the game exactly as typed while off."/>
           <Separator/>
-          <MenuItem Header="_Images"      ToggleType="CheckBox" IsChecked="{Binding ImagesEnabled}"
+          <MenuItem Header="_Images"      ToggleType="CheckBox" IsChecked="{Binding ImagesEnabled, Mode=TwoWay}"
                     ToolTip.Tip="Room/scene artwork in the Portrait panel — same as `#config showimages`. Off clears the current picture immediately; on re-fetches it."/>
         </MenuItem>
         <Separator/>
@@ -234,7 +243,7 @@
                   ToolTip.Tip="Keep the Genie window above all other applications. Also settable as #config alwaysontop on|off."/>
         <MenuItem Header="Align _Input to Game Window"
                   ToggleType="CheckBox"
-                  IsChecked="{Binding AlignInputToGame}"
+                  IsChecked="{Binding AlignInputToGame, Mode=TwoWay}"
                   ToolTip.Tip="Line the command bar up horizontally under the Game window instead of spanning the full width (Genie 4 parity). Follows the Game window as you re-dock or resize it; a floated-out Game window falls back to full width. Also settable as #config sizeinputtogame on|off."/>
         <MenuItem Header="_Disconnect Popup"
                   ToggleType="CheckBox"
@@ -270,15 +279,15 @@
         <MenuItem Header="Game _Window">
           <MenuItem Header="_Game Text"
                     ToggleType="CheckBox"
-                    IsChecked="{Binding Display.ShowGameText}"
+                    IsChecked="{Binding Display.ShowGameText, Mode=TwoWay}"
                     ToolTip.Tip="Server-emitted text (room descriptions, combat, NPC speech, …). Uncheck to hide all game text from the main window."/>
           <MenuItem Header="_Echo Lines"
                     ToggleType="CheckBox"
-                    IsChecked="{Binding Display.ShowEchoText}"
+                    IsChecked="{Binding Display.ShowEchoText, Mode=TwoWay}"
                     ToolTip.Tip="Typed-command echoes (the &quot;&gt; look&quot;-style local echo when you submit input). Uncheck to hide them."/>
           <MenuItem Header="_Script Lines"
                     ToggleType="CheckBox"
-                    IsChecked="{Binding Display.ShowScriptText}"
+                    IsChecked="{Binding Display.ShowScriptText, Mode=TwoWay}"
                     ToolTip.Tip="Script-engine and system diagnostics (&quot;[script] foo done&quot;, &quot;[recorder] subscribed&quot;, etc.). Uncheck to hide them during scripted play."/>
         </MenuItem>
 
@@ -611,24 +620,24 @@
         <MenuItem Header="Update _Settings"
                   ToolTip.Tip="What the silent startup update check covers, and what it's allowed to install by itself. Everything here is also visible in the Updates dialog.">
           <MenuItem Header="Check on Startup">
-            <MenuItem Header="_Genie (Core App)" ToggleType="CheckBox" IsChecked="{Binding CheckCoreOnStartup}"
+            <MenuItem Header="_Genie (Core App)" ToggleType="CheckBox" IsChecked="{Binding CheckCoreOnStartup, Mode=TwoWay}"
                       ToolTip.Tip="Look for a newer Genie release at launch. Found updates light the Help ● badge and the status-bar notice — nothing installs without you."/>
-            <MenuItem Header="_Maps"             ToggleType="CheckBox" IsChecked="{Binding CheckMapsOnStartup}"
+            <MenuItem Header="_Maps"             ToggleType="CheckBox" IsChecked="{Binding CheckMapsOnStartup, Mode=TwoWay}"
                       ToolTip.Tip="Check the enabled map sources at launch."/>
-            <MenuItem Header="_Plugins"          ToggleType="CheckBox" IsChecked="{Binding CheckPluginsOnStartup}"
+            <MenuItem Header="_Plugins"          ToggleType="CheckBox" IsChecked="{Binding CheckPluginsOnStartup, Mode=TwoWay}"
                       ToolTip.Tip="Check the enabled plugin sources at launch."/>
-            <MenuItem Header="_Scripts"          ToggleType="CheckBox" IsChecked="{Binding CheckScriptsOnStartup}"
+            <MenuItem Header="_Scripts"          ToggleType="CheckBox" IsChecked="{Binding CheckScriptsOnStartup, Mode=TwoWay}"
                       ToolTip.Tip="Check the enabled script repositories at launch."/>
           </MenuItem>
           <MenuItem Header="Auto-Apply"
                     ToolTip.Tip="Install what the startup check finds, without a click. All OFF by default — updates only ever download automatically if you opt in here.">
-            <MenuItem Header="_Genie (Core App)" ToggleType="CheckBox" IsChecked="{Binding AutoUpdateCore}"
+            <MenuItem Header="_Genie (Core App)" ToggleType="CheckBox" IsChecked="{Binding AutoUpdateCore, Mode=TwoWay}"
                       ToolTip.Tip="Download a found Genie update in the background and install it when you CLOSE Genie — never a restart mid-session. The status bar notes when a version is staged."/>
-            <MenuItem Header="_Maps"             ToggleType="CheckBox" IsChecked="{Binding AutoUpdateMaps}"
+            <MenuItem Header="_Maps"             ToggleType="CheckBox" IsChecked="{Binding AutoUpdateMaps, Mode=TwoWay}"
                       ToolTip.Tip="Pull new/changed map files at startup (pure data — safest to automate)."/>
-            <MenuItem Header="_Plugins"          ToggleType="CheckBox" IsChecked="{Binding AutoUpdatePlugins}"
+            <MenuItem Header="_Plugins"          ToggleType="CheckBox" IsChecked="{Binding AutoUpdatePlugins, Mode=TwoWay}"
                       ToolTip.Tip="Install plugin updates at startup. Plugins are executable code — enable only for sources you trust."/>
-            <MenuItem Header="_Scripts"          ToggleType="CheckBox" IsChecked="{Binding AutoUpdateScripts}"
+            <MenuItem Header="_Scripts"          ToggleType="CheckBox" IsChecked="{Binding AutoUpdateScripts, Mode=TwoWay}"
                       ToolTip.Tip="Pull script updates at startup. Scripts act as your character, and a repo file with the same name OVERWRITES a locally edited copy — enable only for sources you trust."/>
           </MenuItem>
         </MenuItem>
@@ -661,13 +670,13 @@
           <Separator/>
           <MenuItem Header="_Safety — regex timeout + pre-filter"
                     ToolTip.Tip="Each engine's user regexes run with a match-timeout (a catastrophic pattern is caught and skipped, never hangs the feed) plus a literal pre-filter. ON by default; turn off per component only to reproduce a raw-regex issue.">
-            <MenuItem Header="_Triggers"    ToggleType="CheckBox" IsChecked="{Binding TriggersSafety}"
+            <MenuItem Header="_Triggers"    ToggleType="CheckBox" IsChecked="{Binding TriggersSafety, Mode=TwoWay}"
                       ToolTip.Tip="Match-timeout + pre-filter for user triggers (runs on the read thread — the highest-value protection)."/>
-            <MenuItem Header="_Highlights"  ToggleType="CheckBox" IsChecked="{Binding HighlightsSafety}"
+            <MenuItem Header="_Highlights"  ToggleType="CheckBox" IsChecked="{Binding HighlightsSafety, Mode=TwoWay}"
                       ToolTip.Tip="Match-timeout + pre-filter for regex-type highlight rules (render path)."/>
-            <MenuItem Header="_Substitutes" ToggleType="CheckBox" IsChecked="{Binding SubstitutesSafety}"
+            <MenuItem Header="_Substitutes" ToggleType="CheckBox" IsChecked="{Binding SubstitutesSafety, Mode=TwoWay}"
                       ToolTip.Tip="Match-timeout + pre-filter for substitute rules (display path)."/>
-            <MenuItem Header="_Gags"        ToggleType="CheckBox" IsChecked="{Binding GagsSafety}"
+            <MenuItem Header="_Gags"        ToggleType="CheckBox" IsChecked="{Binding GagsSafety, Mode=TwoWay}"
                       ToolTip.Tip="Match-timeout + pre-filter for gag rules (display path)."/>
           </MenuItem>
           <MenuItem Header="Overlay _Components"
