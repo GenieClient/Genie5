@@ -187,10 +187,27 @@ public sealed class PluginManager
         finally { _inGameTextDispatch = false; }
     }
 
-    /// <summary>Run a typed-input line through every enabled plugin in order.
-    /// Returns the final command to run, or null if swallowed.</summary>
+    // A plugin may send from inside OnInput (host.SendCommand → the command
+    // engine, or a `.script` launch whose own `/command` sends come back
+    // through ScriptEngine.PluginInput). Per-thread guard, matching the game-text
+    // and echo dispatchers: such nested commands pass through undispatched
+    // instead of recursing forever. Before public #325 only genuine typed input
+    // reached here, and the bypass on every programmatic path was itself the
+    // recursion safety — script sends now enter this path, so the guard has to
+    // be explicit.
+    [ThreadStatic] private static bool _inInputDispatch;
+
+    /// <summary>Run an input line through every enabled plugin in order
+    /// (<c>IGeniePlugin.OnInput</c> — Genie 4 <c>ParseInput</c> parity). Fed by
+    /// typed input (all of it) and by script-issued <c>/commands</c> (public
+    /// #325). Returns the final command to run, or null if swallowed.</summary>
     public string? DispatchInput(string input)
-        => Chain(input, (p, s) => p.OnInput(s));
+    {
+        if (_inInputDispatch) return input;
+        _inInputDispatch = true;
+        try     { return Chain(input, (p, s) => p.OnInput(s)); }
+        finally { _inInputDispatch = false; }
+    }
 
     // A plugin may echo from inside OnEcho (host.Echo → GenieCore funnel →
     // back here). Per-thread guard: such nested echoes pass through

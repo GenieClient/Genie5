@@ -106,6 +106,20 @@ public sealed class ScriptEngine
     public Action<string, string>? EchoCommand { get; set; }
 
     /// <summary>
+    /// External-plugin input hook (<c>IGeniePlugin.OnInput</c> via
+    /// <c>PluginManager.DispatchInput</c>). Wired by <c>GenieCore</c>; null in
+    /// headless tests and the TestHarness, which run without a plugin host.
+    ///
+    /// <para>Offered only <c>/…</c> commands, and only through
+    /// <see cref="ResolveOutboundCommand"/> — the point being that a Genie 4
+    /// plugin's commands (<c>/timers start BLESS</c>) work identically whether
+    /// the player types them or a <c>.cmd</c> script issues them, without
+    /// editing every dependent script (public #325). Returns the (possibly
+    /// rewritten) command, or null to swallow it.</para>
+    /// </summary>
+    public Func<string, string?>? PluginInput { get; set; }
+
+    /// <summary>
     /// Returns true when the game character is currently in roundtime.
     /// Set by the UI layer; used by <c>pause</c> and <c>wait</c> to hold
     /// until roundtime resolves.
@@ -1511,16 +1525,17 @@ public sealed class ScriptEngine
                 {
                     HandleMetaCommand(next, inst);
                 }
-                else if (TrySlashCommand(next))
+                else if (ResolveOutboundCommand(next) is not { } outbound)
                 {
-                    // claimed by an extension — client-side, no _inFlight bump.
+                    // Claimed by an extension or swallowed by a plugin —
+                    // client-side, so no _inFlight bump.
                 }
                 else
                 {
                     _inFlight++;
-                    EchoCommand?.Invoke(inst.Name, next);
-                    Extensions.DispatchCommand(next);
-                    _sendCommand(next);
+                    EchoCommand?.Invoke(inst.Name, outbound);
+                    Extensions.DispatchCommand(outbound);
+                    _sendCommand(outbound);
                 }
             }
             return true;
@@ -1838,17 +1853,18 @@ public sealed class ScriptEngine
                     // _inFlight bump.
                     _handleHashCmd?.Invoke(first);
                 }
-                else if (TrySlashCommand(first))
+                else if (ResolveOutboundCommand(first) is not { } outbound)
                 {
-                    // `put /sort …` claimed by an extension — client-side,
-                    // so no _inFlight bump either.
+                    // `put /sort …` claimed by an extension, or `send /timers
+                    // start BLESS` swallowed by a plugin — client-side, so no
+                    // _inFlight bump either.
                 }
                 else
                 {
                     _inFlight++;
-                    EchoCommand?.Invoke(inst.Name, first);
-                    Extensions.DispatchCommand(first);
-                    _sendCommand(first);
+                    EchoCommand?.Invoke(inst.Name, outbound);
+                    Extensions.DispatchCommand(outbound);
+                    _sendCommand(outbound);
                 }
                 return true;
             }
@@ -1932,10 +1948,28 @@ public sealed class ScriptEngine
                         inst.Pc--; // re-run next tick when budget frees up
                         return false;
                     }
+
+                    // `move /whatever` gets the same client-side offer as every
+                    // other outbound path (public #325 — this was the one send
+                    // site that consulted neither the extensions nor the
+                    // plugins). A claim sends nothing, so it must not bump
+                    // _inFlight, AND it must not arm the room-change wait below:
+                    // nothing went to the game, so no room change is coming and
+                    // the script would hang on PauseUntil.MaxValue forever.
+                    // Continuing is the honest outcome — note this is NOT the
+                    // bare `move` case, which deliberately waits for someone
+                    // else's movement (dragging) without sending.
+                    var outbound = ResolveOutboundCommand(rest);
+                    if (outbound is null)
+                    {
+                        DbgEcho(inst, 2, $"move \"{rest}\" claimed client-side — not waiting for a room change");
+                        return true;
+                    }
+
                     _inFlight++;
-                    EchoCommand?.Invoke(inst.Name, rest);
-                    Extensions.DispatchCommand(rest);
-                    _sendCommand(rest);
+                    EchoCommand?.Invoke(inst.Name, outbound);
+                    Extensions.DispatchCommand(outbound);
+                    _sendCommand(outbound);
                 }
                 inst.GateReplay.Clear();  // script-authored block (public #309)
                 inst.Paused     = true;
@@ -2472,25 +2506,41 @@ public sealed class ScriptEngine
                     return false;
                 }
                 // A bare `/sort …` line works like `put /sort …` — extension
-                // console commands are claimable from scripts too.
-                if (TrySlashCommand(text)) return true;
+                // and plugin console commands are claimable from scripts too.
+                if (ResolveOutboundCommand(text) is not { } outbound) return true;
                 _inFlight++;
-                EchoCommand?.Invoke(inst.Name, text);
-                Extensions.DispatchCommand(text);
-                _sendCommand(text);
+                EchoCommand?.Invoke(inst.Name, outbound);
+                Extensions.DispatchCommand(outbound);
+                _sendCommand(outbound);
                 return true;
             }
         }
     }
 
-    /// <summary>Offer a game-bound <c>/…</c> segment to the extensions' console
-    /// command dispatch (/calc, /sort, /tt, …) so scripts can drive them the way
-    /// typed input can. A claimed command is client-side: the text never reaches
-    /// the game, so callers must NOT bump <c>_inFlight</c> — no game prompt will
-    /// ever release the budget. Unclaimed slashes return false and are sent to
-    /// the game verbatim, mirroring the typed-input fall-through.</summary>
-    private bool TrySlashCommand(string cmd) =>
-        cmd.Length > 0 && cmd[0] == '/' && Extensions.DispatchSlashCommand(cmd);
+    /// <summary>Offer a game-bound command to the client-side handlers before it
+    /// reaches the wire, in the same order typed input sees them
+    /// (<c>GenieCore.ProcessInputCore</c>): built-in extensions get first refusal
+    /// (/calc, /sort, /tt, …), then external plugins
+    /// (<c>IGeniePlugin.OnInput</c>), which may rewrite the line or swallow it
+    /// outright — the Genie 4 <c>ParseInput</c> contract.
+    ///
+    /// <para>Returns the text to send, or <c>null</c> when the command was claimed
+    /// client-side. A claimed command never reaches the game, so callers must NOT
+    /// bump <c>_inFlight</c> for it — no game prompt would ever release the budget
+    /// (this is why the offer happens BEFORE the increment, not inside the
+    /// <c>_sendCommand</c> delegate where it would cover every call site at
+    /// once).</para>
+    ///
+    /// <para>Only <c>/…</c> lines enter this path: an ordinary game verb
+    /// (<c>bob</c>, <c>prep mb</c>) is returned unchanged and never reaches plugin
+    /// input dispatch, so the bare-verb corpus is untouched (public #325).</para>
+    /// </summary>
+    private string? ResolveOutboundCommand(string cmd)
+    {
+        if (cmd.Length == 0 || cmd[0] != '/') return cmd;
+        if (Extensions.DispatchSlashCommand(cmd)) return null;   // built-in claimed it
+        return PluginInput is null ? cmd : PluginInput(cmd);     // transform, or null = swallowed
+    }
 
     /// <summary>
     /// Evaluate a condition, treating empty input and parse errors as false.
@@ -3140,7 +3190,16 @@ public sealed class ScriptEngine
             getGlobal: n => Globals.TryGetValue(n, out var g) ? g : (UserVarLookup?.Invoke(n) ?? ""),
             setGlobal: (n, v) => Globals[n] = v,
             echo:      m => _echo(m),
-            put:       c => _sendCommand(c));
+            // `genie.put("/timers start X")` from a .js array script gets the
+            // same extension-then-plugin offer as a .cmd `put` (public #325).
+            // The JS bridge has never participated in the type-ahead budget, so
+            // there is no _inFlight bookkeeping to skip on a claim here.
+            put:       c =>
+            {
+                if (ResolveOutboundCommand(c) is not { } outbound) return;
+                Extensions.DispatchCommand(outbound);
+                _sendCommand(outbound);
+            });
 
     private string SubstituteVars(string text, ScriptInstance inst)
     {

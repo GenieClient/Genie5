@@ -615,6 +615,16 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             handleHashCmd: cmd => RunOnLoop(() => Commands.ProcessInput(cmd, interactive: false)),
             injectGameLine: line => RunOnLoop(() => InjectParsedLine(line)));
 
+        // Script-issued `/commands` get the same client-side offer as typed
+        // input: built-in extensions first (the engine calls
+        // Extensions.DispatchSlashCommand itself), then external plugins here.
+        // Without this leg a Genie 4 plugin's commands worked when typed but
+        // leaked to the game when a .cmd script issued them, so every dependent
+        // legacy script had to be rewritten — public #325 (Barnacus' Tracker
+        // `send /timers start BLESS`). Plugins is constructed above, so the
+        // capture is safe. Only '/'-prefixed script sends reach this.
+        Scripts.PluginInput = cmd => Plugins.DispatchInput(cmd);
+
         // Live config for the runtime script settings (ScriptTimeout,
         // MaxGoSubDepth, AbortDupeScript, ScriptExtension).
         Scripts.Config = Config;
@@ -1162,7 +1172,22 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _gameEventsRelaySub = parser.GameEvents.Subscribe(
             e => { if (e is not TextEvent) _gameEventsRelay.OnNext(e); }, static _ => { });
         _rawXmlRelaySub     = connection.RawXmlStream.Subscribe(x => _rawXmlRelay.OnNext(x), static _ => { });
-        _sentRelaySub       = connection.SentCommandStream.Subscribe(x => _sentRelay.OnNext(x), static _ => { });
+        // SentCommandStream is the one choke point every outbound command passes
+        // through — GameConnection publishes it after the flush, in wire order,
+        // whatever the source (typed, alias, trigger action, script put/send,
+        // JS genie.put, link click). That makes it the correct home for the
+        // plugins' observe-only OnCommandSent hook, whose contract reads "a
+        // command was actually sent to the game (user, alias, script, or link
+        // click) — after OnInput transforms". PluginManager.DispatchCommand had
+        // existed since the plugin host landed but had no caller anywhere, so
+        // OnCommandSent had never once fired for any plugin (found while fixing
+        // public #325). Each() swallows a throwing plugin, so a bad hook cannot
+        // break the relay.
+        _sentRelaySub       = connection.SentCommandStream.Subscribe(x =>
+        {
+            Plugins.DispatchCommand(x);
+            _sentRelay.OnNext(x);
+        }, static _ => { });
         _connStateRelaySub  = connection.StateStream.Subscribe(s => _connStateRelay.OnNext(s), static _ => { });
     }
 
@@ -2139,10 +2164,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // External plugins see the typed line next (IGeniePlugin.OnInput) — each
         // may transform it or swallow it entirely (null), the Genie 4 ParseInput
         // contract. Command-driven plugins (e.g. InventoryView's /iv) depend on
-        // this to keep their commands off the wire. Same genuine-user-input
-        // boundary as the slash dispatch above — programmatic sends (scripts,
-        // aliases, mapper) bypass it, so a plugin's own SendCommand can't loop
-        // back into its OnInput.
+        // this to keep their commands off the wire. EVERY typed line is offered
+        // here; the script engine additionally offers its '/'-prefixed sends via
+        // ScriptEngine.PluginInput (public #325), so a legacy plugin's commands
+        // behave the same typed or scripted. Aliases, trigger actions and the
+        // mapper still bypass this. Re-entrancy is handled inside
+        // PluginManager.DispatchInput — do NOT rely on the bypass for it.
         if (!string.IsNullOrEmpty(input))
         {
             var fromPlugins = Plugins.DispatchInput(input);
