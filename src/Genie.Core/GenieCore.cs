@@ -118,9 +118,11 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     private readonly System.Reactive.Subjects.Subject<GameEvent>       _gameEventsRelay = new();
     private readonly System.Reactive.Subjects.Subject<string>          _rawXmlRelay     = new();
     private readonly System.Reactive.Subjects.Subject<ConnectionEvent> _connStateRelay  = new();
+    private readonly System.Reactive.Subjects.Subject<string>          _sentRelay       = new();
     private IDisposable? _gameEventsRelaySub;
     private IDisposable? _rawXmlRelaySub;
     private IDisposable? _connStateRelaySub;
+    private IDisposable? _sentRelaySub;
 
     // ── Game loop (#251 — docs/internal/GAME_THREAD_DESIGN.md) ────────────────
     /// <summary>The dedicated game thread. Null when <c>#config gamethread off</c>
@@ -274,6 +276,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     /// <summary>Raw XML stream — subscribe for logging, recording, or custom processing.</summary>
     public IObservable<string>          RawXmlStream    => _rawXmlRelay;
+
+    /// <summary>Commands actually written to the socket, in wire order — the
+    /// outbound twin of <see cref="RawXmlStream"/>. Survives reconnects like
+    /// the other relays. Subscribe to attribute a server reply to the command
+    /// that caused it, including sends the client made on its own.</summary>
+    public IObservable<string>          SentCommands    => _sentRelay;
 
     /// <summary>Connection lifecycle events.</summary>
     public IObservable<ConnectionEvent> ConnectionState => _connStateRelay;
@@ -1154,6 +1162,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _gameEventsRelaySub = parser.GameEvents.Subscribe(
             e => { if (e is not TextEvent) _gameEventsRelay.OnNext(e); }, static _ => { });
         _rawXmlRelaySub     = connection.RawXmlStream.Subscribe(x => _rawXmlRelay.OnNext(x), static _ => { });
+        _sentRelaySub       = connection.SentCommandStream.Subscribe(x => _sentRelay.OnNext(x), static _ => { });
         _connStateRelaySub  = connection.StateStream.Subscribe(s => _connStateRelay.OnNext(s), static _ => { });
     }
 
@@ -2046,6 +2055,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _gameEventsRelaySub?.Dispose(); _gameEventsRelaySub = null;
         _rawXmlRelaySub?.Dispose();     _rawXmlRelaySub     = null;
         _connStateRelaySub?.Dispose();  _connStateRelaySub  = null;
+        _sentRelaySub?.Dispose();       _sentRelaySub       = null;
 
         _gameEventSub?.Dispose();    _gameEventSub    = null;
         _pluginXmlSub?.Dispose();    _pluginXmlSub    = null;
@@ -2275,8 +2285,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _gameEventsRelay.OnCompleted();
         _rawXmlRelay.OnCompleted();
         _connStateRelay.OnCompleted();
+        _sentRelay.OnCompleted();
         _gameEventsRelay.Dispose();
         _rawXmlRelay.Dispose();
         _connStateRelay.Dispose();
+        _sentRelay.Dispose();
     }
 }

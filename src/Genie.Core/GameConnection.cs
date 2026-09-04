@@ -45,6 +45,18 @@ public sealed class GameConnection : IAsyncDisposable
     public IObservable<string> AiRawStream  => _aiRawSubject;
 
     /// <summary>
+    /// Every command actually written to the socket, in wire order, published
+    /// after the flush succeeds. This is the outbound twin of
+    /// <see cref="RawXmlStream"/>: without it a capture records only the
+    /// server's reaction, so a command the client sent on its own — an
+    /// injuries poll, an extension refresh, a `;`-split segment — is invisible
+    /// and its rejection ("Please rephrase that command.") unattributable.
+    /// Subscribers: AnalystCapture.
+    /// </summary>
+    private readonly Subject<string> _sentSubject = new();
+    public IObservable<string> SentCommandStream => _sentSubject;
+
+    /// <summary>
     /// Connection lifecycle events (Connected, Disconnected, Reconnecting, Error).
     /// </summary>
     private readonly Subject<ConnectionEvent> _stateSubject = new();
@@ -252,6 +264,11 @@ public sealed class GameConnection : IAsyncDisposable
         {
             _sendGate.Release();
         }
+
+        // Published after the flush, outside the gate: subscribers see exactly
+        // what reached the wire, in wire order, and a slow subscriber never
+        // holds up the next send.
+        try { _sentSubject.OnNext(command); } catch (ObjectDisposedException) { /* disposed mid-send */ }
     }
 
     public async Task DisconnectAsync()
@@ -633,6 +650,7 @@ public sealed class GameConnection : IAsyncDisposable
 
         _rawXmlSubject.Dispose();
         _aiRawSubject.Dispose();
+        _sentSubject.Dispose();
         _stateSubject.Dispose();
         _cts.Dispose();
         _sendGate.Dispose();

@@ -2856,7 +2856,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _analystCapture?.Dispose();
         _analystCapture = new AnalystCapture(dir,
             m => Avalonia.Threading.Dispatcher.UIThread.Post(() => GameText.AddSystemLine(m)));
-        _analystCapture.Start(_core.RawXmlStream, _core.GameEvents, name, DateTime.UtcNow, recipe, extraMeta: meta);
+        _analystCapture.Start(_core.RawXmlStream, _core.GameEvents, name, DateTime.UtcNow, recipe,
+            extraMeta: meta, sentCommands: _core.SentCommands);
 
         _activeCaptureScript = activeScript;
         IsCapturing = true;

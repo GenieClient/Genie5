@@ -69,6 +69,10 @@ public sealed class CaptureRedactor
     /// <summary>Number of raw-XML spans blanked by <see cref="RedactRawXml"/>.</summary>
     public int DroppedXmlSpans { get; private set; }
 
+    /// <summary>Number of outbound commands whose argument tail was blanked by
+    /// <see cref="RedactOutboundCommand"/>.</summary>
+    public int RedactedCommands { get; private set; }
+
     /// <param name="redactStreams">
     /// Streams to drop. Null uses <see cref="SocialStreams"/>. Pass an empty set
     /// to disable stream redaction entirely (raw-XML speech-preset stripping
@@ -181,5 +185,60 @@ public sealed class CaptureRedactor
         });
 
         return block;
+    }
+
+    // ── Outbound redaction ───────────────────────────────────────────────────
+    // The sent-command log is the outbound twin of the raw XML, and it carries
+    // two things a shareable capture must never contain: credentials (the
+    // `#connect`/`#lichconnect` family takes an account and password as bare
+    // arguments) and the player's own social traffic (the inbound side of which
+    // is already dropped by the stream/preset passes above — logging the
+    // outgoing half would reinstate exactly the leak G2 closes).
+    //
+    // Both are redacted verb-first: the verb survives so an analyst can still
+    // see WHEN a command was sent and correlate it with the server's reply,
+    // which is the whole point of the log; only the tail is blanked.
+
+    /// <summary>Commands whose entire argument tail is credentials.</summary>
+    private static readonly Regex CredentialCommand = new(
+        @"^\s*(?<verb>#(?:lich)?connect|#reconnect|#account|#password)\b.*$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Player-initiated social sends. The message body is the redacted part;
+    /// a leading target (whisper/tell/send take one) goes with it, since a
+    /// recipient name is itself other-player information.
+    /// </summary>
+    private static readonly Regex SocialCommand = new(
+        @"^\s*(?<verb>whisper|whis|tell|say|'|says|send|reply|gweth|amulet|esp|think|" +
+        @"thinkto|ooc|group|gtell|answer|hug|kiss|beckon|pray)\b.*$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Redact one outbound command for the capture's sent-command log. Returns
+    /// the command unchanged when nothing matches (the common case — movement,
+    /// combat, polls and every other mechanical command must survive verbatim,
+    /// or the log cannot answer the question it exists to answer).
+    /// Increments <see cref="RedactedCommands"/> on a hit.
+    /// </summary>
+    public string RedactOutboundCommand(string command)
+    {
+        if (string.IsNullOrWhiteSpace(command)) return command;
+
+        var m = CredentialCommand.Match(command);
+        if (m.Success)
+        {
+            RedactedCommands++;
+            return m.Groups["verb"].Value + " [redacted: credentials]";
+        }
+
+        m = SocialCommand.Match(command);
+        if (m.Success)
+        {
+            RedactedCommands++;
+            return m.Groups["verb"].Value + " [redacted: social]";
+        }
+
+        return command;
     }
 }

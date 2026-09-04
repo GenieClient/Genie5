@@ -16,8 +16,12 @@ namespace Genie.Core.Capture;
 ///   <item><c>{base}.xml</c> — raw server XML, <b>best-effort redacted</b>
 ///   (<see cref="CaptureRedactor.RedactRawXml"/>). Ground truth for parser work.</item>
 ///   <item><c>{base}_streams.txt</c> — the parsed <see cref="TextEvent"/> stream,
-///   one line each, <c>[stream]</c>-tagged, with social streams <b>dropped</b>.
-///   The clean view a reader actually scans.</item>
+///   one line each, <c>[stream]</c>-tagged, with social streams <b>dropped</b>,
+///   <b>interleaved with every command the client sent</b> as <c>[SENT]</c>
+///   lines. The clean view a reader actually scans — and the only artifact that
+///   shows cause as well as effect, so a server reply can be attributed to the
+///   command that provoked it (including sends the client made on its own:
+///   polls, extension refreshes, <c>;</c>-split segments).</item>
 ///   <item><c>{base}.meta.json</c> — character, recipe, timings, byte/line counts,
 ///   and a redaction summary, so the capture needs no external explanation.</item>
 /// </list>
@@ -48,6 +52,7 @@ public sealed class AnalystCapture : IDisposable
     private StreamWriter? _streams;
     private IDisposable?  _rawSub;
     private IDisposable?  _eventSub;
+    private IDisposable?  _sentSub;
     private string?       _basePath;        // path stem, sans extension
     private string        _rawPending = ""; // buffer awaiting a prompt boundary
 
@@ -57,6 +62,7 @@ public sealed class AnalystCapture : IDisposable
     private DateTime        _startedUtc;
     private long            _rawBytes;
     private long            _keptLines;
+    private long            _sentLines;
     private IReadOnlyDictionary<string, string?>? _extraMeta;
 
     public AnalystCapture(string captureDir, Action<string>? diagnosticLog = null)
@@ -81,9 +87,10 @@ public sealed class AnalystCapture : IDisposable
         IObservable<GameEvent>  events,
         string                  characterName,
         DateTime                startedUtc,
-        CaptureRecipe?          recipe    = null,
-        CaptureRedactor?        redactor  = null,
-        IReadOnlyDictionary<string, string?>? extraMeta = null)
+        CaptureRecipe?          recipe        = null,
+        CaptureRedactor?        redactor      = null,
+        IReadOnlyDictionary<string, string?>? extraMeta = null,
+        IObservable<string>?    sentCommands  = null)
     {
         Stop();
 
@@ -94,6 +101,7 @@ public sealed class AnalystCapture : IDisposable
         _extraMeta  = extraMeta;
         _rawBytes   = 0;
         _keptLines  = 0;
+        _sentLines  = 0;
         _rawPending = "";
 
         var safe = _character;
@@ -105,6 +113,7 @@ public sealed class AnalystCapture : IDisposable
 
         _rawSub   = rawXml.Subscribe(OnRaw);
         _eventSub = events.OfType<TextEvent>().Subscribe(OnText);
+        _sentSub  = sentCommands?.Subscribe(OnSent);
 
         _diag?.Invoke($"[analyst] capturing → {Path.GetFileName(_basePath)}.*  " +
                       $"(redacting: {string.Join(", ", _redactor.RedactedStreams)})");
@@ -149,6 +158,23 @@ public sealed class AnalystCapture : IDisposable
         }
     }
 
+    /// <summary>
+    /// Record one outbound command. Redacted first (credentials and the
+    /// player's own social traffic never reach a shareable capture — see
+    /// <see cref="CaptureRedactor.RedactOutboundCommand"/>), then written to
+    /// the transcript under the <c>[SENT]</c> tag, which no DR stream id can
+    /// collide with because <see cref="OnText"/> emits stream tags lower-case.
+    /// </summary>
+    private void OnSent(string command)
+    {
+        lock (_gate)
+        {
+            if (_streams is null) return;
+            try { _streams.WriteLine("[SENT] " + _redactor.RedactOutboundCommand(command)); _sentLines++; }
+            catch (Exception ex) { _diag?.Invoke($"[analyst] sent write failed: {ex.Message}"); }
+        }
+    }
+
     /// <summary>Stop the capture, flush the raw tail, and write the meta sidecar.</summary>
     public void Stop()
     {
@@ -158,6 +184,7 @@ public sealed class AnalystCapture : IDisposable
 
             _rawSub?.Dispose();   _rawSub   = null;
             _eventSub?.Dispose(); _eventSub = null;
+            _sentSub?.Dispose();  _sentSub  = null;
 
             if (_rawPending.Length > 0) FlushRaw(_rawPending.Length);
             _rawPending = "";
@@ -170,7 +197,7 @@ public sealed class AnalystCapture : IDisposable
 
             _diag?.Invoke($"[analyst] stopped → {Path.GetFileName(_basePath)}.*  " +
                           $"({_rawBytes:N0} raw bytes / {_keptLines:N0} kept lines / " +
-                          $"{_redactor.DroppedLines:N0} dropped)");
+                          $"{_sentLines:N0} sent / {_redactor.DroppedLines:N0} dropped)");
             _basePath = null;
         }
     }
@@ -187,11 +214,13 @@ public sealed class AnalystCapture : IDisposable
             ["durationSeconds"] = Math.Round((DateTime.UtcNow - _startedUtc).TotalSeconds, 1),
             ["rawBytes"]        = _rawBytes,
             ["keptLines"]       = _keptLines,
+            ["sentCommands"]    = _sentLines,
             ["redaction"] = new Dictionary<string, object?>
             {
                 ["streams"]         = _redactor.RedactedStreams,
                 ["droppedLines"]    = _redactor.DroppedLines,
-                ["droppedXmlSpans"] = _redactor.DroppedXmlSpans,
+                ["droppedXmlSpans"]  = _redactor.DroppedXmlSpans,
+                ["redactedCommands"] = _redactor.RedactedCommands,
             },
         };
         if (_extraMeta is not null)
