@@ -388,6 +388,62 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         if (t is not null) EchoLine?.Invoke(t);
     }
 
+    // ── Pipeline fault containment (2026-08-31 stability review) ─────────────────────────────
+    // The per-line pipeline runs inline on one thread with every consumer chained
+    // off two Subjects, and Subject dispatch does not isolate subscribers. Before
+    // this, one throwing consumer skipped every later one — the UI relay included,
+    // so the player's game text just stopped — and with the game loop off it
+    // escaped into the read loop and disconnected the session outright.
+    //
+    // Containment is applied two ways: PipelineContainment.Contained() guards every
+    // subscriber of the two hot streams (including the four engines that subscribe
+    // inside their own constructors), and Guard() below wraps the individual legs
+    // of ProcessGameTextEvent so a bad trigger or script cannot starve the relay
+    // that displays the line.
+
+    private ILogger? _pipelineLog;
+
+    /// <summary>Distinct faults already echoed this session. A consumer that throws
+    /// on a common line throws on EVERY such line, so the window is told once per
+    /// distinct fault and the rest go to the log — the containment must not become
+    /// its own flood. Capped so a fault whose message varies per line (an index or
+    /// a name in the text) cannot grow this without bound.</summary>
+    private readonly HashSet<string> _reportedFaults = new(StringComparer.Ordinal);
+    private const int MaxDistinctFaultEchoes = 16;
+
+    /// <summary>Log a contained pipeline fault and, the first time each distinct one
+    /// is seen, say so in the game window. Never throws.</summary>
+    private void ReportPipelineFault(string stage, Exception ex)
+    {
+        try
+        {
+            (_pipelineLog ??= _loggerFactory.CreateLogger("Genie.Core.Pipeline"))
+                .LogError(ex, "Contained pipeline fault in {Stage}", stage);
+
+            bool first;
+            lock (_reportedFaults)
+            {
+                first = _reportedFaults.Count < MaxDistinctFaultEchoes
+                     && _reportedFaults.Add($"{stage}|{ex.GetType().Name}|{ex.Message}");
+            }
+
+            if (first)
+                RaiseEchoLine(
+                    $"[genie] {stage} error contained — {ex.GetType().Name}: {ex.Message}. "
+                    + "That line was dropped for this one consumer; the session is unaffected. "
+                    + "Repeats of this fault go to the log only.");
+        }
+        catch { /* the fault reporter must never fault */ }
+    }
+
+    /// <summary>Run one pipeline leg with its fault contained, so the legs after it
+    /// — above all the relay that puts the line on screen — still run.</summary>
+    private void Guard(string stage, Action leg)
+    {
+        try { leg(); }
+        catch (Exception ex) { ReportPipelineFault(stage, ex); }
+    }
+
     private void RaiseScriptOutput(string text)
     {
         var t = Plugins is null ? text : Plugins.DispatchEcho(text, "main");
@@ -874,7 +930,18 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             lf.CreateLogger<GameConnection>(),
             _loop);
         var parser      = new DrXmlParser(lf.CreateLogger<DrXmlParser>());
-        var stateEngine = new GameStateEngine(parser.GameEvents, _state,
+
+        // Every consumer below subscribes through these contained views, never the
+        // raw Subjects (2026-08-31 stability review). Subject dispatch aborts at the first throwing
+        // subscriber and skips the rest, so without this a single bad consumer takes
+        // the UI relay down with it and the player's text stops arriving. Applied
+        // here, at the one place both streams are handed out, so the engines that
+        // subscribe inside their own constructors are covered too.
+        lock (_reportedFaults) _reportedFaults.Clear();   // fresh session, re-report faults once each
+        var events = parser.GameEvents.Contained(ex => ReportPipelineFault("game-event", ex));
+        var rawXml = connection.RawXmlStream.Contained(ex => ReportPipelineFault("raw-xml", ex));
+
+        var stateEngine = new GameStateEngine(events, _state,
             lf.CreateLogger<GameStateEngine>());
         // Live config for RoundTimeOffset (applied to each RoundTimeEvent).
         stateEngine.Config = Config;
@@ -890,11 +957,11 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
         // Wire raw XML → parser (timed as the Parse stage; no-op overhead when
         // the overlay is hidden because Metrics.Enabled is false).
-        _parserFeed = connection.RawXmlStream.Subscribe(
-            xml => Metrics.Time(PipelineStage.Parse, () => parser.Feed(xml)));
+        _parserFeed = rawXml.Subscribe(
+            xml => Guard("parser", () => Metrics.Time(PipelineStage.Parse, () => parser.Feed(xml))));
 
         // Mapper adapter — feeds the persistent AutoMapper from this parser/state.
-        var mapperAdapter = new MapperGameStateAdapter(_state, parser.GameEvents);
+        var mapperAdapter = new MapperGameStateAdapter(_state, events);
         _mapperAdapter = mapperAdapter;
         AutoMapper.Attach(mapperAdapter);
 
@@ -904,7 +971,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // Bound to this connection's parser + character identity; its ctor seeds the
         // initial globals (gamehost="", gameport="0", clientVersion, …).
         _globalsSync = new ScriptGlobalsSync(
-            _state, Scripts.Globals, parser.GameEvents,
+            _state, Scripts.Globals, events,
             gameCode:      cfg.GameCode,
             characterName: cfg.CharacterName,
             accountName:   cfg.AccountName,
@@ -937,7 +1004,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // ── Game event routing ─────────────────────────────────────────────────
         // Note: Scripts.OnGameLine already calls Extensions.DispatchGameLine internally —
         // no need to route TextEvents to the extension manager separately.
-        _gameEventSub = parser.GameEvents.Subscribe(evt =>
+        _gameEventSub = events.Subscribe(evt =>
         {
             // Built-in trackers consume fully-parsed events (Spell Timer's
             // percWindow TextEvents + ClearStreamEvent, the Experience tracker's
@@ -1015,8 +1082,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
         // Plugins see raw XML chunks (Genie 4 ParseXML parity) for structured
         // data the typed events don't surface — e.g. <component id='exp X'>.
-        _pluginXmlSub = connection.RawXmlStream.Subscribe(
-            xml => Metrics.Time(PipelineStage.Plugins, () => Plugins.DispatchXml(xml)));
+        _pluginXmlSub = rawXml.Subscribe(
+            xml => Guard("plugin-xml", () => Metrics.Time(PipelineStage.Plugins, () => Plugins.DispatchXml(xml))));
 
         // ── Ready-for-input signal ─────────────────────────────────────────────
         // StormFront / DevReplay: <settingsInfo/> is authoritative (see docs/SGE_PROTOCOL.md).
@@ -1046,7 +1113,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         }
         else
         {
-            _settingsInfoSub = parser.GameEvents
+            _settingsInfoSub = events
                 .OfType<SettingsInfoEvent>()
                 .Take(1)
                 .Subscribe(_ => OnConnectReady());
@@ -1177,9 +1244,9 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // TextEvents are NOT forwarded here — ProcessGameTextEvent relays them
         // itself after the plugin transform (rewrite/gag), so UI consumers only
         // ever see the plugin-approved text. Everything else passes through raw.
-        _gameEventsRelaySub = parser.GameEvents.Subscribe(
+        _gameEventsRelaySub = events.Subscribe(
             e => { if (e is not TextEvent) _gameEventsRelay.OnNext(e); }, static _ => { });
-        _rawXmlRelaySub     = connection.RawXmlStream.Subscribe(x => _rawXmlRelay.OnNext(x), static _ => { });
+        _rawXmlRelaySub     = rawXml.Subscribe(x => _rawXmlRelay.OnNext(x), static _ => { });
         // SentCommandStream is the one choke point every outbound command passes
         // through — GameConnection publishes it after the flush, in wire order,
         // whatever the source (typed, alias, trigger action, script put/send,
@@ -1408,20 +1475,26 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // wrong seed (e.g. a Lich/DevReplay default, or premium+LTB) is
         // corrected by the authority. Cheap guard before any parsing.
         if (te.Text.IndexOf("type ahead", StringComparison.OrdinalIgnoreCase) >= 0)
-            CalibrateTypeAhead(te.Text);
+            Guard("type-ahead calibration", () => CalibrateTypeAhead(te.Text));
 
         // Each per-line consumer is timed into its own stage so the overlay
         // shows which feature is eating the frame. The Time wrapper is a
         // zero-overhead passthrough while disabled.
+        // Each leg is contained separately (2026-08-31 stability review). The relay on the last
+        // line is what actually puts the text on screen, so it must be reachable
+        // even when a consumer above it throws — a user's trigger action blanking
+        // the game window is the failure this ordering exists to prevent. A failed
+        // plugin transform leaves `transformed` at the original text, so the line
+        // displays unrewritten rather than vanishing.
         string? transformed = te.Text;
-        Metrics.Time(PipelineStage.Plugins,
-                     () => transformed = Plugins.DispatchGameText(te.Text, te.Stream));
+        Guard("plugin text", () => Metrics.Time(PipelineStage.Plugins,
+                     () => transformed = Plugins.DispatchGameText(te.Text, te.Stream)));
         if (transformed is null) return;                    // gagged — nothing downstream
         var ev = string.Equals(transformed, te.Text, StringComparison.Ordinal)
             ? te
             : te with { Text = transformed, Links = null, BoldSpans = null, PresetSpans = null };
 
-        Metrics.Time(PipelineStage.Scripts,  () => Scripts.OnGameLine(ev.Text));   // match/waitfor + EXP/info trackers
+        Guard("scripts", () => Metrics.Time(PipelineStage.Scripts, () => Scripts.OnGameLine(ev.Text)));   // match/waitfor + EXP/info trackers
         // ParseGameOnly (Genie 4 parity): when on, fire triggers only on
         // the main game stream, not secondary stream-windows (thoughts,
         // logons, combat, …). Default off → triggers see every stream.
@@ -1435,13 +1508,13 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // ONLY copy on "main", so it's exactly the Main-targeted line Genie 4
         // fires TriggerParse on for a talk line — skipping it there would
         // silently drop speech triggers. Either mode nets exactly one pass.
-        Metrics.Time(PipelineStage.Triggers, () =>
+        Guard("triggers", () => Metrics.Time(PipelineStage.Triggers, () =>
         {
             var parseGameOnly = Config?.ParseGameOnly ?? false;
             var fires = parseGameOnly ? ev.Stream == "main" : !ev.DuplicateEcho;
             if (fires)
                 Triggers.ProcessLine(ev.Text);                                     // user-defined triggers
-        });
+        }));
         _gameEventsRelay.OnNext(ev);                        // UI consumers see the approved text
     }
 

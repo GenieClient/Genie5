@@ -26,6 +26,12 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10">
       <Private>false</Private>
     </PackageReference>
+    <!-- Compile-time access to IObservable helpers / Subject for pipeline tests;
+         like the logging ref above, the runtime copy is resolved from Core's
+         output dir via ModuleInit.cs (Core is self-contained, so it ships one). -->
+    <PackageReference Include="System.Reactive" Version="6.0.1">
+      <Private>false</Private>
+    </PackageReference>
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>

@@ -605,6 +605,19 @@ public sealed class GameConnection : IAsyncDisposable
                 _aiRawSubject.OnNext(chunk);
         }
         catch (ObjectDisposedException) { }
+        catch (Exception ex)
+        {
+            // Last-resort backstop (2026-08-31 stability review). Subscribers are individually
+            // contained upstream in GenieCore, so reaching here means a consumer
+            // this connection knows nothing about threw. Letting it escape would
+            // end the session: with a game loop this runs inside GameLoop.Execute
+            // (which would report it and continue), but with `#config gamethread
+            // off` — and in every unit test — PublishCore runs INLINE on the read
+            // loop, where an escaping exception exits ReadLoopAsync and emits
+            // Disconnected. One malformed line must never cost the player a live
+            // session, so it is logged and the read loop carries on.
+            _log.LogError(ex, "Contained subscriber fault publishing chunk: {Chunk}", chunk);
+        }
     }
 
     /// <summary>Publish a connection lifecycle event, marshaled to the game loop
