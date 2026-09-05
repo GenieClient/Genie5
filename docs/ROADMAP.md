@@ -21,7 +21,7 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.8 "Field Notes"
+## Where we are — v5.0.0-beta.8.3 "Steady Hands"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
@@ -34,7 +34,13 @@ in-house; **beta.7** makes scrolled-back reading hold still with honest copy
 (#272); and **beta.8** lands the server-dialog capture groundwork with the
 `#dialogs` reporting flow (#156), layers per-character rules over the shared
 global set (#257), fixes `#eval` composition in value position (#300), brings
-SGE-over-TLS to Linux and macOS (#316), and blinks inactive tabs on activity.
+SGE-over-TLS to Linux and macOS (#316), and blinks inactive tabs on activity;
+**beta.8.2** gives every Configuration list panel a live search box and
+teaches the automapper named-object hidden exits; and **beta.8.3** moves the
+whole game pipeline onto its own thread so a wedged script can no longer
+freeze the client (#251), runs Genie 4's embedded `<% %>` JavaScript blocks
+again (#322), and makes a plugin's `/commands` work from scripts, aliases and
+triggers alike (#325, #326).
 Self-update is now **verified end-to-end on all three platforms** (#27 —
 thanks @dylb0t for the macOS validation). Highlights of what works today:
 

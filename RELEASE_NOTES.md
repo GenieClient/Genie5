@@ -1,3 +1,55 @@
+# Genie 5 — v5.0.0-beta.8.3
+
+**"Steady Hands"** — a wedged script can no longer take the whole client down
+with it, Genie 4's embedded JavaScript blocks run again, and the Master
+Toggles menu finally does what its checkmarks say.
+
+## ✨ New
+- **Scripts can no longer freeze the client** — the entire game pipeline
+  (reading, parsing, script ticks, triggers, plugins, commands) now runs on
+  its own thread instead of sharing the interface's. A busy or stuck script
+  stalls only the game side: typing, clicking, menus, and **Esc** /
+  `#stopall` stay responsive, and a script wedged for more than five seconds
+  is reported in a banner instead of hanging the window in silence. On by
+  default — `#config gamethread off` restores the old behavior at the next
+  launch if you need it (#251).
+- **Embedded `<% … %>` JavaScript blocks in `.cmd` scripts** — the Genie 4
+  pattern runs again instead of being sent to the game as text. A block can
+  set a script variable that the very next line reads, and engine state
+  carries across separate blocks in the same script. Matches Genie 4's rules:
+  `<%` opens a block only at the start of a line, the block closes on the
+  first line ending in `%>`, and an unterminated block at end of file still
+  runs (#322).
+- **Analyst captures now record what Genie sent** — captures only ever held
+  the incoming stream, so a reply could never be tied to the command that
+  caused it. Outbound commands are now interleaved as `[SENT]` lines in wire
+  order. Anything sensitive is redacted before it reaches the file — account
+  and password on `#connect` / `#lichconnect` / `#reconnect`, and your own
+  speech — keeping *when* a command went out while dropping what it said.
+  Movement, combat, and polling commands are recorded verbatim.
+
+## 🐛 Fixes
+- **Master Toggles do something again** — turning off Triggers (or
+  Highlights, Substitutes, Gags, Aliases, Images) from the File menu ticked
+  the checkmark and changed nothing. The engines and `#config triggers off`
+  were always correct; the menu simply never wrote the change back. Twenty-
+  three checkbox menu items were affected, including Auto Log, the Game
+  Window view options, and the updater's check-on-startup and auto-apply
+  settings.
+- **Plugin `/commands` work from scripts, aliases and triggers** — a
+  plugin's own command, such as `send /timers start BLESS`, went straight to
+  DragonRealms, which answered "Please rephrase that command." A Genie 4
+  plugin could not serve the legacy scripts and triggers that call its
+  commands without rewriting every one of them. Client extensions now get
+  first refusal and plugins get the command next — the same order typed
+  input already used — everywhere a command can originate: `.cmd` scripts,
+  alias expansions, trigger actions, quick-send segments, the `#send` queue,
+  `move <cmd>`, JavaScript, and one plugin driving another. Slash commands
+  nobody claims still go to the game as before, and ordinary commands are
+  untouched (#325, #326).
+
+---
+
 # Genie 5 — v5.0.0-beta.8.2
 
 **"Spyglass"** — every list panel in Configuration gets a live search box,
