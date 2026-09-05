@@ -93,6 +93,16 @@ public sealed class CommandEngine
     /// outbound send at FormMain's send sink.</summary>
     public Func<string, bool>?  ClientSlashCommand { get; set; }
 
+    /// <summary>External-plugin input hook for game-bound <c>/commands</c>
+    /// (<c>IGeniePlugin.OnInput</c>). Consulted after
+    /// <see cref="ClientSlashCommand"/> declines, matching the extensions-then-
+    /// plugins order typed input uses in <c>GenieCore.ProcessInputCore</c>.
+    /// Returns the (possibly rewritten) command, or null to swallow it. Wired by
+    /// GenieCore to <c>PluginManager.DispatchInput</c>, so a Genie 4 plugin's
+    /// commands work identically whether the player types them or an alias or
+    /// trigger action produces them (public #326, sibling of #325).</summary>
+    public Func<string, string?>? PluginInput { get; set; }
+
     public CommandEngine(GenieConfig config, CommandQueue commandQueue, EventQueue eventQueue, ICommandHost host)
     {
         _config       = config;
@@ -194,16 +204,20 @@ public sealed class CommandEngine
                         ? $"send {qsDelay} {qsCmd}"
                         : $"send {qsCmd}");
                 }
-                else if (command[0] == '/' && ClientSlashCommand?.Invoke(command) == true)
+                else if (command[0] == '/')
                 {
-                    // Claimed client-side (extension /commands — /track, /calc,
-                    // /tt, …). Genie 4 ran every outbound send through the
-                    // plugins' ParseInput at the send sink (FormMain
+                    // Client-side claim for /commands: extensions first (/track,
+                    // /calc, /tt, …), then external plugins, which may rewrite
+                    // the line or swallow it. Genie 4 ran every outbound send
+                    // through the plugins' ParseInput at the send sink (FormMain
                     // ClassCommand_SendText:4122), so a queued `#send /track
                     // clear`, an alias expansion, or a trigger action gets the
                     // same client-side chance here as typed input and script
-                    // puts do at their own boundaries. Unclaimed slashes fall
-                    // through and go to the game verbatim.
+                    // puts do at their own boundaries (public #326). Unclaimed
+                    // slashes still fall through and go to the game verbatim.
+                    if (ResolveOutboundCommand(command) is { } outbound)
+                        _host.SendToGame(outbound, true,
+                            echoOverride: applyOverride ? echoOverride : null);
                 }
                 else
                 {
@@ -216,6 +230,24 @@ public sealed class CommandEngine
         {
             _processInputDepth--;
         }
+    }
+
+    /// <summary>Offers a game-bound <c>/command</c> to the client side before it
+    /// reaches the wire: built-in extensions get first refusal, then external
+    /// plugins. Returns the command to transmit — possibly rewritten by a plugin
+    /// — or null when it was claimed or swallowed. Non-slash commands are
+    /// returned untouched, so the ordinary verb corpus never enters plugin input
+    /// dispatch. Mirrors <c>ScriptEngine.ResolveOutboundCommand</c> (public #325)
+    /// so both layers behave identically for the same command text (#326).
+    /// <para>Re-entrancy — a plugin may call <c>host.SendCommand</c> from inside
+    /// its own <c>OnInput</c>, which routes back through <c>ProcessInput</c> to
+    /// here; the nested dispatch passes through undispatched via the thread guard
+    /// in <c>PluginManager.DispatchInput</c> rather than recursing.</para></summary>
+    private string? ResolveOutboundCommand(string cmd)
+    {
+        if (cmd.Length == 0 || cmd[0] != '/') return cmd;
+        if (ClientSlashCommand?.Invoke(cmd) == true) return null;  // built-in claimed it
+        return PluginInput is null ? cmd : PluginInput(cmd);       // transform, or null = swallowed
     }
 
     private void HandleInternalCommand(string command)

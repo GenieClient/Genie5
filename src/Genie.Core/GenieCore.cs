@@ -706,6 +706,14 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // e.g. `#send /track clear` was consumed there too (finding #9).
         Commands.ClientSlashCommand      = s => Scripts.Extensions.DispatchSlashCommand(s);
 
+        // …and the external-plugin leg of the same offer (public #326). Without
+        // it a `/`-command produced by an alias expansion, a trigger action, a
+        // quick-send segment or one plugin's own host.SendCommand went to the
+        // game verbatim ("Please rephrase that command."), so a Genie 4 plugin
+        // could serve a typed or scripted command but not a triggered one.
+        // Extensions above get first refusal; plugins may rewrite or swallow.
+        Commands.PluginInput             = cmd => Plugins.DispatchInput(cmd);
+
         // Honour the settings.cfg tracker toggles, and re-sync when they change.
         SyncTrackerToggles();
         Config.ConfigChanged += field => { if (field == Genie.Core.Config.ConfigFieldUpdated.Trackers) SyncTrackerToggles(); };
@@ -2166,10 +2174,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // contract. Command-driven plugins (e.g. InventoryView's /iv) depend on
         // this to keep their commands off the wire. EVERY typed line is offered
         // here; the script engine additionally offers its '/'-prefixed sends via
-        // ScriptEngine.PluginInput (public #325), so a legacy plugin's commands
-        // behave the same typed or scripted. Aliases, trigger actions and the
-        // mapper still bypass this. Re-entrancy is handled inside
-        // PluginManager.DispatchInput — do NOT rely on the bypass for it.
+        // ScriptEngine.PluginInput (public #325) and the command engine offers
+        // its own via CommandEngine.PluginInput (public #326), so a legacy
+        // plugin's commands behave the same typed, scripted, aliased or
+        // triggered. Only '/'-prefixed commands reach those two extra hooks;
+        // EVERY typed line reaches this one. Re-entrancy is handled inside
+        // PluginManager.DispatchInput — do NOT rely on call-path bypass for it.
         if (!string.IsNullOrEmpty(input))
         {
             var fromPlugins = Plugins.DispatchInput(input);
