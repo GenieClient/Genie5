@@ -4,11 +4,23 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.8.2 — Spyglass
+## Latest: v5.0.0-beta.8.3 — Steady Hands
+
+A wedged script can no longer take the whole client down with it, Genie 4's embedded JavaScript blocks run again, and a plugin's `/commands` work no matter where the command came from.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.8.3** as a delta from beta.8.2.
+
+- **Plugin `/commands` work from scripts, aliases and triggers** — a plugin's own command, such as `send /timers start BLESS`, was reaching DragonRealms instead of the plugin, which answered "Please rephrase that command." Client extensions now get first refusal and plugins get the command next — the same order typed input already used — everywhere a command can originate: `.cmd` scripts, alias expansions, trigger actions, quick-send segments, the `#send` queue, `move <cmd>`, JavaScript, and one plugin driving another. Slash commands nobody claims still go to the game, and ordinary commands are untouched (#325, #326).
+- **Embedded `<% … %>` JavaScript blocks in `.cmd` scripts** — the Genie 4 pattern runs again instead of being sent to the game as text. A block can set a script variable that the very next line reads, and engine state carries across blocks in the same script (#322).
+- **Scripts can no longer freeze the client** — the whole game pipeline (reading, parsing, script ticks, triggers, plugins, commands) now runs on its own thread. A busy or stuck script stalls only the game side: typing, clicking, menus, and **Esc** / `#stopall` stay responsive, and a script wedged for more than five seconds is reported in a banner instead of hanging the window. On by default; `#config gamethread off` restores the previous behaviour at the next launch (#251).
+- **Analyst captures record what Genie sent** — outbound commands are interleaved as `[SENT]` lines in wire order, so a reply can be matched to the command that caused it. Account and password on `#connect` / `#lichconnect` / `#reconnect`, and your own speech, are redacted before they reach the file.
+- **Master Toggles do something again** — turning off Triggers, Highlights, Substitutes, Gags, Aliases or Images from the File menu ticked the checkmark and changed nothing; twenty-three checkbox menu items were affected, including Auto Log and the updater's check-on-startup and auto-apply settings.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.8.3)
+
+## v5.0.0-beta.8.2 — Spyglass
 
 Every list panel in Configuration gets a live search box, scrolled-back reading holds still under even heavier spam, and the automapper learns another hidden-exit idiom.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.8.2** as a delta from beta.8.
 
 - **Find… boxes on every Configuration list panel** — Variables, Macros, Names, and Classes join the other rule panels with a live type-to-filter box; Variables searches values too, so typing `off` finds every disabled toggle. The whole filter family got hardened: filters reset cleanly on profile switch and import, hiding the selected row clears the editor form, a search keystroke no longer discards unsaved edits or a multi-row selection, and Variables' Select All says when a filter is hiding rows from the copy.
 - **Automapper: named-object hidden exits** — map arcs like `objsearch outcropping climb handholds` now search the named object first, wait out the reveal, then take the move (Genie 4 `MOVE.OBJSEARCH` parity).
