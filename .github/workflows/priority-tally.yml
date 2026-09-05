@@ -1,0 +1,147 @@
+name: Priority tally
+
+# Rebuilds the community priority board from 👍 reactions on open issues.
+#
+# The vote primitive is a plain 👍 reaction — no bot, no account linking, no
+# extra step for the voter. This job only makes those votes *visible*: it
+# rewrites the table inside the board issue (the one labelled
+# `priority-board`) between the PRIORITY-TALLY markers, leaving the
+# hand-written intro above it untouched.
+#
+# Votes are input, not a contract. Nothing here reorders a milestone or a
+# roadmap on its own.
+
+on:
+  schedule:
+    # 06:17 UTC daily. Off the hour on purpose — GitHub queues a large share of
+    # scheduled runs at :00 and delays them under load.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+concurrency:
+  group: priority-tally
+  cancel-in-progress: false
+
+jobs:
+  tally:
+    name: Rebuild the priority board
+    # Scope the job to this repo so a run on a fork -- which has no
+    # community board to update -- is a clean no-op rather than a red X.
+    if: github.repository == 'GenieClient/Genie5'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TOP_N: 15
+    steps:
+      - name: Locate the board issue
+        id: board
+        shell: bash
+        run: |
+          set -euo pipefail
+          board=$(gh issue list --label priority-board --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -z "$board" ]; then
+            echo "::notice::No open issue labelled 'priority-board' — nothing to update. Open one, label it 'priority-board', and this job starts working."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Board issue: #$board"
+            echo "found=true"        >> "$GITHUB_OUTPUT"
+            echo "number=$board"     >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the vote table
+        if: steps.board.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh issue list --state open --limit 500 \
+            --json number,title,url,labels,reactionGroups > issues.json
+
+          # Rank by 👍 count, ties broken by issue number (oldest first, so a
+          # long-standing request outranks a fresh one on equal votes).
+          jq -r --argjson top "${TOP_N}" '
+            map(select([.labels[].name] | index("priority-board") | not))
+            | map({
+                n: .number,
+                u: .url,
+                t: (.title | split("|") | join("&#124;")),
+                votes: ([.reactionGroups[] | select(.content == "THUMBS_UP") | .users.totalCount] | first // 0),
+                area: ([.labels[].name | select(startswith("area:")) | sub("^area:"; "")] | join(", ")),
+                est:  ([.labels[].name | select(startswith("est:")) | sub("^est:"; "")] | first // ""),
+                pri:  ([.labels[].name | select(test("^P[0-9]$"))]    | first // "")
+              })
+            | map(select(.votes > 0))
+            | sort_by(-.votes, .n)
+            | .[:$top]
+            | if length == 0 then
+                "> **No votes yet.** Be the first — open any issue below and hit 👍 on the opening post.\n"
+              else
+                (
+                  ["| Votes | Issue | Area | Priority | Est. |",
+                   "|---:|---|---|---|---|"]
+                  + map("| **\(.votes)** | [#\(.n)](\(.u)) \(.t) | \(.area) | \(.pri) | \(.est) |")
+                ) | join("\n")
+              end
+          ' issues.json > table.md
+
+          {
+            echo ""
+            echo "_Rebuilt $(date -u '+%Y-%m-%d %H:%M') UTC from 👍 reactions on open issues. Votes are input, not a contract._"
+          } >> table.md
+
+          echo "--- table.md ---"
+          cat table.md
+
+      - name: Update the board issue
+        if: steps.board.outputs.found == 'true'
+        shell: bash
+        env:
+          BOARD: ${{ steps.board.outputs.number }}
+        run: |
+          set -euo pipefail
+          gh issue view "$BOARD" --json body --jq .body > body.md
+
+          python3 - <<'PY'
+          import pathlib, re, sys
+
+          START, END = "<!-- PRIORITY-TALLY:START -->", "<!-- PRIORITY-TALLY:END -->"
+          body  = pathlib.Path("body.md").read_text(encoding="utf-8")
+          table = pathlib.Path("table.md").read_text(encoding="utf-8").strip()
+          block = f"{START}\n{table}\n{END}"
+
+          def signature(text):
+              # The timestamp changes every run; ignore it so an unchanged
+              # ranking doesn't rewrite the issue body every single day.
+              return "\n".join(
+                  ln for ln in text.splitlines() if not ln.startswith("_Rebuilt ")
+              ).strip()
+
+          if START in body and END in body:
+              current = body.split(START, 1)[1].split(END, 1)[0]
+              if signature(current) == signature(table):
+                  print("unchanged")
+                  sys.exit(0)
+              new = re.sub(
+                  re.escape(START) + r".*?" + re.escape(END),
+                  lambda _: block, body, flags=re.S,
+              )
+          else:
+              # First run against a board that has no markers yet: append.
+              new = body.rstrip() + "\n\n" + block + "\n"
+
+          pathlib.Path("new_body.md").write_text(new, encoding="utf-8")
+          # Signal the shell below with a file: GITHUB_ENV only reaches
+          # *later* steps, never the rest of the step that wrote it.
+          pathlib.Path("changed.flag").touch()
+          print("changed")
+          PY
+
+          if [ -f changed.flag ]; then
+            gh issue edit "$BOARD" --body-file new_body.md
+            echo "::notice::Priority board #$BOARD updated."
+          else
+            echo "::notice::Ranking unchanged; board #$BOARD left alone."
+          fi

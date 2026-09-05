@@ -3,6 +3,9 @@ contact_links:
   - name: 🔒 Security vulnerability
     url: https://github.com/GenieClient/Genie5/blob/main/SECURITY.md
     about: Credential leaks, code execution, or anything that could harm another user — please report privately, not as a public issue.
+  - name: 👍 Vote on priorities
+    url: https://github.com/GenieClient/Genie5/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc
+    about: Already filed? Don't open a duplicate — find it here and hit 👍. Reaction counts drive the priority board.
   - name: 💬 Discord community
     url: https://discord.gg/MtmzE2w
     about: Scripting help, mapper questions, alpha-tester chat, or sanity-checking an idea before opening an issue.

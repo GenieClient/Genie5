@@ -171,6 +171,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports, feature requests, and PRs a
 - **Discord** — [discord.gg/MtmzE2w](https://discord.gg/MtmzE2w) — the long-running Genie community server, shared with Genie 4. Drop in for beta-tester chat, scripting help, mapper questions, or general DR conversation.
 - **Issues** — [GitHub Issues](https://github.com/GenieClient/Genie5/issues) for bug reports + feature requests
 - **Discussions** — [GitHub Discussions](https://github.com/GenieClient/Genie5/discussions) for Q&A, ideas, and show-and-tell
+- **Vote on priorities** — [issues ranked by 👍](https://github.com/GenieClient/Genie5/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc) — react with 👍 on any open issue to push it up the [priority board](https://github.com/GenieClient/Genie5/issues?q=is%3Aissue+is%3Aopen+label%3Apriority-board). It's the fastest way to influence what gets built next.
 
 ## Code signing policy
 

@@ -6,6 +6,7 @@ Thanks for your interest. Genie 5 is beta-stage software with a small contributo
 
 - 🐛 [File a bug](https://github.com/GenieClient/Genie5/issues/new?template=bug_report.md)
 - 💡 [Request a feature](https://github.com/GenieClient/Genie5/issues/new?template=feature_request.md)
+- 👍 [Vote on priorities](https://github.com/GenieClient/Genie5/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc) — no account setup, no comment; just a reaction
 - 🔒 [Report a security issue](SECURITY.md) — **please don't file these as public issues**
 - 💬 [Discuss in Discord](https://discord.gg/MtmzE2w) — shared community server with Genie 4. Drop by for design questions before opening a big PR; it'll save us both review-cycle time.
 
@@ -126,6 +127,27 @@ PRs that touch parser / scripting / mapper subsystems may want a smoke-test agai
 - **Bug report** — please include the OS, .NET version, what you did, what you expected, what actually happened, and (if relevant) a session XML snippet captured via **File → Record Session**.
 - **Feature request** — describe the use case first ("when I'm hunting and …"), then the proposed solution. Bonus points for noting how Genie 4 / Lich / Wrayth handle the same thing.
 - **Parser gap report** — if you see weird game text or untyped XML, capture a recording, find the relevant section, and paste it into the issue. Parser-gap reports are some of the most valuable contributions.
+
+## Voting on priorities
+
+Genie 5 is built by one person, so the *order* things get built in matters as
+much as the list. Two ways to weigh in, neither of which requires writing code:
+
+- **👍 a reaction on any open issue.** That is the vote. React to as many as you
+  like, change your mind whenever. A [pinned priority
+  board](https://github.com/GenieClient/Genie5/issues?q=is%3Aissue+is%3Aopen+label%3Apriority-board)
+  rebuilds itself daily from those counts, and you can always sort the raw list
+  [by votes](https://github.com/GenieClient/Genie5/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc).
+- **Polls in [Discussions](https://github.com/GenieClient/Genie5/discussions/categories/polls).**
+  Before each beta, a poll goes up with a short list of candidates for that
+  cycle. One vote per person, and it closes when the beta is cut.
+
+Votes are input, not a contract. They show where demand is and they break ties,
+but a crash affecting three people still outranks a convenience feature fifty
+people want, and some popular requests are simply large — the `est:` label on
+each issue is an honest guess at the size. If something well-voted keeps not
+shipping, ask on the board and you'll get a straight answer about what's in the
+way.
 
 ## Writing your first `.cmd` script
 
