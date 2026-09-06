@@ -203,6 +203,13 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// owns.</summary>
     public Dialogs.ServerDialogEngine ServerDialogs { get; } = new();
 
+    /// <summary>Per-profile decisions about where each server dialog renders
+    /// (#156 Phase 1). Loaded from the connected profile's
+    /// <c>dialogmappings.json</c>; the host writes through
+    /// <see cref="SaveDialogMappings"/> after the chooser or settings grid
+    /// changes one.</summary>
+    public Dialogs.ServerDialogMappings DialogMappings { get; } = new();
+
     // ── Command pipeline ───────────────────────────────────────────────────────
     private readonly CommandQueue _commandQueue;
     private readonly EventQueue   _eventQueue;
@@ -1070,6 +1077,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                     // block below.
                     _dialogTracker.Observe(od);
                     ServerDialogs.Observe(od);
+                    // Keep the settings grid able to show a friendly name.
+                    DialogMappings.NoteTitle(od.Id, od.Title);
                     (_dialogJournal ??= new Dialogs.DialogJournal(Config.LogDir))
                         .ObserveOpen(od.Id, od.RawXml);
                     break;
@@ -1208,6 +1217,13 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // LIST mode and unauthenticated replay sessions fall back to the
         // shared Config dir.
         ProfileDirectory = Config.ApplyCharacterProfile(cfg.CharacterName, cfg.AccountName);
+
+        // Dialog layout mappings follow the profile (#156). Session-only state —
+        // "ask me later" deferrals and which choosers have already been shown —
+        // is dropped here, so an unanswered dialog asks again this session.
+        DialogMappings.ResetSession();
+        DialogMappings.Load(Path.Combine(
+            Config.ConfigProfileDir, Dialogs.ServerDialogMappings.FileName));
 
         // ── Auto-load persisted rule sets ──────────────────────────────────────
         // Genie 4 loads classes.cfg / aliases.cfg / variables.cfg /
@@ -2170,6 +2186,13 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// session/global (not per-character loaded), so they are left intact; only
     /// USER-scope variables are dropped (system/reserved globals persist).
     /// </summary>
+    /// <summary>Persist the dialog layout mappings to the connected profile.
+    /// Returns false rather than throwing — a settings write must not take the
+    /// session down.</summary>
+    public bool SaveDialogMappings() =>
+        DialogMappings.Save(Path.Combine(
+            Config.ConfigProfileDir, Dialogs.ServerDialogMappings.FileName));
+
     public void ResetRuleEngines()
     {
         Classes.Clear();
