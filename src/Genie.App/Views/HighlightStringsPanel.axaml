@@ -83,7 +83,7 @@
         <TextBlock Grid.Row="3" Grid.Column="0" Text="Windows:" VerticalAlignment="Center" Margin="0,0,8,4"/>
         <TextBox   Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Name="WindowsBox" Margin="0,0,0,4"
                    Watermark="all windows (leave blank), or e.g.:  main, room, thoughts"
-                   ToolTip.Tip="Comma-separated window ids this highlight paints in. Blank = every window. Known ids: main, room, mobs, players, backpack, and stream tabs (talk, whispers, thoughts, combat, logons, familiar, death, assess, atmospherics, ooc, log, itemlog)."/>
+                   ToolTip.Tip="Comma-separated window ids this highlight paints in. Blank = every window. Known ids: main, room, mobs, players, objects, backpack, and stream tabs (talk, whispers, thoughts, combat, logons, familiar, death, assess, atmospherics, ooc, log, itemlog)."/>
 
         <StackPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3"
                     Orientation="Horizontal" Spacing="16" Margin="0,2,0,4">

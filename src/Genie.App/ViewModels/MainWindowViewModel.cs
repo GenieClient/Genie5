@@ -70,6 +70,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>Backs the dockable Players panel — other players in the room (#86).</summary>
     public PlayersViewModel    Players    { get; } = new();
 
+    /// <summary>Backs the dockable Objects panel — what's on the ground (#329).</summary>
+    public ObjectsViewModel    Objects    { get; } = new();
+
     /// <summary>Backs the dockable Raw XML panel — verbatim live server stream
     /// for parser dev / protocol debugging (#14). Hidden by default.</summary>
     public RawXmlViewModel     RawXml     { get; } = new();
@@ -600,6 +603,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     [Reactive] public bool SceneVisible    { get; private set; }   // hidden by default (opt-in)
     [Reactive] public bool MobsVisible     { get; private set; }   // hidden by default (opt-in)
     [Reactive] public bool PlayersVisible  { get; private set; }   // hidden by default (opt-in)
+    [Reactive] public bool ObjectsVisible  { get; private set; }   // hidden by default (opt-in)
     [Reactive] public bool RawXmlVisible   { get; private set; }   // hidden by default (opt-in, #14)
     [Reactive] public bool InjuriesVisible { get; private set; }   // hidden by default (opt-in, #18)
 
@@ -665,6 +669,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ToggleSceneCommand    { get; }
     public ReactiveCommand<Unit, Unit> ToggleMobsCommand     { get; }
     public ReactiveCommand<Unit, Unit> TogglePlayersCommand  { get; }
+    public ReactiveCommand<Unit, Unit> ToggleObjectsCommand  { get; }
     public ReactiveCommand<Unit, Unit> ToggleRawXmlCommand   { get; }
     public ReactiveCommand<Unit, Unit> ToggleInjuriesCommand { get; }
 
@@ -1325,6 +1330,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         WindowSettings.Register("scene",     "Portrait");   // Genie 4's Portrait window (room/scene art); id predates the rename
         WindowSettings.Register("mobs",      "Mobs");
         WindowSettings.Register("players",   "Players");
+        WindowSettings.Register("objects",   "Objects");
         WindowSettings.Register("raw-xml",   "Raw XML");
         WindowSettings.Register("injuries",  "Injuries");
 
@@ -2102,6 +2108,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleSceneCommand    = MakeToggleCommand("scene",     v => SceneVisible    = v);
         ToggleMobsCommand     = MakeToggleCommand("mobs",      v => MobsVisible     = v);
         TogglePlayersCommand  = MakeToggleCommand("players",   v => PlayersVisible  = v);
+        ToggleObjectsCommand  = MakeToggleCommand("objects",   v => ObjectsVisible  = v);
         ToggleRawXmlCommand   = MakeToggleCommand("raw-xml",   v => RawXmlVisible   = v);
         ToggleInjuriesCommand = MakeToggleCommand("injuries",  v => InjuriesVisible = v);
 
@@ -3075,6 +3082,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         SetVisibilityBool("scene",     factory.IsToolVisible("scene"));
         SetVisibilityBool("mobs",      factory.IsToolVisible("mobs"));
         SetVisibilityBool("players",   factory.IsToolVisible("players"));
+        SetVisibilityBool("objects",   factory.IsToolVisible("objects"));
         SetVisibilityBool("raw-xml",   factory.IsToolVisible("raw-xml"));
         SetVisibilityBool("injuries",  factory.IsToolVisible("injuries"));
     }
@@ -3100,7 +3108,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             "backpack", "mapper", "scripts", "scene",
             "logons", "talk", "whispers", "thoughts", "combat",
             "familiar", "death", "assess", "atmospherics", "ooc",
-            "mobs", "players", "injuries", "raw-xml",
+            "mobs", "players", "objects", "injuries", "raw-xml",
             "log", "itemlog",
         };
 
@@ -3134,6 +3142,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             "ooc"            => "ooc",
             "mobs"           => "mobs",
             "players"        => "players",
+            "objects"        => "objects",
             "injuries"       => "injuries",
             "raw-xml"        => "raw-xml",
             "log"            => "log",
@@ -3846,6 +3855,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "scene":     ForceSet(visible, v => SceneVisible    = v, () => SceneVisible);    break;
             case "mobs":      ForceSet(visible, v => MobsVisible     = v, () => MobsVisible);     break;
             case "players":   ForceSet(visible, v => PlayersVisible  = v, () => PlayersVisible);  break;
+            case "objects":   ForceSet(visible, v => ObjectsVisible  = v, () => ObjectsVisible);  break;
             case "raw-xml":   ForceSet(visible, v => RawXmlVisible   = v, () => RawXmlVisible);   break;
             case "injuries":  ForceSet(visible, v => InjuriesVisible = v, () => InjuriesVisible); break;
         }
@@ -4878,6 +4888,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         IconBar.Attach(_core);
         Mobs.Attach(_core);
         Players.Attach(_core);
+        Objects.Attach(_core);
         RawXml.Attach(_core);
         Injuries.Attach(_core);
         // Gate the injuries auto-refresh poll on the panel actually being open

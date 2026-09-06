@@ -626,6 +626,38 @@
       </Grid>
     </DataTemplate>
 
+    <!-- ── Objects ──────────────────────────────────────────────────────────── -->
+    <!-- What's on the ground in the room, one per line (issue #329). Split
+         best-effort from DR's "You also see …" line, which carries no
+         per-item markup — see RoomObjectSplitter. Genie 4's window listed
+         creatures too, so they stay, marked by the creatures preset. -->
+    <DataTemplate DataType="docking:ObjectsTool">
+      <Grid RowDefinitions="Auto,*">
+        <TextBlock Grid.Row="0" Margin="8,6,8,2" FontSize="10"
+                   Foreground="{DynamicResource Theme.SectionHeader}" FontWeight="SemiBold"
+                   Text="{Binding ViewModel.Count, StringFormat='OBJECTS ({0})'}"/>
+        <ScrollViewer Grid.Row="1">
+          <StackPanel Margin="8,2,8,8">
+            <TextBlock Text="Nothing else here." Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"
+                       IsVisible="{Binding ViewModel.IsEmpty}"/>
+            <ItemsControl ItemsSource="{Binding ViewModel.Objects}"
+                          IsVisible="{Binding !ViewModel.IsEmpty}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:ObjectRow">
+                  <!-- Foreground is resolved per row (creatures preset for a
+                       bolded creature, theme text otherwise) — never null,
+                       which would render invisible glyphs. -->
+                  <SelectableTextBlock controls:InlinesBehavior.Source="{Binding Inlines}"
+                                       Foreground="{Binding Foreground}"
+                                       FontSize="12" TextWrapping="Wrap" Margin="0,1"/>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </DataTemplate>
+
     <!-- ── Injuries ─────────────────────────────────────────────────────── -->
     <!-- Body-part sprite display (issue #18), fed by the server's injuries
          dialog. Each of the 16 regions renders its Assets/Injuries sprite in

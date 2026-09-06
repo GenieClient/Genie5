@@ -323,6 +323,11 @@
                   IsChecked="{Binding PlayersVisible, Mode=OneWay}"
                   Command="{Binding TogglePlayersCommand}"
                   ToolTip.Tip="Other players in the current room, one per line (Genie 3/4 Players window)."/>
+        <MenuItem Header="_Objects"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding ObjectsVisible, Mode=OneWay}"
+                  Command="{Binding ToggleObjectsCommand}"
+                  ToolTip.Tip="What's on the ground in the current room, one per line (Genie 3/4 Objects window). Creatures are listed too, in the creatures preset colour."/>
         <MenuItem Header="_Inventory"
                   ToggleType="CheckBox"
                   IsChecked="{Binding BackpackVisible, Mode=OneWay}"

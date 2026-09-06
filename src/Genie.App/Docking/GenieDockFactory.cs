@@ -240,6 +240,7 @@ public class GenieDockFactory : Factory
         var scene      = new SceneTool     (_vm.Scene,              ws.Get("scene"));
         var mobs       = new MobsTool      (_vm.Mobs,               ws.Get("mobs"));
         var players    = new PlayersTool   (_vm.Players,            ws.Get("players"));
+        var objects    = new ObjectsTool   (_vm.Objects,            ws.Get("objects"));
         var rawXml     = NewRawXmlTool(ws);
         var injuries   = new InjuriesTool  (_vm.Injuries,           ws.Get("injuries"));
 
@@ -418,10 +419,14 @@ public class GenieDockFactory : Factory
         // Portrait (id "scene"): room/scene artwork — also hidden by default
         // (re-open via Window → Portrait). Lives beside the Backpack when shown.
         _tools[scene.Id]      = (scene,      backpackDock.Id);
-        // Mobs / Players: room-occupant lists — hidden by default (re-open via
-        // Window → Mobs / Players). Home beside the Room panel they complement.
+        // Mobs / Players / Objects: room-contents lists — hidden by default
+        // (re-open via Window → Mobs / Players / Objects). Home beside the Room
+        // panel they complement.
         _tools[mobs.Id]       = (mobs,       roomDock.Id);
         _tools[players.Id]    = (players,    roomDock.Id);
+        // Objects (#329): what's on the ground — same home and same
+        // hidden-by-default treatment as its Mobs/Players siblings.
+        _tools[objects.Id]    = (objects,    roomDock.Id);
         // Raw XML (#14): dev/debug protocol dump — hidden by default, re-opens
         // beside the Backpack via Window → Raw XML (grouped with Scripts/Scene).
         _tools[rawXml.Id]     = (rawXml,     backpackDock.Id);
@@ -502,6 +507,7 @@ public class GenieDockFactory : Factory
         var scene      = new SceneTool        (_vm.Scene,              ws.Get("scene"));
         var mobs       = new MobsTool         (_vm.Mobs,               ws.Get("mobs"));
         var players    = new PlayersTool      (_vm.Players,            ws.Get("players"));
+        var objects    = new ObjectsTool      (_vm.Objects,            ws.Get("objects"));
         var rawXml     = NewRawXmlTool(ws);
         var injuries   = new InjuriesTool     (_vm.Injuries,           ws.Get("injuries"));
 
@@ -515,7 +521,7 @@ public class GenieDockFactory : Factory
             ("vitals", vitals), ("experience", experience), ("analytics", analytics),
             ("active-spells", activeSpells),
             ("time-tracker", timeTracker), ("inventory-view", inventoryView), ("scene", scene),
-            ("mobs", mobs), ("players", players), ("raw-xml", rawXml),
+            ("mobs", mobs), ("players", players), ("objects", objects), ("raw-xml", rawXml),
             ("injuries", injuries),
         };
 

@@ -31,7 +31,7 @@ public sealed class HighlightRule
     }
 
     /// <summary>The windows this rule paints in, by canonical id ("main",
-    /// "room", "mobs", "players", a stream id like "thoughts", a plugin window
+    /// "room", "mobs", "players", "objects", a stream id like "thoughts", a plugin window
     /// name). <b>Empty = every window</b> (the default, so existing and
     /// Genie 4-imported rules apply everywhere). Case-insensitive.</summary>
     public IReadOnlySet<string> Windows { get; private set; }
