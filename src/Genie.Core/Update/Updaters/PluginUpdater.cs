@@ -145,7 +145,15 @@ public sealed class PluginUpdater : IUpdater
 
         var sha256   = ComputeSha256(bytes);
         Directory.CreateDirectory(_pluginsDir);
-        var localPath = Path.Combine(_pluginsDir, asset.Name);
+
+        // The asset name comes from the remote release. This routine writes the file
+        // and then LOADS it, so a name that escapes the Plugins folder is arbitrary
+        // code at an attacker-chosen path, not just a stray write.
+        if (!FeedPath.TryResolveUnder(_pluginsDir, asset.Name, allowSubdirectories: false, out var localPath))
+        {
+            var refusal = $"Refused '{asset.Name}': a plugin asset must be a plain filename in the Plugins folder.";
+            return new UpdateApplyResult(false, refusal, new[] { refusal });
+        }
 
         // Unload first if the plugin is currently loaded — releases the file
         // lock so the write succeeds on Windows. Best-effort: if Unload fails
@@ -233,7 +241,8 @@ public sealed class PluginUpdater : IUpdater
     private string? ResolveInstalledVersion()
     {
         var assetName = ResolveAssetName(_feed.AssetPattern);
-        var localPath = Path.Combine(_pluginsDir, assetName);
+        if (!FeedPath.TryResolveUnder(_pluginsDir, assetName, allowSubdirectories: false, out var localPath))
+            return null;   // an unusable pattern has nothing installed under it
 
         // 1. Loaded plugin (most authoritative — Version is what the plugin
         // declares in its own Id metadata, not the assembly version).

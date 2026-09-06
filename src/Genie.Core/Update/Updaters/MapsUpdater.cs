@@ -76,7 +76,8 @@ public sealed class MapsUpdater : IUpdater
 
             foreach (var entry in listing.Files)
             {
-                var localPath = Path.Combine(_mapsDir, entry.Name);
+                if (!FeedPath.TryResolveUnder(_mapsDir, entry.Name, allowSubdirectories: false, out var localPath))
+                    continue;   // hostile / malformed name — ApplyAsync reports it, Check just skips
                 if (!File.Exists(localPath))
                 {
                     newCount++;
@@ -165,7 +166,8 @@ public sealed class MapsUpdater : IUpdater
             // not a hash of the local file, because the local file is our own
             // re-serialization (see CheckAsync).
             if (!string.IsNullOrEmpty(entry.Sha) &&
-                File.Exists(Path.Combine(_mapsDir, entry.Name)) &&
+                FeedPath.TryResolveUnder(_mapsDir, entry.Name, allowSubdirectories: false, out var currentPath) &&
+                File.Exists(currentPath) &&
                 recorded.TryGetValue(entry.Name, out var appliedSha) &&
                 appliedSha == entry.Sha)
             {
@@ -187,7 +189,12 @@ public sealed class MapsUpdater : IUpdater
                 // attribute) so PR-friendly identity matches the upstream repo
                 // exactly. Two zones with the same display name but different
                 // filenames stay distinct on disk.
-                var localPath = Path.Combine(_mapsDir, entry.Name);
+                if (!FeedPath.TryResolveUnder(_mapsDir, entry.Name, allowSubdirectories: false, out var localPath))
+                {
+                    errors.Add($"{entry.Name}: refused — the name is not a plain filename in the Maps folder.");
+                    progress?.Report(new UpdateProgress(i + 1, total, entry.Name, "refused: unsafe path"));
+                    continue;
+                }
                 bool isNew    = !File.Exists(localPath);
                 if (!isNew)
                 {

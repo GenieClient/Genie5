@@ -188,21 +188,7 @@ public sealed class ScriptsUpdater : IUpdater
     /// traversal — since the name ultimately comes from a remote repo.
     /// </summary>
     private bool TryResolveLocalPath(string name, out string localPath)
-    {
-        localPath = "";
-        if (string.IsNullOrWhiteSpace(name)) return false;
-
-        var relative = name.Replace('/', Path.DirectorySeparatorChar);
-        if (Path.IsPathRooted(relative) || relative.Contains(':')) return false;
-
-        var root = Path.GetFullPath(_scriptsDir);
-        var full = Path.GetFullPath(Path.Combine(root, relative));
-        if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        localPath = full;
-        return true;
-    }
+        => FeedPath.TryResolveUnder(_scriptsDir, name, allowSubdirectories: true, out localPath);
 
     /// <summary>
     /// Human-readable "installed" description for the Updates dialog.
