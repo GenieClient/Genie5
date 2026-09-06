@@ -62,10 +62,13 @@ window of their own.
   while a genuine memory bomb is still stopped (#330).
 - **`element()` clamps out-of-range indices like Genie 4** — asking for an
   index past the end returned an empty string instead of the last element,
-  and a negative index counted from the end rather than returning "". Genie 4
-  never reports out of range, and scripts are written expecting that; the
-  difference turned up as comparisons against "" further down. Now matched,
-  including negative indices counting back from the end (#323).
+  and a negative index returned "" instead of counting back from the end.
+  Genie 4 never reports out of range, and scripts are written expecting that;
+  the difference turned up as comparisons against "" further down. Both are
+  now matched. Parentheses are stripped from a list before it is split, the
+  way Genie 4 does it, so `element("(a|b|c)", 0)` gives `a` rather than `(a`
+  — that applies to `|` lists only, leaving a list you split on your own
+  separator untouched (#323).
 - **Update feeds can only write inside their own folder** — filenames coming
   from a maps or plugins feed were used as given, and a name containing a
   path could send its bytes somewhere else on disk. For the plugin feed that
