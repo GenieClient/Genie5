@@ -1268,6 +1268,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             : Paths.MapsDirectory;
 
         Profiles.Load(_profilesPath);
+        if (Profiles.LastLoadError is { } profileFault)
+        {
+            // The list is empty because the file was unreadable, not because the
+            // user has no accounts. Log it: the alternative is a player opening a
+            // fresh-looking client and concluding their saved logins are gone.
+            ErrorLog.Log("ProfileStore.Load",
+                new InvalidOperationException(
+                    $"profiles.json could not be read — starting with an empty profile list. {profileFault}"));
+        }
 
         Display = DisplaySettings.Load(_displayPath);
         Display.Apply();  // push values into Application.Resources
@@ -2140,7 +2149,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// Persist the current <see cref="Profiles"/> list to disk. Called by the
     /// connect dialog after a Save / Delete action.
     /// </summary>
-    public void SaveProfiles() => Profiles.Save(_profilesPath);
+    public void SaveProfiles()
+    {
+        // Save is atomic and non-throwing; a false return means the profile the
+        // user just entered did NOT reach disk. Silently dropping that would
+        // have them discover it at the next launch.
+        if (!Profiles.Save(_profilesPath))
+            ErrorLog.Log("ProfileStore.Save",
+                new IOException($"could not write {_profilesPath} — profile changes were not saved."));
+    }
 
     /// <summary>
     /// File → Maps Directory... Opens a native folder picker, persists the
