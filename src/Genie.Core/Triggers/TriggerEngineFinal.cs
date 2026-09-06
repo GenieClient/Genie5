@@ -7,6 +7,27 @@ namespace Genie.Core.Triggers;
 public sealed class TriggerEngineFinal
 {
     private readonly List<TriggerRule> _triggers = new();
+
+    // Copy-on-write iteration snapshot. ProcessLine dispatches actions from
+    // inside its own loop, and an action is free to edit the trigger list: the
+    // community idiom `#trigger {stow crossbow} {…;#trigger remove {stow
+    // crossbow}}` removes the very rule being fired. Enumerating the live List
+    // there throws "Collection was modified" deterministically. Rule edits also
+    // arrive off the pipeline thread — the Configuration panel, `#trigger add`,
+    // and rule-file live reload's clear-then-rebuild, which is exactly what a
+    // player editing triggers.json mid-combat does.
+    //
+    // The sibling engines (highlights, gags, substitutes) were given this same
+    // treatment with the game-thread work; the trigger engine was the one left
+    // on a live List. ScriptEngine.FireActions snapshots for the same reason.
+    //
+    // Semantics, deliberately: a rule removed by an action still fires for the
+    // line in flight, and one added by an action does not. The set is fixed when
+    // the line arrives, which is the only reading that stays stable while the
+    // list is being rewritten underneath.
+    private volatile TriggerRule[] _snapshot = Array.Empty<TriggerRule>();
+    private void Resnap() => _snapshot = _triggers.ToArray();
+
     private readonly ICommandHost?     _host;
     private readonly CommandEngine?    _commandEngine;
 
@@ -41,12 +62,19 @@ public sealed class TriggerEngineFinal
     {
         var trigger = new TriggerRule(pattern, action, caseSensitive, isEnabled, className, _safetyEnabled, soundFile, speak, eval, matchAll);
         _triggers.Add(trigger);
+        Resnap();
         if (!string.IsNullOrEmpty(className)) Classes?.Ensure(className);
         return trigger;
     }
 
-    public bool RemoveTrigger(string pattern) => _triggers.RemoveAll(t => t.Pattern == pattern) > 0;
-    public void Clear() => _triggers.Clear();
+    public bool RemoveTrigger(string pattern)
+    {
+        var removed = _triggers.RemoveAll(t => t.Pattern == pattern) > 0;
+        if (removed) Resnap();
+        return removed;
+    }
+
+    public void Clear() { _triggers.Clear(); Resnap(); }
 
     public bool SetEnabled(string pattern, bool isEnabled)
     {
@@ -59,7 +87,7 @@ public sealed class TriggerEngineFinal
     public void ProcessLine(string line, bool echoTriggerDebug = true)
     {
         if (!Enabled) return;
-        foreach (var trigger in _triggers)
+        foreach (var trigger in _snapshot)
         {
             if (!trigger.IsEnabled) continue;
             if (Classes is not null && !Classes.IsActive(trigger.ClassName)) continue;
