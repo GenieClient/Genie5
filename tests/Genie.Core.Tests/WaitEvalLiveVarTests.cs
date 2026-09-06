@@ -113,6 +113,35 @@ public class WaitEvalLiveVarTests : IDisposable
         Assert.True(Echoed("PASSED"), string.Join(" | ", _echoed));
     }
 
+    /// <summary>
+    /// Genie 4 #179 (reported by HanryuDR): <c>$unixtime</c> unusable inside
+    /// <c>waiteval</c>. Genie 5 reproduced it — not as an <c>$unixtime</c>
+    /// special case but as the general variable-freeze above, which caught the
+    /// clock pseudo-var too: the arming-time epoch was baked in, so the
+    /// expression compared a constant against a constant forever. Guards the
+    /// port-fidelity half of GenieClient/Genie5#249.
+    /// </summary>
+    [Fact]
+    public void Waiteval_re_reads_the_unixtime_clock_pseudo_var()
+    {
+        // One second out — $unixtime has whole-second granularity, so this is
+        // the shortest transition it can actually express.
+        var target = DateTimeOffset.Now.ToUnixTimeSeconds() + 1;
+        Start("s", $"waiteval $unixtime >= {target}\necho PASSED\n");
+
+        // Not yet: the deadline hasn't passed, and (pre-fix) never would.
+        Pump();
+        Assert.False(Echoed("PASSED"));
+
+        var giveUp = DateTime.UtcNow.AddSeconds(5);
+        while (!Echoed("PASSED") && DateTime.UtcNow < giveUp)
+        {
+            System.Threading.Thread.Sleep(25);
+            _engine.Tick();
+        }
+        Assert.True(Echoed("PASSED"), string.Join(" | ", _echoed));
+    }
+
     [Fact]
     public void Waiteval_that_is_already_true_falls_straight_through()
     {
