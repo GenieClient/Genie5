@@ -51,7 +51,12 @@ internal sealed class JsLibraryContext
         Action<string>         put)
     {
         _echo      = echo;
-        _guard     = new RunawayLoopGuard(MaxStatementsPerCall);
+        // Statement trigger only. Unlike the threaded .js runtime, this engine's
+        // budgets DO re-baseline per call — Jint calls Constraint.Reset at the top
+        // of every Execute/Evaluate, and each js / jscall / <% %> is its own call —
+        // so LimitMemory below is a per-call cap here, not the one-way lifetime
+        // allowance it silently became on a .js script (#330).
+        _guard     = new RunawayLoopGuard(MaxStatementsPerCall, maxBytesBetweenYields: long.MaxValue);
         _wallClock = new WallClockGuard();
 
         _engine = new Engine(opts =>
