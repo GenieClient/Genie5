@@ -121,6 +121,10 @@
       <Setter Property="(docking:TabStripAutoScroll.Enabled)" Value="True"/>
     </Style>
 
+    <!-- #302 / #320: docked banner visibility. In its own file so the headless
+         tests can load the same rule the app does. -->
+    <StyleInclude Source="avares://Genie5/Themes/BannerChromeStyles.axaml" />
+
     <!-- Local-echo lines: italic + echo colour, driven by DisplaySettings.
          Use :is(TextBlock) so SelectableTextBlock (which subclasses TextBlock)
          also picks up the .echo class style. -->

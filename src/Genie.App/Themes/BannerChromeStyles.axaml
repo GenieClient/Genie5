@@ -1,0 +1,28 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:docking="using:Genie.App.Docking">
+
+  <!--
+    #302 / #320 — docked panel banner visibility.
+
+    The banner is Dock's ToolChromeControl header: the accent bar above the
+    content carrying the active panel's name. It duplicates the tab strip
+    immediately below it (every dockable always draws a tab, single-panel groups
+    included), so collapsing it costs no information and gives the height back to
+    the text.
+
+    This rule does nothing but MARK each chrome. The collapse itself is a local
+    IsVisible assignment in BannerChrome — see that file for why a Setter on the
+    header part is not the mechanism. The style exists so every chrome is handed
+    to us as it appears: panels open, float, re-dock and reload constantly, and a
+    one-shot walk of the visual tree would go stale immediately.
+
+    Kept in its own file rather than inline in App.axaml so the headless tests can
+    load the same rule the app does — HeadlessApp builds its own Application and
+    would otherwise exercise none of this.
+  -->
+  <Style Selector="ToolChromeControl">
+    <Setter Property="(docking:BannerChrome.Managed)" Value="True"/>
+  </Style>
+
+</Styles>

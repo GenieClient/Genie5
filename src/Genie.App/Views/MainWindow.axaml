@@ -210,6 +210,11 @@
                   IsChecked="{Binding Display.ShowIconBar, Mode=OneWay}"
                   Command="{Binding ToggleIconBarCommand}"
                   ToolTip.Tip="Show/hide the character status chips below the vitals bar — posture plus stunned / bleeding / hidden / invisible / webbed / joined / poisoned / diseased (Genie 4's Icon Bar)."/>
+        <MenuItem Header="Window _Banners"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.ShowWindowBanners, Mode=OneWay}"
+                  Command="{Binding ToggleWindowBannersCommand}"
+                  ToolTip.Tip="Show/hide the name bar above each docked panel group. The tab strip already names every panel, so turning this off gives the height back to the text. Floating windows are unaffected — they have their own Hide Title Bar."/>
         <MenuItem Header="_Magic Panels"
                   ToggleType="CheckBox"
                   IsChecked="{Binding Display.ShowMagicPanels}"

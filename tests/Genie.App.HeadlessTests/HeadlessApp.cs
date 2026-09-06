@@ -41,5 +41,13 @@ public class HeadlessApp : Application
         {
             Source = new Uri("avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml")
         });
+        // The app's own dock-chrome rules. Without these the headless tree renders
+        // with stock Dock styling only, so anything App.axaml styles into place
+        // (#302 / #320's banner marker) would silently not apply here and a test
+        // could "pass" against behaviour production never has.
+        Styles.Add(new StyleInclude(new Uri("avares://Genie.App"))
+        {
+            Source = new Uri("avares://Genie5/Themes/BannerChromeStyles.axaml")
+        });
     }
 }

@@ -26,6 +26,7 @@ public sealed class DisplaySettings : ReactiveObject
     public const string GameFontSizeKey   = "GameFontSize";
     public const string EchoFontStyleKey  = "EchoFontStyle";
 
+
     // ── Persisted properties (stored as hex strings / primitives) ─────────────
 
     [Reactive] public string GameColorHex  { get; set; } = "#CCCCCC";
@@ -88,6 +89,28 @@ public sealed class DisplaySettings : ReactiveObject
     /// Layout ▸ Icon Bar toggles it.
     /// </summary>
     [Reactive] public bool   ShowIconBar { get; set; } = true;
+
+    /// <summary>
+    /// Whether docked panel groups show their banner — the accent bar above the
+    /// content carrying the active panel's name (public #302 / #320).
+    ///
+    /// <para>It duplicates information the tab strip already carries: a group's
+    /// tabs are always drawn, single-panel groups included, so the selected tab
+    /// names the panel whether or not the banner is there. Turning it off gives
+    /// the height back to the content, which matters most on short stacked
+    /// panels where the two chrome bands can outweigh the text between them.</para>
+    ///
+    /// <para><b>Global, not per-panel</b>, because the banner belongs to the dock
+    /// GROUP rather than to a window: the stream dock alone puts ten dockables
+    /// behind one banner. A per-window setting would make the banner appear and
+    /// disappear as the user switched tabs inside a group, moving the content
+    /// under the pointer. Floating windows keep their own per-window
+    /// Hide Title Bar (#181), which is unaffected by this.</para>
+    ///
+    /// <para><b>Trade-off:</b> the banner is also the drag handle for re-docking
+    /// a group. While hidden, panels are moved by turning it back on first.</para>
+    /// </summary>
+    [Reactive] public bool   ShowWindowBanners { get; set; } = true;
 
     /// <summary>
     /// Genie 4 "Magic Panels" (<c>SetMagicPanels</c> / config key
@@ -302,6 +325,14 @@ public sealed class DisplaySettings : ReactiveObject
                 // settings-driven repaints.
                 Highlighting.UserHighlights.NotifyRulesChanged();
             });
+
+        // Banner visibility can't be styled: Dock's chrome template pins the
+        // header's IsVisible above style precedence, so it has to be assigned as a
+        // local value on each live chrome (see Docking.BannerChrome). Pushed here
+        // on every change so the menu item takes effect immediately rather than at
+        // next launch, and once now so a persisted "off" applies at startup.
+        this.WhenAnyValue(x => x.ShowWindowBanners)
+            .Subscribe(Genie.App.Docking.BannerChrome.SetVisible);
 
         // The hands-strip visibility/position bools are computed properties
         // (JsonIgnore — derived from ShowHandsBar + HandsAtBottom). ReactiveUI's

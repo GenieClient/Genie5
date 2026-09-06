@@ -408,6 +408,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit>                    ToggleStatusBarCommand   { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleIconBarCommand     { get; }
 
+    /// <summary>View ▸ Window Banners (#302 / #320) — show or hide the accent bar
+    /// above each docked panel group. Global rather than per-panel because the
+    /// banner belongs to the dock GROUP, not the window: one banner sits over all
+    /// ten stream dockables.</summary>
+    public ReactiveCommand<Unit, Unit>                    ToggleWindowBannersCommand { get; }
+
     /// <summary>Backs the Icon Bar status-chip strip (Genie 4 parity, #26).</summary>
     public IconBarViewModel IconBar { get; } = new();
 
@@ -1810,6 +1816,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleIconBarCommand = ReactiveCommand.Create(() =>
         {
             Display.ShowIconBar = !Display.ShowIconBar;
+            Display.Save(_displayPath);
+        });
+
+        ToggleWindowBannersCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ShowWindowBanners = !Display.ShowWindowBanners;
             Display.Save(_displayPath);
         });
 
