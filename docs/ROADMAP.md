@@ -21,7 +21,7 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.8.3 "Steady Hands"
+## Where we are — v5.0.0-beta.9 "Nothing Lost"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
@@ -36,25 +36,22 @@ in-house; **beta.7** makes scrolled-back reading hold still with honest copy
 global set (#257), fixes `#eval` composition in value position (#300), brings
 SGE-over-TLS to Linux and macOS (#316), and blinks inactive tabs on activity;
 **beta.8.2** gives every Configuration list panel a live search box and
-teaches the automapper named-object hidden exits; and **beta.8.3** moves the
+teaches the automapper named-object hidden exits; **beta.8.3** moves the
 whole game pipeline onto its own thread so a wedged script can no longer
 freeze the client (#251), runs Genie 4's embedded `<% %>` JavaScript blocks
 again (#322), and makes a plugin's `/commands` work from scripts, aliases and
-triggers alike (#325, #326).
+triggers alike (#325, #326); and **beta.9** gives the dialogs DragonRealms has
+always sent somewhere to appear — they render as real dockable panels built
+from whatever controls the server sent (#156 Phase 1), and their stream text
+stops leaking into the main window (#324). It also gives the room's contents
+an Objects window (#329), lets dock groups hide their banner (#320), and
+carries a batch of durability fixes: one bad line of game text can no longer
+stop your output, an interrupted `profiles.json` write can no longer lock you
+out, panels re-opened into a squeezed-out column appear again (#331),
+long-running `.js` scripts stop hitting a phantom memory cap (#330), and
+`waiteval` follows a variable that changes while it waits (#332).
 Self-update is now **verified end-to-end on all three platforms** (#27 —
 thanks @dylb0t for the macOS validation).
-
-**On `main`, not yet released** (landing as **beta.9 "Nothing Lost"**): the
-server dialogs DR has always sent finally render as real dockable panels
-(#156 Phase 1) and their stream text stops leaking into the main window
-(#324); the room's contents get an Objects window (#329); dock groups can
-hide their banner (#320); and a batch of durability fixes — one bad line of
-game text can no longer stop your output, an interrupted `profiles.json`
-write can no longer lock you out, panels re-opened into a squeezed-out column
-appear again (#331), long-running `.js` scripts stop hitting a phantom memory
-cap (#330), `waiteval` follows a variable that changes while it waits instead of
-freezing the condition at arming time (#332), and update feeds can only write
-inside their own folder.
 
 Highlights of what works today:
 
@@ -148,7 +145,7 @@ This track is tracked privately during triage because some items are live
 attack surface; the fixes ship in the open. **This is the single most important
 thing standing between beta and a stable release.**
 
-### Track B — Server-driven dialog windows 🔨 *renderer built, unreleased*
+### Track B — Server-driven dialog windows ✅ *renderer shipped in beta.9*
 
 A generic renderer for the `<dialogData>` panels DR sends — bank, store, spell
 prep, feats, character profile, TDP, and friends. The parser already captures
@@ -166,7 +163,7 @@ dialogs are situational (profile `/edit`, feat removal, spell choices), so
 see a `[dialogs] … captured` line in play, reporting it is direct roadmap
 help.
 
-**The renderer half is now built and on `main`**, landing in beta.9. A server
+**The renderer half shipped in beta.9.** A server
 dialog opens as an ordinary panel you can dock, float, or send to its own
 window, built from whatever controls DR sent rather than from per-panel code —
 which was the whole point of the track. Its arrangement is derived from the
@@ -315,7 +312,7 @@ Send specific lines to a chosen dockable panel instead of the main game window
 — a natural fit for the Dock layout. Genie 4
 [#81](https://github.com/GenieClient/Genie4/issues/81).
 
-### Compatibility regression tests 🔨 *both cases closed, unreleased*
+### Compatibility regression tests ✅ *both cases closed*
 
 Port-fidelity guards, not features — an assert-based suite around the documented
 parser / script-engine edge cases. Both listed cases are now closed, but they
@@ -338,7 +335,7 @@ closed in opposite ways, which is worth recording:
   evaluator returned on `SectionEndType`. Covered by a guard so a future rewrite
   that abandons recursive descent doesn't quietly reintroduce it.
 
-Both guards ship in beta.9. The pattern is worth repeating: each one pins a
+Both guards shipped in beta.9. The pattern is worth repeating: each one pins a
 behaviour Genie 4 documented, so a future refactor that diverges fails a test
 instead of arriving as a field report — and a case that *can't* happen is worth
 pinning for the same reason. New port-fidelity cases belong here as they turn up.

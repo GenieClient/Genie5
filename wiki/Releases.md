@@ -4,11 +4,27 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.8.3 — Steady Hands
+## Latest: v5.0.0-beta.9 — Nothing Lost
+
+The dialogs DragonRealms has always sent finally have somewhere to appear, the room's contents get a window of their own, and a bad line of game text can no longer stop your screen.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9** as a delta from beta.8.3.
+
+- **Server dialogs get real windows** — DragonRealms sends structured dialogs for things like paying off bank debt or choosing a spell. Genie has always received them and had nowhere to put them, so they were dropped. They now open as ordinary panels you can dock, float, or send to their own window, built from whatever controls the server sent rather than from per-dialog code. The arrangement is worked out from the coordinates in the message instead of fixed pixels, so a dialog laid out for a small fixed window reflows into whatever space your panel has; a control Genie doesn't recognise yet appears as a labelled placeholder rather than vanishing. Where each dialog lives is remembered per character profile, asked once the first time it appears. This is the first phase — the bespoke ones, the aim timer and injuries for other players, come later (#156).
+- **Dialog text no longer leaks into your main window** — some dialog contents arrive as their own stream, tagged with the dialog they belong to. Genie didn't recognise the tag, so that text fell through into the game window as stray lines with no obvious source. It now goes to the dialog it belongs to (#324).
+- **Objects window** — what's on the ground in the room, one item per line, the way Genie 3/4 had it. Open it from Window → Objects; it docks beside Room alongside Mobs and Players. Creatures are left out by default since the Mobs window already lists them — tick **Creatures** in the panel header, or `#config objectscreatures on`, for the Genie 4 behaviour (#329).
+- **Window banners can be hidden** — the accent bar above a dock group repeats what the tab strip below it already says. **View ▸ Window Banners** collapses it and gives the height to your text (#320).
+- **A single bad line can no longer stop your game text** — everything consuming the game stream ran chained together, so the first consumer to hit an error abandoned the rest for that line. Each is now isolated, so a failure costs that one consumer's work on that one line instead of the line, or the session.
+- **A damaged `profiles.json` can no longer lock you out** — an interrupted write made the client fail to start with no message. Profiles are now written through a temp file and swapped into place; an unreadable file is set aside as `.corrupt`, keeping your encrypted passwords for recovery, and the client starts with an empty list.
+- **Panels that re-opened into nothing** — Mobs, Players or any panel from the Window menu could tick its checkmark and never appear. A saved layout kept a zero-width column, and anything re-opened into it was placed correctly and rendered invisible; some layouts had been hiding Mobs and Players for weeks (#331).
+- **Long-running `.js` scripts stop hitting a phantom memory limit** — the budget counted every byte a script had ever allocated rather than what it was using, so hunt loops reached it first. It now measures live usage (#330).
+- **`waiteval` follows a variable that changes while it waits** — a condition on a value that moved after the wait armed never unblocked, so a recovery block could park forever. The expression is kept as written and re-read on each check (#332).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9)
+
+## v5.0.0-beta.8.3 — Steady Hands
 
 A wedged script can no longer take the whole client down with it, Genie 4's embedded JavaScript blocks run again, and a plugin's `/commands` work no matter where the command came from.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.8.3** as a delta from beta.8.2.
 
 - **Plugin `/commands` work from scripts, aliases and triggers** — a plugin's own command, such as `send /timers start BLESS`, was reaching DragonRealms instead of the plugin, which answered "Please rephrase that command." Client extensions now get first refusal and plugins get the command next — the same order typed input already used — everywhere a command can originate: `.cmd` scripts, alias expansions, trigger actions, quick-send segments, the `#send` queue, `move <cmd>`, JavaScript, and one plugin driving another. Slash commands nobody claims still go to the game, and ordinary commands are untouched (#325, #326).
 - **Embedded `<% … %>` JavaScript blocks in `.cmd` scripts** — the Genie 4 pattern runs again instead of being sent to the game as text. A block can set a script variable that the very next line reads, and engine state carries across blocks in the same script (#322).
