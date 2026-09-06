@@ -1093,6 +1093,17 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                 case ExposeDialogEvent xd:
                     ServerDialogs.Observe(xd);
                     break;
+
+                case DynaStreamEvent ds:
+                    // Content for a server dialog's streamBox (#324 → #156).
+                    ServerDialogs.Observe(ds);
+                    break;
+
+                case ClearStreamEvent cs:
+                    // Shared with the inv panel and SpellTimer's percWindow —
+                    // a no-op here unless a dialog owns a control by that id.
+                    ServerDialogs.ClearStream(cs.StreamId);
+                    break;
             }
         });
 

@@ -269,6 +269,14 @@ public sealed record StreamPopEvent(string LeavingStreamId, string ReturningStre
 public sealed record WindowEvent(string WindowId, string Title) : GameEvent;
 public sealed record ClearStreamEvent(string StreamId) : GameEvent;
 
+/// <summary>
+/// Text routed into a named streamBox — <c>&lt;dynaStream id='spells'&gt;…&lt;/dynaStream&gt;</c>
+/// (public #324). The setter companion to <see cref="ClearStreamEvent"/>, and
+/// how a server dialog's streamBox gets its content (#156). Markup inside the
+/// body is stripped to plain text.
+/// </summary>
+public sealed record DynaStreamEvent(string StreamId, string Text) : GameEvent;
+
 // ── Prompt ───────────────────────────────────────────────────────────────────
 
 /// <summary>

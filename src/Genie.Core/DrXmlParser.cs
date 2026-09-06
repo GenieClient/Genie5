@@ -61,6 +61,8 @@ public sealed class DrXmlParser : IDisposable
     private bool _inComponent = false;
     private bool _inSpell     = false;
     private bool _inHand      = false;   // <left>…</left> / <right>…</right> body — display name, emitted on close
+    private bool _inDynaStream = false;  // <dynaStream id='x'>…</dynaStream> body — text for a named streamBox (#324)
+    private string? _dynaStreamId;
     private string _handNoun  = "";      // <left>/<right> attrs stashed at the open tag; the
     private string _handExist = "";      // HeldItemEvent fires at the close tag with the body text (#172)
     private bool _inCompass   = false;
@@ -520,6 +522,7 @@ public sealed class DrXmlParser : IDisposable
         if (_inComponent) { _componentBuffer.Append(text); return; }
         if (_inSpell)     { _componentBuffer.Append(text); return; }
         if (_inHand)      { _componentBuffer.Append(text); return; } // content discarded on </left>/</right>
+        if (_inDynaStream){ _componentBuffer.Append(text); return; } // emitted on </dynaStream> (#324)
         if (_inCompass)   { _compassBuffer.Append(text);   return; }
         if (_inPrompt)    { _promptBuffer.Append(text);    return; } // indicator chars, emitted on </prompt>
 
@@ -1199,7 +1202,7 @@ public sealed class DrXmlParser : IDisposable
     // Keep <see cref="_handledTags"/> in sync with the HandleElement switch.
     private static readonly HashSet<string> _handledTags = new(StringComparer.OrdinalIgnoreCase)
     {
-        "a", "app", "b", "casttime", "cleardynastream", "clearstream",
+        "a", "app", "b", "casttime", "cleardynastream", "clearstream", "dynastream",
         "closedialog", "compass", "component", "container",
         "crtrstatus", "d", "dialogdata", "dir", "endsetup", "exposedialog",
         "image", "indicator", "inv", "opendialog",
@@ -1847,6 +1850,26 @@ public sealed class DrXmlParser : IDisposable
                 _events.OnNext(new ClearStreamEvent(r["id"] ?? ""));
                 break;
 
+            // ── Text routed into a named streamBox (public #324) ─────────
+            // <dynaStream id='spells'>…</dynaStream> carries the CONTENT of a
+            // server dialog's streamBox (#156 Phase 1) — the companion setter
+            // to the clearStream above. The body is buffered like a component
+            // and emitted whole at the close tag; a self-closing form has no
+            // body and emits immediately.
+            case "dynastream":
+            {
+                var dynaId = r["id"] ?? "";
+                if (rawTag.TrimEnd().EndsWith("/>", StringComparison.Ordinal))
+                {
+                    _events.OnNext(new DynaStreamEvent(dynaId, ""));
+                    break;
+                }
+                _dynaStreamId = dynaId;
+                _componentBuffer.Clear();
+                _inDynaStream = true;
+                break;
+            }
+
             // ── Unrecognised (log at trace for AI analysis) ──────────────
             default:
                 _log.LogTrace("Unknown DR tag: {Tag}", rawTag);
@@ -1909,6 +1932,19 @@ public sealed class DrXmlParser : IDisposable
                 var name2 = System.Net.WebUtility.HtmlDecode(StripBasicXml(spellBody)).Trim();
                 _events.OnNext(new SpellEvent(name2));
                 if (spellAppended.Length > 0) EmitLine(spellAppended);
+                break;
+            }
+            case "dynastream" when _inDynaStream:
+            {
+                _inDynaStream = false;
+                var dynaBody = _componentBuffer.ToString();
+                _componentBuffer.Clear();
+                // Markup inside the body (spell <a> links) is stripped to text;
+                // a richer form can come later if a renderer needs the links.
+                _events.OnNext(new DynaStreamEvent(
+                    _dynaStreamId ?? "",
+                    System.Net.WebUtility.HtmlDecode(StripBasicXml(dynaBody))));
+                _dynaStreamId = null;
                 break;
             }
             case "left" when _inHand:

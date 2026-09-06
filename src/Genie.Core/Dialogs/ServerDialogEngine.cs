@@ -191,10 +191,30 @@ public sealed class ServerDialogEngine
     }
 
     /// <summary>
-    /// Text routed into a named streamBox (<c>&lt;dynaStream id='…'&gt;</c>).
-    /// Cached whether or not a dialog displays it yet — public #324 has to land
-    /// before the parser emits these, so nothing calls this from the pump today.
+    /// A <c>&lt;dynaStream&gt;</c> block (public #324) — APPENDS to the named
+    /// streamBox.
+    ///
+    /// <para>Append, not replace, because that is what DR's established idiom
+    /// implies and what the Genie 4 plugin visibly does: its two streamBox
+    /// renderers both append (<c>AppendText</c>, <c>Stream_AppendSpellItems</c>)
+    /// and <c>clearStream</c> is the explicit reset, exactly as the
+    /// percWindow/inv streams already work here. Only the plugin's internal
+    /// document cache replaced, which would have kept just the last chunk — a
+    /// bug, not a spec. ⚠ UNVERIFIED against a live capture: no recording holds
+    /// a dynaStream BODY, only the open tag from the #324 audit report. If a
+    /// capture ever shows whole-value replacement, this is the one line to
+    /// change.</para>
     /// </summary>
+    public void Observe(DynaStreamEvent e)
+    {
+        if (string.IsNullOrEmpty(e.StreamId)) return;
+        NotifyStream(e.StreamId, () =>
+            _streams[e.StreamId] = _streams.TryGetValue(e.StreamId, out var prior)
+                ? prior + e.Text
+                : e.Text);
+    }
+
+    /// <summary>Replace a named streamBox's text outright.</summary>
     public void SetStream(string controlId, string text)
     {
         if (string.IsNullOrEmpty(controlId)) return;
