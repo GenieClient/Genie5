@@ -297,16 +297,91 @@ public class ObjectsViewModelTests
         Assert.Equal(new[] { "a wooden sign" }, h.Vm.Objects.Select(o => o.Text));
     }
 
+    // ── Creatures: filtered by default, opt-in via #config objectscreatures ──
+    //
+    // The reporter's call: Mobs already lists creatures, so the two panels
+    // shouldn't repeat each other. Genie 4's behaviour (everything on the
+    // line) is still one toggle away.
+
+    private const string WithCreature =
+        "You also see a Custodian of the Dusk and an ornately arched building.";
+
+    private static BoldSpan CustodianBold() =>
+        new(WithCreature.IndexOf("a Custodian", StringComparison.Ordinal),
+            "a Custodian of the Dusk".Length);
+
     [Fact]
-    public async Task Creature_bold_spans_survive_the_trip_and_mark_their_row()
+    public async Task Creatures_are_left_out_by_default()
     {
         await using var h = new Harness();
-        const string content = "You also see a Custodian of the Dusk and an ornately arched building.";
-        h.Objs(content, new BoldSpan(content.IndexOf("a Custodian", StringComparison.Ordinal),
-                                     "a Custodian of the Dusk".Length));
+        h.Objs(WithCreature, CustodianBold());
+
+        Assert.Equal(new[] { "an ornately arched building" }, h.Vm.Objects.Select(o => o.Text));
+        Assert.Equal(1, h.Vm.Count);
+        Assert.False(h.Vm.ShowCreatures);
+    }
+
+    [Fact]
+    public async Task A_room_with_only_creatures_reads_as_empty()
+    {
+        await using var h = new Harness();
+        const string content = "You also see a town guard.";
+        h.Objs(content, new BoldSpan(content.IndexOf("a town guard", StringComparison.Ordinal),
+                                     "a town guard".Length));
+
+        Assert.True(h.Vm.IsEmpty);
+        Assert.Empty(h.Vm.Objects);
+    }
+
+    [Fact]
+    public async Task The_panel_toggle_brings_creatures_back_and_marks_them()
+    {
+        await using var h = new Harness();
+        h.Objs(WithCreature, CustodianBold());
+
+        h.Vm.ShowCreatures = true;
 
         Assert.Collection(h.Vm.Objects,
             r => { Assert.Equal("a Custodian of the Dusk", r.Text);     Assert.True(r.IsCreature); },
             r => { Assert.Equal("an ornately arched building", r.Text); Assert.False(r.IsCreature); });
+    }
+
+    [Fact]
+    public async Task The_panel_toggle_writes_through_to_config()
+    {
+        await using var h = new Harness();
+        h.Vm.ShowCreatures = true;
+        Assert.True(h.Core.Config.ObjectsShowCreatures);
+
+        h.Vm.ShowCreatures = false;
+        Assert.False(h.Core.Config.ObjectsShowCreatures);
+    }
+
+    [Fact]
+    public async Task A_typed_config_command_re_filters_the_live_rows()
+    {
+        await using var h = new Harness();
+        h.Objs(WithCreature, CustodianBold());
+        Assert.Single(h.Vm.Objects);
+
+        h.Core.Config.SetSetting("objectscreatures", "on");
+
+        Assert.True(h.Vm.ShowCreatures);
+        Assert.Equal(2, h.Vm.Objects.Count);
+
+        h.Core.Config.SetSetting("objectscreatures", "off");
+
+        Assert.False(h.Vm.ShowCreatures);
+        Assert.Single(h.Vm.Objects);
+    }
+
+    [Fact]
+    public async Task A_room_arriving_while_the_toggle_is_on_keeps_its_creatures()
+    {
+        await using var h = new Harness();
+        h.Vm.ShowCreatures = true;
+        h.Objs(WithCreature, CustodianBold());
+
+        Assert.Equal(2, h.Vm.Objects.Count);
     }
 }

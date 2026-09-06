@@ -290,6 +290,14 @@ public sealed class GenieConfig
     /// the 4×4 part grid (default). Set from the panel's Figure-layout toggle
     /// or <c>#config injurieslayout figure|grid</c>.</summary>
     public bool InjuriesFigureLayout { get; set; }
+    /// <summary>Objects panel (#329): include the room's creatures in the list.
+    /// OFF by default — the Mobs panel already covers creatures, so the two
+    /// windows don't repeat each other (the reporter's call). Turning it on
+    /// gives the Genie 4 window's behaviour, everything after "You also see:",
+    /// with creatures in the <c>creatures</c> preset colour. Set from the
+    /// panel's Include-creatures checkbox or
+    /// <c>#config objectscreatures on|off</c>.</summary>
+    public bool ObjectsShowCreatures { get; set; }
     public bool ShowLinks { get; set; } = true;
     /// <summary>MonsterBold (#131): render DR's &lt;pushBold&gt; creature names /
     /// combat hits in bold + the <c>creatures</c> preset colour, in every window
@@ -733,6 +741,7 @@ public sealed class GenieConfig
         ("roundtimeoffset", RoundTimeOffset.ToString()),
         ("injuriespoll", InjuriesPollSeconds.ToString()),
         ("injurieslayout", InjuriesFigureLayout ? "figure" : "grid"),
+        ("objectscreatures", ObjectsShowCreatures.ToString()),
         ("scriptdir", ScriptDirRaw),
         ("reposcriptdir", RepoScriptDirRaw),
         ("sounddir", SoundDirRaw),
@@ -843,7 +852,7 @@ public sealed class GenieConfig
         ("Connection",       new[] { "activitytimeout", "classicconnect", "conndebug", "connectscript", "flagscheck", "frontend", "reconnect" }),
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
-        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout" }),
+        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout", "objectscreatures" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "gamethread" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug" }),
@@ -922,6 +931,10 @@ public sealed class GenieConfig
                 case "injurieslayout":
                     // "figure" or "grid"; anything else falls back to grid.
                     InjuriesFigureLayout = value.Trim().Equals("figure", StringComparison.OrdinalIgnoreCase);
+                    break;
+                case "objectscreatures":
+                    ObjectsShowCreatures = ToBool(value);
+                    Notify(ConfigFieldUpdated.ObjectsCreatures);
                     break;
                 case "scriptdir": ScriptDirRaw = SetDir(value); break;
                 // Blank is meaningful here (= pull into scriptdir, feature

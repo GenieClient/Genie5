@@ -5,6 +5,7 @@ using System.Reactive.Linq;
 using Avalonia.Controls;   // FindResource — the TextPrimary fallback below
 using Genie.App.Highlighting;
 using Genie.Core;
+using Genie.Core.Config;
 using Genie.Core.Events;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
@@ -17,14 +18,20 @@ namespace Genie.App.ViewModels;
 /// the trio started in #86: Mobs (creatures), Players, Objects.
 ///
 /// Sourced from the <c>room objs</c> component — the same "You also see …"
-/// line behind <c>$roomobjs</c> and the Room panel's objects field. Genie 4's
-/// window listed EVERYTHING on that line, creatures included, so this does
-/// too; creature rows are marked (<see cref="ObjectRow.IsCreature"/>) from the
-/// component's bold spans and painted in the <c>creatures</c> preset, the same
-/// single colour knob the Mobs panel and the Main window's MonsterBold layer
-/// use. Splitting the line into rows is best-effort — see
+/// line behind <c>$roomobjs</c> and the Room panel's objects field.
+///
+/// <para><b>Creatures are filtered out by default.</b> That line carries the
+/// room's creatures too, and Genie 4's window listed them, but the reporter's
+/// call was objects-only so this panel and Mobs never repeat each other —
+/// with <c>#config objectscreatures on</c> (or the panel's checkbox) bringing
+/// the Genie 4 behaviour back. Creature rows are identified from the
+/// component's bold spans (<see cref="ObjectRow.IsCreature"/>) and, when
+/// shown, painted in the <c>creatures</c> preset — the same single colour knob
+/// the Mobs panel and the Main window's MonsterBold layer use.</para>
+///
+/// <para>Splitting the line into rows is best-effort — see
 /// <see cref="RoomObjectSplitter"/> for why it has to be, and what it can get
-/// wrong.
+/// wrong.</para>
 ///
 /// Hidden by default; re-open via Window → Objects.
 /// </summary>
@@ -51,8 +58,49 @@ public sealed class ObjectsViewModel : ReactiveObject
     private string _lastContent = "";
     private IReadOnlyList<BoldSpan>? _lastBold;
 
+    private GenieCore? _core;
+    private bool _showCreatures;
+
+    /// <summary>Include the room's creatures in the list. Backed by
+    /// <c>#config objectscreatures</c>, so the checkbox and the typed command
+    /// are one mechanism: the setter writes through
+    /// <see cref="GenieConfig.SetSetting"/>, which fires
+    /// <see cref="ConfigFieldUpdated.ObjectsCreatures"/> and brings the rows
+    /// back through the same refresh a typed command takes. Seeding from
+    /// config in <see cref="Attach"/> is a no-op write.</summary>
+    public bool ShowCreatures
+    {
+        get => _showCreatures;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _showCreatures, value);
+            if (_core is not null && value != _core.Config.ObjectsShowCreatures)
+            {
+                _core.Config.SetSetting("objectscreatures", value ? "1" : "0", showException: false);
+                _core.Config.Save();
+            }
+        }
+    }
+
     public void Attach(GenieCore core)
     {
+        _core          = core;
+        ShowCreatures  = core.Config.ObjectsShowCreatures;
+
+        // The toggle from ANY source — this panel's checkbox, a typed
+        // #config objectscreatures, or #config load — re-filters the rows in
+        // place, the same seam the Mobs panel uses for its ignore list.
+        Observable.FromEvent<Action<ConfigFieldUpdated>, ConfigFieldUpdated>(
+                h => core.Config.ConfigChanged += h,
+                h => core.Config.ConfigChanged -= h)
+            .Where(f => f == ConfigFieldUpdated.ObjectsCreatures)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ =>
+            {
+                ShowCreatures = core.Config.ObjectsShowCreatures;
+                Refresh(_lastContent, _lastBold);
+            });
+
         // Two carriers, one subscription so they stay ordered on the UI thread:
         //   • "room objs"  → (re)populate the list.
         //   • "room title" → a NEW room arrived; clear first.
@@ -87,7 +135,13 @@ public sealed class ObjectsViewModel : ReactiveObject
 
         Objects.Clear();
         foreach (var span in RoomObjectSplitter.Split(_lastContent))
-            Objects.Add(new ObjectRow(_lastContent, span, boldSpans));
+        {
+            var row = new ObjectRow(_lastContent, span, boldSpans);
+            // Creatures belong to the Mobs panel unless the user asks for the
+            // Genie 4 everything-on-the-line behaviour.
+            if (row.IsCreature && !_showCreatures) continue;
+            Objects.Add(row);
+        }
 
         Count   = Objects.Count;
         IsEmpty = Objects.Count == 0;

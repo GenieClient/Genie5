@@ -633,9 +633,18 @@
          creatures too, so they stay, marked by the creatures preset. -->
     <DataTemplate DataType="docking:ObjectsTool">
       <Grid RowDefinitions="Auto,*">
-        <TextBlock Grid.Row="0" Margin="8,6,8,2" FontSize="10"
-                   Foreground="{DynamicResource Theme.SectionHeader}" FontWeight="SemiBold"
-                   Text="{Binding ViewModel.Count, StringFormat='OBJECTS ({0})'}"/>
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="8,6,8,2">
+          <TextBlock Grid.Column="0" FontSize="10"
+                     Foreground="{DynamicResource Theme.SectionHeader}" FontWeight="SemiBold"
+                     VerticalAlignment="Center"
+                     Text="{Binding ViewModel.Count, StringFormat='OBJECTS ({0})'}"/>
+          <!-- Same setting as #config objectscreatures on|off — the checkbox
+               writes through SetSetting so typed and clicked stay one path. -->
+          <CheckBox Grid.Column="1" Content="Creatures" FontSize="10"
+                    MinHeight="0" Padding="4,0,0,0" VerticalAlignment="Center"
+                    IsChecked="{Binding ViewModel.ShowCreatures}"
+                    ToolTip.Tip="Also list the room's creatures here, the way the Genie 4 Objects window did. Off by default — the Mobs window already covers them. Same setting as #config objectscreatures on|off."/>
+        </Grid>
         <ScrollViewer Grid.Row="1">
           <StackPanel Margin="8,2,8,8">
             <TextBlock Text="Nothing else here." Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"
