@@ -130,8 +130,9 @@ PRs that touch parser / scripting / mapper subsystems may want a smoke-test agai
 
 ## Voting on priorities
 
-Genie 5 is built by one person, so the *order* things get built in matters as
-much as the list. Two ways to weigh in, neither of which requires writing code:
+Genie 5 is built in spare time, with contributions from the community, so the
+*order* things get built in matters as much as the list. Two ways to weigh
+in, neither of which requires writing code:
 
 - **👍 a reaction on any open issue.** That is the vote. React to as many as you
   like, change your mind whenever. A [pinned priority
