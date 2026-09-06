@@ -1,7 +1,8 @@
 # Genie 5 — v5.0.0-beta.9
 
-**"In Plain Sight"** — the room's contents get their own window, and panels
-that had quietly stopped appearing come back.
+**"Nothing Lost"** — a bad line of game text can no longer stop your screen, a
+damaged profile can no longer lock you out, and the room's contents get a
+window of their own.
 
 ## ✨ New
 - **Objects window** — what's on the ground in the room, one item per line,
@@ -15,8 +16,32 @@ that had quietly stopped appearing come back.
   the trailing "and"; an item whose own name ends in "and" plus an article
   can still land in the wrong place, and a screenshot of the room is enough
   to fix it (#329).
+- **Window banners can be hidden** — the accent bar above a dock group,
+  showing the active panel's name, repeats what the tab strip right below it
+  already says. **View ▸ Window Banners** collapses it and gives the height
+  to your text. It applies to all docked groups rather than one panel at a
+  time, because the banner belongs to the group, not the window — the stream
+  dock alone sits ten panels behind one bar, and a per-panel setting would
+  make it appear and disappear as you switched tabs. Floating windows keep
+  their own Hide Title Bar (#320).
 
 ## 🐛 Fixes
+- **A single bad line can no longer stop your game text** — everything that
+  consumes the game stream ran chained together, so the first consumer to hit
+  an error abandoned the rest of the chain for that line. The part that puts
+  text on your screen runs last, which meant one unlucky trigger action or
+  parser corner could silently stop your output with nothing to explain it —
+  and with the game thread turned off, take the whole session down with it.
+  Each consumer is now isolated, so a failure costs you that one consumer's
+  work on that one line instead of the line, or the session.
+- **A damaged `profiles.json` can no longer lock you out** — if the file was
+  interrupted mid-write, the client failed to start at all, with no message
+  and no way back except finding and deleting the file by hand, which also
+  destroyed every saved account and password. Profiles are now written
+  through a temp file and swapped into place, so an interrupted write leaves
+  the previous good copy intact; an unreadable file is set aside as
+  `.corrupt` — keeping your encrypted passwords for recovery — and the client
+  starts with an empty list rather than refusing to open.
 - **Panels that re-opened into nothing** — Mobs, Players or any panel opened
   from the Window menu could tick its checkmark and never appear, leaving at
   most a sliver at the edge of the window. Drag every panel out of a column
@@ -27,6 +52,36 @@ that had quietly stopped appearing come back.
   weeks. Re-opening a panel now restores the column it lands in. If you were
   affected, save your layout once your panels are back to clear the old value
   for good (#331).
+- **Long-running `.js` scripts stop hitting a phantom memory limit** — a
+  script could abort with "memory limit (128 MB) exceeded" while holding
+  almost nothing. The budget counted every byte a script had ever allocated
+  rather than what it was actually using, so it worked out as a fixed
+  allowance of total work — and hunt loops, the scripts meant to run for
+  hours, reached it first. It now measures the same way the runaway-loop
+  guard does, so a script that keeps its memory small can run indefinitely
+  while a genuine memory bomb is still stopped (#330).
+- **`element()` clamps out-of-range indices like Genie 4** — asking for an
+  index past the end returned an empty string instead of the last element,
+  and a negative index counted from the end rather than returning "". Genie 4
+  never reports out of range, and scripts are written expecting that; the
+  difference turned up as comparisons against "" further down. Now matched,
+  including negative indices counting back from the end (#323).
+- **Update feeds can only write inside their own folder** — filenames coming
+  from a maps or plugins feed were used as given, and a name containing a
+  path could send its bytes somewhere else on disk. For the plugin feed that
+  matters more than a stray file, because a downloaded plugin is then loaded.
+  All three updaters now share one containment check: maps and plugins refuse
+  any name carrying directory structure, scripts keep the nested paths a
+  pulled repository legitimately needs, and both separators are treated as
+  separators on every platform so Windows and Linux agree.
+
+## 🔧 Under the hood
+- **JavaScript engine updated** — Jint 4.3.0 → 4.16.1, thirteen releases of
+  fixes for the engine behind `.js` scripts. The three guards that stand
+  between a runaway script and the client — the time budget, the recursion
+  limit and the memory cap — hook into engine internals that a version bump
+  could quietly change without breaking the build, so each now has a test
+  that actually runs it. All three behave identically on both versions (#289).
 
 ---
 
