@@ -43,18 +43,28 @@ public static class FeedPath
         // A drive-qualified or rooted name would win the Combine outright.
         if (Path.IsPathRooted(name) || name.Contains(':')) return false;
 
+        // Normalize BOTH separators before anything looks at the shape. On Linux a
+        // backslash is an ordinary filename character, so a name like "..\..\evil.xml" arrives
+        // as one long legal name and neither GetFileName nor the containment check
+        // sees a traversal — it would be refused on Windows and quietly accepted on
+        // Linux. No legitimate feed name contains a backslash, so treating it as a
+        // separator everywhere costs nothing and makes the two platforms agree.
+        var relative = name.Replace('\\', Path.DirectorySeparatorChar)
+                           .Replace('/',  Path.DirectorySeparatorChar);
+
         if (!allowSubdirectories)
         {
-            // Bare filename only. GetFileName is the comparison, not the fix: if it
-            // differs from the input the name carried directory structure, and this
-            // feed has no business supplying any.
-            var leaf = Path.GetFileName(name);
-            if (string.IsNullOrWhiteSpace(leaf) || !string.Equals(leaf, name, StringComparison.Ordinal))
-                return false;
-            if (leaf is "." or "..") return false;
+            // Bare filename only: these feeds are flat, so any directory structure
+            // in the name means the feed is not what this updater expects.
+            if (relative.IndexOf(Path.DirectorySeparatorChar) >= 0) return false;
+            if (relative is "." or "..") return false;
         }
 
-        var relative = name.Replace('/', Path.DirectorySeparatorChar);
+        // Segment check, ahead of the containment test. A ".." that cancels out
+        // ("sub/../file") still tells us the feed is composing paths it has no
+        // business composing, and refusing it keeps the accepted set small.
+        foreach (var segment in relative.Split(Path.DirectorySeparatorChar))
+            if (segment is ".." or ".") return false;
 
         string root, full;
         try
