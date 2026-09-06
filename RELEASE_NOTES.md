@@ -1,3 +1,35 @@
+# Genie 5 — v5.0.0-beta.9
+
+**"In Plain Sight"** — the room's contents get their own window, and panels
+that had quietly stopped appearing come back.
+
+## ✨ New
+- **Objects window** — what's on the ground in the room, one item per line,
+  the way Genie 3/4 had it. Open it from Window → Objects; it docks beside
+  Room alongside Mobs and Players, completing that trio. Creatures are left
+  out by default, since the Mobs window already lists them — tick
+  **Creatures** in the panel header, or `#config objectscreatures on`, to get
+  the Genie 4 behaviour of listing everything after "You also see:" with
+  creatures in the `creatures` colour. DragonRealms sends that line as plain
+  prose with no per-item markup, so the split into rows reads the commas and
+  the trailing "and"; an item whose own name ends in "and" plus an article
+  can still land in the wrong place, and a screenshot of the room is enough
+  to fix it (#329).
+
+## 🐛 Fixes
+- **Panels that re-opened into nothing** — Mobs, Players or any panel opened
+  from the Window menu could tick its checkmark and never appear, leaving at
+  most a sliver at the edge of the window. Drag every panel out of a column
+  over enough sessions and the layout renormalizes that column to zero width,
+  and a saved layout keeps the zero; anything re-opened into it was placed
+  correctly and rendered invisible. This bit people who had never touched the
+  panels in question — some layouts had been hiding Mobs and Players for
+  weeks. Re-opening a panel now restores the column it lands in. If you were
+  affected, save your layout once your panels are back to clear the old value
+  for good (#331).
+
+---
+
 # Genie 5 — v5.0.0-beta.8.3
 
 **"Steady Hands"** — a wedged script can no longer take the whole client down
