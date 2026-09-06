@@ -1,0 +1,117 @@
+<!-- Server-driven dialog panel (#156 Phase 1). DR describes these windows over
+     <dialogData>; DialogGridLayout infers a column/row grid from the server's
+     pixel coordinates and every cell sizes to its content, so the layout holds
+     up under a font stack Wrayth never saw. Controls are data-templated per
+     kind; activating one resolves its %placeholder% command through
+     ServerDialogCommand and hands the result to the host.
+
+     The body grid is built in code-behind: its row and column counts change
+     with every delta, and Avalonia cannot convert a bound string into
+     RowDefinitions/ColumnDefinitions. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Genie.App.ViewModels"
+             x:Class="Genie.App.Views.ServerDialogPanel"
+             x:DataType="vm:ServerDialogViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="Button.dlgbtn">
+      <Setter Property="MinWidth" Value="64"/>
+      <Setter Property="Padding"  Value="10,3"/>
+    </Style>
+  </UserControl.Styles>
+
+  <!-- Type-matched, so a ContentControl bound to any control VM picks its own. -->
+  <UserControl.DataTemplates>
+
+    <DataTemplate DataType="vm:DialogLabelViewModel">
+      <TextBlock Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:DialogButtonViewModel">
+      <Button Classes="dlgbtn"
+              Content="{Binding Caption}"
+              IsEnabled="{Binding IsEnabled}"
+              Tag="{Binding Id}"
+              Click="OnControlActivated"/>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:DialogTextBoxViewModel">
+      <TextBox Text="{Binding Value, Mode=TwoWay}"
+               IsEnabled="{Binding IsEnabled}"
+               MinWidth="80"
+               Tag="{Binding Id}"
+               KeyDown="OnEditBoxKeyDown"/>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:DialogCheckBoxViewModel">
+      <CheckBox Content="{Binding Caption}"
+                IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                IsEnabled="{Binding IsEnabled}"
+                Tag="{Binding Id}"
+                Click="OnControlActivated"/>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:DialogRadioViewModel">
+      <!-- GroupName drives no exclusivity here: the VM owns that, so a group
+           spread across several rows still behaves as one. -->
+      <RadioButton Content="{Binding Caption}"
+                   IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                   IsEnabled="{Binding IsEnabled}"
+                   Tag="{Binding Id}"
+                   Click="OnRadioSelected"/>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:DialogComboViewModel">
+      <ComboBox ItemsSource="{Binding Items}"
+                SelectedItem="{Binding Selected, Mode=TwoWay}"
+                IsEnabled="{Binding IsEnabled}"
+                MinWidth="120"
+                Tag="{Binding Id}"
+                SelectionChanged="OnComboChanged"/>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:DialogStreamViewModel">
+      <!-- Fed by dynaStream (#324), never by the main text pipeline. -->
+      <Border BorderThickness="1" BorderBrush="{DynamicResource Theme.Border}"
+              MinHeight="80" MaxHeight="380" MinWidth="180">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto">
+          <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" Margin="4"/>
+        </ScrollViewer>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:DialogProgressViewModel">
+      <Grid MinWidth="120">
+        <ProgressBar Minimum="0" Maximum="100" Value="{Binding Value}" Height="16"/>
+        <TextBlock Text="{Binding Caption}" FontSize="11"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      </Grid>
+    </DataTemplate>
+
+  </UserControl.DataTemplates>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Auto">
+    <StackPanel Margin="8">
+
+      <Grid x:Name="Body"/>
+
+      <!-- Bottom-anchored button strip (align s/sw/se), outside the grid. -->
+      <ItemsControl x:Name="BottomStrip"
+                    ItemsSource="{Binding BottomControls}"
+                    Margin="0,10,0,0">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel HorizontalAlignment="Center"/>
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <ContentControl Content="{Binding}" Margin="4,0"/>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

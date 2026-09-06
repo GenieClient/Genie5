@@ -14,6 +14,7 @@ using Genie.Core.Aliases;
 using Genie.Core.Capture;
 using Genie.Core.Classes;
 using Genie.Core.Connection;
+using Genie.Core.Dialogs;
 using Genie.Core.Events;
 using Genie.Core.Gags;
 using Genie.Core.Highlights;
@@ -3155,6 +3156,132 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     /// <summary>Wire the host's plugin-window seam to the dock factory. Both
     /// callbacks marshal to the UI thread — they fire from parser/plugin threads
+    /// <summary>
+    /// Drive the server-driven dialog windows from the state engine (#156
+    /// Phase 1). Every change is resolved against the per-profile mapping: a
+    /// dialog nobody has decided about prompts once and renders nothing
+    /// meanwhile, while the engine keeps merging its content so whatever the
+    /// user picks opens up to date.
+    /// </summary>
+    private void AttachServerDialogs(GenieCore core)
+    {
+        core.ServerDialogs.Changes.Subscribe(change =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => OnServerDialogChanged(core, change)));
+    }
+
+    private readonly HashSet<string> _hookedServerDialogs = new(StringComparer.OrdinalIgnoreCase);
+
+    private async void OnServerDialogChanged(GenieCore core, ServerDialogChange change)
+    {
+        try
+        {
+            if (change.Kind == ServerDialogChangeKind.Reset)
+            {
+                _hookedServerDialogs.Clear();
+                return;
+            }
+            if (change.State is null || DockFactory is not GenieDockFactory factory) return;
+
+            var state = change.State;
+            var how   = core.DialogMappings.Resolve(state.Id, state.Location);
+
+            if (how.NeedsPrompt)
+            {
+                await PromptForServerDialog(core, state);
+                return;
+            }
+            if (!how.ShouldRender) return;
+
+            // Lifecycle only moves an existing window; it never creates one.
+            if (change.Kind == ServerDialogChangeKind.Closed)
+            {
+                factory.HideServerDialog(state.Id);
+                return;
+            }
+
+            // AutoOpen off means populate silently and let the Window menu open
+            // it; DR having closed the dialog likewise shouldn't re-surface it.
+            var show = how.AutoOpen && state.IsOpen;
+            var vm   = factory.GetOrCreateServerDialog(state.Id, state.Title, show);
+
+            vm.SeparatorChar = core.Config.SeparatorChar;
+            HookServerDialog(core, factory, vm);
+            vm.Apply(state);
+
+            if (change.Kind == ServerDialogChangeKind.Exposed)
+                factory.ExposeServerDialog(state.Id);
+        }
+        catch (Exception ex)
+        {
+            // A dialog we cannot render must never take the session down.
+            GameText.AddSystemLine(
+                $"[dialogs] could not render '{change.DialogId}': {ex.Message}");
+        }
+    }
+
+    /// <summary>Wire one dialog VM's outputs once: a resolved command goes
+    /// through the normal user-command path (identical trust model to a
+    /// <c>&lt;d cmd&gt;</c> link), a url: through the existing WebLinkSafety
+    /// prompt.</summary>
+    private void HookServerDialog(GenieCore core, GenieDockFactory factory, ServerDialogViewModel vm)
+    {
+        if (!_hookedServerDialogs.Add(vm.DialogId)) return;
+
+        vm.ActionRequested += action =>
+        {
+            switch (action.Kind)
+            {
+                case ServerDialogActionKind.GameCommand:
+                    core.Commands.ProcessInput(action.Value);
+                    break;
+                case ServerDialogActionKind.WebLink:
+                    Highlighting.DefaultHighlights.OnUrlClicked?.Invoke(action.Value);
+                    break;
+            }
+        };
+
+        vm.CloseRequested += () => factory.HideServerDialog(vm.DialogId);
+    }
+
+    /// <summary>
+    /// Ask, once, where a newly described dialog should live. Claiming the
+    /// prompt first is what keeps a burst of dialogData from stacking identical
+    /// choosers; the window is modal to the main window but the game loop runs
+    /// on regardless, and the engine keeps buffering this dialog's content.
+    /// </summary>
+    private async Task PromptForServerDialog(GenieCore core, ServerDialogState state)
+    {
+        if (!core.DialogMappings.TryClaimPrompt(state.Id)) return;
+
+        var owner = (Avalonia.Application.Current?.ApplicationLifetime
+                        as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        if (owner is null) return;
+
+        var prompt = new Views.ServerDialogPromptDialog(state);
+        var mode   = await prompt.ShowDialog<ServerDialogMode?>(owner);
+
+        if (mode is null or ServerDialogMode.AskLater)
+        {
+            core.DialogMappings.DeferForSession(state.Id);
+            return;
+        }
+
+        core.DialogMappings.Set(new ServerDialogMapping
+        {
+            Id       = state.Id,
+            Mode     = mode.Value,
+            AutoOpen = prompt.AutoOpen,
+            Title    = state.Title,
+        });
+        core.SaveDialogMappings();
+
+        // Render immediately with whatever accumulated while we were asking.
+        var current = core.ServerDialogs.Get(state.Id);
+        if (current is not null)
+            OnServerDialogChanged(core,
+                new ServerDialogChange(state.Id, ServerDialogChangeKind.Data, current));
+    }
+
     /// and mutate the dock tree.</summary>
     private void AttachPluginWindows(GenieCore core)
     {
@@ -4891,6 +5018,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Objects.Attach(_core);
         RawXml.Attach(_core);
         Injuries.Attach(_core);
+        AttachServerDialogs(_core);
         // Gate the injuries auto-refresh poll on the panel actually being open
         // — no visible window, no silent `health` sends. InjuriesVisible is the
         // canonical mirror of the dock tool's state (toggle commands + the

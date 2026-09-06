@@ -128,6 +128,17 @@ public class GenieDockFactory : Factory
     /// <see cref="CreateLayout"/>.</summary>
     private const string PluginWindowParentId = "backpack-dock";
 
+    /// <summary>Dock-id prefix for a server-driven dialog window (#156).</summary>
+    public const string ServerDialogPrefix = "serverdlg:";
+
+    private readonly Dictionary<string, ServerDialogTool> _serverDialogTools =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Canonical dock id for a dialog id, so the panel round-trips
+    /// through saved layouts.</summary>
+    public static string ServerDialogId(string dialogId) =>
+        ServerDialogPrefix + (dialogId ?? "").Trim().ToLowerInvariant();
+
     /// <summary>Canonical dock id for a plugin window of the given display name.</summary>
     public static string PluginWindowId(string name) =>
         PluginWindowPrefix + (name ?? "").Trim().ToLowerInvariant();
@@ -2166,6 +2177,73 @@ public class GenieDockFactory : Factory
         _tools[id]             = (tool, PluginWindowParentId);
         tool.WindowMenu        = BuildWindowMenu(id, tool);
         return tool;
+    }
+
+    /// <summary>
+    /// Get (creating on first sight) the window for a server dialog (#156
+    /// Phase 1). Mirrors <see cref="GetOrCreatePluginWindow"/>: on-demand
+    /// creation is what keeps a new window off the ten wiring sites a built-in
+    /// tool needs.
+    ///
+    /// <para><paramref name="show"/> false populates the panel silently — the
+    /// per-dialog AutoOpen toggle off. A newly created window is always shown
+    /// on first sight, because a window nobody has ever seen cannot be found in
+    /// the Window menu.</para>
+    /// </summary>
+    public ServerDialogViewModel GetOrCreateServerDialog(
+        string dialogId, string? title = null, bool show = true)
+    {
+        var id = ServerDialogId(dialogId);
+        if (!_serverDialogTools.TryGetValue(id, out var tool))
+        {
+            var vm = new ServerDialogViewModel(dialogId)
+            {
+                Title = string.IsNullOrWhiteSpace(title) ? dialogId : title!,
+            };
+            // Public #233: register so Configuration → Layout offers per-window
+            // settings for it, same as a dynamic plugin window.
+            var settings = _vm.WindowSettings.Register(id, vm.Title);
+            tool = new ServerDialogTool(vm, id, vm.Title, settings);
+
+            _serverDialogTools[id] = tool;
+            _tools[id]             = (tool, PluginWindowParentId);
+            tool.WindowMenu        = BuildWindowMenu(id, tool);
+            show = true;
+        }
+        else if (!string.IsNullOrWhiteSpace(title))
+        {
+            tool.ViewModel.Title = title!;
+        }
+
+        if (show && !IsToolVisible(id)) SetToolVisibility(id, true);
+        return tool.ViewModel;
+    }
+
+    /// <summary>Bring an already-created dialog window to the front
+    /// (<c>&lt;exposeDialog&gt;</c>).</summary>
+    public void ExposeServerDialog(string dialogId)
+    {
+        var id = ServerDialogId(dialogId);
+        if (_serverDialogTools.ContainsKey(id)) SetToolVisibility(id, true);
+    }
+
+    /// <summary>Hide a dialog window without discarding its state
+    /// (<c>&lt;closeDialog&gt;</c>).</summary>
+    public void HideServerDialog(string dialogId)
+    {
+        var id = ServerDialogId(dialogId);
+        if (_serverDialogTools.ContainsKey(id) && IsToolVisible(id))
+            SetToolVisibility(id, false);
+    }
+
+    /// <summary>All server dialog windows created this session, as
+    /// (id, title, visible) — for the Window menu.</summary>
+    public IReadOnlyList<(string Id, string Title, bool Visible)> ServerDialogWindows()
+    {
+        var list = new List<(string, string, bool)>();
+        foreach (var (id, tool) in _serverDialogTools)
+            list.Add((id, tool.Title, IsToolVisible(id)));
+        return list;
     }
 
     /// <summary>All plugin windows created this session, as (id, title, visible)

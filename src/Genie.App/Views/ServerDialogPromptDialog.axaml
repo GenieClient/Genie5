@@ -1,0 +1,42 @@
+<!-- First-seen prompt for a server-driven dialog (#156 Phase 1). DR has just
+     described a window Genie has never been told what to do with. The Genie 4
+     plugin simply created one and let you opt out afterwards; asking once, up
+     front, is the improvement. Non-blocking by contract: the caller queues
+     these one at a time and the dialog's state keeps buffering meanwhile. -->
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Genie.App.Views.ServerDialogPromptDialog"
+        Title="New Server Window"
+        SizeToContent="WidthAndHeight"
+        MinWidth="440"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+  <StackPanel Margin="16" Spacing="10">
+
+    <TextBlock x:Name="HeadingText"
+               FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"/>
+
+    <TextBlock TextWrapping="Wrap" Opacity="0.85"
+               Text="DragonRealms wants to show a window Genie hasn't seen before. Where should it go? You can change this later in Configuration."/>
+
+    <Border BorderThickness="1" BorderBrush="{DynamicResource Theme.Border}"
+            Padding="8" CornerRadius="3">
+      <StackPanel Spacing="2">
+        <TextBlock x:Name="DetailText" FontSize="11" Opacity="0.8" TextWrapping="Wrap"/>
+        <TextBlock x:Name="ContentsText" FontSize="11" Opacity="0.8" TextWrapping="Wrap"/>
+      </StackPanel>
+    </Border>
+
+    <CheckBox x:Name="AutoOpenCheck" IsChecked="True"
+              Content="Open it automatically when DragonRealms sends it"/>
+
+    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+      <Button Content="Its own window" Click="OnNewWindow" IsDefault="True"/>
+      <Button Content="Where DR suggests" Click="OnWhereDrProposes"/>
+      <Button Content="Never show it" Click="OnIgnore"/>
+      <Button x:Name="LaterButton" Content="Ask me later" Click="OnAskLater"/>
+    </StackPanel>
+
+  </StackPanel>
+</Window>

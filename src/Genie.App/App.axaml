@@ -1742,6 +1742,13 @@
     <!-- IPluginHost.SetWindow("My Panel", text) and the dock factory spins up -->
     <!-- a PluginWindowTool bound here. Monospaced for column-aligned plugin   -->
     <!-- output (inventory trees, tables).                                      -->
+    <!-- Server-driven dialog window (#156): DR describes the controls over    -->
+    <!-- <dialogData>, the grid is inferred from its pixel coordinates, and     -->
+    <!-- the panel renders real controls rather than lines of text.            -->
+    <DataTemplate DataType="docking:ServerDialogTool">
+      <views:ServerDialogPanel DataContext="{Binding ViewModel}"/>
+    </DataTemplate>
+
     <DataTemplate DataType="docking:PluginWindowTool">
       <!-- Horizontal scrolling must stay DISABLED: an Auto h-scrollbar hands
            the lines unbounded width, so their TextWrapping="Wrap" never kicks
