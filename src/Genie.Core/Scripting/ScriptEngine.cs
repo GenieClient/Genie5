@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Genie.Core.Config;
@@ -1610,12 +1610,23 @@ public sealed class ScriptEngine
                         t.StartsWith("__jsinclude ", StringComparison.OrdinalIgnoreCase) ||
                         t.StartsWith("__jsblock ",   StringComparison.OrdinalIgnoreCase);
 
+        // `waiteval <expr>` is stored RAW and re-substituted on every tick, so
+        // the expression must reach Dispatch with its $/% references intact.
+        // Genie 4 makes exactly this distinction: `waitfor` dispatches the
+        // already-substituted `ParsedLine`, while `waiteval` alone dispatches
+        // `oLine.sRowContent` — the raw row — and re-runs ParseVariables at
+        // each re-evaluation (Script.cs:2702-2708 and :1453). Pre-substituting
+        // here froze the arming-time values into the stored expression, so
+        // `waiteval $mana > 80` became the literal `50 > 80` and could never
+        // flip true — the script hung forever even after mana recovered.
+        bool isWaitEvalStmt = t.StartsWith("waiteval ", StringComparison.OrdinalIgnoreCase);
+
         // Undefined vars never abort a line: Genie 4 leaves them literal in
         // the substituted text and the dispatch/eval layers treat the remnant
         // as inert string data. (An earlier design reserved an AbortReason
         // flag here for undefined-$var aborts; it was never set and the
         // mechanism is gone — G4 has no such stop.)
-        var substituted = (isActionStmt || isJsStmt) ? t : SubstituteVars(t, inst);
+        var substituted = (isActionStmt || isJsStmt || isWaitEvalStmt) ? t : SubstituteVars(t, inst);
 
         // Level 10: trace every executed line. Suppress repeats when a
         // statement backed off and re-attempted (the put-throttle, RT gate,
