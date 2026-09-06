@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Genie.Core.Config;
 using Genie.Core.Extensions;
+using Genie.Core.Runtime;
 using Genie.Core.Scripting;
 using Xunit;
 
@@ -47,24 +49,39 @@ public class ScriptPluginCommandTests
         }
     }
 
-    private sealed record Run(List<string> Seen, List<string> Sent, ProbeExtension Probe);
+    private sealed record Run(List<string> Seen, List<string> Sent, List<string> Echoed,
+                              ProbeExtension Probe);
 
     /// <summary>Run a .cmd body against a fresh engine whose PluginInput records
     /// every offer and applies <paramref name="transform"/> (default: pass through
-    /// unchanged — the "no plugin claims it" case). Returns what the plugin saw
-    /// and what actually reached the send delegate.</summary>
+    /// unchanged — the "no plugin claims it" case). Returns what the plugin saw,
+    /// what actually reached the send delegate, and what was echoed.
+    /// <paramref name="configure"/> mutates the engine's live
+    /// <see cref="GenieConfig"/> before the script runs (used for
+    /// <c>mycommandchar</c>); leave it null to exercise the default <c>'/'</c>.
+    /// </summary>
     private static Run RunFixture(string body, Func<string, string?>? transform = null,
-                                  int ticks = 400, bool registerProbe = false)
+                                  int ticks = 400, bool registerProbe = false,
+                                  Action<GenieConfig>? configure = null)
     {
-        var seen = new List<string>();
-        var sent = new List<string>();
-        var dir  = Path.Combine(Path.GetTempPath(), "gc_plugincmd_" + Guid.NewGuid().ToString("N"));
+        var seen   = new List<string>();
+        var sent   = new List<string>();
+        var echoed = new List<string>();
+        var dir    = Path.Combine(Path.GetTempPath(), "gc_plugincmd_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             File.WriteAllText(Path.Combine(dir, "t.cmd"), body);
             var engine = new ScriptEngine(dir, new TypeAheadSession(),
-                                          sendCommand: c => sent.Add(c), echo: _ => { });
+                                          sendCommand: c => sent.Add(c), echo: e => echoed.Add(e));
+            if (configure is not null)
+            {
+                var lds = new LocalDirectoryService("GenieScriptPluginCmdTest", dir);
+                lds.UseExplicitRoot(dir);
+                var cfg = new GenieConfig(lds);
+                configure(cfg);
+                engine.Config = cfg;
+            }
             var probe = new ProbeExtension();
             if (registerProbe) engine.Extensions.Register(probe);
             engine.PluginInput = cmd =>
@@ -74,7 +91,7 @@ public class ScriptPluginCommandTests
             };
             engine.TryStart("t", new List<string>());
             for (int i = 0; i < ticks; i++) engine.Tick();
-            return new Run(seen, sent, probe);
+            return new Run(seen, sent, echoed, probe);
         }
         finally { try { Directory.Delete(dir, true); } catch { /* best effort */ } }
     }
@@ -124,20 +141,93 @@ public class ScriptPluginCommandTests
     [Fact]
     public void Plugin_can_rewrite_a_script_slash_command()
     {
+        // The rewrite lands, and the gate then runs on the REWRITTEN line: '/new'
+        // is still a mycommandchar line, so it stays client-side. A plugin that
+        // wants its command to reach DragonRealms rewrites it to a game verb —
+        // see A_plugin_rewrite_to_a_game_verb_still_reaches_the_game. The rewrite
+        // is not re-offered to the plugins (Genie 4 did not re-enter ParseInput).
         var r = RunFixture("put /old\n", cmd => cmd == "/old" ? "/new" : cmd);
 
-        Assert.Contains("/new", r.Sent);
-        Assert.DoesNotContain("/old", r.Sent);
+        Assert.Contains("/old", r.Seen);
+        Assert.Contains("/new", r.Echoed);
+        Assert.Empty(r.Sent);
     }
 
     [Fact]
-    public void Unhandled_slash_command_keeps_the_existing_game_fallback()
+    public void Unhandled_slash_command_is_kept_local_and_never_reaches_the_game()
     {
-        // Typed-input parity: a '/…' nothing owns is ordinary game text.
+        // Typed-input parity, correctly stated this time. The superseded version
+        // of this test asserted the opposite and justified it as "typed-input
+        // parity: a '/…' nothing owns is ordinary game text" — but typed input
+        // has never behaved that way: GenieCore.SendToGame gates the socket write
+        // on Config.MyCommandChar, so a typed '/unknown thing' is echoed and
+        // dropped. Scripts bypass that sink, so they alone leaked the line to
+        // DragonRealms, which answered "Please rephrase that command."
         var r = RunFixture("put /unknown thing\n");
 
-        Assert.Contains("/unknown thing", r.Seen);
+        Assert.Contains("/unknown thing", r.Seen);   // plugins still get their offer
+        Assert.Empty(r.Sent);                        // …but nothing reaches the game
+    }
+
+    [Fact]
+    public void Unclaimed_slash_command_explains_itself_once()
+    {
+        // Silence was the field failure: a restart routine's `/restart …` looked
+        // like it ran, and the `quit` on the next line logged the character out.
+        var r = RunFixture("put /restart CharProfile .uber\nput /restart CharProfile .uber\n");
+
+        var warnings = r.Echoed.FindAll(e => e.StartsWith("[genie] script sent"));
+        Assert.Single(warnings);                                     // once per distinct command
+        Assert.Contains("/restart CharProfile .uber", warnings[0]);
+        Assert.Contains("did NOT reach the game",     warnings[0]);
+        Assert.Empty(r.Sent);
+    }
+
+    [Fact]
+    public void A_custom_mycommandchar_is_held_back_without_the_plugin_warning()
+    {
+        // `#config mycommandchar ~` is the deliberate trigger-feed idiom, not a
+        // missing plugin — hold the line back, but stay quiet about it. It never
+        // enters the '/' offer path, so the plugins are not consulted either.
+        var r = RunFixture("put ~500\n", configure: c => c.MyCommandChar = '~');
+
+        Assert.Empty(r.Seen);
+        Assert.Empty(r.Sent);
+        Assert.DoesNotContain(r.Echoed, e => e.StartsWith("[genie] script sent"));
+        Assert.Contains("~500", r.Echoed);           // still echoed, Genie 4 parity
+    }
+
+    [Fact]
+    public void A_slash_line_stays_game_bound_when_mycommandchar_is_not_slash()
+    {
+        // Mirror of SendToGame: the gate keys on MyCommandChar, so with '~'
+        // configured an unclaimed '/…' is ordinary game text again.
+        var r = RunFixture("put /unknown thing\n", configure: c => c.MyCommandChar = '~');
+
+        Assert.Contains("/unknown thing", r.Seen);   // '/' still drives the plugin offer
         Assert.Contains("/unknown thing", r.Sent);
+    }
+
+    [Fact]
+    public void A_plugin_rewrite_to_a_game_verb_still_reaches_the_game()
+    {
+        // The gate runs on the REWRITTEN line, so a plugin that turns its own
+        // command into a real verb is unaffected by the hold-back.
+        var r = RunFixture("put /bless\n", cmd => cmd == "/bless" ? "prep bless" : cmd);
+
+        Assert.Contains("prep bless", r.Sent);
+    }
+
+    [Fact]
+    public void A_held_back_slash_does_not_consume_the_typeahead_budget()
+    {
+        // Same load-bearing constraint as a swallowed command: _inFlight is
+        // released only by a game prompt, so holding the line back must not bump
+        // it or the following send waits forever.
+        var r = RunFixture("put /unknown thing\nput look\n");
+
+        Assert.Contains("look", r.Sent);
+        Assert.DoesNotContain("/unknown thing", r.Sent);
     }
 
     // The narrow-scope guarantee: the bare-verb corpus is untouched, so the
@@ -281,13 +371,50 @@ public class ScriptPluginCommandTests
         Assert.Contains("look", r.Sent);
     }
 
+    [Fact]
+    public void Standalone_js_array_script_gets_the_same_offer_and_hold_back()
+    {
+        // The inline `<% … %>` bridge above runs through JsLibraryContext, which
+        // already routed to ResolveOutboundCommand. A standalone .js array script
+        // runs on JsScriptRuntime, whose send delegate was wired straight to the
+        // raw sink — the last sink still bypassing both the client-side offer and
+        // the mycommandchar gate.
+        var seen = new List<string>();
+        var sent = new List<string>();
+        var dir  = Path.Combine(Path.GetTempPath(), "gc_plugincmd_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "t.js"),
+                              "genie.put('/owned');\ngenie.put('look');\n");
+            var engine = new ScriptEngine(dir, new TypeAheadSession(),
+                                          sendCommand: c => sent.Add(c), echo: _ => { });
+            engine.PluginInput = cmd => { seen.Add(cmd); return cmd; };
+            Assert.True(engine.TryStart("t", new List<string>()));
+
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (DateTime.UtcNow < deadline && !sent.Contains("look"))
+            {
+                engine.Tick();
+                System.Threading.Thread.Sleep(10);
+            }
+
+            Assert.Contains("/owned", seen);        // plugins got their offer
+            Assert.DoesNotContain("/owned", sent);  // …and the line stayed local
+            Assert.Contains("look", sent);          // ordinary verbs unaffected
+        }
+        finally { try { Directory.Delete(dir, true); } catch { /* best effort */ } }
+    }
+
     // ── host-not-wired safety ────────────────────────────────────────────────
 
     [Fact]
-    public void Engine_without_a_plugin_host_sends_slashes_verbatim()
+    public void Engine_without_a_plugin_host_still_holds_slashes_back()
     {
-        // PluginInput is null in the TestHarness and headless tests; the
-        // pre-#325 fall-through must survive.
+        // PluginInput is null in the TestHarness and headless tests. Nothing can
+        // claim the line there, which makes it MORE certain to be local-only, not
+        // less — the mycommandchar gate does not depend on a plugin host being
+        // wired, exactly as GenieCore.SendToGame's does not for typed input.
         var sent = new List<string>();
         var dir  = Path.Combine(Path.GetTempPath(), "gc_plugincmd_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -299,7 +426,7 @@ public class ScriptPluginCommandTests
             engine.TryStart("t", new List<string>());
             for (int i = 0; i < 200; i++) engine.Tick();
 
-            Assert.Contains("/owned", sent);
+            Assert.Empty(sent);
         }
         finally { try { Directory.Delete(dir, true); } catch { /* best effort */ } }
     }

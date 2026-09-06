@@ -213,8 +213,10 @@ public sealed class CommandEngine
                     // ClassCommand_SendText:4122), so a queued `#send /track
                     // clear`, an alias expansion, or a trigger action gets the
                     // same client-side chance here as typed input and script
-                    // puts do at their own boundaries (public #326). Unclaimed
-                    // slashes still fall through and go to the game verbatim.
+                    // puts do at their own boundaries (public #326). An unclaimed
+                    // slash still falls through to SendToGame, where the Genie 4
+                    // mycommandchar gate keeps it off the wire — it is echoed and
+                    // fed to triggers but never reaches the game.
                     if (ResolveOutboundCommand(command) is { } outbound)
                         _host.SendToGame(outbound, true,
                             echoOverride: applyOverride ? echoOverride : null);

@@ -76,10 +76,17 @@ public class TrackSlashCommandTests
     [Fact]
     public void Similar_but_different_command_is_not_claimed()
     {
-        // "/tracker" must not be swallowed by the /track prefix check — it's
-        // not ours, so it follows the normal unclaimed-slash fall-through.
-        var (sent, _) = RunScript("put /tracker on\necho done\n");
-        Assert.Contains(sent, c => c.Contains("/tracker on"));
+        // "/tracker" must not be swallowed by the /track prefix check — it's not
+        // ours. "Did it reach the game?" used to be the proxy for that, but an
+        // unclaimed slash is now held back by the mycommandchar gate, so the
+        // discriminator is the unclaimed-slash diagnostic: it only fires once
+        // every extension AND plugin has refused the line.
+        var (sent, echoed) = RunScript("put /tracker on\necho done\n");
+
+        Assert.DoesNotContain(echoed, l => l.Contains("gain tracking reset"));
+        Assert.Contains(echoed, l => l.StartsWith("[genie] script sent")
+                                  && l.Contains("/tracker on"));
+        Assert.DoesNotContain(sent, c => c.Contains("/tracker on"));
     }
 
     [Fact]

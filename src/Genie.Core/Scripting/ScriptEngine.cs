@@ -175,6 +175,11 @@ public sealed class ScriptEngine
 
     private int _inFlight;
 
+    /// <summary>Distinct unclaimed <c>/…</c> commands already reported by
+    /// <see cref="ResolveOutboundCommand"/>, so a script looping over one keeps
+    /// the diagnostic to a single line per session.</summary>
+    private readonly HashSet<string> _warnedUnclaimedSlash = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Session-wide global variables, accessible from scripts as <c>$Name</c>.
     /// Populated by <c>#tvar</c>, the EXP tracker, and host code (mapper, profile,
@@ -267,7 +272,19 @@ public sealed class ScriptEngine
 
         _js = new JsScriptRuntime(
             scriptsDir:         _scriptsDir,
-            send:               _sendCommand,
+            // `genie.put()` from a standalone .js array script gets the same
+            // extension-then-plugin offer and mycommandchar hold-back as a .cmd
+            // `put` and as the per-script JS library (EnsureJsLib). This sink was
+            // the last one still wired straight to the raw send delegate, so a
+            // .js `genie.put("/restart …")` leaked to the game while the same
+            // line from a .cmd script did not. The JS bridge has never
+            // participated in the type-ahead budget, so there is no _inFlight
+            // bookkeeping to skip when the line is claimed or held.
+            send:               c =>
+                                {
+                                    if (ResolveOutboundCommand(c) is { } outbound)
+                                        _sendCommand(outbound);
+                                },
             echo:               _echo,
             globals:            Globals,
             roundtimeRemaining: () => RoundTimeRemainingSeconds?.Invoke() ?? 0,
@@ -2545,12 +2562,57 @@ public sealed class ScriptEngine
     /// <para>Only <c>/…</c> lines enter this path: an ordinary game verb
     /// (<c>bob</c>, <c>prep mb</c>) is returned unchanged and never reaches plugin
     /// input dispatch, so the bare-verb corpus is untouched (public #325).</para>
+    ///
+    /// <para>A <c>/…</c> line nobody claims is then held back by the Genie 4
+    /// <c>mycommandchar</c> rule rather than falling through to the game — the
+    /// half of #325 that was missed. Typed input already behaved this way
+    /// (<c>GenieCore.SendToGame</c>), but scripts bypass that sink, so
+    /// <c>put /restart …</c> went to DragonRealms as a literal command and came
+    /// back "Please rephrase that command."</para>
     /// </summary>
     private string? ResolveOutboundCommand(string cmd)
     {
-        if (cmd.Length == 0 || cmd[0] != '/') return cmd;
-        if (Extensions.DispatchSlashCommand(cmd)) return null;   // built-in claimed it
-        return PluginInput is null ? cmd : PluginInput(cmd);     // transform, or null = swallowed
+        if (cmd.Length == 0) return cmd;
+
+        if (cmd[0] == '/')
+        {
+            if (Extensions.DispatchSlashCommand(cmd)) return null;   // built-in claimed it
+            if (PluginInput is not null)
+            {
+                if (PluginInput(cmd) is not { } rewritten) return null;   // swallowed
+                cmd = rewritten;
+                if (cmd.Length == 0) return cmd;
+            }
+        }
+
+        // Genie 4 mycommandchar (Game.cs SendText gates the socket write for EVERY
+        // send, scripted included — Genie 5 applies it to typed input at
+        // GenieCore.SendToGame but scripts bypass that sink entirely). Nothing
+        // claimed the line, so it stays client-side: echo it where a sent command
+        // would appear and drop it. Returning null is what keeps the caller from
+        // bumping _inFlight — a local-only line draws no prompt, so a bump here
+        // would strand the type-ahead budget (same contract as a claimed command).
+        if (cmd[0] == (Config?.MyCommandChar ?? '/'))
+        {
+            _echo(cmd);
+
+            // A '/…' line reaching here was offered to the extensions and the
+            // plugins and refused by both, which almost always means the Genie 4
+            // plugin that used to own the command simply isn't loaded. Silence
+            // was the actual field failure (a script's `/restart …` looked like
+            // it ran while the routine's next line logged the character out), so
+            // say so — once per distinct command, matching the warnrawvars
+            // diagnostic. A custom mycommandchar never enters the offer path
+            // above, so the deliberate `#config mycommandchar ~` trigger-feed
+            // idiom stays silent.
+            if (cmd[0] == '/' && _warnedUnclaimedSlash.Add(cmd.Trim()))
+                _echo($"[genie] script sent '{cmd.Trim()}' — no extension or plugin claimed it, " +
+                      $"so it stayed local (mycommandchar '{Config?.MyCommandChar ?? '/'}') and did " +
+                      $"NOT reach the game. If a Genie 4 plugin handled this command, it isn't loaded.");
+            return null;
+        }
+
+        return cmd;
     }
 
     /// <summary>

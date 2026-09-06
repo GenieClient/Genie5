@@ -129,13 +129,17 @@ public class ScriptSlashCommandTests
     }
 
     [Fact]
-    public void Unclaimed_slash_command_falls_through_to_game()
+    public void Unclaimed_slash_command_is_held_back_from_the_game()
     {
-        // Typed-input parity: a '/…' no extension owns is ordinary game text.
+        // Typed-input parity — and the earlier version of this test had that
+        // parity backwards. GenieCore.SendToGame gates the socket write on
+        // Config.MyCommandChar, so a typed '/unknown thing' is echoed and
+        // dropped; only the script path bypassed that sink and leaked the line
+        // to DragonRealms ("Please rephrase that command.").
         var (probe, sent) = RunFixture("put /unknown thing\n");
 
         Assert.Empty(probe.Claimed);
-        Assert.Contains("/unknown thing", sent);
+        Assert.Empty(sent);
     }
 
     [Fact]
