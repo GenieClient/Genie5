@@ -2,6 +2,7 @@ using System;
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using Dock.Avalonia.Themes.Fluent;
 using Genie.App.HeadlessTests;
@@ -48,6 +49,22 @@ public class HeadlessApp : Application
         Styles.Add(new StyleInclude(new Uri("avares://Genie.App"))
         {
             Source = new Uri("avares://Genie5/Themes/BannerChromeStyles.axaml")
+        });
+
+        // The two control-theme overrides App.axaml merges into
+        // Application.Resources. Without them the headless tree renders Dock's
+        // STOCK ToolControl and ProportionalDockControl, so anything that turns
+        // on the app's own skins is invisible to these tests — which is exactly
+        // how #331 (a panel re-opened into a dock emptied by a float never
+        // re-expands) could ship: the collapse behaviour it hinges on lives in
+        // ProportionalDockCollapseSkin, which the harness never loaded.
+        Resources.MergedDictionaries.Add(new ResourceInclude(new Uri("avares://Genie.App"))
+        {
+            Source = new Uri("avares://Genie5/Themes/ToolControlCachedSkin.axaml")
+        });
+        Resources.MergedDictionaries.Add(new ResourceInclude(new Uri("avares://Genie.App"))
+        {
+            Source = new Uri("avares://Genie5/Themes/ProportionalDockCollapseSkin.axaml")
         });
     }
 }

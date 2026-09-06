@@ -1256,7 +1256,7 @@ public class GenieDockFactory : Factory
                         InsertDockable(lastParent, dockable, lastPos.Index);
                     else
                         AddDockable(lastParent, dockable);
-                    SetActiveDockable(dockable);
+                    Reveal(dockable);
                     return;
                 }
 
@@ -1289,7 +1289,7 @@ public class GenieDockFactory : Factory
 
                     InitDockable(dockable, rebuiltParent);
                     AddDockable(rebuiltParent, dockable);
-                    SetActiveDockable(dockable);
+                    Reveal(dockable);
                     return;
                 }
 
@@ -1386,7 +1386,7 @@ public class GenieDockFactory : Factory
                         // Add the tool itself to the new ToolDock.
                         InitDockable(dockable,      rebuiltParent);
                         AddDockable (rebuiltParent, dockable);
-                        SetActiveDockable(dockable);
+                        Reveal(dockable);
 
                         // Finally drop the wrapper back into the great-
                         // grandparent at the anchor's old slot.
@@ -1420,7 +1420,7 @@ public class GenieDockFactory : Factory
 
                     InitDockable(dockable, rebuiltParent);
                     AddDockable(rebuiltParent, dockable);
-                    SetActiveDockable(dockable);
+                    Reveal(dockable);
                     return;
                 }
             }
@@ -1438,7 +1438,7 @@ public class GenieDockFactory : Factory
                 // "user actually sees their panel back."
                 InitDockable(dockable, parent);
                 AddDockable(parent, dockable);
-                SetActiveDockable(dockable);
+                Reveal(dockable);
             }
             // The parent ToolDock was pruned when its last child was closed
             // (the tab-X bug). Rebuild it in its home position so the tool
@@ -1463,7 +1463,7 @@ public class GenieDockFactory : Factory
             {
                 InitDockable(dockable, fallbackParent);
                 AddDockable(fallbackParent, dockable);
-                SetActiveDockable(dockable);
+                Reveal(dockable);
             }
             else
             {
@@ -1484,6 +1484,73 @@ public class GenieDockFactory : Factory
             // (which Dock.Avalonia may have replaced during init).
             CloseDockable(current!);
         }
+    }
+
+    /// <summary>Share handed back to an ancestor found squeezed to nothing.
+    /// Matches the default layout's left column (0.22), rounded.</summary>
+    private const double RestoredProportion = 0.20;
+
+    /// <summary>Below this an ancestor is treated as squeezed out rather than
+    /// merely narrow.</summary>
+    private const double MinUsableProportion = 0.02;
+
+    /// <summary>
+    /// Activate a just-shown dockable and make sure it can actually be seen
+    /// (#331).
+    ///
+    /// <para>Adding a tool back to its home is not enough when the home's
+    /// COLUMN has been squeezed to nothing. Drag every panel out of a column
+    /// over a few sessions and Dock renormalizes it to <c>Proportion 0</c>; a
+    /// saved layout persists that zero, and the column comes back as a live,
+    /// empty, zero-width node. <see cref="TryRestoreHomeDock"/> then happily
+    /// rebuilds the pruned ToolDock inside it — the model ends up perfect and
+    /// the user sees a one-pixel sliver. That was the whole of #331, and it hit
+    /// every panel homed there (Mobs, Players, Objects) at once.</para>
+    ///
+    /// <para>So after activating, walk the ancestor chain and give a usable
+    /// share back to anything measuring at zero. NaN proportions are left
+    /// alone: NaN means "auto", which the panel already sizes sensibly.</para>
+    /// </summary>
+    private void Reveal(IDockable dockable)
+    {
+        SetActiveDockable(dockable);
+        if (_root is null) return;
+
+        var node = (IDockable)dockable;
+        while (FindParentInTree(_root, node) is { } parent)
+        {
+            RestoreSqueezedShare(parent, node);
+            if (ReferenceEquals(parent, _root)) break;
+            node = parent;
+        }
+    }
+
+    /// <summary>Give <paramref name="child"/> a usable proportion back if it has
+    /// been squeezed to zero, scaling its explicit siblings down to make room.
+    /// No-op for auto (NaN) or already-visible proportions.</summary>
+    private static void RestoreSqueezedShare(IDock parent, IDockable child)
+    {
+        if (child is not IDock dock) return;
+        if (double.IsNaN(dock.Proportion) || dock.Proportion >= MinUsableProportion) return;
+
+        dock.Proportion = RestoredProportion;
+
+        // Siblings with an explicit share have to give the space up, or the
+        // column's own container stays over-subscribed and nothing moves.
+        // Splitters aren't IDock, so they're skipped for free.
+        var siblings = parent.VisibleDockables?
+            .OfType<IDock>()
+            .Where(s => !ReferenceEquals(s, dock)
+                     && !double.IsNaN(s.Proportion)
+                     && s.Proportion > 0)
+            .ToList();
+        if (siblings is not { Count: > 0 }) return;
+
+        var total = siblings.Sum(s => s.Proportion);
+        if (total <= 0) return;
+
+        var scale = (1.0 - RestoredProportion) / total;
+        foreach (var sibling in siblings) sibling.Proportion *= scale;
     }
 
     /// <summary>
@@ -1531,7 +1598,7 @@ public class GenieDockFactory : Factory
         // visual isn't bound to its content.
         InitDockable(dockable, dock);
         AddDockable(dock, dockable);
-        SetActiveDockable(dockable);
+        Reveal(dockable);
         return true;
     }
 
