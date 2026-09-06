@@ -315,20 +315,33 @@ Send specific lines to a chosen dockable panel instead of the main game window
 — a natural fit for the Dock layout. Genie 4
 [#81](https://github.com/GenieClient/Genie4/issues/81).
 
-### Compatibility regression tests 🔨 *guards written, unreleased*
+### Compatibility regression tests 🔨 *both cases closed, unreleased*
 
 Port-fidelity guards, not features — an assert-based suite around the documented
-parser / script-engine edge cases. Both listed cases now have one:
+parser / script-engine edge cases. Both listed cases are now closed, but they
+closed in opposite ways, which is worth recording:
 
-- `contains()` inside multi-variant evaluation — Genie 4
-  [#145](https://github.com/GenieClient/Genie4/issues/145). Guarded.
 - `unixtime` with `waiteval` — Genie 4
-  [#179](https://github.com/GenieClient/Genie4/issues/179). Guarded.
+  [#179](https://github.com/GenieClient/Genie4/issues/179). **Reproduced.** It
+  was a real defect in Genie 5, and `$unixtime` turned out to be only the
+  visible edge of it: `waiteval` stored its expression already
+  variable-substituted, so *any* variable was frozen at the moment the wait
+  armed. Fixed and tracked as
+  [#332](https://github.com/GenieClient/Genie5/issues/332); the guard now stops
+  it regressing.
+- `contains()` inside multi-variant evaluation — Genie 4
+  [#145](https://github.com/GenieClient/Genie4/issues/145). **Does not
+  reproduce**, and structurally cannot. Genie 5's evaluator is recursive
+  descent: `ParseIdentOrCall` consumes a call's argument list through a nested
+  `ParseOr` and then requires its own `)`, so a call's closing parenthesis can
+  never close the group around it. Genie 4 hit this because its flat-queue
+  evaluator returned on `SectionEndType`. Covered by a guard so a future rewrite
+  that abandons recursive descent doesn't quietly reintroduce it.
 
-Both landed alongside the `waiteval` fix (#332) and ship in beta.9. The pattern is
-worth repeating: each guard pins a behaviour Genie 4 documented, so a future
-refactor that quietly diverges fails a test instead of surfacing as a field
-report. New port-fidelity cases belong here as they turn up.
+Both guards ship in beta.9. The pattern is worth repeating: each one pins a
+behaviour Genie 4 documented, so a future refactor that diverges fails a test
+instead of arriving as a field report — and a case that *can't* happen is worth
+pinning for the same reason. New port-fidelity cases belong here as they turn up.
 
 ### Map format decision
 
