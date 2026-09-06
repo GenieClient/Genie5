@@ -124,4 +124,33 @@ public class ScriptExpressionTests
     [InlineData("count(\"abc\",\"\")",       "0")]   // G4 hangs here; we return 0
     public void Eval_count_counts_occurrences(string expr, string expected)
         => Assert.Equal(expected, ScriptExpression.Eval(expr, NewInst())?.ToString());
+
+    [Theory]
+    // #323: element() clamps like Genie 4 (Eval.cs:1204) instead of returning ""
+    // out of range. Order matters — clamp high, then wrap a negative from the
+    // end, then floor at the first element.
+    [InlineData("element(\"a|b|c\",0)",  "a")]    // in range, unchanged
+    [InlineData("element(\"a|b|c\",2)",  "c")]
+    [InlineData("element(\"a|b|c\",3)",  "c")]    // one past the end — mm_train's shape
+    [InlineData("element(\"a|b|c\",5)",  "c")]    // far past the end
+    [InlineData("element(\"a|b|c\",-1)", "c")]    // negative counts from the end
+    [InlineData("element(\"a|b|c\",-3)", "a")]
+    [InlineData("element(\"a|b|c\",-9)", "a")]    // past the start floors at the first
+    // parentheses are stripped from a pipe list before splitting, G4-style
+    [InlineData("element(\"(a|b|c)\",0)", "a")]
+    [InlineData("element(\"(a|b|c)\",2)", "c")]
+    [InlineData("element(\"a|(b)|c\",1)", "b")]   // stripped anywhere, not just the ends
+    // degenerate lists still land on a real element rather than throwing
+    [InlineData("element(\"\",0)",       "")]
+    [InlineData("element(\"\",4)",       "")]
+    [InlineData("element(\"solo\",7)",   "solo")]
+    // the third separator argument is our extension: it clamps the same way, but
+    // keeps parentheses, because that list is the caller's format and not a G4
+    // pipe list.
+    [InlineData("element(\"a,b,c\",9,\",\")",     "c")]
+    [InlineData("element(\"a,b,c\",-1,\",\")",    "c")]
+    [InlineData("element(\"(a),(b)\",0,\",\")",   "(a)")]
+    [InlineData("element(\"(a|b)\",0,\"|\")",     "a")]   // explicit '|' still strips
+    public void Eval_element_clamps_like_Genie4(string expr, string expected)
+        => Assert.Equal(expected, ScriptExpression.Eval(expr, NewInst())?.ToString());
 }

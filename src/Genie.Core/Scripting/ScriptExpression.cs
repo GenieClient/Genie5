@@ -592,12 +592,33 @@ internal sealed class ScriptExpression
                 return (double)(A(0).LastIndexOf(A(1), StringComparison.Ordinal) + 1);
             case "element":
             {
-                // element(list, index [, sep])  — default separator is '|'
+                // element(list, index [, sep]) — default separator is '|'.
+                // Genie 4 (Eval.cs:1204) never reports out of range; it clamps,
+                // in this order: high to the last element, then a negative index
+                // counts back from the end, then anything still negative floors
+                // at the first. Scripts lean on that (#323) — mm_train's Pred.Day
+                // bounds its counter against one list and indexes another, so the
+                // index runs one past the end and G4 hands back the last circle
+                // requirement. Returning "" there fed `%circle < ""` into the
+                // next line.
+                var sep  = args.Count >= 3 ? A(2) : "|";
                 var list = A(0);
-                int ix = (int)N(1);
-                var sep = args.Count >= 3 ? A(2) : "|";
+
+                // G4 strips every parenthesis from the list before splitting.
+                // That belongs to its pipe-delimited list format, so it applies
+                // to '|' lists only: with a custom separator — our extension,
+                // which G4 has no form of — the list is the caller's own format
+                // and is left intact rather than silently losing characters.
+                if (sep == "|") list = list.Replace("(", "").Replace(")", "");
+
+                // Split never yields an empty array, so the clamps below always
+                // land on a real index.
                 var parts = list.Split(new[] { sep }, StringSplitOptions.None);
-                return ix >= 0 && ix < parts.Length ? parts[ix] : "";
+                int ix = (int)N(1);
+                if (ix >= parts.Length) ix = parts.Length - 1;
+                if (ix < 0)             ix = parts.Length + ix;
+                if (ix < 0)             ix = 0;
+                return parts[ix];
             }
             case "floor":   return Math.Floor(N(0));
             case "ceiling":
