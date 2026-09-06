@@ -54,6 +54,14 @@ longer lock you out.
   their own Hide Title Bar (#320).
 
 ## 🐛 Fixes
+- **`waiteval` follows a variable that changes while it waits** — a condition
+  on a value that moved after the wait armed never unblocked, and the script
+  parked on that line for good. The classic shape is a recovery block:
+  `waiteval ($mana > 80)` armed while mana was 50 got frozen as the literal
+  `50 > 80`, so mana could climb well past 80 and nothing would notice. The
+  expression is now kept as written and re-read on each check, the way Genie 4
+  does it — `waitfor` still matches on the substituted line, `waiteval` alone
+  keeps its variables live (#332).
 - **A single bad line can no longer stop your game text** — everything that
   consumes the game stream ran chained together, so the first consumer to hit
   an error abandoned the rest of the chain for that line. The part that puts

@@ -52,7 +52,9 @@ hide their banner (#320); and a batch of durability fixes — one bad line of
 game text can no longer stop your output, an interrupted `profiles.json`
 write can no longer lock you out, panels re-opened into a squeezed-out column
 appear again (#331), long-running `.js` scripts stop hitting a phantom memory
-cap (#330), and update feeds can only write inside their own folder.
+cap (#330), `waiteval` follows a variable that changes while it waits instead of
+freezing the condition at arming time (#332), and update feeds can only write
+inside their own folder.
 
 Highlights of what works today:
 
@@ -313,15 +315,20 @@ Send specific lines to a chosen dockable panel instead of the main game window
 — a natural fit for the Dock layout. Genie 4
 [#81](https://github.com/GenieClient/Genie4/issues/81).
 
-### Compatibility regression tests
+### Compatibility regression tests 🔨 *guards written, unreleased*
 
-Port-fidelity guards, not features — stand up an assert-based test suite around
-the documented parser / script-engine edge cases:
+Port-fidelity guards, not features — an assert-based suite around the documented
+parser / script-engine edge cases. Both listed cases now have one:
 
-- `contains()` inside multi-variant evaluation. Genie 4
-  [#145](https://github.com/GenieClient/Genie4/issues/145).
-- `unixtime` with `waiteval`. Genie 4
-  [#179](https://github.com/GenieClient/Genie4/issues/179).
+- `contains()` inside multi-variant evaluation — Genie 4
+  [#145](https://github.com/GenieClient/Genie4/issues/145). Guarded.
+- `unixtime` with `waiteval` — Genie 4
+  [#179](https://github.com/GenieClient/Genie4/issues/179). Guarded.
+
+Both landed alongside the `waiteval` fix (#332) and ship in beta.9. The pattern is
+worth repeating: each guard pins a behaviour Genie 4 documented, so a future
+refactor that quietly diverges fails a test instead of surfacing as a field
+report. New port-fidelity cases belong here as they turn up.
 
 ### Map format decision
 
