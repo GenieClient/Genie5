@@ -197,6 +197,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// backs <c>#dialogs list</c> / <c>#dialogs report</c>.</summary>
     private readonly Dialogs.DialogSessionTracker _dialogTracker = new();
 
+    /// <summary>Live state of every server-driven dialog DR has described
+    /// (#156 Phase 1). Bespoke surfaces (injuries panel, vitals bar) are
+    /// excluded by the engine, so this holds only what a generic renderer
+    /// owns.</summary>
+    public Dialogs.ServerDialogEngine ServerDialogs { get; } = new();
+
     // ── Command pipeline ───────────────────────────────────────────────────────
     private readonly CommandQueue _commandQueue;
     private readonly EventQueue   _eventQueue;
@@ -1063,6 +1069,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                     // is logged so its geometry/title accompany the content
                     // block below.
                     _dialogTracker.Observe(od);
+                    ServerDialogs.Observe(od);
                     (_dialogJournal ??= new Dialogs.DialogJournal(Config.LogDir))
                         .ObserveOpen(od.Id, od.RawXml);
                     break;
@@ -1072,10 +1079,19 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                     // (the renderer fixtures for #156 accrue from normal play)
                     // and say so once.
                     _dialogTracker.Observe(dd);
+                    ServerDialogs.Observe(dd);
                     if ((_dialogJournal ??= new Dialogs.DialogJournal(Config.LogDir))
                         .Observe(dd.DialogId, dd.RawXml))
                         RaiseEchoLine(
                             $"[dialogs] new server dialog '{dd.DialogId}' captured → Logs/{Dialogs.DialogJournal.FileName}");
+                    break;
+
+                case CloseDialogEvent cd:
+                    ServerDialogs.Observe(cd);
+                    break;
+
+                case ExposeDialogEvent xd:
+                    ServerDialogs.Observe(xd);
                     break;
             }
         });
@@ -1145,6 +1161,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                 // Fresh session → clear any stale type-ahead count so the UI
                 // counter starts empty.
                 _typeAhead.ResetInFlight();
+
+                // The server re-describes its own dialogs every session, so
+                // last session's are stale the moment a new one starts (#156).
+                ServerDialogs.Reset();
             });
 
         // ── $connected ─────────────────────────────────────────────────────────
