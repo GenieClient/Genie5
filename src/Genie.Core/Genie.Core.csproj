@@ -37,7 +37,7 @@
     <PackageReference Include="Anthropic.SDK" Version="4.0.0" />
     <!-- Pure-C# JavaScript engine for .js array scripts (cross-platform, no
          native binaries — fits Genie 5's self-contained packaging). -->
-    <PackageReference Include="Jint" Version="4.3.0" />
+    <PackageReference Include="Jint" Version="4.16.1" />
     <!-- Structured logging -->
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
   </ItemGroup>
