@@ -102,13 +102,42 @@ public sealed record PresetSpan(int Start, int Length, string PresetId);
 
 /// <summary>
 /// &lt;progressBar id="health" value="87" text="87"/&gt;
-/// IDs seen in DR: health, mana, spirit, stamina, encumbrance, concentration
+/// IDs seen in DR: health, mana, spirit, stamina, encumbrance, concentration,
+/// plus <c>health2</c> — the same health figure, reported by the bar inside the
+/// <c>injuries</c> dialog rather than <c>minivitals</c>. The parser reports the
+/// server’s id verbatim (the dialog renderer needs it); consumers that map bars
+/// onto vitals go through <see cref="VitalBars.Normalize"/>.
 /// </summary>
 public sealed record ProgressBarEvent(
-    string BarId,    // "health" | "mana" | "spirit" | "stamina" | "encumbrance" | "concentration"
+    string BarId,    // "health" | "health2" | "mana" | "spirit" | "stamina" | "encumbrance" | "concentration"
     int    Value,    // 0–100 (percentage) for health/mana/spirit/stamina
     string Text      // display label (may be "87" or "87/100" etc.)
 ) : GameEvent;
+
+/// <summary>
+/// Bar-id aliasing for <see cref="ProgressBarEvent"/> consumers that map bars onto
+/// vitals (game state, script globals, the vitals panel).
+/// </summary>
+/// <remarks>
+/// DR reports health twice under different ids: <c>health</c> from
+/// <c>minivitals</c>, and <c>health2</c> from the bar inside the <c>injuries</c>
+/// dialog. They agree — across a 45-minute recorded session (2026-08-30) the two
+/// never disagreed once both were flowing — but <c>health2</c> starts arriving
+/// FIRST: 13 of its samples landed before the first <c>minivitals</c> health bar,
+/// so a consumer that ignores it shows its default value through session opening.
+/// The parser deliberately keeps the raw id (the injuries dialog renders that
+/// control), so the alias is applied here, once, on the way in.
+/// </remarks>
+public static class VitalBars
+{
+    /// <summary>Lower-case a raw <c>progressBar</c> id and fold known aliases onto
+    /// the canonical vitals id. Unknown ids pass through lower-cased.</summary>
+    public static string Normalize(string? barId)
+    {
+        var id = barId?.ToLowerInvariant() ?? "";
+        return id == "health2" ? "health" : id;
+    }
+}
 
 /// <summary>
 /// &lt;resource id="mana" value="412"/&gt; — absolute value bar (seen in some DR variants).

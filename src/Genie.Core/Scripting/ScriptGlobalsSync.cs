@@ -260,7 +260,12 @@ public sealed class ScriptGlobalsSync : IDisposable
         // BarId is one of "health" | "mana" | "spirit" | "stamina" |
         // "encumbrance" | "concentration" per the parser docs. Update both
         // the numeric value and the bar's display text.
-        var id = bar.BarId?.ToLowerInvariant() ?? "";
+        //
+        // Normalize first: DR also sends "health2" (the injuries-dialog bar).
+        // Genie 4 has no $health2, so folding it onto health both keeps the
+        // variable set at parity and lets $health seed from the injuries bar,
+        // which arrives before the first minivitals bar.
+        var id = VitalBars.Normalize(bar.BarId);
         if (id.Length == 0) return;
         Set(id, bar.Value.ToString(CultureInfo.InvariantCulture));
         Set($"{id}BarText", bar.Text ?? "");

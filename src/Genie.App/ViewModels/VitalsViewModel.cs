@@ -160,7 +160,9 @@ public class VitalsViewModel : ReactiveObject
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(e =>
             {
-                switch (e.BarId.ToLowerInvariant())
+                // Normalize folds the injuries dialog's "health2" bar onto
+                // health — same figure, and it arrives before minivitals does.
+                switch (VitalBars.Normalize(e.BarId))
                 {
                     case "health":        Health        = e.Value; break;
                     case "mana":          Mana          = e.Value; break;

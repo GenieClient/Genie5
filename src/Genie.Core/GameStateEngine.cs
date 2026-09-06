@@ -267,7 +267,9 @@ public sealed class GameStateEngine : IDisposable
 
     private void ApplyProgressBar(ProgressBarEvent pb)
     {
-        switch (pb.BarId.ToLowerInvariant())
+        // health2 (the injuries-dialog bar) folds onto health here — it is the
+        // same figure and it arrives BEFORE the first minivitals bar.
+        switch (VitalBars.Normalize(pb.BarId))
         {
             case "health":        _state.Vitals.Health         = pb.Value; break;
             case "mana":          _state.Vitals.Mana           = pb.Value; break;
