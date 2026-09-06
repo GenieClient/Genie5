@@ -192,10 +192,48 @@ public class JsEngineGuardTests
         Assert.Contains("allocated 128 MB", abort);
     }
 
+    /// <summary>One <c>jscall</c> that allocates past the cap in a SINGLE call must
+    /// still be stopped. Without this, the non-accumulation test below could pass
+    /// vacuously — a workload the limiter does not count would look exactly like a
+    /// budget that resets correctly.</summary>
+    [Fact]
+    public void JsCall_SingleOversizedAllocation_IsAborted()
+    {
+        var sink = new Sink();
+        var dir  = NewDir();
+        try
+        {
+            // ~2^30 chars if it ran to completion; the cap stops it long before.
+            File.WriteAllText(Path.Combine(dir, "t.cmd"),
+                "jscall n " + Doubling(30) + "\necho T:n=%n\n");
+            var engine = new ScriptEngine(dir, new TypeAheadSession(),
+                                          sendCommand: _ => { }, echo: sink.Add);
+            engine.TryStart("t", new List<string>());
+            for (int i = 0; i < 400; i++) engine.Tick();
+
+            Assert.Contains(sink.Snapshot(), l => l.Contains("aborted"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { /* best effort */ } }
+    }
+
     /// <summary>The synchronous js/jscall path was never affected by #330 and must
     /// stay that way: its engine re-baselines per call (Jint resets constraints at
     /// the top of every Evaluate), so repeated allocating calls do not accumulate.
-    /// 100 calls here allocate several times the 128 MB cap between them.</summary>
+    ///
+    /// <para>The work per call is deliberately string doubling rather than a filled
+    /// array. Both allocate; only the array runs 100,000 interpreted iterations to
+    /// do it. That cost is invisible on a dev box and not on a shared CI runner,
+    /// where a single call drifting past the 250 ms wall-clock budget aborts the
+    /// SCRIPT — so the final echo never runs and the test fails for a reason that
+    /// has nothing to do with allocation accumulating. Doubling gets the same
+    /// megabytes out of ~20 interpreted statements, which puts the per-call time
+    /// orders of magnitude under the budget instead of a small multiple of it.</para>
+    ///
+    /// <para>Sized from a measurement, not arithmetic: a single call aborts between
+    /// Doubling(24) and Doubling(25), which puts one call's cumulative allocation at
+    /// about 4 x 2^rounds bytes — so Doubling(20) is ~4 MB. 60 of them is ~240 MB
+    /// against a 128 MB cap, meaning a budget that failed to reset would trip around
+    /// call 32, well inside the run.</para></summary>
     [Fact]
     public void JsCall_AllocationDoesNotAccumulateAcrossCalls()
     {
@@ -204,9 +242,8 @@ public class JsEngineGuardTests
         try
         {
             var cmd = new StringBuilder();
-            for (int i = 0; i < 100; i++)
-                cmd.AppendLine("jscall n (function(){ var a = new Array(100000); " +
-                               "for (var j = 0; j < 100000; j++) a[j] = j; return a.length; })()");
+            for (int i = 0; i < 60; i++)
+                cmd.AppendLine("jscall n " + Doubling(20));
             cmd.AppendLine("echo T:n=%n");
 
             File.WriteAllText(Path.Combine(dir, "t.cmd"), cmd.ToString());
@@ -217,10 +254,18 @@ public class JsEngineGuardTests
 
             var lines = sink.Snapshot();
             // The last call has to return a real value, not "" from a failed one.
-            Assert.Contains(lines, l => l == "T:n=100000");
+            Assert.Contains(lines, l => l == "T:n=1048576");
             Assert.DoesNotContain(lines, l => l.Contains("memory limit"));
             Assert.DoesNotContain(lines, l => l.Contains("runaway"));
+            // If this ever fires, the runner is slow enough to need a rethink —
+            // say so plainly instead of surfacing as a missing echo.
+            Assert.DoesNotContain(lines, l => l.Contains("wall-clock budget"));
         }
         finally { try { Directory.Delete(dir, true); } catch { /* best effort */ } }
     }
+
+    /// <summary>A self-doubling string expression: high allocation, ~<paramref
+    /// name="rounds"/> interpreted statements. Returns the final length.</summary>
+    private static string Doubling(int rounds) =>
+        "(function(){ var s = 'x'; for (var i = 0; i < " + rounds + "; i++) s += s; return s.length; })()";
 }
