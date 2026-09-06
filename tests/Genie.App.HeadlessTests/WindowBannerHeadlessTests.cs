@@ -22,12 +22,18 @@ namespace Genie.App.HeadlessTests;
 /// directly below it, so on a short stacked panel the two chrome bands can outweigh
 /// the text between them.</para>
 ///
-/// <para>The toggle reaches those parts through a <c>DynamicResource</c> in a style,
-/// because they live inside Dock's control template and cannot be data-bound from
-/// the app. That makes the styles themselves load-bearing: a Dock or Avalonia bump
-/// that renames a template part, or a selector that silently matches nothing, turns
-/// the menu item into a no-op with no error anywhere. These tests materialize the
-/// real template under the shipping versions so that fails here instead.</para>
+/// <para>The collapse is a local <c>IsVisible</c> assignment on a template part the
+/// app does not own, reached through a style that marks each chrome as it appears
+/// (see <see cref="Genie.App.Docking.BannerChrome"/>). Every link in that chain is
+/// silent when it breaks: a Dock or Avalonia bump renaming the part, a selector
+/// matching nothing, or the marker style not being loaded all leave the menu item
+/// doing nothing with no error anywhere. These tests materialize the real template
+/// under the shipping versions so that fails here instead.</para>
+///
+/// <para>That last case is not hypothetical — <c>HeadlessApp</c> built its test
+/// Application from the theme stack alone and loaded none of the app's own styles,
+/// so the first version of these tests failed for a reason that had nothing to do
+/// with the code under test. It now loads the same rule the app does.</para>
 /// </summary>
 public class WindowBannerHeadlessTests
 {
