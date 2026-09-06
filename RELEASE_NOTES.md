@@ -1,10 +1,38 @@
 # Genie 5 — v5.0.0-beta.9
 
-**"Nothing Lost"** — a bad line of game text can no longer stop your screen, a
-damaged profile can no longer lock you out, and the room's contents get a
-window of their own.
+**"Nothing Lost"** — the dialogs DragonRealms has always sent finally have
+somewhere to appear, the room's contents get a window of their own, a bad line
+of game text can no longer stop your screen, and a damaged profile can no
+longer lock you out.
 
 ## ✨ New
+- **Server dialogs get real windows** — DragonRealms sends structured dialogs
+  for things like paying off bank debt or choosing a spell. Genie has always
+  received them and had nowhere to put them, so they were dropped on the floor.
+  They now open as ordinary panels you can dock, float, or send to their own
+  window.
+
+  None of it is hand-written per dialog. The panel is built from whatever the
+  server sends, and the arrangement is worked out from the coordinates in the
+  message rather than pinning controls to fixed pixels — so a dialog laid out
+  for a small fixed window reflows into whatever space your panel actually has.
+  A control Genie doesn't recognise yet appears as a labelled placeholder
+  rather than vanishing, so a gap is something you can see and report instead
+  of silently missing.
+
+  The first time a new dialog turns up you're asked once where it should live,
+  and the answer is remembered for that character's profile. Buttons and edited
+  values send the command the server supplied, filled in from the other fields
+  as they read at the moment you click — not as they read when the dialog
+  arrived.
+
+  This is the first phase. The bespoke ones — the aim timer, injuries for other
+  players — come later (#156).
+- **Dialog text no longer leaks into your main window** — some dialog contents
+  arrive as their own stream, tagged with the dialog they belong to. Genie
+  didn't recognise the tag, so that text fell through into the game window as
+  stray lines with no obvious source. It now goes to the dialog it belongs to,
+  and successive updates build up there until the server clears it (#324).
 - **Objects window** — what's on the ground in the room, one item per line,
   the way Genie 3/4 had it. Open it from Window → Objects; it docks beside
   Room alongside Mobs and Players, completing that trio. Creatures are left
