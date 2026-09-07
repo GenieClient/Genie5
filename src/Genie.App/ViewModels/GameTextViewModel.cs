@@ -18,9 +18,13 @@ namespace Genie.App.ViewModels;
 public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
 {
     // Scrollback cap — how many rendered lines to keep before trimming the
-    // oldest. Set from GenieConfig.ScrollbackLines on Attach (default 2000);
-    // the config value is already clamped to [100, 100000].
-    private int _maxLines = 2000;
+    // oldest. Read live from GenieConfig.ScrollbackLines (already clamped to
+    // [100, 100000]) via this provider, set in Attach, so a runtime
+    // #config scrollbacklines takes effect immediately instead of only after
+    // the next reconnect — same live-read pattern as TtsService's voice-dir
+    // provider.
+    private Func<int>? _maxLinesProvider;
+    private int MaxLines => _maxLinesProvider?.Invoke() ?? 2000;
 
     // Tracks whether the most recently appended line was a game prompt, so the
     // PromptEvent subscription can dedup consecutive prompts (Genie 4's
@@ -96,8 +100,8 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
 
     public void Attach(GenieCore core)
     {
-        // Scrollback cap from config (already clamped to [100, 100000]).
-        _maxLines = core.Config?.ScrollbackLines ?? 2000;
+        // Scrollback cap read live from config — see MaxLines.
+        _maxLinesProvider = () => core.Config?.ScrollbackLines ?? 2000;
 
         // Live Names engine for the "Name List Only" right-click filter.
         Names = core.NameHighlights;
@@ -370,7 +374,14 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
         }
     }
 
-    private int TrimCap => _viewHeld ? Math.Max(_maxLines * 2, _maxLines + 1000) : _maxLines;
+    private int TrimCap
+    {
+        get
+        {
+            var maxLines = MaxLines;
+            return _viewHeld ? Math.Max(maxLines * 2, maxLines + 1000) : maxLines;
+        }
+    }
 
     /// <summary>
     /// Drop oldest lines when over the scrollback cap. Trimming is deferred when

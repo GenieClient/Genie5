@@ -34,8 +34,8 @@ public class GameWindowTrimHoldRealisticTests
         public Harness(int cap)
         {
             typeof(GameTextViewModel)
-                .GetField("_maxLines", BindingFlags.NonPublic | BindingFlags.Instance)!
-                .SetValue(Vm, cap);
+                .GetField("_maxLinesProvider", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .SetValue(Vm, (Func<int>)(() => cap));
 
             Sv = new ScrollViewer { Width = 300, Height = 200 };
             // XAML order: the ScrollViewer's attached ItemsSource binds (and
