@@ -961,6 +961,18 @@ public sealed class DrXmlParser : IDisposable
             // self-close), which it sees as "Data at root level invalid".
             // Fall through to the manual parser below so these still
             // dispatch through HandleElement.
+            //
+            // ⚠ THIS CATCH IS LOAD-BEARING FOR DR PLATINUM (public #337).
+            // DRX serialises a failed lookup straight into the attribute list:
+            //     <settingsInfo  space not found crc='0' instance='DRX'/>
+            // — a bare token with no '=' where space='…' would have gone, so
+            // the element is not well-formed and only the fallback below
+            // recovers it. <settingsInfo/> is the authoritative "ready for
+            // input" signal GenieCore fires the initial `look` from, so
+            // narrowing this catch, or making ParseAttributesFallback stricter
+            // about malformed attributes, would leave every Platinum session
+            // authenticated, in the room, and never sending `look`.
+            // Pinned by SettingsInfoReadySignalTests.
         }
 
         // Manual fallback: scrape the name and any name="value" attributes
