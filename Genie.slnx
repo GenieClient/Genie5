@@ -4,6 +4,9 @@
     <Project Path="src/Genie.Core/Genie.Core.csproj" />
     <Project Path="src/Genie.Plugins.Abstractions/Genie.Plugins.Abstractions.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Genie.TestHarness/Genie.TestHarness.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Genie.App.HeadlessTests/Genie.App.HeadlessTests.csproj" />
     <Project Path="tests/Genie.App.Tests/Genie.App.Tests.csproj" />

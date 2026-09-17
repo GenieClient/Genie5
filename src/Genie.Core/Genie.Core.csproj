@@ -5,18 +5,17 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <OutputType>Exe</OutputType>
     <AssemblyName>Genie.Core</AssemblyName>
     <RootNamespace>Genie.Core</RootNamespace>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <Platforms>AnyCPU</Platforms>
 
-    <!-- Mark as self contained so the App project can reference this
-         project in its self contained publish output. NETSDK1150 rule:
-         a self contained exe cannot reference a non self contained exe.
-         Does NOT affect dev `dotnet run` for TestHarness because that
-         path bypasses publish entirely. -->
-    <SelfContained>true</SelfContained>
+    <!-- A plain library: no OutputType, no SelfContained. Both used to be
+         required because TestHarness.cs lived here as top-level statements and
+         made Core an Exe (NETSDK1150 then forced SelfContained so the App's
+         self-contained publish could reference it). The harness now lives in
+         tools/Genie.TestHarness (#122 finding 6), so Core ships no dev-only
+         code and the test project can use a plain ProjectReference again. -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +25,10 @@
     <InternalsVisibleTo Include="Genie.Core.Tests" />
     <!-- GenieCore.PublishGameEventForTests test hook (see AssemblyInfo.cs). -->
     <InternalsVisibleTo Include="Genie.App.Tests" />
+    <!-- The console harness JSINTEROP mode drives JsLibraryContext, which stays
+         internal for the same reason the chunker does. Dev tooling only; the
+         harness is never part of a release lane. -->
+    <InternalsVisibleTo Include="Genie.TestHarness" />
   </ItemGroup>
 
   <ItemGroup>

@@ -27,7 +27,7 @@ A plain `dotnet build` produces an unbundled `bin/Debug/net10.0/Genie5` you can 
 To run the headless engine harness (no UI):
 
 ```bash
-dotnet run --project src/Genie.Core
+dotnet run --project tools/Genie.TestHarness
 ```
 
 ## Publishing a distributable

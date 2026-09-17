@@ -13,7 +13,7 @@ For anything beyond a trivial change, please open an issue first (see CONTRIBUTI
 What did you do to verify this works, and what could it have broken? Be specific.
 For parser / scripting / mapper changes, a REPLAY smoke-test against a real
 recording is the easiest path:
-  dotnet run --project src/Genie.Core -- REPLAY <file>
+  dotnet run --project tools/Genie.TestHarness -- REPLAY <file>
 -->
 
 ## Checklist

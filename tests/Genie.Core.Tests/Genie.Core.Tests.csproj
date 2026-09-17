@@ -6,73 +6,24 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <IsPublishable>false</IsPublishable>
-
-    <!-- Genie.Core is a self-contained Exe, so it can't be a ProjectReference
-         (NETSDK1151). Reference the built DLL instead and load it + its deps at
-         runtime via the ModuleInitializer resolver (ModuleInit.cs).
-         CoreOutDir follows the host RID (osx-arm64 / win-x64 / linux-x64 / …)
-         so `dotnet test` works on every platform without -p:CoreOutDir=….
-         Override with -p:CoreRid=… or -p:CoreOutDir=… when needed. -->
-    <CoreRid Condition="'$(CoreRid)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</CoreRid>
-    <CoreRid Condition="'$(CoreRid)' == ''">$(NETCoreSdkRuntimeIdentifier)</CoreRid>
-    <CoreOutDir Condition="'$(CoreOutDir)' == ''">$(MSBuildThisFileDirectory)../../src/Genie.Core/bin/$(Configuration)/net10.0/$(CoreRid)/</CoreOutDir>
-    <_GenieCoreProject>$(MSBuildThisFileDirectory)../../src/Genie.Core/Genie.Core.csproj</_GenieCoreProject>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <!-- Compile-time access to ILogger / NullLogger for parser tests; the
-         runtime copy is resolved from Core's output dir via ModuleInit.cs. -->
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10">
-      <Private>false</Private>
-    </PackageReference>
-    <!-- Compile-time access to IObservable helpers / Subject for pipeline tests;
-         like the logging ref above, the runtime copy is resolved from Core's
-         output dir via ModuleInit.cs (Core is self-contained, so it ships one). -->
-    <PackageReference Include="System.Reactive" Version="6.0.1">
-      <Private>false</Private>
-    </PackageReference>
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
 
+  <!-- A plain ProjectReference, restored by #122 finding 6. While Genie.Core
+       was a self-contained Exe (because TestHarness.cs lived inside it) this
+       was NETSDK1151-illegal, so the project carried CoreRid/CoreOutDir
+       properties, a HintPath Reference to Genie.Core.dll, an AssemblyMetadata
+       hand-off, an EnsureGenieCoreBuilt inner MSBuild call and a 36-line
+       ModuleInitializer assembly resolver (ModuleInit.cs) to load Core's deps
+       at runtime. All of that is gone: Core's transitive package references
+       (logging abstractions, System.Reactive, …) now flow normally. -->
   <ItemGroup>
-    <Reference Include="Genie.Core">
-      <HintPath>$(CoreOutDir)Genie.Core.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <!-- The public plugin contract (IGeniePlugin / IPluginHost) ships beside
-         Core; resolved at runtime from the same dir via ModuleInit.cs. -->
-    <Reference Include="Genie.Plugins.Abstractions">
-      <HintPath>$(CoreOutDir)Genie.Plugins.Abstractions.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <ProjectReference Include="../../src/Genie.Core/Genie.Core.csproj" />
   </ItemGroup>
-
-  <!-- Surface the Core output dir to the runtime resolver in ModuleInit.cs. -->
-  <ItemGroup>
-    <AssemblyMetadata Include="CoreOutDir" Value="$(CoreOutDir)" />
-  </ItemGroup>
-
-  <!-- Ordering only, no assembly flow (that would be NETSDK1151 — Core is a
-       self-contained Exe). Without this, a cold solution build schedules Core
-       and this project in parallel and EnsureGenieCoreBuilt's inner MSBuild
-       double-builds Core concurrently → intermittent CS2012 file locks. With
-       it, Core finishes first and the inner build is an incremental no-op. -->
-  <ItemGroup>
-    <ProjectReference Include="$(_GenieCoreProject)"
-                      ReferenceOutputAssembly="false"
-                      SkipGetTargetFrameworkProperties="true"
-                      Private="false" />
-  </ItemGroup>
-
-  <!-- Build Core into the host-RID folder before HintPath resolution so a bare
-       `dotnet test` does not require a separate Core build step. -->
-  <Target Name="EnsureGenieCoreBuilt" BeforeTargets="ResolveAssemblyReferences">
-    <MSBuild
-      Projects="$(_GenieCoreProject)"
-      Targets="Build"
-      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(CoreRid)" />
-  </Target>
 
 </Project>

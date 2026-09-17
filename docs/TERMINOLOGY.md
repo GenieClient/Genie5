@@ -9,7 +9,7 @@ Last reviewed May 24, 2026.
 | Term | Means | Notes |
 |---|---|---|
 | **App** | `Genie.App` (Avalonia GUI) | What end-users play DR in. The thing that ships. |
-| **Console** | `TestHarness` (`dotnet run --project src/Genie.Core`) | Dev-only CLI for parser work, analysis, offline automation. Never ships. |
+| **Console** | `TestHarness` (`dotnet run --project tools/Genie.TestHarness`) | Dev-only CLI for parser work, analysis, offline automation. Never ships. |
 
 ## Three states of game data
 
@@ -61,11 +61,11 @@ Last reviewed May 24, 2026.
 5. Disconnect (auto-stops Record) — file lands in `{AppData}/Genie5/Logs/`
 
 ### "I want to analyze a recording offline"
-- For verb / link inventory: `dotnet run --project src/Genie.Core -- VERBS`
-- For parser-output diff: `dotnet run --project src/Genie.Core -- COMPARE <file>`
+- For verb / link inventory: `dotnet run --project tools/Genie.TestHarness -- VERBS`
+- For parser-output diff: `dotnet run --project tools/Genie.TestHarness -- COMPARE <file>`
 
 ### "I want to re-run a recording through the engine without playing live"
-- `dotnet run --project src/Genie.Core -- REPLAY <file> [speed]`
+- `dotnet run --project tools/Genie.TestHarness -- REPLAY <file> [speed]`
 - Speed: 0 = max (parser-dev), 1.0 = real-time, 5.0 = 5×
 
 ## Trigger phrase to resume

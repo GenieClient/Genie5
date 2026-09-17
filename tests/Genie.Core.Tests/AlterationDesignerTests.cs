@@ -350,11 +350,12 @@ public class AlterationDesignerTests : IDisposable
     }
 
     // NB: these are three Facts rather than one Theory over AlterationFilter.
-    // An InlineData argument typed as a Genie.Core enum breaks xUnit DISCOVERY in
-    // this project — attribute argument types are resolved before the
-    // ModuleInitializer resolver in ModuleInit.cs can locate Genie.Core.dll
-    // (referenced by HintPath with Private=false, since Core is a self-contained
-    // exe and can't be a ProjectReference). Keep Core types out of attributes.
+    // That was forced by the old HintPath arrangement — attribute argument types
+    // were resolved before ModuleInit.cs's ModuleInitializer could locate
+    // Genie.Core.dll, so a Genie.Core enum in InlineData broke xUnit DISCOVERY.
+    // The project is a plain ProjectReference again (#122 finding 6) and the
+    // resolver is gone, so the restriction no longer applies; these are left as
+    // three Facts because they pass and read fine, not because they must be.
     [Fact]
     public void The_drafts_filter_selects_only_unfinished_designs()
     {

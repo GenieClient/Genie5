@@ -76,10 +76,9 @@ jobs:
       # Run the unit-test suite (tests/Genie.Core.Tests). The suite itself runs
       # in ~1s, so it rides every matrix leg: Linux gates PRs, pushes/tags get
       # cross-platform coverage for free via the event-tiered matrix above.
-      # No --no-build: the test project resolves Genie.Core.dll from Core's
-      # RID-specific output via a HintPath (Core is a self-contained Exe, so it
-      # can't be a ProjectReference) and its EnsureGenieCoreBuilt target keeps
-      # that DLL fresh — skipping the build risks testing a stale Core.
+      # The test project is a plain ProjectReference again (Core went back to
+      # being a library when the console harness moved to tools/Genie.TestHarness),
+      # so the usual build/test ordering applies with no special handling.
       - name: Test (Release)
         run: dotnet test tests/Genie.Core.Tests -c Release --nologo -v minimal
 
