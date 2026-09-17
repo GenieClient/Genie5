@@ -208,7 +208,8 @@ public sealed class ServerDialogMappings
     {
         if (string.IsNullOrEmpty(dialogId) || string.IsNullOrEmpty(title)) return;
         lock (_gate)
-            if (_mappings.TryGetValue(dialogId, out var m)) m.Title = title;
+            if (_mappings.TryGetValue(dialogId, out var m))
+                m.Title = DialogTitle.Normalize(title);
     }
 
     /// <summary>Every mapping, ordered by id.</summary>
@@ -242,7 +243,13 @@ public sealed class ServerDialogMappings
             {
                 _mappings.Clear();
                 foreach (var m in loaded)
-                    if (!string.IsNullOrEmpty(m.Id)) _mappings[m.Id] = m;
+                {
+                    if (string.IsNullOrEmpty(m.Id)) continue;
+                    // Files written before #344 hold the doubled form; collapse
+                    // on read so an existing profile is fixed without an edit.
+                    m.Title = DialogTitle.Normalize(m.Title);
+                    _mappings[m.Id] = m;
+                }
             }
             return true;
         }

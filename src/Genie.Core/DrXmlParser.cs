@@ -1712,8 +1712,14 @@ public sealed class DrXmlParser : IDisposable
             // profile's windows, and situationally mid-session. It WRAPS a
             // dialogData child, which the cases above handle normally.
             case "opendialog":
+                // Title is normalised here so every consumer — the window
+                // title, the remembered name in dialogmappings.json, #dialogs
+                // list, the gap report — gets the same string (public #344).
+                // RawXml still carries what the server actually sent.
                 _events.OnNext(new OpenDialogEvent(
-                    r["id"] ?? "", r["title"] ?? "", r["location"] ?? "",
+                    r["id"] ?? "",
+                    Dialogs.DialogTitle.Normalize(r["title"]) ?? "",
+                    r["location"] ?? "",
                     r["width"], r["height"], IsTruthy(r["resident"]),
                     r["type"] ?? "", rawTag));
                 break;
