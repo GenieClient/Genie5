@@ -148,6 +148,17 @@ Two namespaces, by prefix:
 
 `%` reads `Vars` only. `$` reads the top `$`-frame (for `$0..$9`), then falls back to `Globals`. Substitution rules (right-shrinking name search for `[A-Za-z0-9_.-]` identifiers, `%%name`/`$$name` double-eval, `%name(N)` pipe-array indexing) follow Genie 4.
 
+Full `$` resolution order: the computed live-state pseudo-vars
+(`$0..$9`, `$argcount`, `$roundtime`, `$casttimeremaining`, `$spelltime`,
+`$spellstarttime`), then the session `Globals`, then the persisted `#var`
+store, then the reserved clock vars (`$date`/`$time`/…). Because `Globals`
+outrank the store, `#var name value` also writes the session global when one
+of that name already exists, and `#unvar` / `#var remove` clear both — Genie 4
+kept a single variable list, so without that mirror a `#var` on a name a
+`#tvar` (or a plugin) had planted stored its value and left `$name` reading
+the stale global (public #340). `$connected` is the one name `#var` routes
+straight to the globals and never persists (public #294).
+
 ### Engine-set globals
 
 These are mirrored by [ScriptGlobalsSync](../src/Genie.Core/Scripting/ScriptGlobalsSync.cs) at event time (not on access). A non-exhaustive list:

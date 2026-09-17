@@ -56,7 +56,7 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
         if (vm.GagEngine        is { } gags)        GagsPanelCtrl       .Initialize(gags,        vm.OnGagsChanged,        vm.ScopeContextFor("gags.json"));
         if (vm.AliasEngine      is { } aliases)     AliasesPanelCtrl    .Initialize(aliases,     vm.OnAliasesChanged,     vm.ScopeContextFor("aliases.json"));
         if (vm.MacroEngine      is { } macros)      MacrosPanelCtrl     .Initialize(macros,      vm.OnMacrosChanged,      vm.ScopeContextFor("macros.json"));
-        if (vm.VariableStore    is { } variables)   VariablesPanelCtrl  .Initialize(variables,   vm.OnVariablesChanged);
+        if (vm.VariableStore    is { } variables)   VariablesPanelCtrl  .Initialize(variables,   vm.OnVariablesChanged,   vm.LiveGlobals);
         if (vm.ClassEngine      is { } classes)     ClassesPanelCtrl    .Initialize(classes,     vm.OnClassesChanged);
 
         // WindowSettingsStore is always present — it's app-level state, not

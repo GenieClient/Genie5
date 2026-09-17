@@ -852,7 +852,7 @@ public sealed class CommandEngine
             case "unsetvariable":
                 if (parts.Count > 1 && Variables is not null)
                 {
-                    Variables.Store.Remove(parts[1]);
+                    RemoveVarValue(parts[1]);
                     _host.Echo($"Variable removed: {parts[1]}");
                 }
                 break;
@@ -1496,7 +1496,7 @@ public sealed class CommandEngine
         // 3+ args
         if (sub == "remove" || sub == "delete")
         {
-            Variables.Store.Remove(parts[2]);
+            RemoveVarValue(parts[2]);
             _host.Echo($"Variable removed: {parts[2]}");
             return;
         }
@@ -1527,13 +1527,58 @@ public sealed class CommandEngine
     /// would be inert while connected (globals outrank it), shadow
     /// <c>$connected</c> for scripts run before the session's first connect,
     /// and pin a stale copy into variables.json/.cfg forever (public #294).
+    /// Every other name is stored AND mirrored onto a live global of the same
+    /// name when one already exists — globals outrank the store on the $-read
+    /// path, so a store-only write would be silently inert (public #340).
     /// </summary>
     private void SetVarValue(string name, string value)
     {
         if (ReservedConnectionVars.Contains(name))
+        {
             _host.SetGlobalVariable(name, value);
-        else
-            Variables!.Store.Set(name, value);
+            return;
+        }
+
+        Variables!.Store.Set(name, value);
+
+        // A name that ALREADY exists in the live globals is written there too
+        // (public #340). The $-read path resolves Globals before the #var store
+        // (ScriptEngine.TryResolveVar), so a store-only write is silently inert
+        // for such a name: Azothy's `put #var preparedSymbiosis 0` stored the 0
+        // and left `$preparedSymbiosis` expanding to the 1 a `#tvar` had planted,
+        // so `if (!$preparedSymbiosis)` read `if (!1)` forever — while a
+        // brand-new name (not in Globals) worked. Genie 4 had ONE variable list,
+        // so `#var` overwrote whatever was there; writing both restores that.
+        // Third report of this one root cause: #294 ($connected) and #226
+        // ($roundtime, where `#var roundtime 0` could not clear the mirror) each
+        // patched a single name — this generalises it to every name.
+        // The store row is still written so `#var save` and the Variables panel
+        // reflect what the user set; a name whose global the connection layer
+        // owns outright belongs in ReservedConnectionVars instead.
+        if (_host.GetGlobalVariables().ContainsKey(name))
+            _host.SetGlobalVariable(name, value);
+    }
+
+    /// <summary>
+    /// Remove a <c>#var</c> value — the <see cref="SetVarValue"/> twin, so
+    /// <c>#unvar</c> / <c>#var remove</c> clear BOTH stores when a live global
+    /// shadows the row (public #340). Store-only removal would leave
+    /// <c>$name</c> resolving the very value the preceding <c>#var</c> wrote
+    /// into the globals — Genie 4's single list removed it outright, and a
+    /// live-state global re-seeds itself from the next game event.
+    /// A reserved connection-state name keeps its live global (#294 owns it):
+    /// dropping <c>$connected</c> mid-session would leave a polling reconnect
+    /// script reading the literal <c>$connected</c> until the next transition.
+    /// </summary>
+    private void RemoveVarValue(string name)
+    {
+        Variables!.Store.Remove(name);
+        if (ReservedConnectionVars.Contains(name)) return;
+        if (_host.GetGlobalVariables().ContainsKey(name))
+        {
+            _host.RemoveGlobalVariable(name);
+            _userTvars.Remove(name);
+        }
     }
 
     // ── #dialogs (public #156 Phase 0c) ──────────────────────────────────────

@@ -19,6 +19,16 @@ public partial class VariablesPanel : UserControl
     private Action?        _onChanged;
     private string         _filter = string.Empty;
 
+    /// <summary>
+    /// The live session globals when this panel is editing the CONNECTED
+    /// profile, else null (a draft profile has no live session). A row whose
+    /// name also exists here is shadowed on the <c>$name</c> read path
+    /// (globals resolve before the #var store), so editing it in the store
+    /// alone looked like a no-op to scripts — the panel half of public #340,
+    /// same root cause as <c>CommandEngine.SetVarValue</c>.
+    /// </summary>
+    private IDictionary<string, string>? _liveGlobals;
+
     /// <summary>Name of the variable currently loaded in the editor form. When
     /// a Refresh restores the selection to this same variable (a Find…
     /// keystroke), OnSelectionChanged skips the form rewrite so unsaved edits
@@ -27,10 +37,12 @@ public partial class VariablesPanel : UserControl
 
     public VariablesPanel() => InitializeComponent();
 
-    public void Initialize(VariableStore store, Action onChanged)
+    public void Initialize(VariableStore store, Action onChanged,
+                           IDictionary<string, string>? liveGlobals = null)
     {
-        _store     = store;
-        _onChanged = onChanged;
+        _store       = store;
+        _onChanged   = onChanged;
+        _liveGlobals = liveGlobals;
         // A re-Initialize (profile switch) must not carry the previous
         // profile's filter or form over — a stale filter renders the new
         // profile's list empty for no visible reason.
@@ -82,6 +94,12 @@ public partial class VariablesPanel : UserControl
         if (string.IsNullOrEmpty(name)) { StatusText.Text = "Name is required."; return; }
 
         _store.Set(name, value);
+        // Keep a shadowing live global in step (#340). This also covers the
+        // reserved names Store.Set refuses (`connected`): the store write is a
+        // no-op and the live global — which always exists, seeded at launch —
+        // takes the value, matching what a typed `#var connected 0` does.
+        if (_liveGlobals is not null && _liveGlobals.ContainsKey(name))
+            _liveGlobals[name] = value;
         _onChanged?.Invoke();
         Refresh();
         StatusText.Text = $"Saved '{name}'.";
@@ -96,6 +114,11 @@ public partial class VariablesPanel : UserControl
             return;
         }
         _store.Remove(row.Name);
+        // Removing the store row alone would leave $name resolving the value
+        // the shadowing global still holds (#340). A reserved connection var
+        // keeps its live global — #294 owns that name.
+        if (_liveGlobals is not null && !ReservedConnectionVars.Contains(row.Name))
+            _liveGlobals.Remove(row.Name);
         _onChanged?.Invoke();
         ClearForm();
         Refresh();

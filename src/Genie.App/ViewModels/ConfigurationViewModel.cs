@@ -140,6 +140,16 @@ public class ConfigurationViewModel : ReactiveObject
     public VariableStore?       VariableStore       => EditingConnected ? _core?.Variables.Store : GetDraftVariables();
 
     /// <summary>
+    /// The live session globals, but only while editing the CONNECTED profile
+    /// — a draft profile has no session to keep in step. The Variables panel
+    /// uses it to mirror an edit onto a global of the same name, which
+    /// otherwise shadows the store row on the <c>$name</c> read path
+    /// (public #340). Null offline, so the panel simply skips the mirror.
+    /// </summary>
+    public IDictionary<string, string>? LiveGlobals =>
+        EditingConnected ? _core?.Scripts.Globals : null;
+
+    /// <summary>
     /// Per-window display settings. Currently always the live app-wide store
     /// — per-profile draft layouts could be added later but in practice users
     /// expect consistent window appearance regardless of which character is
