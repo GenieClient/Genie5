@@ -60,6 +60,35 @@ decade-plus of work there would be no Genie 5 to write.
 
 ---
 
+## Ported Genie 4 features
+
+Several Genie 5 built-ins reimplement the behaviour of Genie 4 plugins. Where
+the original source exists it was ported; where only a DLL survives, the
+behaviour was recovered by decompiling it and then **reimplemented** — no
+decompiled code ships in Genie 5. Script-variable names are preserved exactly,
+so community `.cmd` scripts that read them keep working.
+
+The original authors, with thanks:
+
+- **Time Tracker** — *Barnacus* (Genie 4 Time Tracker v1.9.0). Source no longer
+  exists; behaviour recovered from the shipped DLL. Genie 5's built-in keeps the
+  calculator model, the rise/set calibration, and the `Time.*` script variables.
+- **Circle Calculator** — *VTCifer*
+  ([Plugin_CircleCalculator](https://github.com/GenieClient/Plugin_CircleCalculator)
+  v4.0.6b). Ported from the author's published source, including the circle
+  requirement tables.
+- **Alteration Buddy** — *Djordje*
+  ([mj-colonel-panic/AlterationBuddy](https://github.com/mj-colonel-panic/AlterationBuddy),
+  GPL-3.0), source provided by the author for this purpose. Ported as the
+  Alterations menu.
+
+Plugins that remain plugins are credited in their own `Plugin_*V5` repositories.
+
+If your Genie 4 plugin's behaviour is reflected here and you are not credited —
+or you would rather not be — open an issue and it will be corrected.
+
+---
+
 ## Game
 
 [DragonRealms](https://www.play.net/dr) is a Simutronics text MMO.
