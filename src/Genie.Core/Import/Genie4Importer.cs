@@ -27,8 +27,64 @@ public enum ImportMode
     Replace,
 }
 
+/// <summary>Why a line did not make it into an engine.</summary>
+public enum ImportSkipKind
+{
+    /// <summary>
+    /// The line carried a rule and that rule was lost. This is the case the
+    /// user has to be told about.
+    /// </summary>
+    Dropped,
+
+    /// <summary>
+    /// The line was skipped for an expected reason — already present in
+    /// Add-only mode, an <c>#alias delete</c> record, the implicit
+    /// <c>default</c> class. Nothing was lost.
+    /// </summary>
+    ByDesign,
+}
+
+/// <summary>One skipped line, with enough detail to act on it.</summary>
+public readonly record struct ImportSkip(
+    int LineNumber,
+    string Line,
+    string Reason,
+    ImportSkipKind Kind)
+{
+    /// <summary>Single-line form for a report: <c>line 42: reason — text</c>.</summary>
+    public override string ToString()
+    {
+        var text = Line.Length > 120 ? Line[..120] + "…" : Line;
+        return $"line {LineNumber}: {Reason} — {text}";
+    }
+}
+
 /// <summary>Per-file counts returned by each <c>ImportX</c> method.</summary>
-public readonly record struct ImportResult(int Imported, int Skipped);
+/// <remarks>
+/// <see cref="Skipped"/> was originally the whole story, which is how a long
+/// list of silent import bugs survived: the dialog reported "N imported,
+/// M skipped" and a user had no way to tell whether those M were duplicates
+/// they expected or rules that had just been destroyed. <see cref="Skips"/>
+/// carries the per-line reason so the report can say which.
+/// </remarks>
+public readonly record struct ImportResult(int Imported, int Skipped)
+{
+    private readonly IReadOnlyList<ImportSkip>? _skips;
+
+    /// <summary>Every skipped line, in file order.</summary>
+    public IReadOnlyList<ImportSkip> Skips
+    {
+        get  => _skips ?? Array.Empty<ImportSkip>();
+        init => _skips = value;
+    }
+
+    /// <summary>The skips that actually lost a rule.</summary>
+    public IEnumerable<ImportSkip> Dropped =>
+        Skips.Where(s => s.Kind == ImportSkipKind.Dropped);
+
+    /// <summary>How many rules were lost, as opposed to skipped by design.</summary>
+    public int DroppedCount => Skips.Count(s => s.Kind == ImportSkipKind.Dropped);
+}
 
 /// <summary>Aggregated results from a full-directory import.</summary>
 public sealed class ImportAllResult
@@ -46,6 +102,27 @@ public sealed class ImportAllResult
 
     /// <summary>Config types the caller selected that had no matching file on disk.</summary>
     public List<string> MissingFiles { get; } = new();
+
+    /// <summary>Every per-type result, labelled, in report order.</summary>
+    public IEnumerable<(string Label, ImportResult Result)> All =>
+    [
+        ("Highlights",  Highlights),
+        ("Triggers",    Triggers),
+        ("Substitutes", Substitutes),
+        ("Gags",        Gags),
+        ("Aliases",     Aliases),
+        ("Macros",      Macros),
+        ("Names",       Names),
+        ("Presets",     Presets),
+        ("Variables",   Variables),
+        ("Classes",     Classes),
+    ];
+
+    /// <summary>Total rules lost across every type.</summary>
+    public int DroppedCount => All.Sum(x => x.Result.DroppedCount);
+
+    /// <summary>True when any rule was lost — the condition worth surfacing.</summary>
+    public bool AnyDropped => DroppedCount > 0;
 }
 
 /// <summary>Everything a full-directory import needs in one place.</summary>
@@ -176,6 +253,30 @@ public static class Genie4Importer
         return n;
     }
 
+    // ── Skip accounting ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Accumulates the skipped lines of one file so the caller can report what
+    /// was lost instead of only how much.
+    /// </summary>
+    private sealed class SkipLog
+    {
+        private readonly List<ImportSkip> _items = new();
+
+        public IReadOnlyList<ImportSkip> Items => _items;
+
+        /// <summary>Total skips — what the old bare counter reported.</summary>
+        public int Count => _items.Count;
+
+        /// <summary>Record a line whose rule was lost.</summary>
+        public void Drop(int line, string text, string reason) =>
+            _items.Add(new ImportSkip(line, text, reason, ImportSkipKind.Dropped));
+
+        /// <summary>Record a line skipped for an expected reason.</summary>
+        public void ByDesign(int line, string text, string reason) =>
+            _items.Add(new ImportSkip(line, text, reason, ImportSkipKind.ByDesign));
+    }
+
     // ── Directive tokenizing ────────────────────────────────────────────────
 
     /// <summary>
@@ -220,31 +321,34 @@ public static class Genie4Importer
     {
         if (mode == ImportMode.Replace) engine.Clear();
 
-        int imported = 0, skipped = 0;
+        int imported = 0;
+        var log = new SkipLog();
         var existing = new HashSet<string>(engine.Aliases.Select(a => a.Name), StringComparer.OrdinalIgnoreCase);
 
+        int lineNo = 0;
         foreach (var raw in File.ReadAllLines(path))
         {
+            lineNo++;
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#alias", StringComparison.OrdinalIgnoreCase)) continue;
 
             var m = AliasPattern.Match(line);
-            if (!m.Success) { skipped++; continue; }
-            if (m.Groups["verb"].Value.Equals("delete", StringComparison.OrdinalIgnoreCase)) { skipped++; continue; }
+            if (!m.Success) { log.Drop(lineNo, line, "not a recognised #alias directive"); continue; }
+            if (m.Groups["verb"].Value.Equals("delete", StringComparison.OrdinalIgnoreCase)) { log.ByDesign(lineNo, line, "#alias delete line - nothing to import"); continue; }
 
             var name      = m.Groups["name"].Value;
             var expansion = m.Groups["expansion"].Value;
-            if (string.IsNullOrEmpty(name)) { skipped++; continue; }
+            if (string.IsNullOrEmpty(name)) { log.Drop(lineNo, line, "alias name is empty"); continue; }
 
-            if (mode == ImportMode.AddOnly && existing.Contains(name)) { skipped++; continue; }
+            if (mode == ImportMode.AddOnly && existing.Contains(name)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             engine.RemoveAlias(name);
             engine.AddAlias(name, expansion, isEnabled: true);
             existing.Add(name);
             imported++;
         }
-        return new ImportResult(imported, skipped);
+        return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
 
     // ── Triggers ────────────────────────────────────────────────────────────
@@ -253,17 +357,20 @@ public static class Genie4Importer
     {
         if (mode == ImportMode.Replace) engine.Clear();
 
-        int imported = 0, skipped = 0;
+        int imported = 0;
+        var log = new SkipLog();
         var existing = new HashSet<string>(engine.Triggers.Select(t => t.Pattern), StringComparer.Ordinal);
 
+        int lineNo = 0;
         foreach (var raw in File.ReadAllLines(path))
         {
+            lineNo++;
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#trigger", StringComparison.OrdinalIgnoreCase)) continue;
 
             var args = DirectiveArgs(line, "#trigger");
-            if (args is null || args.Count < 2) { skipped++; continue; }
+            if (args is null || args.Count < 2) { log.Drop(lineNo, line, "not a recognised #trigger directive"); continue; }
 
             var pat = args[0];
             bool caseInsensitive = false;
@@ -277,11 +384,11 @@ public static class Genie4Importer
                 else if (pat.EndsWith('/')) pat = pat[..^1];
             }
 
-            if (string.IsNullOrEmpty(pat)) { skipped++; continue; }
+            if (string.IsNullOrEmpty(pat)) { log.Drop(lineNo, line, "trigger pattern is empty"); continue; }
             try { _ = new Regex(pat); }
-            catch (RegexParseException) { skipped++; continue; }
+            catch (RegexParseException ex) { log.Drop(lineNo, line, "pattern is not a valid regular expression: " + ex.Message); continue; }
 
-            if (mode == ImportMode.AddOnly && existing.Contains(pat)) { skipped++; continue; }
+            if (mode == ImportMode.AddOnly && existing.Contains(pat)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             var action = Arg(args, 1);
             var cls    = Arg(args, 2);
@@ -291,7 +398,7 @@ public static class Genie4Importer
             existing.Add(pat);
             imported++;
         }
-        return new ImportResult(imported, skipped);
+        return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
 
     // ── Highlights ──────────────────────────────────────────────────────────
@@ -300,32 +407,35 @@ public static class Genie4Importer
     {
         if (mode == ImportMode.Replace) engine.Clear();
 
-        int imported = 0, skipped = 0;
+        int imported = 0;
+        var log = new SkipLog();
         var existing = new HashSet<string>(engine.Rules.Select(r => r.Pattern), StringComparer.Ordinal);
 
+        int lineNo = 0;
         foreach (var raw in File.ReadAllLines(path))
         {
+            lineNo++;
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#highlight", StringComparison.OrdinalIgnoreCase)) continue;
 
             var args = DirectiveArgs(line, "#highlight");
-            if (args is null || args.Count < 3) { skipped++; continue; }
+            if (args is null || args.Count < 3) { log.Drop(lineNo, line, "not a recognised #highlight directive"); continue; }
 
             var matchType = ParseMatchType(args[0]);
-            if (matchType is null) { skipped++; continue; }
+            if (matchType is null) { log.Drop(lineNo, line, "unknown highlight type"); continue; }
 
             var (fg, bg)    = ParseColorPair(args[1]);
             var rulePattern = args[2];
-            if (string.IsNullOrEmpty(rulePattern) || string.IsNullOrEmpty(fg)) { skipped++; continue; }
+            if (string.IsNullOrEmpty(rulePattern) || string.IsNullOrEmpty(fg)) { log.Drop(lineNo, line, "highlight pattern or foreground colour is empty"); continue; }
 
             if (matchType == HighlightMatchType.Regex)
             {
                 try { _ = new Regex(rulePattern); }
-                catch (RegexParseException) { skipped++; continue; }
+                catch (RegexParseException ex) { log.Drop(lineNo, line, "pattern is not a valid regular expression: " + ex.Message); continue; }
             }
 
-            if (mode == ImportMode.AddOnly && existing.Contains(rulePattern)) { skipped++; continue; }
+            if (mode == ImportMode.AddOnly && existing.Contains(rulePattern)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             var cls = Arg(args, 3);
 
@@ -334,7 +444,7 @@ public static class Genie4Importer
             existing.Add(rulePattern);
             imported++;
         }
-        return new ImportResult(imported, skipped);
+        return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
 
     private static HighlightMatchType? ParseMatchType(string raw) =>
@@ -354,17 +464,20 @@ public static class Genie4Importer
     {
         if (mode == ImportMode.Replace) engine.Clear();
 
-        int imported = 0, skipped = 0;
+        int imported = 0;
+        var log = new SkipLog();
         var existing = new HashSet<string>(engine.Rules.Select(r => r.Pattern), StringComparer.Ordinal);
 
+        int lineNo = 0;
         foreach (var raw in File.ReadAllLines(path))
         {
+            lineNo++;
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#subs", StringComparison.OrdinalIgnoreCase)) continue;
 
             var args = DirectiveArgs(line, "#subs");
-            if (args is null || args.Count < 2) { skipped++; continue; }
+            if (args is null || args.Count < 2) { log.Drop(lineNo, line, "not a recognised #subs directive"); continue; }
 
             var pat = args[0];
             bool caseInsensitive = false;
@@ -372,11 +485,11 @@ public static class Genie4Importer
             if (pat.EndsWith("/i", StringComparison.OrdinalIgnoreCase)) { caseInsensitive = true; pat = pat[..^2]; }
             else if (pat.EndsWith('/')) pat = pat[..^1];
 
-            if (string.IsNullOrEmpty(pat)) { skipped++; continue; }
+            if (string.IsNullOrEmpty(pat)) { log.Drop(lineNo, line, "substitute pattern is empty"); continue; }
             try { _ = new Regex(pat); }
-            catch (RegexParseException) { skipped++; continue; }
+            catch (RegexParseException ex) { log.Drop(lineNo, line, "pattern is not a valid regular expression: " + ex.Message); continue; }
 
-            if (mode == ImportMode.AddOnly && existing.Contains(pat)) { skipped++; continue; }
+            if (mode == ImportMode.AddOnly && existing.Contains(pat)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             var repl = Arg(args, 1);
             var cls  = Arg(args, 2);
@@ -386,7 +499,7 @@ public static class Genie4Importer
             existing.Add(pat);
             imported++;
         }
-        return new ImportResult(imported, skipped);
+        return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
 
     // ── Gags ────────────────────────────────────────────────────────────────
@@ -395,17 +508,20 @@ public static class Genie4Importer
     {
         if (mode == ImportMode.Replace) engine.Clear();
 
-        int imported = 0, skipped = 0;
+        int imported = 0;
+        var log = new SkipLog();
         var existing = new HashSet<string>(engine.Rules.Select(r => r.Pattern), StringComparer.Ordinal);
 
+        int lineNo = 0;
         foreach (var raw in File.ReadAllLines(path))
         {
+            lineNo++;
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#gag", StringComparison.OrdinalIgnoreCase)) continue;
 
             var args = DirectiveArgs(line, "#gag");
-            if (args is null || args.Count < 1) { skipped++; continue; }
+            if (args is null || args.Count < 1) { log.Drop(lineNo, line, "not a recognised #gag directive"); continue; }
 
             var pat = args[0];
             bool caseInsensitive = false;
@@ -413,11 +529,11 @@ public static class Genie4Importer
             if (pat.EndsWith("/i", StringComparison.OrdinalIgnoreCase)) { caseInsensitive = true; pat = pat[..^2]; }
             else if (pat.EndsWith('/')) pat = pat[..^1];
 
-            if (string.IsNullOrEmpty(pat)) { skipped++; continue; }
+            if (string.IsNullOrEmpty(pat)) { log.Drop(lineNo, line, "gag pattern is empty"); continue; }
             try { _ = new Regex(pat); }
-            catch (RegexParseException) { skipped++; continue; }
+            catch (RegexParseException ex) { log.Drop(lineNo, line, "pattern is not a valid regular expression: " + ex.Message); continue; }
 
-            if (mode == ImportMode.AddOnly && existing.Contains(pat)) { skipped++; continue; }
+            if (mode == ImportMode.AddOnly && existing.Contains(pat)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             var cls = Arg(args, 1);
 
@@ -426,7 +542,7 @@ public static class Genie4Importer
             existing.Add(pat);
             imported++;
         }
-        return new ImportResult(imported, skipped);
+        return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
 
     // ── Macros ──────────────────────────────────────────────────────────────
@@ -435,29 +551,32 @@ public static class Genie4Importer
     {
         if (mode == ImportMode.Replace) engine.Clear();
 
-        int imported = 0, skipped = 0;
+        int imported = 0;
+        var log = new SkipLog();
         var existing = new HashSet<string>(engine.Rules.Select(r => r.Key), StringComparer.OrdinalIgnoreCase);
 
+        int lineNo = 0;
         foreach (var raw in File.ReadAllLines(path))
         {
+            lineNo++;
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#macro", StringComparison.OrdinalIgnoreCase)) continue;
 
             var args = DirectiveArgs(line, "#macro");
-            if (args is null || args.Count < 2) { skipped++; continue; }
+            if (args is null || args.Count < 2) { log.Drop(lineNo, line, "not a recognised #macro directive"); continue; }
 
             var key    = args[0].Trim();
             var action = args[1];
-            if (string.IsNullOrEmpty(key)) { skipped++; continue; }
+            if (string.IsNullOrEmpty(key)) { log.Drop(lineNo, line, "macro key is empty"); continue; }
 
-            if (mode == ImportMode.AddOnly && existing.Contains(key)) { skipped++; continue; }
+            if (mode == ImportMode.AddOnly && existing.Contains(key)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             engine.Add(key, action);
             existing.Add(key);
             imported++;
         }
-        return new ImportResult(imported, skipped);
+        return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
 
     // ── Names ───────────────────────────────────────────────────────────────
@@ -466,29 +585,32 @@ public static class Genie4Importer
     {
         if (mode == ImportMode.Replace) engine.Clear();
 
-        int imported = 0, skipped = 0;
+        int imported = 0;
+        var log = new SkipLog();
         var existing = new HashSet<string>(engine.Rules.Select(r => r.Name), StringComparer.OrdinalIgnoreCase);
 
+        int lineNo = 0;
         foreach (var raw in File.ReadAllLines(path))
         {
+            lineNo++;
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#name", StringComparison.OrdinalIgnoreCase)) continue;
 
             var args = DirectiveArgs(line, "#name");
-            if (args is null || args.Count < 2) { skipped++; continue; }
+            if (args is null || args.Count < 2) { log.Drop(lineNo, line, "not a recognised #name directive"); continue; }
 
             var (fg, bg) = ParseColorPair(args[0]);
             var name = args[1].Trim();
-            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(fg)) { skipped++; continue; }
+            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(fg)) { log.Drop(lineNo, line, "name or foreground colour is empty"); continue; }
 
-            if (mode == ImportMode.AddOnly && existing.Contains(name)) { skipped++; continue; }
+            if (mode == ImportMode.AddOnly && existing.Contains(name)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             engine.Add(name, fg, bg);
             existing.Add(name);
             imported++;
         }
-        return new ImportResult(imported, skipped);
+        return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
 
     // ── Presets ─────────────────────────────────────────────────────────────
@@ -501,22 +623,25 @@ public static class Genie4Importer
     {
         if (mode == ImportMode.Replace) engine.ResetToDefaults();
 
-        int imported = 0, skipped = 0;
+        int imported = 0;
+        var log = new SkipLog();
         var existing = new HashSet<string>(engine.Presets.Keys, StringComparer.OrdinalIgnoreCase);
 
+        int lineNo = 0;
         foreach (var raw in File.ReadAllLines(path))
         {
+            lineNo++;
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#preset", StringComparison.OrdinalIgnoreCase)) continue;
 
             var m = PresetPattern.Match(line);
-            if (!m.Success) { skipped++; continue; }
+            if (!m.Success) { log.Drop(lineNo, line, "not a recognised #preset directive"); continue; }
 
             var id = m.Groups["id"].Value.Trim();
-            if (string.IsNullOrEmpty(id)) { skipped++; continue; }
+            if (string.IsNullOrEmpty(id)) { log.Drop(lineNo, line, "preset id is empty"); continue; }
 
-            if (mode == ImportMode.AddOnly && existing.Contains(id)) { skipped++; continue; }
+            if (mode == ImportMode.AddOnly && existing.Contains(id)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             var (fg, bg) = ParseColorPair(m.Groups["colors"].Value);
             bool highlightLine = false;
@@ -536,7 +661,7 @@ public static class Genie4Importer
             existing.Add(id);
             imported++;
         }
-        return new ImportResult(imported, skipped);
+        return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
 
     // ── Variables ───────────────────────────────────────────────────────────
@@ -549,32 +674,35 @@ public static class Genie4Importer
     {
         if (mode == ImportMode.Replace) store.ClearUserVariables();
 
-        int imported = 0, skipped = 0;
+        int imported = 0;
+        var log = new SkipLog();
         var existing = new HashSet<string>(store.GetAll().Keys, StringComparer.OrdinalIgnoreCase);
 
+        int lineNo = 0;
         foreach (var raw in File.ReadAllLines(path))
         {
+            lineNo++;
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
 
             var m = VariablePattern.Match(line);
-            if (!m.Success) { skipped++; continue; }
+            if (!m.Success) { log.Drop(lineNo, line, "not a recognised #var directive"); continue; }
 
             var name  = m.Groups["name"].Value;
             var value = m.Groups["value"].Value;
-            if (string.IsNullOrEmpty(name)) { skipped++; continue; }
+            if (string.IsNullOrEmpty(name)) { log.Drop(lineNo, line, "variable name is empty"); continue; }
 
-            if (mode == ImportMode.AddOnly && existing.Contains(name)) { skipped++; continue; }
+            if (mode == ImportMode.AddOnly && existing.Contains(name)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             // Set() refuses reserved connection-state names (public #294) —
             // Genie 4's type-flip quirk means any profile that ever ran
             // `#var connected …` carries a stale connected row in
             // variables.cfg; count it as skipped, not imported.
-            if (!store.Set(name, value)) { skipped++; continue; }
+            if (!store.Set(name, value)) { log.Drop(lineNo, line, "the variable store refused this name (reserved connection-state variable)"); continue; }
             existing.Add(name);
             imported++;
         }
-        return new ImportResult(imported, skipped);
+        return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
 
     // ── Classes ─────────────────────────────────────────────────────────────
@@ -583,26 +711,29 @@ public static class Genie4Importer
     {
         if (mode == ImportMode.Replace) engine.Clear();
 
-        int imported = 0, skipped = 0;
+        int imported = 0;
+        var log = new SkipLog();
         var existing = new HashSet<string>(engine.Names, StringComparer.OrdinalIgnoreCase);
 
+        int lineNo = 0;
         foreach (var raw in File.ReadAllLines(path))
         {
+            lineNo++;
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#class", StringComparison.OrdinalIgnoreCase)) continue;
 
             var args = DirectiveArgs(line, "#class");
-            if (args is null || args.Count < 2) { skipped++; continue; }
+            if (args is null || args.Count < 2) { log.Drop(lineNo, line, "not a recognised #class directive"); continue; }
 
             var name  = args[0].Trim();
             var state = args[1].Trim().ToLowerInvariant();
             if (string.IsNullOrEmpty(name) || name.Equals("default", StringComparison.OrdinalIgnoreCase))
             {
-                skipped++;
+                log.Drop(lineNo, line, name.Length == 0 ? "class name is empty" : "the 'default' class is implicit");
                 continue;
             }
-            if (mode == ImportMode.AddOnly && existing.Contains(name)) { skipped++; continue; }
+            if (mode == ImportMode.AddOnly && existing.Contains(name)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             bool active = state switch
             {
@@ -614,7 +745,7 @@ public static class Genie4Importer
             existing.Add(name);
             imported++;
         }
-        return new ImportResult(imported, skipped);
+        return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
 
     // ── Shared helpers ──────────────────────────────────────────────────────

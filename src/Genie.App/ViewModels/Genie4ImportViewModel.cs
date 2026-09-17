@@ -370,27 +370,60 @@ public sealed class Genie4ImportViewModel : ReactiveObject
         sb.AppendLine($"Target scope: {(TargetIsGlobal ? "GLOBAL (all characters)" : "PER-CHARACTER (current profile only)")}");
         sb.AppendLine($"Mode: {Mode}");
         sb.AppendLine();
-        AppendLine(sb, "Highlights",  result.Highlights);
-        AppendLine(sb, "Triggers",    result.Triggers);
-        AppendLine(sb, "Substitutes", result.Substitutes);
-        AppendLine(sb, "Gags",        result.Gags);
-        AppendLine(sb, "Aliases",     result.Aliases);
-        AppendLine(sb, "Macros",      result.Macros);
-        AppendLine(sb, "Variables",   result.Variables);
-        AppendLine(sb, "Classes",     result.Classes);
+        // Every type the importer actually ran, including Names and Presets —
+        // they were missing from this list, so their counts never surfaced.
+        foreach (var (label, r) in result.All)
+            AppendLine(sb, label, r);
 
         if (result.MissingFiles.Count > 0)
         {
             sb.AppendLine();
             sb.AppendLine($"Missing files (skipped): {string.Join(", ", result.MissingFiles)}");
         }
+
+        AppendDropped(sb, result);
         return sb.ToString().TrimEnd();
     }
 
     private static void AppendLine(System.Text.StringBuilder sb, string label, ImportResult r)
     {
         if (r.Imported == 0 && r.Skipped == 0) return;
-        sb.AppendLine($"  {label}: {r.Imported} imported, {r.Skipped} skipped");
+
+        // Separate the skips that lost a rule from the ones that were
+        // expected, so "12 skipped" can no longer hide "12 destroyed".
+        var dropped = r.DroppedCount;
+        var detail  = dropped == 0
+            ? $"{r.Skipped} skipped"
+            : $"{r.Skipped} skipped ({dropped} NOT imported)";
+        sb.AppendLine($"  {label}: {r.Imported} imported, {detail}");
+    }
+
+    /// <summary>
+    /// List the lines that carried a rule and lost it, with the reason and the
+    /// line number so the user can go look. Capped per type so one malformed
+    /// file cannot bury the rest of the report.
+    /// </summary>
+    private static void AppendDropped(System.Text.StringBuilder sb, ImportAllResult result)
+    {
+        if (!result.AnyDropped) return;
+
+        const int PerTypeCap = 10;
+
+        sb.AppendLine();
+        sb.AppendLine($"NOT IMPORTED — {result.DroppedCount} rule(s) were in the files but could not be read:");
+
+        foreach (var (label, r) in result.All)
+        {
+            var dropped = r.Dropped.ToList();
+            if (dropped.Count == 0) continue;
+
+            sb.AppendLine();
+            sb.AppendLine($"  {label} ({dropped.Count}):");
+            foreach (var d in dropped.Take(PerTypeCap))
+                sb.AppendLine($"    {d}");
+            if (dropped.Count > PerTypeCap)
+                sb.AppendLine($"    … and {dropped.Count - PerTypeCap} more");
+        }
     }
 
     /// <summary>
