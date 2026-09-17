@@ -24,7 +24,7 @@ Out of the box you get a three-column arrangement:
 | --- | --- |
 | **Game** | The main scrolling game text. Supports clickable links and per-tag visibility (below). |
 | **Room** | Current room title, description, and obvious paths — split out from the game text so it's always glanceable. Creature names honor MonsterBold coloring. |
-| **Mobs**, **Players** | The creatures and the other players in the room, as two separate glanceable lists. |
+| **Mobs**, **Players** | The creatures and the other players in the room, as two separate glanceable lists. After you run `assess`, the Mobs list switches to the game's own assess view: the creatures in assess order with their numbers, each one's balance, where it is relative to you, and the range — plus whether it's hostile, engaged, or flying as that keeps changing. Click a creature to face it, or right-click for face / look. It returns to the plain list when you leave the room. |
 | **Inventory** | What you're carrying. |
 | **Vitals** | Health / mana / spirit / fatigue / concentration bars as a dockable panel (the same numbers as the bottom vitals strip). |
 | **Inventory View** | A searchable catalog of everything your characters own — person, vault, deed register, home, and Trader storage — with item weight/size columns and a player-shop price search. See [the Inventory View window](#the-inventory-view-window) below. |

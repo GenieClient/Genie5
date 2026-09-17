@@ -132,6 +132,21 @@ public sealed class CombatState
     /// keyed by the creature's <c>exist</c> object id (public #202). Cleared on
     /// room change — engagement is room-local.</summary>
     public ConcurrentDictionary<string, CreatureStatusReading> CreatureStatuses { get; } = new();
+
+    /// <summary>Latest <c>assess</c> result as structured rows (public #313).
+    /// Joins to <see cref="CreatureStatuses"/> on exist id — see
+    /// <see cref="TryGetCreatureStatus"/>. Cleared on room change with it.</summary>
+    public AssessSnapshot Assess { get; } = new();
+
+    /// <summary>Live combat flags for a creature by exist id — the join that
+    /// pairs an <see cref="AssessRow"/> (a point-in-time reading) with the
+    /// <c>&lt;crtrStatus&gt;</c> flags, which keep arriving after the assess.
+    /// False when the creature has sent no status this room.</summary>
+    public bool TryGetCreatureStatus(string? existId, out CreatureStatusReading status)
+    {
+        status = default;
+        return !string.IsNullOrEmpty(existId) && CreatureStatuses.TryGetValue(existId, out status);
+    }
 }
 
 /// <summary>Per-creature combat flags from <c>&lt;crtrStatus&gt;</c>. <see cref="Disengaged"/>

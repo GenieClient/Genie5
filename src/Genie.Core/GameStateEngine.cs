@@ -1,3 +1,4 @@
+using Genie.Core.Combat;
 using Genie.Core.Config;
 using Genie.Core.Events;
 using Genie.Core.Models;
@@ -17,6 +18,10 @@ public sealed class GameStateEngine : IDisposable
     private readonly Models.GameState        _state;
     private readonly ILogger<GameStateEngine> _log;
     private readonly IDisposable             _subscription;
+
+    /// <summary>Assess-stream block state machine — owns the accumulation into
+    /// <c>State.Combat.Assess</c> (public #313).</summary>
+    private readonly AssessTracker           _assess;
 
     public Models.GameState State => _state;
 
@@ -38,6 +43,9 @@ public sealed class GameStateEngine : IDisposable
         _state  = state;
         _log    = log;
         _utcNow = utcNow ?? (static () => DateTimeOffset.UtcNow);
+        // Shares the engine's clock so a test (or a replay) that fakes time
+        // sees a consistent CapturedAt.
+        _assess = new AssessTracker(state.Combat.Assess, () => _utcNow());
         _subscription = gameEvents.Subscribe(Apply);
     }
 
@@ -209,6 +217,9 @@ public sealed class GameStateEngine : IDisposable
                     // Engagement is room-local — the old room's creatures (and
                     // their exist ids) are gone once we move (public #202).
                     _state.Combat.CreatureStatuses.Clear();
+                    // The assess snapshot described THAT room's creatures by
+                    // the same exist ids, so it goes with them (public #313).
+                    _assess.Reset();
                 }
                 break;
 
@@ -216,6 +227,11 @@ public sealed class GameStateEngine : IDisposable
             case CreatureStatusEvent crtr:
                 _state.Combat.CreatureStatuses[crtr.ExistId] =
                     new CreatureStatusReading(crtr.Hostile, crtr.Disengaged, crtr.Flying);
+                break;
+
+            // ── Assess block reset (<clearStream id="assess"/>) ────────────
+            case ClearStreamEvent clear:
+                _assess.OnClearStream(clear.StreamId);
                 break;
 
             // ── Guild (from `info` verb) ──────────────────────────────────
@@ -397,6 +413,15 @@ public sealed class GameStateEngine : IDisposable
 
     private void ApplyText(TextEvent te)
     {
+        // Assess stream → structured rows (public #313). Nothing further down
+        // applies to it — the exp table is main-stream text — so it returns
+        // here rather than falling through.
+        if (string.Equals(te.Stream, AssessTracker.StreamId, StringComparison.OrdinalIgnoreCase))
+        {
+            _assess.OnText(te);
+            return;
+        }
+
         var text = te.Text;
         if (string.IsNullOrEmpty(text)) return;
 

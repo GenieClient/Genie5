@@ -510,7 +510,7 @@
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="8,6,8,2">
           <TextBlock Grid.Column="0" FontSize="10" VerticalAlignment="Center"
                      Foreground="{DynamicResource Theme.SectionHeader}" FontWeight="SemiBold"
-                     Text="{Binding ViewModel.Count, StringFormat='MOBS ({0})'}"/>
+                     Text="{Binding ViewModel.HeaderText}"/>
           <ToggleButton Grid.Column="1" Content="⚙" FontSize="11"
                         Padding="4,0" MinHeight="0" MinWidth="0"
                         Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Theme.SectionHeader}"
@@ -522,9 +522,77 @@
         <ScrollViewer Grid.Row="1">
           <StackPanel Margin="8,2,8,8">
             <TextBlock Text="No creatures here." Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"
-                       IsVisible="{Binding ViewModel.IsEmpty}"/>
+                       IsVisible="{Binding ViewModel.ShowEmptyPlaceholder}"/>
+
+            <!-- Assess rows (#313). Shown INSTEAD of the phrase list whenever an
+                 assess reading is live for this room: same creatures, but with
+                 the game's own order and numbering, the reported balance /
+                 position / range, the live crtrStatus flags joined on exist id,
+                 and the server's own face/look commands behind the click and
+                 the context menu. Clears back to the phrase list on room
+                 change, when the engine drops the snapshot. -->
+            <TextBlock Text="{Binding ViewModel.SelfLine}" FontSize="11" Margin="0,0,0,4"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource Theme.TextMuted}"
+                       IsVisible="{Binding ViewModel.HasAssess}"/>
+            <ItemsControl ItemsSource="{Binding ViewModel.AssessRows}"
+                          IsVisible="{Binding ViewModel.HasAssess}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:AssessRowItem">
+                  <!-- Left-click = face this creature, the panel's whole point:
+                       assess -> click the one you want, instead of assess ->
+                       scroll back -> retype. The raw line stays on the tooltip
+                       so nothing the server said is lost to the structured
+                       view. -->
+                  <Border Background="Transparent" Padding="0,2" Margin="0,1"
+                          ToolTip.Tip="{Binding RawText}">
+                    <Border.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Face" Command="{Binding FaceCommand}"
+                                  ToolTip.Tip="Turn to face this creature"/>
+                        <MenuItem Header="Look" Command="{Binding LookCommand}"
+                                  ToolTip.Tip="Look at this creature"/>
+                        <Separator/>
+                        <MenuItem Header="Ignore this creature"
+                                  Command="{Binding IgnoreCommand}"
+                                  ToolTip.Tip="Adds the exact phrase to the ignore list"/>
+                      </ContextMenu>
+                    </Border.ContextMenu>
+                    <Grid ColumnDefinitions="Auto,*">
+                      <TextBlock Grid.Column="0" Text="{Binding Number, StringFormat='{}{0}.'}"
+                                 FontSize="12" MinWidth="18" VerticalAlignment="Top"
+                                 Foreground="{DynamicResource Theme.TextMuted}"/>
+                      <StackPanel Grid.Column="1">
+                        <Button Padding="0" MinHeight="0" MinWidth="0" Cursor="Hand"
+                                HorizontalAlignment="Left" Background="Transparent"
+                                BorderThickness="0"
+                                Command="{Binding FaceCommand}"
+                                AutomationProperties.Name="Face this creature"
+                                ToolTip.Tip="Face this creature">
+                          <!-- Plain TextBlock, not Selectable: a
+                               SelectableTextBlock captures the pointer for text
+                               selection and the click would never reach the
+                               Button. The full line stays selectable in the
+                               Assess stream window, and is on this row's
+                               tooltip. -->
+                          <TextBlock controls:InlinesBehavior.Source="{Binding Inlines}"
+                                     Foreground="{Binding Foreground}"
+                                     FontSize="12" TextWrapping="Wrap"/>
+                        </Button>
+                        <TextBlock Text="{Binding Detail}" FontSize="10" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Theme.TextMuted}"/>
+                        <TextBlock Text="{Binding Flags}" FontSize="10" TextWrapping="Wrap"
+                                   IsVisible="{Binding HasFlags}"
+                                   Foreground="{DynamicResource Theme.SectionHeader}"/>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
             <ItemsControl ItemsSource="{Binding ViewModel.Mobs}"
-                          IsVisible="{Binding !ViewModel.IsEmpty}">
+                          IsVisible="{Binding !ViewModel.HasAssess}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="vm:MobItem">
                   <!-- Inlines = the shared highlight pipeline (user rules paint

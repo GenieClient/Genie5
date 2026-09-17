@@ -18,16 +18,19 @@ namespace Genie.Core.Tests;
 /// untracked scratch note until this file; #313 quotes the same bytes.
 /// </para>
 /// <para>
-/// Nothing in #313 is built yet. This class does NOT test the feature — it
-/// pins what today's parser already hands a future Mobs/Assess panel, so the
-/// raw material survives in the repo and a regression in it shows up here
-/// rather than in whoever picks #313 up. The finding worth recording: the
-/// join #313 asks for needs no new parser work. Every assess line already
-/// arrives as its own <see cref="TextEvent"/> on the <c>assess</c> stream, in
-/// the game's own assess order, carrying the creature's exist id in its
+/// This class pins the PARSER half only — that every assess line arrives as
+/// its own <see cref="TextEvent"/> on the <c>assess</c> stream, in the game's
+/// own assess order, carrying the creature's exist id in its
 /// <see cref="LinkSpan"/>s — the same ids <c>&lt;crtrStatus&gt;</c> keys
-/// <c>GameState.Combat.CreatureStatuses</c> by. The gap is entirely in the UI
-/// layer: line parsing (balance / position / range), the join, and the rows.
+/// <c>GameState.Combat.CreatureStatuses</c> by. That was the finding behind
+/// the fixture: the join #313 asks for needed no new parser work at all.
+/// </para>
+/// <para>
+/// The feature itself is now built on top of exactly this: see
+/// <see cref="AssessRowsTests"/> for the structured rows
+/// (<c>GameState.Combat.Assess</c>) and the Mobs panel that renders them.
+/// Keeping the two classes separate is deliberate — a failure here means the
+/// stream itself changed shape, a failure there means the row parsing did.
 /// </para>
 /// <para>
 /// Related: <see cref="CrtrStatusCoverageTests"/> (public #202) pins the
@@ -36,25 +39,10 @@ namespace Genie.Core.Tests;
 /// </summary>
 public class AssessStreamCaptureTests
 {
-    /// <summary>
-    /// simtel12's capture, verbatim, in DR's CRLF wire framing.
-    /// <para>
-    /// Four creatures, numbered in assess order, each line linking
-    /// <c>look #ID</c> on the name and <c>face #ID</c> on the trailing "F".
-    /// Note the leading <c>pushStream</c>+<c>clearStream</c> pair, the blank
-    /// line after the header, and that every line re-pushes the stream after a
-    /// <c>popStream</c> — the block is not one continuous push.
-    /// </para>
-    /// </summary>
-    private const string Capture =
-        "<pushStream id=\"assess\"/><clearStream id=\"assess\"/>You assess your combat situation...\r\n" +
-        "\r\n" +
-        "<popStream/><pushStream id=\"assess\"/>You (solidly balanced) are facing <d cmd='look #45029699'>a sleazy lout</d> (1) at pole weapon range.\r\n" +
-        "<popStream/><pushStream id=\"assess\"/><d cmd='look #45029699'>A sleazy lout</d> (1: nimbly balanced) is facing you at pole weapon range. | <d cmd='face #45029699'>F</d>\r\n" +
-        "<popStream/><pushStream id=\"assess\"/><d cmd='look #45029702'>A sleazy lout</d> (2: solidly balanced) is behind you at pole weapon range. | <d cmd='face #45029702'>F</d>\r\n" +
-        "<popStream/><pushStream id=\"assess\"/><d cmd='look #45029705'>A sleazy lout</d> (3: badly balanced) is behind you at pole weapon range. | <d cmd='face #45029705'>F</d>\r\n" +
-        "<popStream/><pushStream id=\"assess\"/><d cmd='look #45029711'>A sleazy lout</d> (4: badly balanced) is moving to flank you at pole weapon range. | <d cmd='face #45029711'>F</d>\r\n" +
-        "<popStream/><pushStream id=\"assess\"/>\r\n";
+    /// <summary>The capture itself lives in <see cref="AssessCapture"/> — the
+    /// structured-row tests in <see cref="AssessRowsTests"/> feed the same
+    /// bytes, and the two halves must not drift apart.</summary>
+    private const string Capture = AssessCapture.Block;
 
     [Fact]
     public void Capture_produces_no_unknown_tags()
