@@ -136,13 +136,16 @@
 
        Layout (mirrors dylb0t's structure for easy upstream sync):
          Assets/app.ico                — Windows EXE icon (ApplicationIcon above)
-         Assets/app.icns               — macOS .app bundle icon (passed to vpk pack in CI)
+         Assets/app.icns               — macOS .app bundle icon. On disk only:
+                                         release.yml passes its PATH to vpk pack,
+                                         so it is deliberately NOT an
+                                         AvaloniaResource (it was embedded in all
+                                         four lanes for nothing, 2.23 MB).
          Assets/app.png                — Linux + Window.Icon source via avares://
          Assets/Icons/*.png            — 23 status + compass glyphs
          Assets/Genie5_iconset/*.png   — macOS iconutil source (regen-only, NOT embedded)
   -->
   <ItemGroup>
-    <AvaloniaResource Include="Assets/app.icns" />
     <AvaloniaResource Include="Assets/app.png" />
     <AvaloniaResource Include="Assets/Icons/*.png" />
     <!-- 16 body-part sprites for the Injuries panel, one per DR hit-test

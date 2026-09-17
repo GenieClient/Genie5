@@ -86,12 +86,8 @@ Voices/
 _refs/
 
 # ─── Agent / IDE context ──────────────────────────────────────────────────
-# Per-developer agent project memory and IDE state — contains personal
-# notes, in-progress checkpoints, character references, etc. Each
-# contributor keeps their own.
-.claude/
-.cursor/
-.aider*
+# The agent/IDE scratch directories are listed in the first block above; only
+# this per-developer override lives here.
 CLAUDE.local.md
 
 # ─── Personal gameplay scripts (per-machine, not for the repo) ────────────

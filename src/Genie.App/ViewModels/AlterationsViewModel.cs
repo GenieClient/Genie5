@@ -184,13 +184,3 @@ public class AlterationsViewModel : ReactiveObject
         foreach (var d in _library.Designs) Designs.Add(d);
     }
 }
-
-/// <summary>
-/// One entry in the Alterations ▸ Saved Designs submenu. Mirrors
-/// <see cref="LayoutMenuItem"/> / <see cref="ThemeMenuItem"/>: a display string
-/// plus the index the command needs, so the menu can be rebuilt from the live
-/// library on every open without holding view state.
-/// </summary>
-/// <param name="Index">Position in <see cref="AlterationsViewModel.Designs"/>.</param>
-/// <param name="Display">Menu label — the design's title, tap, or short tap.</param>
-public readonly record struct AlterationMenuItem(int Index, string Display);
