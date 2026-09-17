@@ -38,9 +38,6 @@ The csproj defaults make `dotnet publish` emit a single self-contained executabl
 # Windows x64
 dotnet publish src/Genie.App -c Release -r win-x64   -o publish/win-x64
 
-# Windows arm64
-dotnet publish src/Genie.App -c Release -r win-arm64 -o publish/win-arm64
-
 # macOS Apple Silicon
 dotnet publish src/Genie.App -c Release -r osx-arm64 -o publish/osx-arm64
 
@@ -50,6 +47,11 @@ dotnet publish src/Genie.App -c Release -r osx-x64   -o publish/osx-x64
 # Linux x64
 dotnet publish src/Genie.App -c Release -r linux-x64 -o publish/linux-x64
 ```
+
+Those four RIDs are the ones `release.yml` builds. Windows on Arm is deliberately
+not among them — no release has ever shipped a win-arm64 package, and x64 emulation
+covers Arm laptops today. Adding it would mean a CI leg, a Velopack channel, a
+signing pass and an updater channel mapping, so it waits for real demand (#291).
 
 Each produces a single `Genie5` / `Genie5.exe` that a tester can copy and double-click — no .NET install, no loose DLLs.
 
