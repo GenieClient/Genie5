@@ -268,6 +268,11 @@ public sealed class ScriptEngine
         // first-class dock window fed by CatalogChanged (not the text-window seam).
         // Always on — it costs nothing until a scan runs.
         Extensions.Register(new global::Genie.Core.Extensions.Builtin.InventoryView.InventoryViewExtension());
+        // SimuCoins: command-driven (/sc, /sca) store balance + reward claim. Its
+        // credentials come from the profile store, which lives in the app layer, so
+        // the host wires AccountProvider after construction the same way it gates
+        // the trackers from settings.cfg. Never runs on its own (public #328).
+        Extensions.Register(new global::Genie.Core.Extensions.Builtin.SimuCoins.SimuCoinsExtension());
         Directory.CreateDirectory(_scriptsDir);
 
         _js = new JsScriptRuntime(

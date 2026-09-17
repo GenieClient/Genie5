@@ -4886,6 +4886,36 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             _core.Metrics.Record(Genie.Core.Diagnostics.PipelineStage.JavaScript, ms);
         Perf.JsStatsProvider = () => _core.Scripts.JsRunningStats();
 
+        // SimuCoins (#328) gets its credentials from here rather than keeping its
+        // own account file the way the Genie 4 plugin did — these are the same
+        // play.net credentials the profile store already holds. Core can't reach
+        // ProfileStore (it lives in the app layer), so the provider is injected.
+        if (_core.Scripts.Extensions.Extensions
+                .OfType<Genie.Core.Extensions.Builtin.SimuCoins.SimuCoinsExtension>()
+                .FirstOrDefault() is { } simuCoins)
+        {
+            simuCoins.AccountProvider = all =>
+            {
+                // A password is only usable if one was actually saved; profiles that
+                // prompt for it every time have nothing to hand over.
+                var usable = (all
+                        ? Profiles.Profiles.AsEnumerable()
+                        : ConnectedProfile is { } cp ? new[] { cp } : Array.Empty<ConnectionProfile>())
+                    .Where(p => !string.IsNullOrWhiteSpace(p.AccountName)
+                             && !string.IsNullOrWhiteSpace(p.EncryptedPassword));
+
+                // One account commonly has a profile per character, so /sca would
+                // otherwise sign in to the same account several times over.
+                return usable
+                    .GroupBy(p => p.AccountName, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .Select(p => new Genie.Core.Extensions.Builtin.SimuCoins.SimuCoinsAccount(
+                        p.AccountName, Profiles.GetPassword(p)))
+                    .Where(a => !string.IsNullOrEmpty(a.Password))
+                    .ToList();
+            };
+        }
+
         // Wire <d cmd="..."> link clicks to the command pipeline so they
         // behave like the user typed the command. Mirror the ShowLinks
         // config gate so users can opt out of clickable styling entirely.
