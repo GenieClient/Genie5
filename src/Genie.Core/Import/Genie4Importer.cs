@@ -4,6 +4,7 @@ using Genie.Core.Classes;
 using Genie.Core.Gags;
 using Genie.Core.Highlights;
 using Genie.Core.Macros;
+using Genie.Core.Parsing;
 using Genie.Core.Presets;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
@@ -175,6 +176,40 @@ public static class Genie4Importer
         return n;
     }
 
+    // ── Directive tokenizing ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Split a <c>*.cfg</c> directive line into its <c>{braced}</c> arguments,
+    /// returning null when the line is not that directive.
+    /// </summary>
+    /// <remarks>
+    /// Each rule type used to have its own regex with <c>[^{}]*</c> for the
+    /// payload, which rejected any rule whose own text contained a brace —
+    /// and a Genie 4 payload very often does, because <c>#if</c>, <c>#eval</c>
+    /// and friends take braced arguments:
+    /// <code>
+    /// #trigger {^(\w+) appears to be aiming at you} {#if {$guild = Paladin} "#send glyph ward $1"}
+    /// </code>
+    /// Those lines were counted as "skipped" and silently never imported —
+    /// 9 triggers and 2 macros in the reference settings tree. Worse, the
+    /// runtime parses the very same text with
+    /// <see cref="ArgumentParser.ParseArgs"/> when a <c>.cfg</c> is replayed
+    /// through the command engine, so the importer and the client disagreed
+    /// about what a valid rule was. Using the one tokenizer for both removes
+    /// the divergence as well as the bug.
+    /// </remarks>
+    private static IReadOnlyList<string>? DirectiveArgs(string line, string verb)
+    {
+        var tokens = ArgumentParser.ParseArgs(line);
+        if (tokens.Count == 0 || !tokens[0].Equals(verb, StringComparison.OrdinalIgnoreCase))
+            return null;
+        return tokens.Count == 1 ? [] : tokens.Skip(1).ToList();
+    }
+
+    /// <summary>Argument at <paramref name="index"/>, or "" when absent.</summary>
+    private static string Arg(IReadOnlyList<string> args, int index) =>
+        index >= 0 && index < args.Count ? args[index] : string.Empty;
+
     // ── Aliases ─────────────────────────────────────────────────────────────
 
     private static readonly Regex AliasPattern = new(
@@ -214,10 +249,6 @@ public static class Genie4Importer
 
     // ── Triggers ────────────────────────────────────────────────────────────
 
-    private static readonly Regex TriggerPattern = new(
-        @"^\s*#trigger\s+\{(?<pat>[^{}]*)\}\s+\{(?<action>[^{}]*)\}(?:\s+\{(?<cls>[^{}]*)\})?\s*$",
-        RegexOptions.IgnoreCase);
-
     public static ImportResult ImportTriggers(string path, TriggerEngineFinal engine, ImportMode mode)
     {
         if (mode == ImportMode.Replace) engine.Clear();
@@ -231,10 +262,10 @@ public static class Genie4Importer
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#trigger", StringComparison.OrdinalIgnoreCase)) continue;
 
-            var m = TriggerPattern.Match(line);
-            if (!m.Success) { skipped++; continue; }
+            var args = DirectiveArgs(line, "#trigger");
+            if (args is null || args.Count < 2) { skipped++; continue; }
 
-            var pat = m.Groups["pat"].Value;
+            var pat = args[0];
             bool caseInsensitive = false;
             // Genie4 accepts both evaluated triggers (e/.../) and inline /.../i case-insensitive markers.
             if (pat.StartsWith("e/", StringComparison.OrdinalIgnoreCase) && pat.EndsWith('/'))
@@ -252,8 +283,8 @@ public static class Genie4Importer
 
             if (mode == ImportMode.AddOnly && existing.Contains(pat)) { skipped++; continue; }
 
-            var action = m.Groups["action"].Value;
-            var cls    = m.Groups["cls"].Success ? m.Groups["cls"].Value : string.Empty;
+            var action = Arg(args, 1);
+            var cls    = Arg(args, 2);
 
             engine.RemoveTrigger(pat);
             engine.AddTrigger(pat, action, caseSensitive: !caseInsensitive, isEnabled: true, className: cls);
@@ -264,10 +295,6 @@ public static class Genie4Importer
     }
 
     // ── Highlights ──────────────────────────────────────────────────────────
-
-    private static readonly Regex HighlightPattern = new(
-        @"^\s*#highlight\s+\{(?<type>[^{}]*)\}\s+\{(?<colors>[^{}]*)\}\s+\{(?<pattern>[^{}]*)\}(?:\s+\{(?<cls>[^{}]*)\})?(?:\s+\{[^{}]*\})?\s*$",
-        RegexOptions.IgnoreCase);
 
     public static ImportResult ImportHighlights(string path, HighlightEngine engine, ImportMode mode)
     {
@@ -282,14 +309,14 @@ public static class Genie4Importer
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#highlight", StringComparison.OrdinalIgnoreCase)) continue;
 
-            var m = HighlightPattern.Match(line);
-            if (!m.Success) { skipped++; continue; }
+            var args = DirectiveArgs(line, "#highlight");
+            if (args is null || args.Count < 3) { skipped++; continue; }
 
-            var matchType = ParseMatchType(m.Groups["type"].Value);
+            var matchType = ParseMatchType(args[0]);
             if (matchType is null) { skipped++; continue; }
 
-            var (fg, bg)    = ParseColorPair(m.Groups["colors"].Value);
-            var rulePattern = m.Groups["pattern"].Value;
+            var (fg, bg)    = ParseColorPair(args[1]);
+            var rulePattern = args[2];
             if (string.IsNullOrEmpty(rulePattern) || string.IsNullOrEmpty(fg)) { skipped++; continue; }
 
             if (matchType == HighlightMatchType.Regex)
@@ -300,7 +327,7 @@ public static class Genie4Importer
 
             if (mode == ImportMode.AddOnly && existing.Contains(rulePattern)) { skipped++; continue; }
 
-            var cls = m.Groups["cls"].Success ? m.Groups["cls"].Value : string.Empty;
+            var cls = Arg(args, 3);
 
             engine.RemoveRule(rulePattern);
             engine.AddRule(rulePattern, fg, bg, matchType.Value, caseSensitive: false, isEnabled: true, className: cls);
@@ -323,10 +350,6 @@ public static class Genie4Importer
 
     // ── Substitutes ─────────────────────────────────────────────────────────
 
-    private static readonly Regex SubsPattern = new(
-        @"^\s*#subs\s+\{(?<pat>[^{}]*)\}\s+\{(?<repl>[^{}]*)\}(?:\s+\{(?<cls>[^{}]*)\})?\s*$",
-        RegexOptions.IgnoreCase);
-
     public static ImportResult ImportSubstitutes(string path, SubstituteEngine engine, ImportMode mode)
     {
         if (mode == ImportMode.Replace) engine.Clear();
@@ -340,10 +363,10 @@ public static class Genie4Importer
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#subs", StringComparison.OrdinalIgnoreCase)) continue;
 
-            var m = SubsPattern.Match(line);
-            if (!m.Success) { skipped++; continue; }
+            var args = DirectiveArgs(line, "#subs");
+            if (args is null || args.Count < 2) { skipped++; continue; }
 
-            var pat = m.Groups["pat"].Value;
+            var pat = args[0];
             bool caseInsensitive = false;
             if (pat.StartsWith('/')) pat = pat[1..];
             if (pat.EndsWith("/i", StringComparison.OrdinalIgnoreCase)) { caseInsensitive = true; pat = pat[..^2]; }
@@ -355,8 +378,8 @@ public static class Genie4Importer
 
             if (mode == ImportMode.AddOnly && existing.Contains(pat)) { skipped++; continue; }
 
-            var repl = m.Groups["repl"].Value;
-            var cls  = m.Groups["cls"].Success ? m.Groups["cls"].Value : string.Empty;
+            var repl = Arg(args, 1);
+            var cls  = Arg(args, 2);
 
             engine.RemoveRule(pat);
             engine.AddRule(pat, repl, caseSensitive: !caseInsensitive, isEnabled: true, className: cls);
@@ -367,10 +390,6 @@ public static class Genie4Importer
     }
 
     // ── Gags ────────────────────────────────────────────────────────────────
-
-    private static readonly Regex GagPattern = new(
-        @"^\s*#gag\s+\{(?<pat>[^{}]*)\}(?:\s+\{(?<cls>[^{}]*)\})?\s*$",
-        RegexOptions.IgnoreCase);
 
     public static ImportResult ImportGags(string path, GagEngine engine, ImportMode mode)
     {
@@ -385,10 +404,10 @@ public static class Genie4Importer
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#gag", StringComparison.OrdinalIgnoreCase)) continue;
 
-            var m = GagPattern.Match(line);
-            if (!m.Success) { skipped++; continue; }
+            var args = DirectiveArgs(line, "#gag");
+            if (args is null || args.Count < 1) { skipped++; continue; }
 
-            var pat = m.Groups["pat"].Value;
+            var pat = args[0];
             bool caseInsensitive = false;
             if (pat.StartsWith('/')) pat = pat[1..];
             if (pat.EndsWith("/i", StringComparison.OrdinalIgnoreCase)) { caseInsensitive = true; pat = pat[..^2]; }
@@ -400,7 +419,7 @@ public static class Genie4Importer
 
             if (mode == ImportMode.AddOnly && existing.Contains(pat)) { skipped++; continue; }
 
-            var cls = m.Groups["cls"].Success ? m.Groups["cls"].Value : string.Empty;
+            var cls = Arg(args, 1);
 
             engine.RemoveRule(pat);
             engine.AddRule(pat, caseSensitive: !caseInsensitive, isEnabled: true, className: cls);
@@ -411,10 +430,6 @@ public static class Genie4Importer
     }
 
     // ── Macros ──────────────────────────────────────────────────────────────
-
-    private static readonly Regex MacroPattern = new(
-        @"^\s*#macro\s+\{(?<key>[^{}]*)\}\s+\{(?<action>[^{}]*)\}\s*$",
-        RegexOptions.IgnoreCase);
 
     public static ImportResult ImportMacros(string path, MacroEngine engine, ImportMode mode)
     {
@@ -429,11 +444,11 @@ public static class Genie4Importer
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#macro", StringComparison.OrdinalIgnoreCase)) continue;
 
-            var m = MacroPattern.Match(line);
-            if (!m.Success) { skipped++; continue; }
+            var args = DirectiveArgs(line, "#macro");
+            if (args is null || args.Count < 2) { skipped++; continue; }
 
-            var key    = m.Groups["key"].Value.Trim();
-            var action = m.Groups["action"].Value;
+            var key    = args[0].Trim();
+            var action = args[1];
             if (string.IsNullOrEmpty(key)) { skipped++; continue; }
 
             if (mode == ImportMode.AddOnly && existing.Contains(key)) { skipped++; continue; }
@@ -446,10 +461,6 @@ public static class Genie4Importer
     }
 
     // ── Names ───────────────────────────────────────────────────────────────
-
-    private static readonly Regex NamePattern = new(
-        @"^\s*#name\s+\{(?<colors>[^{}]*)\}\s+\{(?<name>[^{}]*)\}(?:\s+\{[^{}]*\}){0,2}\s*$",
-        RegexOptions.IgnoreCase);
 
     public static ImportResult ImportNames(string path, NameHighlightEngine engine, ImportMode mode)
     {
@@ -464,11 +475,11 @@ public static class Genie4Importer
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#name", StringComparison.OrdinalIgnoreCase)) continue;
 
-            var m = NamePattern.Match(line);
-            if (!m.Success) { skipped++; continue; }
+            var args = DirectiveArgs(line, "#name");
+            if (args is null || args.Count < 2) { skipped++; continue; }
 
-            var (fg, bg) = ParseColorPair(m.Groups["colors"].Value);
-            var name = m.Groups["name"].Value.Trim();
+            var (fg, bg) = ParseColorPair(args[0]);
+            var name = args[1].Trim();
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(fg)) { skipped++; continue; }
 
             if (mode == ImportMode.AddOnly && existing.Contains(name)) { skipped++; continue; }
@@ -568,10 +579,6 @@ public static class Genie4Importer
 
     // ── Classes ─────────────────────────────────────────────────────────────
 
-    private static readonly Regex ClassPattern = new(
-        @"^\s*#class\s+\{(?<name>[^{}]*)\}\s+\{(?<state>[^{}]*)\}\s*$",
-        RegexOptions.IgnoreCase);
-
     public static ImportResult ImportClasses(string path, ClassEngine engine, ImportMode mode)
     {
         if (mode == ImportMode.Replace) engine.Clear();
@@ -585,11 +592,11 @@ public static class Genie4Importer
             if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
             if (!line.StartsWith("#class", StringComparison.OrdinalIgnoreCase)) continue;
 
-            var m = ClassPattern.Match(line);
-            if (!m.Success) { skipped++; continue; }
+            var args = DirectiveArgs(line, "#class");
+            if (args is null || args.Count < 2) { skipped++; continue; }
 
-            var name  = m.Groups["name"].Value.Trim();
-            var state = m.Groups["state"].Value.Trim().ToLowerInvariant();
+            var name  = args[0].Trim();
+            var state = args[1].Trim().ToLowerInvariant();
             if (string.IsNullOrEmpty(name) || name.Equals("default", StringComparison.OrdinalIgnoreCase))
             {
                 skipped++;

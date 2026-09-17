@@ -14,6 +14,16 @@ namespace Genie.Core.Parsing;
 /// Brace grouping is what scripts and saved <c>*.cfg</c> files rely on, so it
 /// must survive a save-then-load round-trip without splitting on the spaces
 /// inside the braces.
+/// <para>
+/// A backslash escapes the next character so it cannot delimit — Genie 4's
+/// <c>Utility.ParseArgs</c> does the same, and so does <see cref="SafeSplit"/>
+/// here (#132). The backslash is <b>preserved</b> in the output, because
+/// Genie 4 takes substrings and never unescapes at this stage; a regex
+/// pattern like <c>\w+</c> or <c>\.</c> therefore passes through untouched,
+/// and only <c>\{</c> / <c>\}</c> / <c>\"</c> change grouping. Without this,
+/// <c>#macro {Z, Alt} {\\x;'\}$speak @}</c> had its group closed by the
+/// escaped brace and tokenized into nonsense.
+/// </para>
 /// </summary>
 public static class ArgumentParser
 {
@@ -32,10 +42,17 @@ public static class ArgumentParser
         // shifted every later $-arg left, so $5 (the window name) came up
         // empty and the menu redraw cleared the main Game window.
         var grouped   = false;
+        var escaped   = false;   // previous char was an unconsumed backslash
 
         for (int i = 0; i < text.Length; i++)
         {
             var ch = text[i];
+
+            // Escapes are checked before everything else, in every context, so
+            // an escaped delimiter is only ever content. Both characters are
+            // kept (Genie 4 does not unescape here).
+            if (escaped)      { current.Append(ch); escaped = false; continue; }
+            if (ch == '\\')   { current.Append(ch); escaped = true;  continue; }
 
             // Inside a quoted run, only " and { tracking matter (and {…} are
             // literal characters that don't open groups inside quotes).
@@ -100,19 +117,23 @@ public static class ArgumentParser
         var braceDepth = 0;
         var inToken    = false;
         var tokens     = 0;
+        var escaped    = false;   // must mirror ParseArgs, or the two disagree
 
         for (int i = 0; i < text.Length; i++)
         {
             var ch = text[i];
+            if (escaped) { escaped = false; continue; }
             if (inQuotes)
             {
-                if (ch == '"') inQuotes = false;
+                if      (ch == '\\') escaped  = true;
+                else if (ch == '"')  inQuotes = false;
                 continue;
             }
             if (braceDepth > 0)
             {
-                if      (ch == '{') braceDepth++;
-                else if (ch == '}') braceDepth--;
+                if      (ch == '\\') escaped = true;
+                else if (ch == '{')  braceDepth++;
+                else if (ch == '}')  braceDepth--;
                 continue;
             }
             if (ch == ' ' || ch == '\t')
@@ -125,8 +146,9 @@ public static class ArgumentParser
                 if (tokens == skipTokens) return text[i..].TrimEnd();
                 inToken = true;
             }
-            if      (ch == '"') inQuotes   = true;
-            else if (ch == '{') braceDepth = 1;
+            if      (ch == '\\') escaped    = true;
+            else if (ch == '"')  inQuotes   = true;
+            else if (ch == '{')  braceDepth = 1;
         }
         return string.Empty;
     }
