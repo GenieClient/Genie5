@@ -85,6 +85,21 @@ Not every tool belongs in the layout. **Alterations** is its own top-level menu 
 
 **Alterations ▸ Open Designer…** gives you the four alteration fields with live length counters, builds the request line as you type, and keeps a library of designs shared across your characters. It works entirely offline, before you connect. If you used the Alteration Buddy plugin in Genie 4, your `alterations.csv` imports straight in. See [Alterations](Alterations).
 
+## SimuCoins
+
+`/sc` signs in to [store.play.net](https://store.play.net/), reports your SimuCoin balance and how long until your next subscription reward, and claims that reward if one is already waiting.
+
+- `/sc` — the account you're connected as. No arguments: Genie already has these credentials if you saved the password with your profile.
+- `/sc <account> <password>` — some other account, one off. Nothing is stored.
+- `/sca` — every distinct account across your saved profiles, one after another. An account with a profile per character is only checked once.
+- `/sct` and `/sctext` are aliases of `/sc`, and `/scall` of `/sca`, for Genie 4 muscle memory. Type `/sc help` for the list.
+
+**It only ever runs because you typed it.** There's no timer, no check at connect, and no trigger shipped for it. The Genie 4 plugin's README suggested a `^Welcome to DragonRealms` trigger firing `/sca` at every login; that isn't shipped and isn't recommended. You can write one yourself, but that's your call to make rather than a default.
+
+If the store is redesigned, a check will say it couldn't read the page rather than quietly reporting a balance of zero — the page is scraped, so it's expected to need repair from time to time.
+
+This is a rebuild of Thires's Genie 4 **SimuCoins** plugin, with his blessing.
+
 ## The bottom strips
 
 ![The bottom strips — vitals bars, hands strip with a prepared spell and cast bar, roundtime counter, and the command bar](images/interface-bottom-strips.png)
