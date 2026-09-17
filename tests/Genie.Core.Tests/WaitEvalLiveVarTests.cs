@@ -124,8 +124,17 @@ public class WaitEvalLiveVarTests : IDisposable
     [Fact]
     public void Waiteval_re_reads_the_unixtime_clock_pseudo_var()
     {
-        // One second out — $unixtime has whole-second granularity, so this is
-        // the shortest transition it can actually express.
+        // Wait out the current second first. $unixtime has whole-second
+        // granularity, so a target of "now + 1" gives however much of this
+        // second happens to be left — and if that is a few milliseconds, the
+        // deadline passes before the Assert.False below and the test fails on
+        // a correct engine. Crossing the boundary first buys the arming step a
+        // near-full second regardless of when the test starts.
+        var second = DateTimeOffset.Now.ToUnixTimeSeconds();
+        while (DateTimeOffset.Now.ToUnixTimeSeconds() == second)
+            System.Threading.Thread.Sleep(5);
+
+        // One second out — the shortest transition $unixtime can express.
         var target = DateTimeOffset.Now.ToUnixTimeSeconds() + 1;
         Start("s", $"waiteval $unixtime >= {target}\necho PASSED\n");
 
