@@ -81,6 +81,11 @@ The original authors, with thanks:
   ([mj-colonel-panic/AlterationBuddy](https://github.com/mj-colonel-panic/AlterationBuddy),
   GPL-3.0), source provided by the author for this purpose. Ported as the
   Alterations menu.
+- **SimuCoins** — *Thires* ([Thires/SimuCoins](https://github.com/Thires/SimuCoins)
+  v2.1.2, GPL-3.0), rebuilt with the author's blessing. Genie 5's built-in keeps
+  the store conversation and the `/sc` / `/sct` / `/sca` command spellings; the
+  plugin's own account file is not carried over, because the credentials are
+  already in your profile.
 
 Plugins that remain plugins are credited in their own `Plugin_*V5` repositories.
 
