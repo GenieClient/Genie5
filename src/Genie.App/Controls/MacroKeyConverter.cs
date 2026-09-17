@@ -14,7 +14,15 @@ namespace Genie.App.Controls;
 ///   at least one of Ctrl/Alt. Shift alone is treated as ordinary typing.</item>
 /// <item><c>ctrl+1</c>, <c>alt+0</c> — number-row digits with modifier.</item>
 /// <item><c>ctrl+num5</c>, <c>alt+num0</c> — numpad digits with modifier.</item>
+/// <item><c>num/</c>, <c>num*</c>, <c>num-</c>, <c>num+</c>, <c>num.</c> —
+///   numpad operators, with or without modifier.</item>
+/// <item><c>esc</c>, <c>shift+esc</c> — Escape, after the global kill switch
+///   has had its turn.</item>
 /// </list>
+/// Genie 4 spells these differently in <c>macros.cfg</c> (<c>NumPad5</c>,
+/// <c>Decimal</c>, <c>Escape</c>, <c>F1, Shift</c>); see
+/// <c>Genie.Core.Macros.MacroKeyNormalizer</c>, which maps that vocabulary
+/// onto this one at lookup time.
 /// Returns <c>null</c> for keystrokes that should never fire a macro or be
 /// captured into a macro-key field — plain letters, plain digits, navigation
 /// keys without modifiers, Tab/Enter, modifier keys themselves.
@@ -64,7 +72,21 @@ public static class MacroKeyConverter
             case Key.Multiply: return BuildKeyName("num*", mods);
             case Key.Subtract: return BuildKeyName("num-", mods);
             case Key.Add:      return BuildKeyName("num+", mods);
+            // Numpad '.' — the last seat on Genie 3/4's ten-key movement pad
+            // ({Decimal} {up} in the reference macros.cfg). Without this the
+            // imported binding had no key to fire from.
+            case Key.Decimal:  return BuildKeyName("num.", mods);
         }
+
+        // Escape. MainWindow.OnGlobalKeyDown already handles Esc as the
+        // always-available kill switch and deliberately falls through "so such
+        // a macro can still fire" when there is nothing to stop — but this
+        // method never produced an esc key, so that fallthrough could not
+        // resolve to anything. Genie 4's own default binding is
+        // {Escape} {#queue clear;#script abort all}, so the stop-first
+        // ordering upstream is what keeps the kill switch honest.
+        if (key == Key.Escape)
+            return BuildKeyName("esc", mods);
 
         return null;
     }
