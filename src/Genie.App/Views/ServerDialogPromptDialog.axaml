@@ -18,7 +18,7 @@
                FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"/>
 
     <TextBlock TextWrapping="Wrap" Opacity="0.85"
-               Text="DragonRealms wants to show a window Genie hasn't seen before. Where should it go? You can change this later in Configuration."/>
+               Text="DragonRealms wants to show a window Genie hasn't seen before. Where should it go? Your answer is saved with this profile, in dialogmappings.json — there is no settings page to change it yet."/>
 
     <Border BorderThickness="1" BorderBrush="{DynamicResource Theme.Border}"
             Padding="8" CornerRadius="3">
