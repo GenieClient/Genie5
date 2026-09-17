@@ -14,8 +14,10 @@ namespace Genie.Core.Mapper;
 ///   <item>UTF-8 without BOM, LF line endings, 2-space indent — matches the
 ///         conventions in the upstream repo so <c>git diff</c> output stays
 ///         minimal across forks and platforms.</item>
-///   <item>Position values are scaled back to pixel coordinates (X * 20, Y * 20)
-///         — Genie 4 stores pixels; we work in grid units internally.</item>
+///   <item>Position values are written as the pixel coordinates the zone was
+///         imported with. Genie 4 stores pixels and they are not all on the
+///         20px grid, so we keep them verbatim rather than recomputing them
+///         from the internal grid units.</item>
 ///   <item>Nodes are emitted in ascending node-id order so two clients walking
 ///         the same zone produce identical files.</item>
 ///   <item>The <c>server_id</c> attribute is a Genie 5 extension carrying the
@@ -95,17 +97,22 @@ public static class Genie4MapExporter
             if (tags.Length > 0) writer.WriteAttributeString("tags", tags);
         }
 
-        if (!string.IsNullOrEmpty(node.Description))
+        // Every description, in file order — a room may legitimately carry
+        // several (seasonal / day-night variants) and Genie 4 matches against
+        // all of them. Writing only the first erased the rest from disk.
+        foreach (var desc in node.Descriptions)
         {
             writer.WriteStartElement("description");
-            writer.WriteString(node.Description);
+            writer.WriteString(desc);
             writer.WriteEndElement();
         }
 
-        // Position — scale grid units back to pixels (importer divides by 20).
+        // Position — the authoritative pixel values, verbatim. Recomputing
+        // these as X*20 re-snapped every off-grid room to the 20px grid (44.6%
+        // of the corpus) and skewed negative coordinates. See MapNode.PixelX.
         writer.WriteStartElement("position");
-        writer.WriteAttributeString("x", (node.X * 20).ToString());
-        writer.WriteAttributeString("y", (node.Y * 20).ToString());
+        writer.WriteAttributeString("x", node.PixelX.ToString());
+        writer.WriteAttributeString("y", node.PixelY.ToString());
         writer.WriteAttributeString("z", node.Z.ToString());
         writer.WriteEndElement();
 
@@ -116,11 +123,31 @@ public static class Genie4MapExporter
         foreach (var exit in node.Exits)
         {
             writer.WriteStartElement("arc");
-            writer.WriteAttributeString("exit", exit.Direction.ToString().ToLowerInvariant());
+            // The raw token wins over the parsed Direction. Direction has no
+            // Go/Climb member, so writing Direction.ToString() turned 22.0% of
+            // community arcs into exit="none" and destroyed multi-word tokens
+            // like "go branches". See MapExit.ExitToken.
+            // An arc with no exit token at all is legal Genie 4 (58 corpus
+            // arcs identify themselves by name= instead). Emit no exit
+            // attribute for those rather than inventing exit="none".
+            var exitToken = !string.IsNullOrEmpty(exit.ExitToken) ? exit.ExitToken
+                          : exit.Direction != Direction.None
+                                ? exit.Direction.ToString().ToLowerInvariant()
+                                : string.Empty;
+            if (!string.IsNullOrEmpty(exitToken))
+                writer.WriteAttributeString("exit", exitToken);
+            // Genie 4's legacy movement attribute, kept where the source used
+            // it so those arcs keep their command.
+            if (!string.IsNullOrEmpty(exit.LegacyName))
+                writer.WriteAttributeString("name", exit.LegacyName);
             writer.WriteAttributeString("move",
-                string.IsNullOrEmpty(exit.MoveCommand) ? exit.Direction.ToString().ToLowerInvariant() : exit.MoveCommand);
+                string.IsNullOrEmpty(exit.MoveCommand) ? exitToken : exit.MoveCommand);
+            if (!string.IsNullOrEmpty(exit.Hidden))
+                writer.WriteAttributeString("hidden", exit.Hidden);
             if (exit.DestinationId.HasValue)
                 writer.WriteAttributeString("destination", exit.DestinationId.Value.ToString());
+            else if (!string.IsNullOrEmpty(exit.RawDestination))
+                writer.WriteAttributeString("destination", exit.RawDestination);
             // Genie 5 extensions. Omitted when null/empty so PR diffs
             // against unchanged upstream maps stay minimal. Old Genie 4
             // clients silently ignore unknown attributes — backwards

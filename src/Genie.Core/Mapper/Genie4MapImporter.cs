@@ -59,10 +59,18 @@ public static class Genie4MapImporter
             Genie4Id = zoneEl.GetAttribute("id"),
         };
 
+        // A zone file may repeat a node id (Taisidon_Mystery.xml declares 256
+        // twice). Pass 1 lets the last declaration win for the node's own
+        // attributes; pass 2 must then read arcs from that SAME element, or it
+        // appends both elements' arcs onto one node and inflates the room's
+        // exits on every save. Keyed here so both passes agree on the winner.
+        var nodeElementById = new Dictionary<int, XmlElement>();
+
         // ── Pass 1: build all nodes (preserve Genie4 integer IDs) ────────────
         foreach (XmlElement nodeEl in zoneEl.SelectNodes("node")!)
         {
             if (!int.TryParse(nodeEl.GetAttribute("id"), out int nodeId)) continue;
+            nodeElementById[nodeId] = nodeEl;
 
             var node = new MapNode
             {
@@ -70,10 +78,13 @@ public static class Genie4MapImporter
                 Title = nodeEl.GetAttribute("name"),
             };
 
-            // Description — take the first <description> child
-            var descEl = nodeEl.SelectSingleNode("description");
-            if (descEl != null)
-                node.Description = descEl.InnerText.Trim();
+            // Descriptions — a node may carry several (seasonal / day-night
+            // variants), and some are empty. All of them are kept in file
+            // order so export can write them back. Taking only the first
+            // silently destroyed 4,731 elements across 3,963 nodes in the
+            // community corpus on the next save.
+            foreach (XmlElement descEl in nodeEl.SelectNodes("description")!)
+                node.Descriptions.Add(descEl.InnerText.Trim());
 
             // Note — Genie4 stores it as an attribute on <node>, with multiple
             // labels separated by '|' (used by #goto for label lookup).
@@ -109,20 +120,21 @@ public static class Genie4MapImporter
                 int.TryParse(posEl.GetAttribute("x"), out int px);
                 int.TryParse(posEl.GetAttribute("y"), out int py);
                 int.TryParse(posEl.GetAttribute("z"), out int pz);
-                // Genie4 uses pixel coordinates (multiples of ~20).
-                // Divide by 20 to convert to grid units.
-                node.X = px / 20;
-                node.Y = py / 20;
-                node.Z = pz;
+                // Keep the pixels verbatim; MapNode.X/Y derive the grid cell.
+                // The old `X = px / 20` moved 44.6% of corpus rooms (they are
+                // not all on the 20px grid) and truncated the 10,900 negative
+                // coordinates toward zero. See MapNode.PixelX.
+                node.PixelX = px;
+                node.PixelY = py;
+                node.Z      = pz;
             }
 
             zone.Nodes[nodeId] = node;
         }
 
         // ── Pass 2: resolve arcs ─────────────────────────────────────────────
-        foreach (XmlElement nodeEl in zoneEl.SelectNodes("node")!)
+        foreach (var (nodeId, nodeEl) in nodeElementById)
         {
-            if (!int.TryParse(nodeEl.GetAttribute("id"), out int nodeId)) continue;
             if (!zone.Nodes.TryGetValue(nodeId, out var node)) continue;
 
             foreach (XmlElement arcEl in nodeEl.SelectNodes("arc")!)
@@ -131,6 +143,11 @@ public static class Genie4MapImporter
                 var moveStr     = arcEl.GetAttribute("move");
                 var destStr     = arcEl.GetAttribute("destination");
                 var requiresStr = arcEl.GetAttribute("requires");
+                // Genie 4 legacy attributes. `name` is the pre-`move` spelling
+                // of the movement command (58 corpus arcs still use it, and
+                // Genie 4 falls back to it); `hidden` marks an undrawn arc.
+                var nameStr     = arcEl.GetAttribute("name");
+                var hiddenStr   = arcEl.GetAttribute("hidden");
                 // Phase 3 additions — optional in zone XML, fall back to null
                 // when absent. Old Genie 4 client ignores unknown attributes,
                 // preserving backwards compat for round-trip.
@@ -142,21 +159,38 @@ public static class Genie4MapImporter
 
                 var dir = DirectionHelper.Parse(exitStr);
 
+                // A dangling destination (id not in this zone) stays out of
+                // DestinationId so the pathfinder ignores it, but the raw text
+                // is kept so export doesn't erase what Genie 4 preserves.
                 int? destId = null;
-                if (int.TryParse(destStr, out int parsedDest) && zone.Nodes.ContainsKey(parsedDest))
-                    destId = parsedDest;
+                string rawDest = string.Empty;
+                if (int.TryParse(destStr, out int parsedDest))
+                {
+                    if (zone.Nodes.ContainsKey(parsedDest)) destId  = parsedDest;
+                    else                                    rawDest = destStr.Trim();
+                }
+
+                // Movement command precedence mirrors Genie 4: move, then the
+                // legacy name attribute, then the bare exit token.
+                var move = !string.IsNullOrEmpty(moveStr) ? moveStr
+                         : !string.IsNullOrEmpty(nameStr) ? nameStr
+                         : exitStr;
 
                 node.Exits.Add(new MapExit
                 {
-                    Direction     = dir,
-                    MoveCommand   = string.IsNullOrEmpty(moveStr) ? exitStr : moveStr,
-                    DestinationId = destId,
-                    Requires      = requiresStr?.Trim() ?? string.Empty,
-                    RtCost        = int.TryParse(rtStr,      out var rt)      ? rt      : null,
-                    WaitMin       = int.TryParse(waitMinStr, out var waitMin) ? waitMin : null,
-                    WaitMax       = int.TryParse(waitMaxStr, out var waitMax) ? waitMax : null,
-                    Environment   = envStr?.Trim() ?? string.Empty,
-                    Notes         = notesStr?.Trim() ?? string.Empty,
+                    Direction      = dir,
+                    ExitToken      = exitStr,
+                    LegacyName     = nameStr?.Trim()   ?? string.Empty,
+                    Hidden         = hiddenStr?.Trim() ?? string.Empty,
+                    RawDestination = rawDest,
+                    MoveCommand    = move,
+                    DestinationId  = destId,
+                    Requires       = requiresStr?.Trim() ?? string.Empty,
+                    RtCost         = int.TryParse(rtStr,      out var rt)      ? rt      : null,
+                    WaitMin        = int.TryParse(waitMinStr, out var waitMin) ? waitMin : null,
+                    WaitMax        = int.TryParse(waitMaxStr, out var waitMax) ? waitMax : null,
+                    Environment    = envStr?.Trim() ?? string.Empty,
+                    Notes          = notesStr?.Trim() ?? string.Empty,
                 });
             }
         }
@@ -169,10 +203,10 @@ public static class Genie4MapImporter
         // round-trip through Genie 5 doesn't silently destroy a map's labels.
         foreach (XmlElement labelEl in zoneEl.SelectNodes("label")!)
         {
-            var text = labelEl.GetAttribute("text");
-            if (string.IsNullOrEmpty(text)) continue;
-
-            var label = new MapLabel { Text = text.Trim() };
+            // Empty-text labels are kept too: six exist in the community
+            // corpus, and skipping them deleted the element from the file on
+            // the next save.
+            var label = new MapLabel { Text = labelEl.GetAttribute("text").Trim() };
             if (labelEl.SelectSingleNode("position") is XmlElement lpos)
             {
                 int.TryParse(lpos.GetAttribute("x"), out int lx);

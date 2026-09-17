@@ -7,6 +7,49 @@ public sealed class MapExit
     public int?      DestinationId { get; set; }
 
     /// <summary>
+    /// The raw <c>exit="…"</c> token exactly as it appears on disk. Written
+    /// back verbatim by the exporter; <see cref="Direction"/> is only the
+    /// parsed compass hint derived from it.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Mapper.Direction"/> has no <c>Go</c> or <c>Climb</c> member,
+    /// so every non-compass arc parses to <see cref="Mapper.Direction.None"/>
+    /// — and the exporter, which wrote <c>Direction.ToString()</c>, turned all
+    /// of them into <c>exit="none"</c>. That is 13,056 of 59,382 arcs (22.0%)
+    /// in the community corpus, and it breaks Genie 4's own ability to follow
+    /// or author those portal arcs. It also flattened multi-word tokens the
+    /// enum can't express at all (<c>exit="go branches"</c>,
+    /// <c>exit="go moss"</c>). Keeping the token separate from the parsed
+    /// direction makes the round-trip exact without changing what the
+    /// pathfinder or automapper consider a walkable compass step.
+    /// </remarks>
+    public string    ExitToken     { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Genie 4's legacy <c>name="…"</c> arc attribute. On the 58 corpus arcs
+    /// that carry it instead of <c>move</c>, Genie 4 falls back to it for the
+    /// movement command; the importer now does the same, and the exporter
+    /// writes it back so those arcs don't lose their command on save.
+    /// </summary>
+    public string    LegacyName    { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Genie 4's <c>hidden="…"</c> arc flag (1,933 uses in the corpus) — an arc
+    /// the map canvas does not draw. Preserved verbatim for round-trip; Genie 5
+    /// does not yet act on it.
+    /// </summary>
+    public string    Hidden        { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The raw <c>destination="…"</c> string when it names a node id that is
+    /// not present in this zone file. <see cref="DestinationId"/> stays null so
+    /// the pathfinder ignores the dangling arc, but the original value is
+    /// written back on export instead of being erased — Genie 4 keeps it, and
+    /// some are cross-zone stubs an author still needs.
+    /// </summary>
+    public string    RawDestination { get; set; } = string.Empty;
+
+    /// <summary>
     /// Free-form skill / class / level requirement hint for non-compass arcs
     /// ("climb tall wall", "swim raging river", "go secret door", etc.).
     /// Parsed by <see cref="ExitRequirement"/> into structured form

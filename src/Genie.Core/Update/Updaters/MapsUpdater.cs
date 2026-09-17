@@ -240,23 +240,69 @@ public sealed class MapsUpdater : IUpdater
     }
 
     /// <summary>
-    /// Copy locally-collected per-node fields from <paramref name="existing"/>
-    /// onto <paramref name="fresh"/>, keyed on Genie4 node id. Right now
-    /// that's just <see cref="MapNode.ServerRoomId"/> — populated when the
-    /// player has visited the room and seen its <c>&lt;nav rm="…"/&gt;</c>.
-    /// Everything else (title, description, exits, coordinates, notes) is
-    /// taken from the upstream refresh, since that's what the user wanted
-    /// to update.
+    /// Copy locally-collected and locally-authored fields from
+    /// <paramref name="existing"/> onto <paramref name="fresh"/>, keyed on
+    /// Genie4 node id. Upstream remains the source of truth for the map itself
+    /// — titles, descriptions, coordinates, and which arcs exist — since that
+    /// is what the user asked to update. What survives is the work upstream
+    /// does not carry and cannot replace:
+    /// <list type="bullet">
+    ///   <item><see cref="MapNode.ServerRoomId"/> — learned by visiting the
+    ///         room and seeing its <c>&lt;nav rm="…"/&gt;</c>.</item>
+    ///   <item><see cref="MapNode.Tags"/> — the user's own <c>#goto @tag</c>
+    ///         markers.</item>
+    ///   <item>Per-exit travel metadata authored in the Edit Exit dialog:
+    ///         <c>requires</c>, <c>rt</c>, <c>wait_min</c>, <c>wait_max</c>,
+    ///         <c>env</c>, <c>notes</c>.</item>
+    /// </list>
+    /// Previously only <c>ServerRoomId</c> was carried over, so every Edit
+    /// Exit value the user had entered was silently discarded on each
+    /// "Update Maps" — and the Maps folder is the one the docs tell users to
+    /// keep as a git clone and PR from.
     /// </summary>
     private static void MergePreservingServerIds(MapZone existing, MapZone fresh)
     {
         foreach (var (id, freshNode) in fresh.Nodes)
         {
-            if (existing.Nodes.TryGetValue(id, out var existingNode) &&
-                !string.IsNullOrEmpty(existingNode.ServerRoomId))
-            {
+            if (!existing.Nodes.TryGetValue(id, out var existingNode)) continue;
+
+            if (!string.IsNullOrEmpty(existingNode.ServerRoomId))
                 freshNode.ServerRoomId = existingNode.ServerRoomId;
-            }
+
+            foreach (var tag in existingNode.Tags)
+                if (!freshNode.HasTag(tag)) freshNode.Tags.Add(tag);
+
+            MergeExitMetadata(existingNode, freshNode);
+        }
+    }
+
+    /// <summary>
+    /// Carry the user's Edit Exit values onto the matching refreshed arc.
+    /// Arcs are matched on the movement command, then on the raw exit token —
+    /// the two things that identify "the same way out of this room" across an
+    /// upstream edit. An upstream value always wins, so a map that starts
+    /// publishing its own timings supersedes the local guess.
+    /// </summary>
+    private static void MergeExitMetadata(MapNode existingNode, MapNode freshNode)
+    {
+        foreach (var freshExit in freshNode.Exits)
+        {
+            var match = existingNode.Exits.FirstOrDefault(e =>
+                            !string.IsNullOrEmpty(e.MoveCommand) &&
+                            string.Equals(e.MoveCommand, freshExit.MoveCommand,
+                                          StringComparison.OrdinalIgnoreCase))
+                     ?? existingNode.Exits.FirstOrDefault(e =>
+                            !string.IsNullOrEmpty(e.ExitToken) &&
+                            string.Equals(e.ExitToken, freshExit.ExitToken,
+                                          StringComparison.OrdinalIgnoreCase));
+            if (match is null) continue;
+
+            if (string.IsNullOrEmpty(freshExit.Requires))    freshExit.Requires    = match.Requires;
+            if (string.IsNullOrEmpty(freshExit.Environment)) freshExit.Environment = match.Environment;
+            if (string.IsNullOrEmpty(freshExit.Notes))       freshExit.Notes       = match.Notes;
+            freshExit.RtCost  ??= match.RtCost;
+            freshExit.WaitMin ??= match.WaitMin;
+            freshExit.WaitMax ??= match.WaitMax;
         }
     }
 
