@@ -1857,6 +1857,21 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Scripts.Globals.TryRemove(name, out _);
     }
 
+    /// <summary>
+    /// <c>#dialogs forget &lt;id&gt;</c> — drop the saved disposition and write
+    /// the file back, so the dialog prompts again next time DR sends it.
+    /// <see cref="Dialogs.ServerDialogMappings.Remove"/> also clears the
+    /// session's deferred/prompted marks, so the re-prompt happens in THIS
+    /// session, not only after a reconnect.
+    /// </summary>
+    bool ICommandHost.ForgetDialog(string dialogId)
+    {
+        if (string.IsNullOrWhiteSpace(dialogId)) return false;
+        if (!DialogMappings.Remove(dialogId)) return false;
+        SaveDialogMappings();   // false on a write failure; the in-memory drop stands
+        return true;
+    }
+
     // ConcurrentDictionary is itself an IReadOnlyDictionary; enumeration is
     // thread-safe, so #var can list these while the parser thread updates them.
     IReadOnlyDictionary<string, string> ICommandHost.GetGlobalVariables() => Scripts.Globals;

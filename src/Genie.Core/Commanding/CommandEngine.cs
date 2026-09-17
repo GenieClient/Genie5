@@ -1652,7 +1652,21 @@ public sealed class CommandEngine
             return;
         }
 
-        _host.Echo("Usage: #dialogs [list] | #dialogs report <id>");
+        if ((sub == "forget" || sub == "reset") && parts.Count > 2)
+        {
+            // The way back from a mistaken "Never show it". Deliberately NOT
+            // gated on DialogTracker.TryGet: the mapping is per-profile and
+            // outlives the session, so an id the server has not sent yet this
+            // session must still be forgettable.
+            var forgetId = parts[2];
+            if (_host.ForgetDialog(forgetId))
+                _host.Echo($"#dialogs: forgot '{forgetId}' — Genie will ask again the next time DragonRealms sends it.");
+            else
+                _host.Echo($"#dialogs: no saved answer for '{forgetId}'. #dialogs list shows the dialogs seen this session.");
+            return;
+        }
+
+        _host.Echo("Usage: #dialogs [list] | #dialogs report <id> | #dialogs forget <id>");
     }
 
     /// <summary>Version/OS/commit lines for gap-report drafts, from the entry

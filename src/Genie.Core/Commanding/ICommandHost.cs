@@ -199,6 +199,16 @@ public interface ICommandHost
     void RemoveGlobalVariable(string name);
 
     /// <summary>
+    /// Drop the saved layout answer for a server dialog so the next sighting
+    /// asks again, and persist the change. Returns false when no mapping was
+    /// stored under that id (or when there is no live session to save into).
+    /// Backs <c>#dialogs forget &lt;id&gt;</c> — the only in-app way out of a
+    /// mistaken "Never show it" until the settings grid exists (public #343).
+    /// Default-implemented so hosts without a dialog store need not care.
+    /// </summary>
+    bool ForgetDialog(string dialogId) => false;
+
+    /// <summary>
     /// The reserved / live-state script variables ($health, $roomid, $zoneid,
     /// the status flags, hands, clock family, …) mirrored from the game stream
     /// into the script engine's Globals (plus any <c>#tvar</c> session-globals).
