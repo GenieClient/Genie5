@@ -506,7 +506,7 @@ public sealed class ScriptEngine
         ScriptInstance inst;
         try
         {
-            inst = ScriptParser.Parse(name, baseDir, File.ReadAllText(path));
+            inst = ScriptParser.Parse(name, baseDir, File.ReadAllText(path), path);
         }
         catch (Exception ex)
         {
@@ -917,7 +917,8 @@ public sealed class ScriptEngine
         ScriptInstance fresh;
         try
         {
-            fresh = ScriptParser.Parse(inst.Name, inst.BaseDir, File.ReadAllText(inst.SourcePath));
+            fresh = ScriptParser.Parse(inst.Name, inst.BaseDir, File.ReadAllText(inst.SourcePath),
+                                       inst.SourcePath);
         }
         catch (Exception ex)
         {

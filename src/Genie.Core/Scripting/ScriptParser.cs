@@ -2,14 +2,22 @@ namespace Genie.Core.Scripting;
 
 public static class ScriptParser
 {
-    public static ScriptInstance Parse(string name, string scriptsDir, string source)
+    /// <param name="sourcePath">Path the script text was read from, when there is
+    /// one. Seeds the include-once set so a script that includes ITSELF pulls the
+    /// text in once (Genie 4 puts the running file in <c>m_oScriptFiles</c> too).
+    /// Omitting it costs nothing but that one case — a self-include still
+    /// terminates, because the path is recorded before the recursive call.</param>
+    public static ScriptInstance Parse(string name, string scriptsDir, string source,
+                                       string? sourcePath = null)
     {
         var inst = new ScriptInstance { Name = name };
 
         // 1. Recursive include expansion → flat raw line list.
         var raw = new List<(string Origin, int LineNo, string Raw)>();
-        ExpandIncludes(name, source, scriptsDir, raw,
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrEmpty(sourcePath) && CanonicalPath(sourcePath) is { } rootPath)
+            visited.Add(rootPath);
+        ExpandIncludes(name, source, scriptsDir, raw, visited);
 
         // 2. Normalise inline-body conditionals to block form. Matches
         //    Genie4's parse-time behavior: `if X then stmt` becomes
@@ -221,12 +229,29 @@ public static class ScriptParser
         return raw[..i];
     }
 
+    /// <summary>
+    /// Splices every <c>include</c> into the raw line list, depth-first, at the
+    /// point the directive appears (Genie 4 <c>AppendFile</c> parity).
+    /// <para><paramref name="visited"/> is the include-once set and is keyed on
+    /// the RESOLVED FILE PATH, never on the file's name or stem. Genie 4 keys its
+    /// own guard on the include argument as written
+    /// (<c>m_oScriptFiles.Contains(strArgument)</c>), so <c>foo.inc</c> and
+    /// <c>foo.cmd</c> are two different entries there and both load. Keying on the
+    /// stem instead — with the running script seeded into the same set — silently
+    /// dropped two shapes players actually write (public #347): a script that
+    /// splits its variables into a sibling of the same name (<c>foo.cmd</c> doing
+    /// <c>include foo.inc</c>) expanded to NOTHING, and <c>include x.inc</c>
+    /// followed by <c>include x.cmd</c> expanded only the first. Both failed with
+    /// no diagnostic — the file resolved fine, it was the guard that dropped it —
+    /// so the first symptom was a <c>gosub</c> into a label that no longer
+    /// existed.</para>
+    /// <para>Recording the path BEFORE recursing is what bounds a cycle: A → B → A
+    /// stops when B's include of A finds A's path already in the set.</para>
+    /// </summary>
     private static void ExpandIncludes(
         string origin, string source, string scriptsDir,
         List<(string, int, string)> output, HashSet<string> visited)
     {
-        if (!visited.Add(origin)) return;
-
         var lines = source.Replace("\r\n", "\n").Split('\n');
         for (int i = 0; i < lines.Length; i++)
         {
@@ -257,6 +282,9 @@ public static class ScriptParser
                 var path = ResolveIncludePath(scriptsDir, incName);
                 if (path != null)
                 {
+                    // Already pulled in (by any spelling that resolves here) —
+                    // skip silently, exactly as Genie 4 does for a repeat include.
+                    if (!visited.Add(CanonicalPath(path) ?? path)) continue;
                     var subOrigin = Path.GetFileNameWithoutExtension(path);
                     ExpandIncludes(subOrigin, File.ReadAllText(path), scriptsDir, output, visited);
                 }
@@ -269,6 +297,24 @@ public static class ScriptParser
 
             output.Add((origin, i + 1, raw));
         }
+    }
+
+    /// <summary>
+    /// One canonical spelling for a file so the include-once set compares two
+    /// references to the same file as equal — <c>lib\a.inc</c> vs <c>lib/a.inc</c>,
+    /// a relative include vs an absolute one, a <c>.</c> segment in the middle.
+    /// Returns null for a path the runtime refuses to canonicalise, and the caller
+    /// falls back to the raw string rather than losing the guard entirely.
+    /// <para>The set itself is case-insensitive, which is right on Windows and
+    /// macOS and slightly conservative on Linux: two include files in one
+    /// directory differing only in case would collapse to one. That was already
+    /// the comparer before #347 and the alternative — two files a player cannot
+    /// tell apart in a listing — is the worse failure.</para>
+    /// </summary>
+    private static string? CanonicalPath(string path)
+    {
+        try { return Path.GetFullPath(path); }
+        catch { return null; }
     }
 
     private static string? ResolveIncludePath(string dir, string name)
