@@ -1,3 +1,150 @@
+# Genie 5 — v5.0.0-beta.10
+
+**"Carried Over"** — the release where a Genie 4 config folder finally arrives
+intact. Your highlights, macros, aliases, names and colour presets come across
+as themselves, the importer tells you the truth about anything it could not
+take, your maps stop being damaged by the thing meant to update them, and the
+classic Genie 4 workspace is a layout you can pick from a menu.
+
+## ✨ New
+- **"Heirloom" — the Genie 4 workspace as a built-in layout** — a third shipped
+  arrangement beside Strongbox and Shadowveil, rebuilding the classic Genie 4
+  desktop in windowed mode: Game over Talk at the left, the Thoughts /
+  Experience / Whispers / Familiar / Active Spells stack beside it, Arrivals
+  floating over that stack, and the Mapper filling the right half. The geometry
+  is measured off a real Genie 4 session rather than eyeballed, and the chrome
+  matches — roundtime on the hands strip and the map canvas set to the
+  parchment background so it doesn't come up dark. Three things a layout file
+  cannot carry stay unlike the original: window titles, fonts and colours, all
+  of which are per-profile window settings rather than layout data.
+
+- **The import dialog now offers names, presets and settings** — it had
+  checkboxes for eight config types while the engine supported ten. Names and
+  colour presets were being counted during the folder scan and then never
+  imported, so a user's whole colour palette was lost by every supported import
+  path — and the only workaround, hand-copying the folder, is the one that
+  corrupts highlights. Settings are handled key by key rather than loaded
+  wholesale: Genie 4's settings.cfg carries scriptdir, configdir and logdir as
+  paths relative to *its own* install, so a naive load would have repointed
+  Genie 5's directories at another program's folders. Each key is sorted into
+  applied, refused or advised, and the dialog says which.
+
+- **The importer reports what it dropped, not just how many** — the summary
+  said "N imported, M skipped" and nothing more, which is exactly why a long
+  run of import bugs survived to beta.9: nobody could tell whether those M were
+  duplicates they expected or rules that had just been destroyed. Every skipped
+  line now carries its line number, the offending text, a reason, and whether a
+  rule was actually lost — a real drop versus a by-design skip like an
+  already-present rule in Add-only mode. Losses print under a NOT IMPORTED
+  heading grouped by type, capped at ten per type so one malformed file cannot
+  bury the rest.
+
+- **SimuCoins balance and reward claim, first-party** — check your balance and
+  claim the monthly reward without leaving the client. Ported with thanks to
+  Thires, whose Genie 4 plugin this replaces (#328).
+
+- **The Mobs panel reads structured assess rows** — assess output is parsed
+  into rows joined to the creature status stream, so the panel shows what you
+  actually assessed rather than a flat list, rebuilds on a re-assess, and
+  renumbers survivors after a kill (#313).
+
+- **`#dialogs forget <id>`** — an in-app way back from having told a server
+  dialog "Never show it". Previously that was a one-way door.
+
+- **The Experience window honours Word Wrap** — it was hard-wired to no-wrap
+  with a horizontal scrollbar, so a narrow panel pushed the right-hand columns
+  out of sight instead of folding them. It now reads the same per-window Word
+  Wrap setting every other text panel uses, and the right-click menu grows the
+  toggle.
+
+## 🐛 Fixes
+- **Update Maps no longer rewrites your maps through a lossy exporter** — the
+  updater was round-tripping every downloaded zone through an exporter that
+  could not represent what it had just read, so `go`/`climb` arcs came back out
+  as `exit="none"` and room descriptions were thinned. It ran on every update,
+  so the damage accumulated silently. The round-trip is gone, and user metadata
+  — edited exits, notes, colours, server ids — survives a full rewrite intact.
+
+  ⚠ **If you have run any earlier release, your Maps folder is already
+  damaged, and a normal Update Maps will not repair it** — the updater only
+  rewrites zones whose upstream copy changed. To force a full repair, delete
+  `.map-shas.json` in your Maps folder and run Update Maps once. Every zone
+  re-downloads clean and your own edits are preserved (#352).
+
+- **Genie 4 highlights and names import in the right argument order** — Genie 4
+  writes `#highlight {beginswith} {#DFEB9E} {Also here:}`; Genie 5 writes
+  `#highlight {pattern} {fg} {bg}`. Nothing noticed the difference, so every
+  line landed with the match *type* as its pattern and the real pattern as a
+  background colour. Since the type is only ever regexp or beginswith, all 235
+  rules in a reference config collided on two patterns and overwrote each other
+  — leaving two garbage rules, no error, and a panel that looked as though the
+  import had simply failed. Two further defects in the same path are fixed with
+  it: Genie 4's `regexp` spelling was not recognised, so 230 regex rules would
+  have degraded to literal matches, and the sound file in Genie 4's fifth
+  argument was being dropped.
+
+- **Imported macros fire, and imported alias arguments substitute** — macros
+  came across in a form the macro engine could not dispatch, and aliases kept a
+  literal `$1` instead of substituting the argument. Keys that were previously
+  unrepresentable, including `{Escape}` and `{Decimal}`, now work.
+
+- **Rules whose payload contains a brace are no longer dropped on import** —
+  the parser treated an inner brace as the end of the value, so any rule
+  carrying one vanished without a word.
+
+- **`include` loads a same-named file again** — the include-once guard keyed on
+  each file's extension-stripped stem and seeded the running script into the
+  same set, so `foo.cmd` running `include foo.inc` expanded to nothing, and
+  `include x.inc` followed by `include x.cmd` only ran the first. Both failed
+  silently: the file resolved, so no "not found" line printed, and the first
+  symptom was a `gosub` into a label that no longer existed. The guard now keys
+  on the resolved full path, which matches Genie 4 more closely and also
+  collapses two spellings of one file. Cycles stay bounded (#347).
+
+- **`#var` overwrites a shadowing session global** — setting a persistent
+  variable while a session global of the same name existed left the old value
+  visible to scripts (#340).
+
+- **The Injuries panel clears after a death** — DragonRealms pushes no injury
+  data at all while a character is unconscious or dead, so the wound wipe that
+  comes with a resurrection was never announced and the panel kept showing the
+  injuries the character died with, even while `health` read "You have no
+  significant injuries." The `health` report's summary line is now treated as
+  authoritative and clears the regions it does not name.
+
+- **`progressBar id="health2"` maps onto health** — an injured character read
+  FULL HEALTH until the minivitals bar started reporting (#333).
+
+- **`#config scrollbacklines` takes effect immediately** — the value was read
+  once when a window attached and then cached, so a change did nothing until
+  the next reconnect (#339).
+
+- **Unclaimed `/commands` are held back from the game** — the rule that keeps an
+  unrecognised slash command from reaching the server was wired to only one of
+  the two send paths. A command typed on the other path went straight to
+  DragonRealms, which is what logged a character out.
+
+- **Server dialog titles no longer show a doubled ampersand** — Win32 escapes
+  `&` as `&&` in dialog titles and Genie was rendering it literally. Profiles
+  already poisoned by the earlier behaviour are repaired on read (#344).
+
+- **The dialog chooser no longer promises a settings page that does not
+  exist** (#343).
+
+## 🔧 Under the hood
+- **`Genie.Core` is a plain class library again** — the console test harness
+  lived inside it, which forced `OutputType=Exe` and `SelfContained` onto the
+  library every other host embeds. It now lives in `tools/Genie.TestHarness`,
+  so "pure class library with no UI dependencies" is literally true (#122).
+- **Dead assets removed** — an unused `.icns` embed, two skin bitmaps, a dead
+  control and a dead type (#122).
+- **CI moved off the Node 20 actions** ahead of their runner deprecation (#338).
+- **`win-arm64` publishing decided and documented** — the lane is not shipped,
+  and the reasoning is written down rather than left as an unexplained gap
+  (#291).
+
+---
+
 # Genie 5 — v5.0.0-beta.9
 
 **"Nothing Lost"** — the dialogs DragonRealms has always sent finally have

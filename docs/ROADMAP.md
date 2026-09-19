@@ -21,7 +21,7 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.9 "Nothing Lost"
+## Where we are — v5.0.0-beta.10 "Carried Over"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
@@ -49,7 +49,14 @@ carries a batch of durability fixes: one bad line of game text can no longer
 stop your output, an interrupted `profiles.json` write can no longer lock you
 out, panels re-opened into a squeezed-out column appear again (#331),
 long-running `.js` scripts stop hitting a phantom memory cap (#330), and
-`waiteval` follows a variable that changes while it waits (#332).
+`waiteval` follows a variable that changes while it waits (#332); and
+**beta.10** makes a Genie 4 config folder arrive intact — highlights and
+names import in Genie 4's argument order rather than colliding into two
+garbage rules, macros fire, alias arguments substitute, braced payloads
+survive, and the importer now reports every rule it dropped instead of a
+bare skip count. It also stops Update Maps damaging the user's maps through
+a lossy exporter (#352), ships the Genie 4 workspace as the "Heirloom"
+layout, and brings SimuCoins in-house (#328).
 Self-update is now **verified end-to-end on all three platforms** (#27 —
 thanks @dylb0t for the macOS validation).
 
