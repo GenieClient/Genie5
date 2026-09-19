@@ -112,6 +112,31 @@
                              IsVisible="{Binding CountClasses, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
                 </StackPanel>
               </CheckBox>
+              <CheckBox IsChecked="{Binding ImportNames}" AutomationProperties.Name="Names">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="Names" FontSize="12"/>
+                  <TextBlock Text="{Binding CountNames, StringFormat='— {0} rules'}"
+                             Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11"
+                             IsVisible="{Binding CountNames, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
+                </StackPanel>
+              </CheckBox>
+              <CheckBox IsChecked="{Binding ImportPresets}" AutomationProperties.Name="Presets">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="Presets" FontSize="12"/>
+                  <TextBlock Text="{Binding CountPresets, StringFormat='— {0} colours'}"
+                             Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11"
+                             IsVisible="{Binding CountPresets, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
+                </StackPanel>
+              </CheckBox>
+              <CheckBox IsChecked="{Binding ImportSettings}" AutomationProperties.Name="Settings"
+                        ToolTip.Tip="App-wide, not per-character. Genie 4 folder paths and keys with no Genie 5 equivalent are reported rather than applied.">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="Settings" FontSize="12"/>
+                  <TextBlock Text="{Binding CountSettings, StringFormat='— {0} keys'}"
+                             Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11"
+                             IsVisible="{Binding CountSettings, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
+                </StackPanel>
+              </CheckBox>
             </StackPanel>
           </Grid>
         </StackPanel>

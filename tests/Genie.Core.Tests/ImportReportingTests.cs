@@ -3,7 +3,9 @@ using System.IO;
 using System.Linq;
 using Genie.Core.Aliases;
 using Genie.Core.Highlights;
+using Genie.Core.Config;
 using Genie.Core.Import;
+using Genie.Core.Runtime;
 using Genie.Core.Macros;
 using Genie.Core.Triggers;
 using Xunit;
@@ -20,6 +22,14 @@ namespace Genie.Core.Tests;
 /// </summary>
 public class ImportReportingTests
 {
+    private static GenieConfig NewConfig()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "genie_import_report_" + Guid.NewGuid().ToString("N"));
+        var lds  = new LocalDirectoryService("GenieImportReportTest", root);
+        lds.UseExplicitRoot(root);
+        return new GenieConfig(lds);
+    }
+
     private static string WriteCfg(params string[] lines)
     {
         var path = Path.Combine(Path.GetTempPath(), $"g4report_{Guid.NewGuid():N}.cfg");
@@ -183,6 +193,7 @@ public class ImportReportingTests
             Presets     = new Genie.Core.Presets.PresetEngine(),
             Variables   = new Genie.Core.Variables.VariableStore(),
             Classes     = new Genie.Core.Classes.ClassEngine(),
+            Settings    = NewConfig(),
         };
 
         var result = Genie4Importer.ImportDirectory(dir, ctx, ImportMode.Replace);

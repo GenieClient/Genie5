@@ -99,6 +99,7 @@ public sealed class ImportAllResult
     public ImportResult Presets      { get; set; }
     public ImportResult Variables    { get; set; }
     public ImportResult Classes      { get; set; }
+    public ImportResult Settings     { get; set; }
 
     /// <summary>Config types the caller selected that had no matching file on disk.</summary>
     public List<string> MissingFiles { get; } = new();
@@ -116,6 +117,7 @@ public sealed class ImportAllResult
         ("Presets",     Presets),
         ("Variables",   Variables),
         ("Classes",     Classes),
+        ("Settings",    Settings),
     ];
 
     /// <summary>Total rules lost across every type.</summary>
@@ -138,6 +140,7 @@ public sealed class Genie4ImportContext
     public required PresetEngine         Presets      { get; init; }
     public required VariableStore        Variables    { get; init; }
     public required ClassEngine          Classes      { get; init; }
+    public required Config.GenieConfig   Settings     { get; init; }
 }
 
 /// <summary>
@@ -158,8 +161,10 @@ public enum Genie4ImportTypes
     Presets     = 1 << 7,
     Variables   = 1 << 8,
     Classes     = 1 << 9,
+    Settings    = 1 << 10,
     All         = Aliases | Triggers | Highlights | Substitutes | Gags
-                | Macros  | Names    | Presets    | Variables   | Classes,
+                | Macros  | Names    | Presets    | Variables   | Classes
+                | Settings,
 }
 
 /// <summary>
@@ -205,6 +210,8 @@ public static class Genie4Importer
             RunIfExists(directory, "variables.cfg",   p => result.Variables   = ImportVariables  (p, ctx.Variables,   mode), result, "variables.cfg");
         if (types.HasFlag(Genie4ImportTypes.Classes))
             RunIfExists(directory, "classes.cfg",     p => result.Classes     = ImportClasses    (p, ctx.Classes,     mode), result, "classes.cfg");
+        if (types.HasFlag(Genie4ImportTypes.Settings))
+            RunIfExists(directory, "settings.cfg",    p => result.Settings    = ImportSettings   (p, ctx.Settings,    mode), result, "settings.cfg");
 
         return result;
     }
@@ -238,6 +245,7 @@ public static class Genie4Importer
         Probe(Genie4ImportTypes.Presets,     "presets.cfg",     "#preset");
         Probe(Genie4ImportTypes.Variables,   "variables.cfg",   "#var");
         Probe(Genie4ImportTypes.Classes,     "classes.cfg",     "#class");
+        Probe(Genie4ImportTypes.Settings,    "settings.cfg",    "#config");
         return counts;
     }
 
@@ -702,6 +710,119 @@ public static class Genie4Importer
             existing.Add(name);
             imported++;
         }
+        return new ImportResult(imported, log.Count) { Skips = log.Items };
+    }
+
+    // ── Settings ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Keys that name a directory. Genie 4 stores these <b>relative to its own
+    /// install</b> — the reference <c>settings.cfg</c> has
+    /// <c>scriptdir {Scripts}</c>, <c>configdir {Config}</c>,
+    /// <c>logdir {Logs}</c> — so applying them would repoint Genie 5's data
+    /// root at folders that either don't exist or belong to Genie 4. Refused,
+    /// and reported, rather than applied.
+    /// </summary>
+    private static readonly HashSet<string> DirectorySettings =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "scriptdir", "configdir", "logdir", "sounddir",
+            "artdir", "mapdir", "plugindir", "reposcriptdir",
+        };
+
+    /// <summary>
+    /// Genie 4 key → Genie 5 key, where the setting survived under a new name
+    /// and the value means the same thing.
+    /// </summary>
+    private static readonly Dictionary<string, string> RenamedSettings =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["maxrowbuffer"] = "scrollbacklines",
+            ["rubypath"]     = "lichruby",
+            ["licharguments"]= "lichargs",
+        };
+
+    /// <summary>
+    /// Keys whose Genie 5 counterpart exists but does <b>not</b> take the same
+    /// value, so an automatic mapping would be a guess. Reported with the
+    /// command to run instead.
+    /// </summary>
+    private static readonly Dictionary<string, string> AdviseInsteadOfApplying =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["connectstring"]        = "Genie 5 picks the front end by name — set '#config frontend wrayth' instead.",
+            ["servertimeout"]        = "Genie 5 has one idle timer — see '#config activitytimeout'.",
+            ["servertimeoutcommand"] = "Genie 5 has one idle timer — see '#config activitytimeout'.",
+            ["usertimeout"]          = "Genie 5 has one idle timer — see '#config activitytimeout'.",
+            ["usertimeoutcommand"]   = "Genie 5 has one idle timer — see '#config activitytimeout'.",
+        };
+
+    /// <summary>
+    /// Apply a Genie 4 <c>settings.cfg</c> to <paramref name="config"/>, one
+    /// key at a time, so the ones Genie 5 cannot honour are reported rather
+    /// than silently ignored.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not <see cref="Config.GenieConfig.Load"/>: that applies
+    /// whatever it recognises and drops the rest without a word, which for
+    /// this file would include repointing the data directories at Genie 4's.
+    /// <para>
+    /// Settings are app-wide, so <see cref="ImportMode"/> only decides whether
+    /// an already-set key may be overwritten — there is nothing to "clear".
+    /// </para>
+    /// </remarks>
+    public static ImportResult ImportSettings(string path, Config.GenieConfig config, ImportMode mode)
+    {
+        int imported = 0;
+        var log = new SkipLog();
+
+        int lineNo = 0;
+        foreach (var raw in File.ReadAllLines(path))
+        {
+            lineNo++;
+            var line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#!")) continue;
+            if (!line.StartsWith("#config", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var args = DirectiveArgs(line, "#config");
+            if (args is null || args.Count < 2)
+            {
+                log.Drop(lineNo, line, "not a recognised #config directive");
+                continue;
+            }
+
+            var key   = args[0].Trim();
+            var value = args[1];
+
+            if (DirectorySettings.Contains(key))
+            {
+                log.Drop(lineNo, line,
+                    $"'{key}' is a Genie 4 folder path — applying it would repoint Genie 5's data directories");
+                continue;
+            }
+
+            if (AdviseInsteadOfApplying.TryGetValue(key, out var advice))
+            {
+                log.Drop(lineNo, line, $"'{key}' has no direct equivalent. {advice}");
+                continue;
+            }
+
+            var target = RenamedSettings.TryGetValue(key, out var renamed) ? renamed : key;
+
+            try
+            {
+                config.SetSetting(target, value, showException: true);
+                imported++;
+            }
+            catch (Exception ex)
+            {
+                log.Drop(lineNo, line,
+                    target.Equals(key, StringComparison.OrdinalIgnoreCase)
+                        ? $"'{key}' is not a Genie 5 setting"
+                        : $"'{key}' maps to '{target}', which rejected the value: {ex.Message}");
+            }
+        }
+
         return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
 

@@ -77,6 +77,16 @@ public sealed class Genie4ImportViewModel : ReactiveObject
     [Reactive] public bool ImportMacros      { get; set; } = true;
     [Reactive] public bool ImportVariables   { get; set; } = true;
     [Reactive] public bool ImportClasses     { get; set; } = true;
+    [Reactive] public bool ImportNames       { get; set; } = true;
+    [Reactive] public bool ImportPresets     { get; set; } = true;
+
+    /// <summary>
+    /// Off by default, unlike every other type. Settings are app-wide
+    /// rather than per-profile, and a Genie 4 settings.cfg carries keys
+    /// Genie 5 either renames or cannot honour at all — so this one is a
+    /// deliberate choice rather than part of "bring everything over".
+    /// </summary>
+    [Reactive] public bool ImportSettings    { get; set; }
 
     // Per-type counts populated by Probe. Shown next to each checkbox in
     // the dialog ("Highlights — 47 rules found"). -1 means "not yet probed
@@ -91,6 +101,9 @@ public sealed class Genie4ImportViewModel : ReactiveObject
     [Reactive] public int CountMacros       { get; private set; } = -1;
     [Reactive] public int CountVariables    { get; private set; } = -1;
     [Reactive] public int CountClasses      { get; private set; } = -1;
+    [Reactive] public int CountNames        { get; private set; } = -1;
+    [Reactive] public int CountPresets      { get; private set; } = -1;
+    [Reactive] public int CountSettings     { get; private set; } = -1;
 
     // ── Target (Global vs Profile-Specific) ────────────────────────────────
 
@@ -266,6 +279,9 @@ public sealed class Genie4ImportViewModel : ReactiveObject
         if (counts.TryGetValue(Genie4ImportTypes.Macros,      out n))      CountMacros       = n;
         if (counts.TryGetValue(Genie4ImportTypes.Variables,   out n))      CountVariables    = n;
         if (counts.TryGetValue(Genie4ImportTypes.Classes,     out n))      CountClasses      = n;
+        if (counts.TryGetValue(Genie4ImportTypes.Names,       out n))      CountNames        = n;
+        if (counts.TryGetValue(Genie4ImportTypes.Presets,     out n))      CountPresets      = n;
+        if (counts.TryGetValue(Genie4ImportTypes.Settings,    out n))      CountSettings     = n;
 
         var totalRules = counts.Values.Sum();
         SourceStatus = totalRules > 0
@@ -295,6 +311,9 @@ public sealed class Genie4ImportViewModel : ReactiveObject
             if (ImportMacros)      types |= Genie4ImportTypes.Macros;
             if (ImportVariables)   types |= Genie4ImportTypes.Variables;
             if (ImportClasses)     types |= Genie4ImportTypes.Classes;
+            if (ImportNames)       types |= Genie4ImportTypes.Names;
+            if (ImportPresets)     types |= Genie4ImportTypes.Presets;
+            if (ImportSettings)    types |= Genie4ImportTypes.Settings;
 
             if (types == Genie4ImportTypes.None)
             {
@@ -316,6 +335,7 @@ public sealed class Genie4ImportViewModel : ReactiveObject
                 Presets     = _core.Presets,
                 Variables   = _core.Variables.Store,
                 Classes     = _core.Classes,
+                Settings    = _core.Config,
             };
 
             var result = await Task.Run(() =>
@@ -348,6 +368,14 @@ public sealed class Genie4ImportViewModel : ReactiveObject
                 ConfigPersistence.WriteLines(Path.Combine(targetDir, "variables.cfg"), CfgFormat.VariableLines(_core.Variables.Store));
             if (ImportClasses)
                 ConfigPersistence.WriteLines(Path.Combine(targetDir, "classes.cfg"), CfgFormat.ClassLines(_core.Classes.GetAll()));
+            if (ImportNames)
+                ConfigPersistence.WriteLines(Path.Combine(targetDir, "names.cfg"), CfgFormat.NameLines(_core.NameHighlights.Rules));
+            if (ImportPresets)
+                ConfigPersistence.WriteLines(Path.Combine(targetDir, "presets.cfg"), CfgFormat.PresetLines(_core.Presets.Presets));
+            // Settings are app-wide and live in the global settings.cfg that
+            // GenieConfig owns, so they are NOT written into the per-profile
+            // target dir here - ImportSettings applied them to the live config
+            // and the normal config save persists them.
 
             ResultMessage = BuildResultSummary(result, targetDir);
             return true;
