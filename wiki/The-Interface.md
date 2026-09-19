@@ -151,6 +151,7 @@ Turn off script lines, for example, to keep a busy hunt script from cluttering t
 Rearrange the panels however you like, then keep the arrangement — the **Layout** menu manages it all:
 
 - **Layout → Save Layout As… / Load Layout / Manage Layouts…** — keep several named layouts (a "Combat" layout vs. an "In-Character" layout) and switch between them; **Manage Layouts…** also picks the default.
+- Three layouts ship with Genie and appear in **Load Layout** marked *built-in*: **Strongbox** (the out-of-the-box three-column dock with a floating Mapper), **Shadowveil** (room and story columns around the game text, chatter and experience at right), and **Heirloom** (the Genie 4 arrangement in windowed mode — Game over Talk at the left, the Thoughts/Experience/Whispers/Familiar/Active Spells stack beside it, Arrivals floating over it, and the Mapper filling the right half). Saving over a built-in makes your own editable copy; deleting that copy brings the shipped one back.
 - **Layout → Reset to Default Layout** restores the three-column arrangement.
 - **Layout → Windowed Mode (MDI)** switches from docked panels to free-floating child windows, Genie 4-style.
 - **Layout → Always on Top** keeps Genie above other windows.
