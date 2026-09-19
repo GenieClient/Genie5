@@ -22,6 +22,21 @@ public class ExperienceTool : ActivityTool, IWindowMenuHost
     private double     _toolFontSize = 12;
     public  double     ToolFontSize { get => _toolFontSize; private set => SetProperty(ref _toolFontSize, value); }
 
+    // Word Wrap (#120 semantics, same per-window WindowSettings.WordWrap every
+    // other text panel uses). The rows are column-aligned, so wrapping only
+    // bites once the panel is narrower than a row: wrap ON folds the overflow
+    // onto a second line (Genie 4 EXPTracker behaviour — nothing hides), wrap
+    // OFF keeps the columns rigid and hands long rows an h-scrollbar.
+    private TextWrapping _toolTextWrapping = TextWrapping.Wrap;
+    public  TextWrapping ToolTextWrapping { get => _toolTextWrapping; private set => SetProperty(ref _toolTextWrapping, value); }
+
+    // Paired with the wrap mode: an Auto h-scrollbar gives the ItemsControl
+    // infinite width, which would stop wrapping from ever happening.
+    private Avalonia.Controls.Primitives.ScrollBarVisibility _toolHScroll
+        = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
+    public  Avalonia.Controls.Primitives.ScrollBarVisibility ToolHScroll
+    { get => _toolHScroll; private set => SetProperty(ref _toolHScroll, value); }
+
     public ExperienceTool(ExperienceViewModel vm, WindowSettings? settings = null)
     {
         ViewModel = vm;
@@ -51,5 +66,9 @@ public class ExperienceTool : ActivityTool, IWindowMenuHost
         Title          = string.IsNullOrEmpty(s.DisplayTitle) ? s.DefaultTitle : s.DisplayTitle;
         ToolFontFamily = WindowSettingsResolver.ResolveFontFamily(s.FontFamily);
         ToolFontSize   = WindowSettingsResolver.ResolveFontSize(s.FontSize);
+        ToolTextWrapping = s.WordWrap ? TextWrapping.Wrap : TextWrapping.NoWrap;
+        ToolHScroll      = s.WordWrap
+            ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+            : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
     }
 }

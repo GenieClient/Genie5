@@ -1626,9 +1626,12 @@
                     ToolTip.Tip="Show rested EXP (stored / usable / cycle refresh) under the summary. The $RestedEXP.* globals populate either way."/>
         </WrapPanel>
         <!-- One SelectableTextBlock per row (via Lines/Inlines) so user highlights -->
-        <!-- fire on the Experience window (#144). No wrapping: keep columns aligned; -->
-        <!-- an Auto h-scrollbar hands long rows their full width.                    -->
-        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+        <!-- fire on the Experience window (#144). Wrapping follows the window's own -->
+        <!-- "Word Wrap" menu item like every other text panel: ON (default) folds a  -->
+        <!-- too-long row onto a second line, OFF keeps the columns rigid and hands   -->
+        <!-- long rows an Auto h-scrollbar. The h-scrollbar has to be Disabled while  -->
+        <!-- wrapping, or the ItemsControl gets infinite width and never wraps.       -->
+        <ScrollViewer HorizontalScrollBarVisibility="{Binding ToolHScroll}"
                       VerticalScrollBarVisibility="Auto">
           <ItemsControl ItemsSource="{Binding ViewModel.Lines}"
                         FontFamily="{Binding ToolFontFamily}"
@@ -1637,7 +1640,8 @@
                         Foreground="{DynamicResource GameBrush}">
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="vm:TextLine">
-                <SelectableTextBlock ContextFlyout="{x:Null}"
+                <SelectableTextBlock TextWrapping="{Binding $parent[ItemsControl].DataContext.ToolTextWrapping}"
+                                     ContextFlyout="{x:Null}"
                                      controls:InlinesBehavior.Source="{Binding Inlines}"/>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

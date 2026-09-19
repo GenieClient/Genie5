@@ -1020,9 +1020,11 @@ public class GenieDockFactory : Factory
         // Word Wrap (#120) — WindowSettings-backed per-window toggle for the
         // TextLine feeds. Plugin windows stay always-wrap (menu-script text
         // depends on it); Raw XML stays always-NoWrap (protocol dump).
+        // Experience joined the list so a narrow panel folds its rows instead
+        // of hiding them behind an h-scrollbar (Genie 4 EXPTracker look).
         var  wrapInit   = true;
         Action<bool>? wrapToggle = null;
-        if (dockable is GameTextDocument or StreamTool or BackpackTool)
+        if (dockable is GameTextDocument or StreamTool or BackpackTool or ExperienceTool)
         {
             var wrapSettings = _vm.WindowSettings.Get(id);
             wrapInit   = wrapSettings.WordWrap;

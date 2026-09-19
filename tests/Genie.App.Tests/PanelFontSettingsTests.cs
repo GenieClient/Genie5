@@ -39,6 +39,26 @@ public class PanelFontSettingsTests
     }
 
     [Fact]
+    public void Experience_tool_follows_the_per_window_word_wrap_toggle()
+    {
+        // The Experience panel used to be hard-wired NoWrap + Auto h-scrollbar,
+        // so a narrow panel hid the right-hand columns. It now honours the same
+        // WindowSettings.WordWrap the "Word Wrap" window-menu item writes, and
+        // flips the h-scrollbar with it (an Auto scrollbar means infinite width,
+        // which would stop wrapping from ever happening).
+        var s    = Settings("experience");
+        s.WordWrap = true;
+        var tool = new ExperienceTool(new ExperienceViewModel(), s);
+        Assert.Equal(Avalonia.Media.TextWrapping.Wrap, tool.ToolTextWrapping);
+        Assert.Equal(Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled, tool.ToolHScroll);
+
+        s.WordWrap = false;
+        s.NotifyChanged();
+        Assert.Equal(Avalonia.Media.TextWrapping.NoWrap, tool.ToolTextWrapping);
+        Assert.Equal(Avalonia.Controls.Primitives.ScrollBarVisibility.Auto, tool.ToolHScroll);
+    }
+
+    [Fact]
     public void ActiveSpells_tool_applies_saved_font_size_and_live_changes()
     {
         var s    = Settings("active-spells", fontSize: 18);
