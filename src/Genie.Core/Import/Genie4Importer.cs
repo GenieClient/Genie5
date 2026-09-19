@@ -446,9 +446,14 @@ public static class Genie4Importer
             if (mode == ImportMode.AddOnly && existing.Contains(rulePattern)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             var cls = Arg(args, 3);
+            // Genie 4's fifth argument is a sound file to play on match — the
+            // reference highlights.cfg has 16 of them. The importer read only
+            // as far as the class, so every one was silently dropped.
+            var sound = Arg(args, 4);
 
             engine.RemoveRule(rulePattern);
-            engine.AddRule(rulePattern, fg, bg, matchType.Value, caseSensitive: false, isEnabled: true, className: cls);
+            engine.AddRule(rulePattern, fg, bg, matchType.Value, caseSensitive: false, isEnabled: true,
+                           className: cls, soundFile: sound);
             existing.Add(rulePattern);
             imported++;
         }

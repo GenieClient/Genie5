@@ -1860,6 +1860,35 @@ public sealed class CommandEngine
             return;
         }
 
+        // Genie 4 dialect: #highlight {matchtype} {colour} {pattern} [{class}] [{sound}]
+        //
+        // Genie 4 puts the match type first and the pattern third; Genie 5 puts
+        // the pattern first. A Genie 4 highlights.cfg hand-copied into the
+        // config folder is replayed through this handler at connect, so every
+        // line used to land as a rule whose PATTERN was the literal word
+        // "regexp" or "beginswith" and whose BACKGROUND was the real pattern.
+        // Worse, they all collided on those two patterns and upserted each
+        // other, so the reference file's 235 rules collapsed into two.
+        //
+        // The discriminator is safe: the first argument being one of the five
+        // match-type keywords AND a third argument being present is Genie 4's
+        // shape. In Genie 5's shape that would mean a rule whose pattern is
+        // literally "regexp" and whose background is the text after it, which
+        // is not a thing anyone writes.
+        if (parts.Count >= 4 && IsMatchTypeToken(parts[1]) && !string.IsNullOrEmpty(parts[3]))
+        {
+            var g4Match   = ParseMatchType(parts[1]);
+            var (g4Fg, g4Bg) = SplitColorPair(parts[2]);   // Genie 4 allows "fg,bg"
+            var g4Pattern = parts[3];
+            var g4Cls     = parts.Count > 4 ? parts[4] : "";
+            var g4Sound   = parts.Count > 5 ? parts[5] : "";
+
+            Highlights.RemoveRule(g4Pattern);
+            Highlights.AddRule(g4Pattern, g4Fg, g4Bg, g4Match, false, true, g4Cls, g4Sound, "");
+            EchoRule($"Highlight added: {g4Pattern} fg={g4Fg}{(string.IsNullOrEmpty(g4Bg) ? "" : $" bg={g4Bg}")}");
+            return;
+        }
+
         // Implicit positional: #highlight {pattern} {fg} [{bg}] [{matchType}] [{class}] [{sound}] [{speak}]
         var pPattern = parts[1];
         var pFg      = parts.Count > 2 ? parts[2] : "";
@@ -1969,6 +1998,20 @@ public sealed class CommandEngine
             var bg   = parts.Count > 4 ? parts[4] : "";
             Names.Add(name, fg, bg);                          // Add upserts by name
             EchoNameAdded(name, fg, bg);
+            return;
+        }
+
+        // Genie 4 dialect: #name {colour} {name} — colour first, the reverse of
+        // Genie 5. Only recognised when the first argument is a #RRGGBB
+        // literal, which cannot be a player name; a Genie 4 file using NAMED
+        // colours stays ambiguous (a player really can be called "Red") and
+        // falls through to Genie 5's order below.
+        if (parts.Count >= 3 && IsHexColor(parts[1]) && !IsHexColor(parts[2]))
+        {
+            var (g4Fg, g4Bg) = SplitColorPair(parts[1]);
+            var g4Name = parts[2];
+            Names.Add(g4Name, g4Fg, g4Bg);
+            EchoNameAdded(g4Name, g4Fg, g4Bg);
             return;
         }
 
@@ -2109,10 +2152,47 @@ public sealed class CommandEngine
     private static HighlightMatchType ParseMatchType(string token) => token.ToLowerInvariant() switch
     {
         "regex"      => HighlightMatchType.Regex,
+        // Genie 4 spells it "regexp", and that is what every regex rule in a
+        // Genie 4 highlights.cfg says. Without this the fallback made them
+        // literal string matches — 230 of the 235 rules in the reference file.
+        "regexp"     => HighlightMatchType.Regex,
         "line"       => HighlightMatchType.Line,
         "beginswith" => HighlightMatchType.BeginsWith,
         _            => HighlightMatchType.String,
     };
+
+    /// <summary>
+    /// The match-type keywords Genie 4 writes in the FIRST argument position of
+    /// a <c>highlights.cfg</c> line. Used to tell that dialect apart from
+    /// Genie 5's, where the first argument is the pattern.
+    /// </summary>
+    private static bool IsMatchTypeToken(string token) => token.ToLowerInvariant()
+        is "string" or "line" or "beginswith" or "regexp" or "regex";
+
+    /// <summary>
+    /// Genie 4 packs both colours into one argument as <c>fg,bg</c>. Returns
+    /// the pair; a token with no comma is a foreground on its own.
+    /// </summary>
+    private static (string Fg, string Bg) SplitColorPair(string raw)
+    {
+        var bits = raw.Split(',', 2);
+        return (bits[0].Trim(), bits.Length > 1 ? bits[1].Trim() : string.Empty);
+    }
+
+    /// <summary>
+    /// True for a token that can only be a colour, never a pattern or a
+    /// player name — i.e. a <c>#RRGGBB</c> literal. Deliberately narrow: a
+    /// NAMED colour like <c>red</c> is also a plausible player name, so those
+    /// stay ambiguous and are left to Genie 5's own argument order.
+    /// </summary>
+    private static bool IsHexColor(string token)
+    {
+        token = token.Trim();
+        if (token.Length is not (4 or 7 or 9) || token[0] != '#') return false;
+        for (int i = 1; i < token.Length; i++)
+            if (!Uri.IsHexDigit(token[i])) return false;
+        return true;
+    }
 
     /// <summary>A comma/semicolon-separated window list ("main,room") → ids.
     /// Empty / "all" = no restriction (paints everywhere).</summary>
