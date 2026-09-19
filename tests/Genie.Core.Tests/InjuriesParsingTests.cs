@@ -276,6 +276,123 @@ public class InjuriesParsingTests
         Assert.Contains(events.OfType<TextEvent>(), t => t.Text == "You have a few nicks and scratches.");
     }
 
+    // ── `health` summary clears a stale panel (post-death staleness) ─────────
+    // DR pushes the injuries dialog only while the character is conscious, so
+    // the wound wipe that comes with a resurrection is never announced and the
+    // panel would keep showing what the character died with. The `health`
+    // report's summary line is authoritative for WHICH regions are injured:
+    // every region it does not name reads healthy. Lines verbatim from the
+    // 2026-09-18 session (death by lightning → depart → resurrection).
+
+    // Renucci's readings at the moment of death.
+    private const string DiedWithBlock =
+        "<dialogData id=\"injuries\">" +
+        "<image id=\"leftArm\" name=\"Injury1\" height=\"0\" width=\"0\"/>" +
+        "<image id=\"chest\" name=\"Injury1\" height=\"0\" width=\"0\"/>" +
+        "<image id=\"leftLeg\" name=\"Injury1\" height=\"0\" width=\"0\"/>" +
+        "<image id=\"nsys\" name=\"Nsys3\" height=\"0\" width=\"0\"/></dialogData>";
+
+    private const string AllClearReport =
+        "Your body feels in very bad shape!\n" +
+        "Your spirit feels empty.\n" +
+        "You are fatigued.\n" +
+        "You have no significant injuries.\n";
+
+    private static Genie.Core.Models.GameState FeedToState(params string[] chunks)
+    {
+        var parser = new DrXmlParser(NullLogger<DrXmlParser>.Instance);
+        var state  = new Genie.Core.Models.GameState();
+        using var engine = new Genie.Core.GameState.GameStateEngine(
+            parser.GameEvents, state, NullLogger<Genie.Core.GameState.GameStateEngine>.Instance);
+        foreach (var chunk in chunks) parser.Feed(chunk);
+        return state;
+    }
+
+    [Fact]
+    public void HealthAllClear_ClearsEveryRegion_IncludingNsys()
+    {
+        var state = FeedToState(DiedWithBlock, AllClearReport);
+
+        Assert.All(state.Injuries.Values, r => Assert.Equal(InjuryKind.None, r.Kind));
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.None, 0), state.Injuries["leftArm"]);
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.None, 0), state.Injuries["nsys"]);
+
+        // The cleared areas must be the dialog's own region ids — a typo here
+        // would quietly add a phantom key and leave the real region stale.
+        Assert.Equal(
+            new[] { "abdomen", "back", "chest", "head", "leftArm", "leftEye", "leftFoot",
+                    "leftHand", "leftLeg", "neck", "nsys", "rightArm", "rightEye",
+                    "rightFoot", "rightHand", "rightLeg" },
+            state.Injuries.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public void HealthSummary_ClearsOnlyTheRegionsItDoesNotName()
+    {
+        var state = FeedToState(
+            DiedWithBlock,
+            "Your body feels slightly battered.\n" +
+            "Your spirit feels full of life.\n" +
+            "You are tired.\n" +
+            "You have some minor abrasions to the left arm.\n");
+
+        // Named → the dialog's reading stands; unnamed → healthy.
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.Wound, 1), state.Injuries["leftArm"]);
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.None, 0),  state.Injuries["chest"]);
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.None, 0),  state.Injuries["leftLeg"]);
+    }
+
+    [Fact]
+    public void HealthSummary_LeavesNsysToTheNerveScan()
+    {
+        // Nerve damage is described as whole-body / skin wording, which must
+        // not be read as "nsys unmentioned".
+        var state = FeedToState(
+            DiedWithBlock,
+            "Your body feels at death's door!\n" +
+            "You have some minor abrasions to the chest, complete paralysis of the " +
+            "entire body compounded by open and bleeding sores all over the skin.\n");
+
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.Damage, 3), state.Injuries["nsys"]);
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.Wound, 1),  state.Injuries["chest"]);
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.None, 0),   state.Injuries["leftArm"]);
+    }
+
+    [Fact]
+    public void YouHaveLine_OutsideAHealthReport_ClearsNothing()
+    {
+        // No "Your body feels" first line → not a report, so a stray line that
+        // happens to name a body part can never wipe the panel.
+        var state = FeedToState(
+            DiedWithBlock,
+            "You have a firm grip on the left arm of the chair.\n");
+
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.Wound, 1),  state.Injuries["chest"]);
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.Damage, 3), state.Injuries["nsys"]);
+    }
+
+    [Fact]
+    public void HealthReport_SkipsInterleavedYouHaveLine_AndStillApplies()
+    {
+        // Text can land between the report's first line and its summary; a
+        // line that names no region leaves the window open for the real one.
+        var state = FeedToState(
+            DiedWithBlock,
+            "Your body feels in extremely bad shape!\n" +
+            "You have gained favor with your god.\n" +
+            "You have no significant injuries.\n");
+
+        Assert.All(state.Injuries.Values, r => Assert.Equal(InjuryKind.None, r.Kind));
+    }
+
+    [Fact]
+    public void HealthReport_AllClearLine_StillDisplays()
+    {
+        // The clear is a side effect — a user-typed `health` still prints.
+        var events = Feed(AllClearReport);
+        Assert.Contains(events.OfType<TextEvent>(), t => t.Text == "You have no significant injuries.");
+    }
+
     [Fact]
     public void HealthProgressBar_InsideInjuriesDialog_StillEmitsVitals()
     {

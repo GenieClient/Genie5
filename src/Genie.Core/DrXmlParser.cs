@@ -390,6 +390,71 @@ public sealed class DrXmlParser : IDisposable
         ("developed slurred speech",                  InjuryKind.Scar,  1),
     };
 
+    // ── `health` report window (#18 — clearing a stale injuries panel) ───────
+    // Armed by the report's "Your body feels …" first line; the injuries
+    // summary ("You have …") that follows is authoritative for WHICH regions
+    // are injured. Valves: at most HealthReportMaxLines lines and 5 s, so an
+    // unrelated "You have …" long after a report can never be mistaken for the
+    // summary (and one that lands inside the window is ignored unless it names
+    // a region or reads as the all-clear).
+    private int _healthReportLines;
+    private DateTimeOffset _healthReportDeadline = DateTimeOffset.MinValue;
+    private const int HealthReportMaxLines = 12;
+
+    // Region names as the `health` summary writes them ("…to the left arm",
+    // "…along the chest"). Matched with word boundaries anywhere in the line:
+    // a false MATCH only means a region is left alone, which is the safe
+    // direction — only a false MISS could wrongly clear a real injury.
+    private static readonly (string Region, System.Text.RegularExpressions.Regex Re)[] _healthRegions =
+        new[]
+        {
+            "head", "neck", "right eye", "left eye", "right arm", "left arm",
+            "right hand", "left hand", "chest", "abdomen", "back",
+            "right leg", "left leg", "right foot", "left foot",
+        }
+        .Select(name => (
+            Region: string.Concat(name.Split(' ').Select((w, i) =>
+                i == 0 ? w : char.ToUpperInvariant(w[0]) + w[1..])),
+            Re: new System.Text.RegularExpressions.Regex(
+                $@"\b{name}\b",
+                System.Text.RegularExpressions.RegexOptions.Compiled
+                | System.Text.RegularExpressions.RegexOptions.IgnoreCase)))
+        .ToArray();
+
+    // Anything that can stand for the nervous system in the summary — the nerve
+    // phrases themselves plus the whole-body/skin wordings DR uses for severe
+    // nsys damage ("complete paralysis of the entire body", "open and bleeding
+    // sores all over the skin"). nsys is left alone whenever one of these shows
+    // up, so the always-on nerve scan below owns the reading.
+    private static readonly System.Text.RegularExpressions.Regex _healthNsysRe = new(
+        @"\b(nerve\w*|nervous|skin|entire body|paralysis|numb\w*|muscle|convulsion\w*|spasm\w*|twitch\w*|slurred speech)\b",
+        System.Text.RegularExpressions.RegexOptions.Compiled
+        | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Apply the `health` verb's injuries summary: every region the line does
+    /// NOT name reads healthy. Returns false when the line doesn't look like
+    /// the summary at all (names no region and isn't the all-clear), leaving
+    /// the report window open for the real one.
+    /// </summary>
+    private bool TryApplyHealthInjurySummary(string line)
+    {
+        var allClear = line.StartsWith("You have no significant injuries", StringComparison.OrdinalIgnoreCase);
+        var named    = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (region, re) in _healthRegions)
+            if (re.IsMatch(line)) named.Add(region);
+        var nsysNamed = _healthNsysRe.IsMatch(line);
+
+        if (!allClear && named.Count == 0 && !nsysNamed) return false;   // not the summary
+
+        foreach (var (region, _) in _healthRegions)
+            if (!named.Contains(region))
+                _events.OnNext(new InjuryEvent(region, InjuryKind.None, 0));
+        if (!nsysNamed)
+            _events.OnNext(new InjuryEvent("nsys", InjuryKind.None, 0));
+        return true;
+    }
+
     // ── News-listing auto-link state (public issue #30) ──────────────────────
     // DR sends the `news` listing as PLAIN TEXT — the numbered item lines carry
     // no <d>/<a> tags, so they're not clickable on their own. We track the
@@ -732,6 +797,35 @@ public sealed class DrXmlParser : IDisposable
         // synthetic room ComponentEvents. Never suppresses the line itself.
         if (_roomSeedArmed)
             TryCaptureRoomSeed(stripped, boldSpans, presetSpans);
+
+        // `health` report window (#18): the verb's summary line is the only
+        // source that can CLEAR a stale injuries panel. DR pushes
+        // <dialogData id='injuries'> with the full 15-image set whenever wounds
+        // change, but it pushes nothing while the character is unconscious /
+        // dead — so the wound wipe that comes with a resurrection is never
+        // announced and the panel keeps showing the injuries the character died
+        // with (verified against raw_session_Renucci_20260805 — the last image
+        // block predates the death and only health2 bars follow). The summary
+        // names every injured region, so any region it does NOT name is healthy.
+        // "Your body feels …" is the report's first line and arms the window;
+        // the line-count + deadline valves keep it from outliving one response
+        // (combat text can interleave before the summary lands).
+        if (_activeStream == "main")
+        {
+            if (stripped.StartsWith("Your body feels", StringComparison.Ordinal))
+            {
+                _healthReportLines    = HealthReportMaxLines;
+                _healthReportDeadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
+            }
+            else if (_healthReportLines > 0)
+            {
+                if (DateTimeOffset.UtcNow > _healthReportDeadline) _healthReportLines = 0;
+                else if (--_healthReportLines >= 0
+                         && stripped.StartsWith("You have ", StringComparison.Ordinal)
+                         && TryApplyHealthInjurySummary(stripped))
+                    _healthReportLines = 0;
+            }
+        }
 
         // Nervous-system refinement (#18): the `health` verb's nerve line is the
         // only wound-vs-scar source for the nsys region (the dialog image can't

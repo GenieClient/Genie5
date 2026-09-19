@@ -254,6 +254,7 @@ public sealed class InjuriesViewModel : ReactiveObject
     private void Apply(string area, InjuryKind kind, int severity)
     {
         if (!_cells.TryGetValue(area, out var cell)) return;   // unknown region
+        if (cell.Kind == kind && cell.Severity == severity) return;   // no change
         cell.Set(kind, severity);
         RebuildSummary();
     }

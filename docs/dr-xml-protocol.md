@@ -122,7 +122,7 @@ Each recognised tag emits one or more `GameEvent`s. Tags in the `_settingsTags` 
 | --- | --- | --- |
 | `<indicator id='IconWEBBED' visible='y'/>` | `IndicatorEvent(id, visible)` | `visible` is `y`/`n`. [GameStateEngine](../src/Genie.Core/GameStateEngine.cs) maps the icon id to a `CharacterStatus`; [ScriptGlobalsSync](../src/Genie.Core/Scripting/ScriptGlobalsSync.cs) mirrors it to `$webbed`/`$standing`/etc. |
 | `<crtrStatus exist='91586721' hostile='0' disengaged='1' flying='1'/>` | `CreatureStatusEvent(exist, hostile, disengaged, flying)` | Per-creature combat status, keyed by exist id (public #202). Dropped if `exist` is missing. |
-| `<dialogData id='injuries'>` + `<image id='rightLeg' name='Injury2'/>` | `InjuryEvent(area, kind, severity)` | Inside the injuries dialog, each `<image>` reads one body region: `Injury<N>` = wound, `Scar<N>` = scar, `Nsys<N>` = nerve damage, name echoing the region id = healthy. Severity 1–3. Outside the injuries dialog, `<image>` is UI layout only and dropped. |
+| `<dialogData id='injuries'>` + `<image id='rightLeg' name='Injury2'/>` | `InjuryEvent(area, kind, severity)` | Inside the injuries dialog, each `<image>` reads one body region: `Injury<N>` = wound, `Scar<N>` = scar, `Nsys<N>` = nerve damage, name echoing the region id = healthy. Severity 1–3. Outside the injuries dialog, `<image>` is UI layout only and dropped. The block always carries the full 15-region set (never a delta), but DR sends **no** image block while the character is unconscious or dead — see the `health` row below for how the wound wipe at a resurrection is picked up. |
 
 ### Session lifecycle
 
@@ -139,6 +139,8 @@ A few events are parsed out of plain game text rather than a tag:
 | Source | Event | Notes |
 | --- | --- | --- |
 | `info` output (`Guild: X` line) | `GuildEvent(guild)` | DR doesn't push guild in a structured tag; fires only when the player runs `info`. |
+| `health` report (the summary line after `Your body feels …`) | `InjuryEvent(area, None, 0)` per healthy region | The summary names every injured region, so any region it does NOT name reads healthy — the only way to clear injuries DR healed while it was pushing no dialog data (death → resurrection). Nerve wording (`the entire body`, `the skin`, the muscle/convulsion phrases) leaves `nsys` to the nerve scan below. Armed by the report's first line, with line-count + 5 s valves so an unrelated "You have …" can't be mistaken for the summary. |
+| `health` nerve line | `InjuryEvent("nsys", kind, severity)` | The only wound-vs-scar source for the nervous system — the dialog image can't say. |
 | Lich ident reply | `CharacterNameEvent(name)` | Character name learned mid-session on a Lich-proxy attach (public #127), where the client never sees `<app char=…/>`. |
 | Connect-time silent `flags` probe | `FlagsReportEvent(flags)` | Flag name → ON/OFF; the probe's output is suppressed from display, and GenieCore warns if a stream-affecting flag deviates from the verified baseline. See [DR_FLAGS.md](DR_FLAGS.md). |
 

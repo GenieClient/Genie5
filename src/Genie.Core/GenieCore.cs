@@ -872,6 +872,27 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// </summary>
     public Func<bool>? InjuriesPanelVisible { get; set; }
 
+    private bool _wasDeadPrompt;
+
+    /// <summary>
+    /// Resurrection resync (#18). DR pushes the injuries dialog only while the
+    /// character is conscious — through a death and back it sends nothing but
+    /// health2 bars — so the wound wipe that comes with a resurrection is never
+    /// announced and the panel keeps showing the injuries the character died
+    /// with. The DEAD prompt is the only marker available (DR never sends an
+    /// IconDEAD indicator), so a DEAD-to-alive transition makes the auto-refresh
+    /// poll due immediately: its `health` summary clears the healed regions.
+    /// Every gate of the periodic poll still applies — with the cadence Off the
+    /// client sends nothing and the panel corrects on the next typed `health`.
+    /// </summary>
+    private void NoteDeathPrompt(string indicator)
+    {
+        var dead = indicator.Contains("DEAD", StringComparison.OrdinalIgnoreCase);
+        if (dead == _wasDeadPrompt) return;
+        _wasDeadPrompt = dead;
+        if (!dead) _lastInjuriesPoll = DateTimeOffset.MinValue;   // alive again → poll on the next tick
+    }
+
     private void InjuriesPollTick()
     {
         var interval = Config.InjuriesPollSeconds;
@@ -1031,7 +1052,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                     ProcessGameTextEvent(te);
                     break;
 
-                case PromptEvent:
+                case PromptEvent pe:
+                    NoteDeathPrompt(pe.Indicator);  // resurrection → resync injuries
                     _typeAhead.NotifyConsumed();   // server caught up → free a type-ahead slot
                     // Unblock `move` BEFORE resuming RT/pause scripts (OnPrompt).
                     // We coalesce the room-change to the prompt (turn boundary)
