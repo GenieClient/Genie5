@@ -382,15 +382,37 @@ public static class Genie4Importer
 
             var pat = args[0];
             bool caseInsensitive = false;
-            // Genie4 accepts both evaluated triggers (e/.../) and inline /.../i case-insensitive markers.
-            if (pat.StartsWith("e/", StringComparison.OrdinalIgnoreCase) && pat.EndsWith('/'))
-                pat = pat[2..^1];
-            else
+
+            // Genie 4's `e/…/` is an EVALUATED trigger: it fires when the value of
+            // the expression inside CHANGES, not when a line of game text matches.
+            // It is not a delimiter style alongside `/…/` and `/…/i` — it selects a
+            // different KIND of rule, and Genie 5's trigger engine has no
+            // variable-change concept at all (nothing under Genie.Core/Triggers
+            // references one).
+            //
+            // This used to strip the marker and keep the inside, so
+            // `e/$roomobjs/` imported as a text trigger whose pattern was the
+            // literal `$roomobjs`. That rule can NEVER fire: TriggerRule.SafeMatch
+            // runs the stored pattern as a regex verbatim and patterns are never
+            // variable-substituted, so `$var` is an end-anchor followed by literal
+            // text — unmatchable. The rule nevertheless counted toward "imported",
+            // which defeats for this one shape the honest-count guarantee 7e14c38
+            // established: a downgraded rule never reaches the NOT IMPORTED report,
+            // so the user is told it worked (#353).
+            //
+            // Reported as a Dropped skip rather than silently degraded. Supporting
+            // the form for real is a trigger-engine feature, not an importer fix.
+            if (IsEvaluatedTriggerPattern(pat))
             {
-                if (pat.StartsWith('/')) pat = pat[1..];
-                if (pat.EndsWith("/i", StringComparison.OrdinalIgnoreCase)) { caseInsensitive = true; pat = pat[..^2]; }
-                else if (pat.EndsWith('/')) pat = pat[..^1];
+                log.Drop(lineNo, line,
+                         "evaluated trigger (e/…/) fires on a variable change, which Genie 5 has no equivalent for — "
+                         + "importing it as a text trigger would produce a pattern that can never match");
+                continue;
             }
+
+            if (pat.StartsWith('/')) pat = pat[1..];
+            if (pat.EndsWith("/i", StringComparison.OrdinalIgnoreCase)) { caseInsensitive = true; pat = pat[..^2]; }
+            else if (pat.EndsWith('/')) pat = pat[..^1];
 
             if (string.IsNullOrEmpty(pat)) { log.Drop(lineNo, line, "trigger pattern is empty"); continue; }
             try { _ = new Regex(pat); }
@@ -459,6 +481,23 @@ public static class Genie4Importer
         }
         return new ImportResult(imported, log.Count) { Skips = log.Items };
     }
+
+    /// <summary>
+    /// True for Genie 4's evaluated-trigger form <c>e/…/</c>, which fires on a
+    /// change in the enclosed expression rather than on matching game text.
+    /// Genie 5 has no equivalent, so these are reported rather than imported
+    /// (#353). Kept deliberately narrow — the marker must be both present and
+    /// closed, which is a shape Genie 5's own dialect never produces.
+    ///
+    /// The degenerate <c>e/</c> counts (its one slash closes the marker it opens).
+    /// That matters: left to the delimiter path below it would have its trailing
+    /// slash stripped and import as the pattern <c>e</c> — a trigger firing on
+    /// almost every line of game text. The old code was worse still and threw,
+    /// computing the reversed range <c>pat[2..^1]</c> on it.
+    /// </summary>
+    internal static bool IsEvaluatedTriggerPattern(string pattern) =>
+        pattern.StartsWith("e/", StringComparison.OrdinalIgnoreCase) &&
+        pattern.EndsWith('/');
 
     private static HighlightMatchType? ParseMatchType(string raw) =>
         raw.Trim().ToLowerInvariant() switch

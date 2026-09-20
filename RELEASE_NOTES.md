@@ -83,6 +83,24 @@ classic Genie 4 workspace is a layout you can pick from a menu.
   have degraded to literal matches, and the sound file in Genie 4's fifth
   argument was being dropped.
 
+- **Genie 4 evaluated triggers are reported instead of quietly broken** —
+  Genie 4's `e/…/` form fires when the value of the enclosed expression
+  *changes*, not when a line of game text matches. The importer treated `e/`
+  as a delimiter style alongside `/…/` and `/…/i`, stripped it, and kept the
+  inside — so `e/$roomobjs/` came across as an ordinary text trigger looking
+  for the literal characters `$roomobjs`. That can never match anything, and
+  it still counted as successfully imported, so nothing told you the rule had
+  been downgraded into something incapable of working. Genie 5 has no
+  variable-change trigger, so these are now listed under NOT IMPORTED with the
+  reason. The same line hand-copied into your config folder is refused with a
+  message rather than banked silently (#353).
+
+  ⚠ **If you imported on beta.9, the dead rules are already in your
+  `triggers.cfg`.** They are inert — they cannot fire or match — but they still
+  occupy rows in Configuration ▸ Triggers. Look for any rule whose pattern is a
+  bare `$something` and delete it; this release stops new ones arriving but does
+  not clean up the old.
+
 - **Imported macros fire, and imported alias arguments substitute** — macros
   came across in a form the macro engine could not dispatch, and aliases kept a
   literal `$1` instead of substituting the argument. Keys that were previously

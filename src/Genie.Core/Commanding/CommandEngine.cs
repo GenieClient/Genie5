@@ -2166,6 +2166,17 @@ public sealed class CommandEngine
     /// a <c>highlights.cfg</c> line. Used to tell that dialect apart from
     /// Genie 5's, where the first argument is the pattern.
     /// </summary>
+    /// <summary>
+    /// True for Genie 4's evaluated-trigger form <c>e/…/</c> (fires on a change
+    /// in the enclosed expression, not on matching text). Genie 5 has no
+    /// equivalent, so these are refused rather than banked as dead text rules
+    /// (#353). Mirrors <c>Genie4Importer.IsEvaluatedTriggerPattern</c> — the two
+    /// layers keep their own copy of the dialect helpers, as with ParseMatchType.
+    /// </summary>
+    private static bool IsEvaluatedTriggerPattern(string pattern) =>
+        pattern.StartsWith("e/", StringComparison.OrdinalIgnoreCase) &&
+        pattern.EndsWith('/');
+
     private static bool IsMatchTypeToken(string token) => token.ToLowerInvariant()
         is "string" or "line" or "beginswith" or "regexp" or "regex";
 
@@ -2290,6 +2301,25 @@ public sealed class CommandEngine
         var matchAll = ExtractFlag(args, "matchall");
         var pattern  = args[0];
         var action   = args[1];
+
+        // Genie 4 dialect: `e/…/` is an EVALUATED trigger — it fires when the
+        // enclosed expression's value changes, not when game text matches. A
+        // hand-copied Genie 4 triggers.cfg is replayed through this handler at
+        // connect (the same route the #highlight / #name argument-order handling
+        // above exists for), so such a line used to be banked verbatim as a text
+        // pattern. It can never match: patterns run as regexes and are never
+        // variable-substituted, so `e/$var/` is a dead rule occupying a slot and
+        // reporting success. Refuse it with a reason instead (#353).
+        //
+        // Deliberately narrow, and it costs Genie 5's own dialect nothing: a
+        // pattern both opening `e/` and closing `/` is not a shape Genie 5
+        // produces, and anyone wanting that literal can escape the slash.
+        if (IsEvaluatedTriggerPattern(pattern))
+        {
+            _host.Echo($"Evaluated trigger not imported — Genie 4's e/…/ fires on a variable change, "
+                       + $"which Genie 5 has no equivalent for: {pattern}");
+            return;
+        }
         var cls      = args.Count > 2 ? args[2] : "";
         var sound    = args.Count > 3 ? args[3] : "";
         var speak    = args.Count > 4 ? args[4] : "";

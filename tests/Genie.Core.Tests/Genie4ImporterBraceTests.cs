@@ -55,8 +55,12 @@ public class Genie4ImporterBraceTests
     [Fact]
     public void Trigger_action_with_several_brace_groups_is_imported_whole()
     {
+        // NB: this case used the evaluated form `e/$roomobjs/` until #353. That was
+        // incidental — the point here is that both braced #eval groups in the ACTION
+        // survive tokenizing — and `e/…/` is now reported rather than imported, so it
+        // would mask this assertion. Plain pattern, identical action.
         var path = WriteCfg(
-            @"#trigger {e/$roomobjs/} {#var monsterdead #eval {count(""$roomobjs"",""appears dead"")} + #eval {count(""$roomobjs"",""(dead)"")}}");
+            @"#trigger {^You also see} {#var monsterdead #eval {count(""$roomobjs"",""appears dead"")} + #eval {count(""$roomobjs"",""(dead)"")}}");
         var engine = new TriggerEngineFinal();
 
         var result = Genie4Importer.ImportTriggers(path, engine, ImportMode.Replace);

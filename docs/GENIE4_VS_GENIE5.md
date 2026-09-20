@@ -289,7 +289,7 @@ The largest area of genuine parity. **Genie 5 ships all of Genie 4's rule engine
 | Highlight foreground + background colors | ✅ | ✅ | ✅ |
 | Highlight case-sensitive flag | ✅ | ✅ | ✅ |
 | Trigger regex `/pattern/i` syntax | ✅ | ✅ | ✅ |
-| Trigger `eval` expression triggers | ✅ via `e/` | ⚠️ via `def(...)` | ✅ (different syntax) |
+| Trigger `eval` expression triggers | ✅ via `e/` | ❌ no equivalent — nothing under `Genie.Core/Triggers` has a variable-change concept; `def(...)` is a **script-expression** function (`ScriptExpression.cs:537`), not a trigger kind | ❌ gap — imported `e/…/` rules are now reported rather than degraded (#353) |
 | Trigger fire-on-input (vs server only) | ✅ via `triggeroninput` | ✅ | ✅ |
 | Macro keybind: F-keys, Ctrl/Alt/Shift+X | ✅ | ✅ | ✅ |
 | Variable types: SaveToFile / Temporary / Reserved | ✅ | ⚠️ via `Scope` enum (Global/Script/Tvar) | ✅ (semantically equivalent) |
