@@ -4,11 +4,34 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.9 — Nothing Lost
+## Latest: v5.0.0-beta.9.5 — Carried Over
+
+A Genie 4 config folder finally arrives intact, and Update Maps stops damaging the maps it was meant to update.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.5** as a delta from beta.9.
+
+> ### ⚠️ If you have ever run an earlier release, repair your maps once
+> Every build before this one rewrote downloaded map zones through an exporter that could not represent what it had just read, so `go` and `climb` exits came back as `none` and room descriptions were thinned — a little more on every update. This release stops the damage, but a normal **Update Maps** only rewrites zones whose upstream copy changed, so it will **not** repair what is already there.
+>
+> To force a full repair: close Genie, delete **`.map-shas.json`** from your Maps folder, start Genie and run **Update Maps** once. All 122 zones re-download clean. Your own edits — edited exits, notes, colours, server ids — are preserved; a verified repair on a heavily-annotated folder kept 10,833 pieces of user metadata untouched while restoring 7,393 `go` arcs and 2,187 `climb` arcs (#352).
+
+- **Genie 4 highlights and names import in the right order** — Genie 4 writes `#highlight {beginswith} {#DFEB9E} {Also here:}`; Genie 5 writes `#highlight {pattern} {fg} {bg}`. Nothing noticed, so every line landed with the match *type* as its pattern and the real pattern as a background colour. Because the type is only ever `regexp` or `beginswith`, all 235 rules in a reference config collided on two patterns and overwrote each other — leaving two garbage rules, no error, and a panel that looked as though the import had simply failed. Genie 4's `regexp` spelling is recognised now too (without it, 230 regex rules would have degraded to literal matches), and the sound file in Genie 4's fifth argument is no longer dropped.
+- **The import dialog offers names, colour presets and settings** — it had checkboxes for eight config types while the engine supported ten. Names and presets were counted during the folder scan and then never imported, so a whole colour palette was lost by every supported path. Settings are handled key by key rather than loaded wholesale, because Genie 4's `settings.cfg` carries `scriptdir`, `configdir` and `logdir` as paths relative to *its own* install — loading those naively would have repointed Genie 5's folders at another program's.
+- **Imported macros fire and alias arguments substitute** — macros came across in a form the macro engine could not dispatch, and aliases kept a literal `$1` instead of substituting. Keys that were previously unrepresentable, including `{Escape}` and `{Decimal}`, now work.
+- **The importer tells you what it dropped** — the summary said "N imported, M skipped" and nothing more, so you could not tell whether those M were duplicates you expected or rules that had just been destroyed. Every skipped line now carries its line number, the offending text, a reason, and whether a rule was actually lost, printed under a **NOT IMPORTED** heading.
+- **Rules whose payload contains a brace no longer vanish** on import, and **Genie 4 evaluated triggers** (`e/…/`, which fire on a variable change) are reported as unsupported rather than silently degraded into patterns that could never match (#353).
+- **"Heirloom" — the Genie 4 workspace as a built-in layout** — a third shipped arrangement beside Strongbox and Shadowveil, rebuilding the classic Genie 4 desktop in windowed mode, with the geometry measured off a real Genie 4 session. **Layout ▸ Load Layout ▸ Heirloom**.
+- **SimuCoins balance and reward claim, in-house** — check your balance and claim the monthly reward without leaving the client. With thanks to Thires, whose Genie 4 plugin this replaces (#328).
+- **Structured assess rows in the Mobs panel** — assess output is parsed into rows joined to the creature status stream, rebuilt on a re-assess and renumbered after a kill (#313).
+- **`include` loads a same-named file again** — a `foo.cmd` running `include foo.inc` expanded to nothing, and `include x.inc` followed by `include x.cmd` only ran the first. Both failed silently; the first symptom was a `gosub` into a label that no longer existed (#347).
+- **The Injuries panel clears after a death** — DragonRealms sends no injury data at all while you are dead, so the panel kept showing the injuries you died with even while `health` read "no significant injuries."
+- Also: **`health2` maps onto health** so an injured character no longer reads full health at session start (#333), **`#config scrollbacklines` takes effect immediately** (#339), **unclaimed `/commands` are held back from the game**, the **Experience window honours Word Wrap**, and server dialog titles no longer show a doubled ampersand (#344).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.5)
+
+## v5.0.0-beta.9 — Nothing Lost
 
 The dialogs DragonRealms has always sent finally have somewhere to appear, the room's contents get a window of their own, and a bad line of game text can no longer stop your screen.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9** as a delta from beta.8.3.
 
 - **Server dialogs get real windows** — DragonRealms sends structured dialogs for things like paying off bank debt or choosing a spell. Genie has always received them and had nowhere to put them, so they were dropped. They now open as ordinary panels you can dock, float, or send to their own window, built from whatever controls the server sent rather than from per-dialog code. The arrangement is worked out from the coordinates in the message instead of fixed pixels, so a dialog laid out for a small fixed window reflows into whatever space your panel has; a control Genie doesn't recognise yet appears as a labelled placeholder rather than vanishing. Where each dialog lives is remembered per character profile, asked once the first time it appears. This is the first phase — the bespoke ones, the aim timer and injuries for other players, come later (#156).
 - **Dialog text no longer leaks into your main window** — some dialog contents arrive as their own stream, tagged with the dialog they belong to. Genie didn't recognise the tag, so that text fell through into the game window as stray lines with no obvious source. It now goes to the dialog it belongs to (#324).
