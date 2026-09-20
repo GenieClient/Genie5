@@ -1,4 +1,4 @@
-# Genie 5 — v5.0.0-beta.10
+# Genie 5 — v5.0.0-beta.9.5
 
 **"Carried Over"** — the release where a Genie 4 config folder finally arrives
 intact. Your highlights, macros, aliases, names and colour presets come across
