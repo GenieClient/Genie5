@@ -271,13 +271,17 @@ disposition table live in
 [#271](https://github.com/GenieClient/Genie5/issues/271); the individual ports
 are filed beneath it — Crutch
 ([#263](https://github.com/GenieClient/Genie5/issues/263), the Empath healing
-console, and the largest of them), Combat Tracker
-([#265](https://github.com/GenieClient/Genie5/issues/265)), Bank Tracker
+console, and the largest of them), Bank Tracker
 ([#266](https://github.com/GenieClient/Genie5/issues/266)), SpellInfo
 ([#267](https://github.com/GenieClient/Genie5/issues/267)), BestiaryQuery
 ([#269](https://github.com/GenieClient/Genie5/issues/269)), and per-window
-logging ([#270](https://github.com/GenieClient/Genie5/issues/270)). ExpEcho
-retired: its behaviour shipped built-in with the beta.7 Experience window.
+logging ([#270](https://github.com/GenieClient/Genie5/issues/270)).
+
+Two are retired rather than pending. ExpEcho's behaviour shipped built-in with
+the beta.7 Experience window. Combat Tracker
+([#265](https://github.com/GenieClient/Genie5/issues/265)) was closed
+`not planned` in September 2026 — the issue asked whether anyone still used it
+and nobody did. Say so if you want it back.
 
 Several carry a `design-question` label rather than a spec: the Genie 5 plugin
 contract is deliberately UI-free, so a plugin whose whole value is a clickable
