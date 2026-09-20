@@ -36,6 +36,7 @@
   "HandsStripVisible": true,
   "HandsStripAtBottom": true,
   "ShowStatusBar": true,
+  "ScriptBarAtBottom": false,
   "RoundTimeOnHandsStrip": true,
   "ShowGameText": true,
   "ShowEchoText": true,

@@ -444,6 +444,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit>                    RoundTimeToCommandBarCommand { get; }
     /// <summary>Window → Roundtime Position → Hands Strip. Moves the RT badge onto the L/R/S row.</summary>
     public ReactiveCommand<Unit, Unit>                    RoundTimeToHandsStripCommand { get; }
+    /// <summary>Layout → Script Bar Position → Top. Docks the running-script strip under the menu — Genie 4's default (#357).</summary>
+    public ReactiveCommand<Unit, Unit>                    ScriptBarToTopCommand    { get; }
+    /// <summary>Layout → Script Bar Position → Bottom. Docks it above the command bar (the Genie 5 arrangement).</summary>
+    public ReactiveCommand<Unit, Unit>                    ScriptBarToBottomCommand { get; }
 
     /// <summary>File → Record Session — toggle raw-XML capture on/off.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleRecordingCommand   { get; }
@@ -461,6 +465,16 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>True iff the RT badge should render inline on the hands strip
     /// (in RT AND user chose hands-strip position).</summary>
     [Reactive] public bool ShowRtOnHandsStrip  { get; private set; }
+
+    /// <summary>True iff the Script Bar should render in its TOP slot — i.e. a
+    /// script is running AND the user picked the top position (#357). The strip
+    /// is instantiated in both slots and gated by these two flags, mirroring
+    /// how the hands strip handles its own top/bottom choice.</summary>
+    [Reactive] public bool ShowScriptBarTop    { get; private set; }
+
+    /// <summary>True iff the Script Bar should render in its BOTTOM slot
+    /// (a script is running AND the user kept the default position).</summary>
+    [Reactive] public bool ShowScriptBarBottom { get; private set; }
 
     /// <summary>True while <see cref="SessionRecorder"/> is actively writing the
     /// raw XML stream to disk. Drives the File-menu checkbox + the title-bar
@@ -1621,6 +1635,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 HandsStripAtBottom   = true,
                 ShowStatusBar        = true,
                 RoundTimeOnHandsStrip= false,
+                ScriptBarAtBottom    = true,
                 ShowGameText         = true,
                 ShowEchoText         = true,
                 ShowScriptText       = true,
@@ -1943,6 +1958,18 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Display.Save(_displayPath);
         });
 
+        ScriptBarToTopCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ScriptBarAtBottom = false;
+            Display.Save(_displayPath);
+        });
+
+        ScriptBarToBottomCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ScriptBarAtBottom = true;
+            Display.Save(_displayPath);
+        });
+
         // ── Session recorder ──────────────────────────────────────────────
         // Logs sit beside Config under {AppData}/Genie5/ to mirror the layout
         // TestHarness writes to. Always allocate the recorder (cheap — just
@@ -2057,6 +2084,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             {
                 ShowRtInCommandBar = Vitals.InRoundTime && !Display.RoundTimeOnHandsStrip;
                 ShowRtOnHandsStrip = Vitals.InRoundTime &&  Display.RoundTimeOnHandsStrip;
+            });
+
+        // Same shape for the Script Bar's two slots (#357): the strip only
+        // shows when something is running, in whichever slot the user picked.
+        this.WhenAnyValue(
+                x => x.ScriptBar.HasScripts,
+                x => x.Display.ScriptBarAtBottom)
+            .Subscribe(_ =>
+            {
+                ShowScriptBarTop    = ScriptBar.HasScripts && !Display.ScriptBarAtBottom;
+                ShowScriptBarBottom = ScriptBar.HasScripts &&  Display.ScriptBarAtBottom;
             });
 
         // ── Per-dockable toggle commands ───────────────────────────────────
@@ -5601,6 +5639,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             HandsStripAtBottom    = Display.HandsAtBottom,
             ShowStatusBar         = Display.ShowStatusBar,
             RoundTimeOnHandsStrip = Display.RoundTimeOnHandsStrip,
+            ScriptBarAtBottom     = Display.ScriptBarAtBottom,
             ShowGameText          = Display.ShowGameText,
             ShowEchoText          = Display.ShowEchoText,
             ShowScriptText        = Display.ShowScriptText,
@@ -5668,6 +5707,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.HandsAtBottom          = layout.HandsStripAtBottom;
         Display.ShowStatusBar          = layout.ShowStatusBar;
         Display.RoundTimeOnHandsStrip  = layout.RoundTimeOnHandsStrip;
+        Display.ScriptBarAtBottom      = layout.ScriptBarAtBottom;
         Display.ShowGameText           = layout.ShowGameText;
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;

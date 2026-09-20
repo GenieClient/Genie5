@@ -1,0 +1,121 @@
+<!-- ══════════════════════════════════════════════════════════════════════
+     Script Bar — the always-on strip of running-script chips.
+
+     Lives in its own UserControl because the main window hosts it TWICE: once
+     docked Top (just under the menu — Genie 4's default) and once docked
+     Bottom (above the command bar — the Genie 5 arrangement). Exactly one
+     instance is visible, gated by MainWindowViewModel.ShowScriptBarTop /
+     ShowScriptBarBottom, so Layout ▸ Script Bar Position re-docks the strip
+     live (#357). Same two-slot shape the hands strip already uses.
+
+     DataContext is inherited from the main window, so every binding here is
+     relative to MainWindowViewModel.
+     ══════════════════════════════════════════════════════════════════════ -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Genie.App.ViewModels"
+             x:Class="Genie.App.Views.ScriptBarView"
+             x:DataType="vm:MainWindowViewModel">
+
+  <Border Background="{DynamicResource Theme.ToolbarBg}"
+          BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
+          Padding="6,3">
+    <DockPanel LastChildFill="False">
+      <TextBlock DockPanel.Dock="Left" Text="Scripts:" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="11"
+                 FontWeight="SemiBold" VerticalAlignment="Center"
+                 Margin="0,0,2,0"/>
+      <ItemsControl DockPanel.Dock="Left" ItemsSource="{Binding ScriptBar.RunningScripts}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Orientation="Horizontal" Spacing="4"/>
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ScriptBarItem">
+            <Border Background="#283139" BorderBrush="#3e4a55"
+                    BorderThickness="1" CornerRadius="3" Padding="6,1">
+              <!-- Right-click menu — Genie 4's Script Bar dropdown (Resume/
+                   Pause, Abort, Debug levels, Trace, Vars, Edit) plus the
+                   Genie 5 reload. Commands are per-chip (see
+                   ScriptBarViewModel.MakeItem) because this popup detaches
+                   from the visual tree. -->
+              <Border.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="Pause / resume" Command="{Binding MenuPauseResumeCommand}"/>
+                  <MenuItem Header="Abort" Command="{Binding AbortCommand}"/>
+                  <Separator/>
+                  <MenuItem Header="Debug level" IsVisible="{Binding !IsJavaScript}">
+                    <MenuItem Header="0 — off"          Command="{Binding SetDebugCommand}" CommandParameter="0"/>
+                    <MenuItem Header="1 — goto/gosub"   Command="{Binding SetDebugCommand}" CommandParameter="1"/>
+                    <MenuItem Header="2 — + pause/wait" Command="{Binding SetDebugCommand}" CommandParameter="2"/>
+                    <MenuItem Header="3 — + if"         Command="{Binding SetDebugCommand}" CommandParameter="3"/>
+                    <MenuItem Header="4 — + var/math"   Command="{Binding SetDebugCommand}" CommandParameter="4"/>
+                    <MenuItem Header="5 — + actions"    Command="{Binding SetDebugCommand}" CommandParameter="5"/>
+                    <MenuItem Header="10 — every line"  Command="{Binding SetDebugCommand}" CommandParameter="10"/>
+                  </MenuItem>
+                  <MenuItem Header="Show vars"  IsVisible="{Binding !IsJavaScript}" Command="{Binding VarsCommand}"/>
+                  <MenuItem Header="Show trace" IsVisible="{Binding !IsJavaScript}" Command="{Binding TraceCommand}"/>
+                  <MenuItem Header="Reload at next label" IsVisible="{Binding !IsJavaScript}" Command="{Binding ReloadCommand}"/>
+                  <Separator/>
+                  <MenuItem Header="Edit" Command="{Binding EditCommand}"/>
+                </ContextMenu>
+              </Border.ContextMenu>
+              <StackPanel Orientation="Horizontal" Spacing="4"
+                          VerticalAlignment="Center">
+                <TextBlock Text="{Binding Name}" FontSize="11"
+                           Foreground="{DynamicResource Theme.TextPrimary}" VerticalAlignment="Center"/>
+                <!-- Language tag — only shown for .js scripts. -->
+                <Border Background="#2d3b46" CornerRadius="2" Padding="3,0"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding IsJavaScript}">
+                  <TextBlock Text="js" FontSize="9" Foreground="#e8c97a"
+                             VerticalAlignment="Center"/>
+                </Border>
+                <!-- Pause / resume this script (#94). Glyph flips ⏸/▶. -->
+                <Button Content="{Binding PauseGlyph}"
+                        FontSize="10" Padding="3,0" MinWidth="0" MinHeight="0"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="#9ec59a"
+                        AutomationProperties.Name="Pause or resume script"
+                        AutomationProperties.HelpText="Pause / resume this script"
+                        ToolTip.Tip="Pause / resume this script"
+                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.PauseResumeCommand}"
+                        CommandParameter="{Binding}"/>
+                <!-- Per-script debug level (#94): cycles 0→1→5→10. .cmd only. -->
+                <Button Content="{Binding DebugLabel}"
+                        FontSize="9" Padding="3,0" MinWidth="0" MinHeight="0"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="#c0a060"
+                        IsVisible="{Binding !IsJavaScript}"
+                        AutomationProperties.Name="Cycle debug level"
+                        AutomationProperties.HelpText="Cycle this script's debug/trace level (0→1→5→10)"
+                        ToolTip.Tip="Cycle this script's debug/trace level (0→1→5→10)"
+                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.CycleDebugCommand}"
+                        CommandParameter="{Binding}"/>
+                <Button Content="✏"
+                        FontSize="10" Padding="3,0" MinWidth="0" MinHeight="0"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="#80a8c0"
+                        AutomationProperties.Name="Edit script"
+                        AutomationProperties.HelpText="Edit this script in the configured editor"
+                        ToolTip.Tip="Edit this script in the configured editor"
+                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.EditScriptCommand}"
+                        CommandParameter="{Binding Name}"/>
+                <Button Content="✕"
+                        FontSize="10" Padding="3,0" MinWidth="0" MinHeight="0"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="#d08080"
+                        AutomationProperties.Name="Stop script"
+                        AutomationProperties.HelpText="Stop this script (#stop)"
+                        ToolTip.Tip="Stop this script (#stop)"
+                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.StopScriptCommand}"
+                        CommandParameter="{Binding Name}"/>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </DockPanel>
+  </Border>
+
+</UserControl>

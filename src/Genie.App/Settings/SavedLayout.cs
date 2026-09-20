@@ -98,6 +98,11 @@ public sealed class SavedLayout
     public bool   ShowStatusBar        { get; set; } = true;
     public bool   RoundTimeOnHandsStrip{ get; set; } = false;
 
+    /// <summary>Where the Script Bar docks — true = bottom (the Genie 5
+    /// arrangement), false = top, just under the menu (Genie 4's default).
+    /// Defaults to true so layouts saved before #357 keep the old position.</summary>
+    public bool   ScriptBarAtBottom    { get; set; } = true;
+
     /// <summary>Per-tag visibility filters (Window → Game Window).</summary>
     public bool   ShowGameText         { get; set; } = true;
     public bool   ShowEchoText         { get; set; } = true;

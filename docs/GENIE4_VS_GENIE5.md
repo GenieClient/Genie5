@@ -104,7 +104,7 @@ Everything V1 tagged 🔧 FIX BEFORE ALPHA is done, verified against beta.3 sour
 | Paste Multi Line | ✅ | ✅ | ✅ | Edit ▸ Paste Multi Line splits clipboard text on the separator char |
 | Configuration... | ✅ tabbed dialog | ✅ tabbed dialog | ⚠️ | Genie 5 has tabs but the UX still wants a holistic pass per `backlog.md` "Configuration dialog UX pass" |
 | Update Images | ✅ | n/a | 🗓 | No image rendering |
-| Display Settings... | n/a | 🆕 | 🆕 | Font, colors, RoundTime position, hands strip position, editor path |
+| Display Settings... | n/a | 🆕 | 🆕 | Font family/size, game + echo colors, theme picker, editor path. The strip-position choices (hands / roundtime / script bar) live in the Layout menu, not here |
 | Profile → Load / Save / Include Password | ✅ | ✅ merged into Connect dialog | ✅ | Genie 5 always encrypts saved passwords (AES-GCM) — no include toggle |
 
 ### Window menu
@@ -114,6 +114,7 @@ Everything V1 tagged 🔧 FIX BEFORE ALPHA is done, verified against beta.3 sour
 | Show/hide each dockable | ✅ | ✅ | ✅ | Same set: Game / Vitals / Room / Backpack / Mapper / Logons / Talk / Whispers / Thoughts / Combat |
 | Hands Strip toggle + position | n/a | ✅ | 🆕 | Genie 5 addition (Top/Bottom) |
 | Roundtime Position (Command Bar / Hands Strip) | n/a | ✅ | 🆕 | |
+| Script Bar Position (Top / Bottom) | ✅ Dock Top / Dock Bottom | ✅ | ✅ | Under Layout, beside the other two position submenus (#357) |
 | Status Bar toggle | ✅ | ✅ | ✅ | |
 | Game Window → per-tag toggle (Game / Echo / Script) | n/a | ✅ | 🆕 | Genie 5 addition |
 | Float Mapper Window | n/a | ✅ | ✅ | Dock.Avalonia FloatDockable; can re-dock by dragging |
@@ -129,7 +130,7 @@ Everything V1 tagged 🔧 FIX BEFORE ALPHA is done, verified against beta.3 sour
 | Load Default Layout | ✅ | ✅ via Reset Layout | ✅ | Equivalent functionality |
 | Save Default Layout / Save Sized Default / Basic Layout | ✅ | ⚠️ via Save Layout As | ⚠️ | Named-preset set is covered by Save/Load Layout; the specific G4 "default/sized-default/basic" verbs aren't 1:1 |
 | Icon Bar | ✅ submenu | ✅ Icon Bar | ✅ | Text-chip strip below the vitals bar: posture chip (dead > standing > kneeling > sitting > prone) + STUNNED / BLEEDING / POISONED / DISEASED / HIDDEN / INVISIBLE / WEBBED / JOINED, fed by IndicatorEvent, dimmed while disconnected. Poison/disease chips are new over G4's six slots. Fixed position |
-| Script Bar | ✅ | 🆕 always above command bar | 🆕 | Fixed-position; auto-hides when empty |
+| Script Bar | ✅ Dock Top / Dock Bottom | ✅ Script Bar Position (Top / Bottom) | ✅ | Auto-hides when empty. G4 defaults to Top; Genie 5 keeps Bottom as the default and offers Top (#357) |
 | Health Bar | ✅ | ⚠️ via Status Bar toggle | ✅ | Status bar is fixed at bottom |
 | Magic Panels (toggle) | ✅ | ✅ | ✅ | G4 SetMagicPanels parity: mana bar / cast bar / spell labels show-hide with column reflow |
 | Align Input to Game Window | ✅ | ✅ | ✅ | Command bar's side margins track the Game window's dock extent (full-width fallback when floated) |
@@ -385,7 +386,7 @@ Both clients support flexible dockable layouts; the tech differs (WinForms MDI v
 | **Portrait** | ✅ | ✅ | ✅ | Room-art panel takes its G4 name; dock id unchanged so saved layouts restore it |
 | **Room** (title/description/exits) | n/a as separate | ✅ | 🆕 | Genie 5 splits room from game text into its own panel |
 | **Hands Strip** | ✅ within icon bar | ✅ separate strip | 🆕 | Dedicated; toggleable position |
-| **Script Bar** | ✅ | ✅ | ✅ | Auto-hides when empty; per-chip pause/resume/debug/trace/vars/edit/stop |
+| **Script Bar** | ✅ | ✅ | ✅ | Auto-hides when empty; per-chip pause/resume/debug/trace/vars/edit/stop; Top or Bottom position |
 | **Script Manager** panel | ✅ Script Explorer | ✅ dockable panel | 🆕 | Browse / run / edit the library + manage running scripts (pause / stop / reload / vars / trace); toggled from the Scripts menu or `#script explorer` |
 
 ### Default layout

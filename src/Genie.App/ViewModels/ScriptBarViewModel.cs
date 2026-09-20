@@ -66,6 +66,13 @@ public sealed class ScriptBarViewModel : ReactiveObject
 
     public ScriptBarViewModel()
     {
+        // HasScripts is derived from the collection rather than assigned at
+        // each mutation site, so any future add/remove path keeps the strip's
+        // visibility honest. CollectionChanged fires synchronously on the same
+        // (UI) thread as the mutation, so this is the same instant the old
+        // per-site assignments ran.
+        RunningScripts.CollectionChanged += (_, _) => HasScripts = RunningScripts.Count > 0;
+
         StopScriptCommand = ReactiveCommand.Create<string, Unit>(name =>
         {
             if (!string.IsNullOrWhiteSpace(name))
@@ -149,7 +156,6 @@ public sealed class ScriptBarViewModel : ReactiveObject
                     if (RunningScripts[i].Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                         RunningScripts.RemoveAt(i);
                 RunningScripts.Add(MakeItem(name, isJs, lvl));
-                HasScripts = RunningScripts.Count > 0;
             });
         };
 
@@ -186,7 +192,6 @@ public sealed class ScriptBarViewModel : ReactiveObject
                 for (int i = RunningScripts.Count - 1; i >= 0; i--)
                     if (RunningScripts[i].Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                         RunningScripts.RemoveAt(i);
-                HasScripts = RunningScripts.Count > 0;
             });
     }
 }

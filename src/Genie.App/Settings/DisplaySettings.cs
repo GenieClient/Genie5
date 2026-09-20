@@ -244,6 +244,20 @@ public sealed class DisplaySettings : ReactiveObject
     /// <summary>Convenience inverse for radio-button binding in the Window menu.</summary>
     [JsonIgnore] public bool RoundTimeOnCommandBar => !RoundTimeOnHandsStrip;
 
+    /// <summary>
+    /// Where the Script Bar (the running-script chip strip) docks.
+    /// <c>true</c> (default) = BOTTOM, between the hands strip and the command
+    /// bar, which is where the strip has sat since it shipped.
+    /// <c>false</c> = TOP, immediately below the menu bar — Genie 4's own
+    /// default (<c>Genie/ScriptBar Dock=Top</c>, FormMain.cs:2389) and where
+    /// long-time users look for the running-script list (#357).
+    /// Toggle via Layout -> Script Bar Position.
+    /// </summary>
+    [Reactive] public bool   ScriptBarAtBottom { get; set; } = true;
+
+    /// <summary>Convenience inverse for radio-button binding in the Layout menu.</summary>
+    [JsonIgnore] public bool ScriptBarAtTop => !ScriptBarAtBottom;
+
     // ── Per-tag visibility filters (Window → Game Window menu) ────────────
     // Each flag gates one class of line in the main Game window:
     //   ShowGameText   — server-emitted text (room descriptions, combat, NPC speech, …)
@@ -357,6 +371,11 @@ public sealed class DisplaySettings : ReactiveObject
         // refreshes too.
         this.WhenAnyValue(x => x.RoundTimeOnHandsStrip)
             .Subscribe(_ => this.RaisePropertyChanged(nameof(RoundTimeOnCommandBar)));
+
+        // Same for ScriptBarAtTop (JsonIgnore + derived) so the Layout menu's
+        // Top radio button refreshes when the position flips (#357).
+        this.WhenAnyValue(x => x.ScriptBarAtBottom)
+            .Subscribe(_ => this.RaisePropertyChanged(nameof(ScriptBarAtTop)));
         IsApplied = true;
     }
 

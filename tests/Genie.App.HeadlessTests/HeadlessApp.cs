@@ -2,6 +2,7 @@ using System;
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Markup.Xaml.Styling;
+using Avalonia.ReactiveUI;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using Dock.Avalonia.Themes.Fluent;
@@ -22,7 +23,13 @@ public class HeadlessAppBuilder
 {
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<HeadlessApp>()
-            .UseHeadless(new AvaloniaHeadlessPlatformOptions());
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions())
+            // Program.cs calls this too. Without it ReactiveUI has no
+            // activation fetcher for Avalonia views, so constructing any
+            // ReactiveWindow (MainWindow itself) throws before a test can look
+            // at the tree — the harness would simply not be able to host the
+            // production window.
+            .UseReactiveUI();
 }
 
 public class HeadlessApp : Application
