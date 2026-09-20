@@ -298,6 +298,12 @@ public sealed class GenieConfig
     /// panel's Include-creatures checkbox or
     /// <c>#config objectscreatures on|off</c>.</summary>
     public bool ObjectsShowCreatures { get; set; }
+    /// <summary>Objects-panel config bar (the "OBJECTS (n)" header row with the
+    /// Creatures checkbox across the top of the panel). Default on. Pure UI —
+    /// hides the row to reclaim it for the list, the setting behind it still
+    /// applies. Toggled from the Objects window's right-click menu
+    /// ("Show Config Bar") or <c>#config objectsconfigbar on|off</c>.</summary>
+    public bool ObjectsConfigBar { get; set; } = true;
     public bool ShowLinks { get; set; } = true;
     /// <summary>MonsterBold (#131): render DR's &lt;pushBold&gt; creature names /
     /// combat hits in bold + the <c>creatures</c> preset colour, in every window
@@ -742,6 +748,7 @@ public sealed class GenieConfig
         ("injuriespoll", InjuriesPollSeconds.ToString()),
         ("injurieslayout", InjuriesFigureLayout ? "figure" : "grid"),
         ("objectscreatures", ObjectsShowCreatures.ToString()),
+        ("objectsconfigbar", ObjectsConfigBar.ToString()),
         ("scriptdir", ScriptDirRaw),
         ("reposcriptdir", RepoScriptDirRaw),
         ("sounddir", SoundDirRaw),
@@ -852,7 +859,7 @@ public sealed class GenieConfig
         ("Connection",       new[] { "activitytimeout", "classicconnect", "conndebug", "connectscript", "flagscheck", "frontend", "reconnect" }),
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
-        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout", "objectscreatures" }),
+        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout", "objectscreatures", "objectsconfigbar" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "gamethread" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug" }),
@@ -935,6 +942,10 @@ public sealed class GenieConfig
                 case "objectscreatures":
                     ObjectsShowCreatures = ToBool(value);
                     Notify(ConfigFieldUpdated.ObjectsCreatures);
+                    break;
+                case "objectsconfigbar":
+                    ObjectsConfigBar = ToBool(value);
+                    Notify(ConfigFieldUpdated.ObjectsConfigBar);
                     break;
                 case "scriptdir": ScriptDirRaw = SetDir(value); break;
                 // Blank is meaningful here (= pull into scriptdir, feature

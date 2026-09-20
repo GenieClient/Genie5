@@ -33,6 +33,10 @@ public enum ConfigFieldUpdated
     /// panel checkbox or a typed <c>#config objectscreatures</c>) — the panel
     /// rebuilds its rows with creatures shown or filtered out.</summary>
     ObjectsCreatures,
+    /// <summary>The Objects panel's config-bar visibility changed (the window's
+    /// "Show Config Bar" menu item or a typed <c>#config objectsconfigbar</c>)
+    /// — the panel shows or hides its header row.</summary>
+    ObjectsConfigBar,
     /// <summary>Automapper room-resolution trace toggle changed
     /// (<c>#config mapperdebug</c>) — GenieCore attaches/detaches the engine's
     /// diagnostic sink.</summary>

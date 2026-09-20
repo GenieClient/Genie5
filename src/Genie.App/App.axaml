@@ -701,7 +701,12 @@
          creatures too, so they stay, marked by the creatures preset. -->
     <DataTemplate DataType="docking:ObjectsTool">
       <Grid RowDefinitions="Auto,*">
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="8,6,8,2">
+        <!-- Header + Creatures checkbox. The whole row hides via the window
+             right-click menu ("Show Config Bar" -> objectsconfigbar), the same
+             item the Experience window has; an Auto row collapses to nothing
+             when it's hidden, so the list takes the space. -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="8,6,8,2"
+              IsVisible="{Binding ViewModel.ShowConfigBar}">
           <TextBlock Grid.Column="0" FontSize="10"
                      Foreground="{DynamicResource Theme.SectionHeader}" FontWeight="SemiBold"
                      VerticalAlignment="Center"

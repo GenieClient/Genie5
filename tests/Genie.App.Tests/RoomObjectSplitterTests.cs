@@ -384,4 +384,60 @@ public class ObjectsViewModelTests
 
         Assert.Equal(2, h.Vm.Objects.Count);
     }
+
+    // ── Config bar: "Show Config Bar" on the window right-click menu ────────
+    //
+    // Same shape as the Experience window's item: pure UI, persisted as
+    // #config objectsconfigbar, and the creatures setting behind the hidden
+    // row keeps applying.
+
+    [Fact]
+    public async Task The_config_bar_shows_by_default()
+    {
+        await using var h = new Harness();
+
+        Assert.True(h.Vm.ShowConfigBar);
+        Assert.True(h.Core.Config.ObjectsConfigBar);
+    }
+
+    [Fact]
+    public async Task The_menu_toggle_writes_through_to_config()
+    {
+        await using var h = new Harness();
+
+        h.Vm.ShowConfigBar = false;
+        Assert.False(h.Core.Config.ObjectsConfigBar);
+
+        h.Vm.ShowConfigBar = true;
+        Assert.True(h.Core.Config.ObjectsConfigBar);
+    }
+
+    [Fact]
+    public async Task A_typed_config_command_flips_the_live_panel()
+    {
+        await using var h = new Harness();
+
+        h.Core.Config.SetSetting("objectsconfigbar", "off");
+        Assert.False(h.Vm.ShowConfigBar);
+
+        h.Core.Config.SetSetting("objectsconfigbar", "on");
+        Assert.True(h.Vm.ShowConfigBar);
+    }
+
+    [Fact]
+    public async Task Hiding_the_bar_leaves_the_creatures_filter_alone()
+    {
+        await using var h = new Harness();
+        h.Objs(WithCreature, CustodianBold());
+
+        h.Vm.ShowConfigBar = false;
+
+        Assert.Single(h.Vm.Objects);
+        Assert.False(h.Vm.ShowCreatures);
+
+        // And the setting behind the hidden checkbox still applies.
+        h.Core.Config.SetSetting("objectscreatures", "on");
+        Assert.Equal(2, h.Vm.Objects.Count);
+        Assert.False(h.Vm.ShowConfigBar);
+    }
 }

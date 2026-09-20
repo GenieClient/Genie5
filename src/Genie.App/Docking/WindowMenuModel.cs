@@ -138,7 +138,8 @@ public sealed class WindowMenuModel : ReactiveObject
     public bool ShowPauseScroll  => _onScrollPauseToggled is not null;
     public bool ShowWordWrap     => _onWordWrapToggled    is not null;
     /// <summary>"Show Config Bar" — panels with a settings strip across the top
-    /// (currently the Experience window's Density / Track gain / G4 layout row).</summary>
+    /// (the Experience window's Density / Track gain / G4 layout row, and the
+    /// Objects window's header + Creatures checkbox).</summary>
     public bool ShowConfigBar    => _onConfigBarToggled   is not null;
     /// <summary>"Flash on Activity" — windows wired for the unread-tab flash
     /// (ActivityTool derivatives with settings).</summary>
@@ -236,7 +237,8 @@ public sealed class WindowMenuModel : ReactiveObject
     }
 
     /// <summary>"Show Config Bar" checkbox state — mirrors the panel's config-bar
-    /// visibility (Experience: <c>experienceconfigbar</c>). Flipping it runs the
+    /// visibility (Experience: <c>experienceconfigbar</c>; Objects:
+    /// <c>objectsconfigbar</c>). Flipping it runs the
     /// toggle handler, which updates the view-model + persists.</summary>
     public bool IsConfigBarOn
     {

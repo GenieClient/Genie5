@@ -57,6 +57,15 @@ classic Genie 4 workspace is a layout you can pick from a menu.
   Wrap setting every other text panel uses, and the right-click menu grows the
   toggle.
 
+- **The Objects window can hide its top bar** — the same **Show Config Bar**
+  item the Experience window has, now on the Objects window's right-click menu.
+  Unticking it hides the `OBJECTS (n)` header row and its Creatures checkbox and
+  gives the row to the list, which is the difference between seeing three items
+  and four in a short panel. Pure display: the creatures setting behind the
+  hidden checkbox keeps applying, and it stays reachable as
+  `#config objectscreatures on|off`. The bar's own state persists as
+  `#config objectsconfigbar`.
+
 ## 🐛 Fixes
 - **Update Maps no longer rewrites your maps through a lossy exporter** — the
   updater was round-tripping every downloaded zone through an exporter that

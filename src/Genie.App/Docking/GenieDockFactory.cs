@@ -1036,15 +1036,22 @@ public class GenieDockFactory : Factory
             };
         }
 
-        // Show Config Bar — panels with a settings strip across the top; today
-        // just the Experience window's Density / Track gain / G4 layout row.
-        // The toggle drives the view-model, which persists experienceconfigbar.
+        // Show Config Bar — panels with a settings strip across the top: the
+        // Experience window's Density / Track gain / G4 layout row, and the
+        // Objects window's header + Creatures checkbox. The toggle drives the
+        // view-model, which persists experienceconfigbar / objectsconfigbar.
         bool          configBarInit   = true;
         Action<bool>? configBarToggle = null;
-        if (dockable is ExperienceTool expTool)
+        switch (dockable)
         {
-            configBarInit   = expTool.ViewModel.ShowConfigBar;
-            configBarToggle = on => expTool.ViewModel.ShowConfigBar = on;
+            case ExperienceTool expTool:
+                configBarInit   = expTool.ViewModel.ShowConfigBar;
+                configBarToggle = on => expTool.ViewModel.ShowConfigBar = on;
+                break;
+            case ObjectsTool objTool:
+                configBarInit   = objTool.ViewModel.ShowConfigBar;
+                configBarToggle = on => objTool.ViewModel.ShowConfigBar = on;
+                break;
         }
 
         // Flash on Activity — every window wired for the unread-tab flash
@@ -1089,9 +1096,14 @@ public class GenieDockFactory : Factory
                 onFlashToggled:     flashToggle);
 
             // Keep the checkmark honest when the visibility changes outside the
-            // menu — the value seeded from settings.cfg on connect (Attach).
+            // menu — the value seeded from settings.cfg on connect (Attach), or
+            // a typed #config experienceconfigbar / objectsconfigbar.
             if (dockable is ExperienceTool exSync)
                 exSync.ViewModel.WhenAnyValue(v => v.ShowConfigBar)
+                    .Subscribe(v => toolMenu.SyncConfigBar(v));
+
+            if (dockable is ObjectsTool objSync)
+                objSync.ViewModel.WhenAnyValue(v => v.ShowConfigBar)
                     .Subscribe(v => toolMenu.SyncConfigBar(v));
 
             // Same for Flash on Activity edited from the Layout tab.

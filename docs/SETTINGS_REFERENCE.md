@@ -177,3 +177,5 @@ trailing "Other" bucket.
 | `injuriespoll` | `0` | Injuries auto-refresh: seconds between silent `health` polls while the Injuries panel is open. 0 = off; non-zero floored at 10. A resurrection also makes the next poll due immediately — DR pushes no injury data while the character is dead, so the panel is stale until a `health` report lands (typing `health` yourself clears it at any cadence, including off). |
 | `injurieslayout` | `grid` | Injuries panel layout: `figure` (assembled body) or `grid` (4×4 part grid). |
 | `monsterbold` | `True` | Render DR's `<pushBold>` creature names / combat hits in bold + the `creatures` preset colour. |
+| `objectscreatures` | `False` | Also list the room's creatures in the Objects panel (Genie 4 behaviour). Off by default — the Mobs panel already covers them. Also toggled from the panel's **Creatures** checkbox. |
+| `objectsconfigbar` | `True` | Show the config bar (the `OBJECTS (n)` header row with the Creatures checkbox) across the top of the Objects window. Also toggled from the window's right-click menu ("Show Config Bar"). |

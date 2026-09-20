@@ -60,6 +60,7 @@ public sealed class ObjectsViewModel : ReactiveObject
 
     private GenieCore? _core;
     private bool _showCreatures;
+    private bool _showConfigBar = true;
 
     /// <summary>Include the room's creatures in the list. Backed by
     /// <c>#config objectscreatures</c>, so the checkbox and the typed command
@@ -82,21 +83,51 @@ public sealed class ObjectsViewModel : ReactiveObject
         }
     }
 
+    /// <summary>Config-bar (the "OBJECTS (n)" header row with the Creatures
+    /// checkbox) visibility. Toggled from the window right-click menu
+    /// ("Show Config Bar"), the same item the Experience window has; writes
+    /// <c>objectsconfigbar</c> quietly like the strip's own checkbox. Pure UI —
+    /// hiding the row gives it to the list, the creatures setting behind it
+    /// still applies.</summary>
+    public bool ShowConfigBar
+    {
+        get => _showConfigBar;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _showConfigBar, value);
+            if (_core is not null && value != _core.Config.ObjectsConfigBar)
+            {
+                _core.Config.SetSetting("objectsconfigbar", value ? "1" : "0", showException: false);
+                _core.Config.Save();
+            }
+        }
+    }
+
     public void Attach(GenieCore core)
     {
         _core          = core;
         ShowCreatures  = core.Config.ObjectsShowCreatures;
+        ShowConfigBar  = core.Config.ObjectsConfigBar;
 
-        // The toggle from ANY source — this panel's checkbox, a typed
-        // #config objectscreatures, or #config load — re-filters the rows in
-        // place, the same seam the Mobs panel uses for its ignore list.
+        // The toggles from ANY source — this panel's checkbox, the window
+        // menu's "Show Config Bar", a typed #config, or #config load — land
+        // here: creatures re-filters the rows in place (the same seam the Mobs
+        // panel uses for its ignore list), the config bar flips visibility.
         Observable.FromEvent<Action<ConfigFieldUpdated>, ConfigFieldUpdated>(
                 h => core.Config.ConfigChanged += h,
                 h => core.Config.ConfigChanged -= h)
-            .Where(f => f == ConfigFieldUpdated.ObjectsCreatures)
+            .Where(f => f is ConfigFieldUpdated.ObjectsCreatures or ConfigFieldUpdated.ObjectsConfigBar)
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(_ =>
+            .Subscribe(f =>
             {
+                if (f == ConfigFieldUpdated.ObjectsConfigBar)
+                {
+                    // Visibility only — no row rebuild; the menu checkmark
+                    // follows through the same property.
+                    ShowConfigBar = core.Config.ObjectsConfigBar;
+                    return;
+                }
+
                 ShowCreatures = core.Config.ObjectsShowCreatures;
                 Refresh(_lastContent, _lastBold);
             });
