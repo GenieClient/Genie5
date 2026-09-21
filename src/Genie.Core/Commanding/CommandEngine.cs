@@ -512,6 +512,9 @@ public sealed class CommandEngine
                     case "abort":
                     {
                         var (target, except) = ParseScriptTarget(scriptRest);
+                        // A '|' list (or the "none" sentinel) is never "all":
+                        // #script abort $scriptlistpaused with nothing paused
+                        // must abort nothing (#247).
                         if (target is null && except is null) _host.StopAllScripts();
                         else ForEachTargetScript(target, except, n => _host.StopScript(n));
                         break;
@@ -519,21 +522,21 @@ public sealed class CommandEngine
                     case "pause":
                     {
                         var (target, except) = ParseScriptTarget(scriptRest);
-                        if (except is null) _host.PauseScript(target);
+                        if (except is null && !IsScriptList(target)) _host.PauseScript(target);
                         else ForEachTargetScript(target, except, n => _host.PauseScript(n));
                         break;
                     }
                     case "resume":
                     {
                         var (target, except) = ParseScriptTarget(scriptRest);
-                        if (except is null) _host.ResumeScript(target);
+                        if (except is null && !IsScriptList(target)) _host.ResumeScript(target);
                         else ForEachTargetScript(target, except, n => _host.ResumeScript(n));
                         break;
                     }
                     case "pauseorresume":
                     {
                         var (target, except) = ParseScriptTarget(scriptRest);
-                        if (except is null) _host.PauseOrResumeScript(target);
+                        if (except is null && !IsScriptList(target)) _host.PauseOrResumeScript(target);
                         else ForEachTargetScript(target, except, n => _host.PauseOrResumeScript(n));
                         break;
                     }
@@ -1047,16 +1050,56 @@ public sealed class CommandEngine
 
     /// <summary>Apply <paramref name="op"/> to every running script matching
     /// <paramref name="target"/> (null = all) and not excluded by
-    /// <paramref name="except"/>.</summary>
+    /// <paramref name="except"/>.
+    ///
+    /// <para>Both sides accept a <c>'|'</c>-separated LIST (public #247), which
+    /// is what makes <c>#script pause $scriptlistactive</c> and
+    /// <c>#script resume $scriptlistpaused</c> work: the variable expands to
+    /// <c>a|b|c</c> before the command is parsed, so bulk control composes over
+    /// any list the user can build - including one assembled by hand in a
+    /// <c>#var</c>.</para></summary>
     private void ForEachTargetScript(string? target, string? except, Action<string> op)
     {
+        var targets  = SplitScriptList(target);
+        var excludes = SplitScriptList(except);
+
         foreach (var n in _host.RunningScripts())
         {
-            if (target is not null && !n.Equals(target, StringComparison.OrdinalIgnoreCase)) continue;
-            if (except is not null && n.Equals(except, StringComparison.OrdinalIgnoreCase)) continue;
+            if (targets  is not null && !targets .Contains(n)) continue;
+            if (excludes is not null &&  excludes.Contains(n)) continue;
             op(n);
         }
     }
+
+    /// <summary>
+    /// A <c>'|'</c>-separated script list as a case-insensitive set, or null for
+    /// "no restriction" - which is what an empty string and <c>all</c> mean at
+    /// this layer.
+    ///
+    /// <para><c>none</c> maps to an EMPTY set ("match nothing"), not null,
+    /// because <c>#script pause $scriptlistactive</c> with nothing active must
+    /// pause nothing - treating it as "all" would pause every script, the exact
+    /// opposite of what the list said.</para>
+    /// </summary>
+    private static HashSet<string>? SplitScriptList(string? list)
+    {
+        if (string.IsNullOrWhiteSpace(list)) return null;
+        if (list.Equals("all", StringComparison.OrdinalIgnoreCase)) return null;
+        if (list.Equals("none", StringComparison.OrdinalIgnoreCase))
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        return new HashSet<string>(
+            list.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>True when a target names more than one script (or explicitly
+    /// none), so the single-name fast paths in the <c>#script</c> dispatcher
+    /// must defer to <see cref="ForEachTargetScript"/> (public #247).</summary>
+    private static bool IsScriptList(string? target) =>
+        target is not null &&
+        (target.Contains('|', StringComparison.Ordinal) ||
+         target.Equals("none", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The <c>#script</c>/<c>#scripts</c> listing — Genie 4's
     /// EventListScripts format: an "Active scripts:" header, then one status

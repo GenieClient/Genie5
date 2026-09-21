@@ -3601,6 +3601,14 @@ public sealed class ScriptEngine
             // (Genie 4 parity). Computed on read so it's always current.
             if (name.Equals("scriptlist", StringComparison.OrdinalIgnoreCase))
             { value = BuildScriptList(); return true; }
+            // $scriptlistactive / $scriptlistpaused - the same list split by
+            // pause state (public #247). Same '|' separator and same "none"
+            // sentinel as $scriptlist, so they compose with `#script` the way
+            // $scriptlist already does.
+            if (name.Equals("scriptlistactive", StringComparison.OrdinalIgnoreCase))
+            { value = BuildScriptList(paused: false); return true; }
+            if (name.Equals("scriptlistpaused", StringComparison.OrdinalIgnoreCase))
+            { value = BuildScriptList(paused: true); return true; }
             // Genie 4 reserved clock variables ($date/$time/$unixtime/...).
             // Computed on read so they're always current, and resolved as a
             // final fallback so a user var of the same name can still shadow.
@@ -3627,6 +3635,24 @@ public sealed class ScriptEngine
         // the live list if a start/stop mutates it mid-read. Includes .js scripts
         // so $scriptlist reflects everything the user is running.
         var joined = string.Join("|", RunningScriptNames());
+        return joined.Length == 0 ? "none" : joined;
+    }
+
+    /// <summary>
+    /// <c>$scriptlistactive</c> / <c>$scriptlistpaused</c> (public #247): the
+    /// running scripts filtered by pause state, joined with <c>'|'</c>, or the
+    /// literal <c>"none"</c> when the filtered set is empty.
+    ///
+    /// <para>Built from <see cref="GetStatuses"/> rather than the instance list
+    /// because pause state lives in two places - <c>.cmd</c> keeps it on
+    /// <c>UserPaused</c> and <c>.js</c> on its own host - and GetStatuses is
+    /// already the one place that reconciles them. A second reconciliation here
+    /// would be the kind that drifts.</para>
+    /// </summary>
+    private string BuildScriptList(bool paused)
+    {
+        var joined = string.Join("|",
+            GetStatuses().Where(st => st.Paused == paused).Select(st => st.Name));
         return joined.Length == 0 ? "none" : joined;
     }
 

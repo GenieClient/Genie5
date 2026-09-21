@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using Genie.Core.Commanding;
@@ -42,6 +42,82 @@ public class ScriptCommandTests : IDisposable
 
     private void Run(FakeCommandHost host, string input) =>
         new CommandEngine(_config, new CommandQueue(), new EventQueue(), host).ProcessInput(input);
+
+    // -- #247: bulk control over a '|'-separated list ------------------------
+    //
+    // $scriptlistactive / $scriptlistpaused expand to "a|b|c" BEFORE the
+    // command is parsed, so the dispatcher sees a list rather than a name.
+    // That is what makes bulk script control scriptable over an arbitrary set,
+    // including one assembled by hand in a #var.
+
+    [Fact]
+    public void Abort_over_a_list_stops_exactly_those_scripts()
+    {
+        var host = new FakeCommandHost();
+        host.RunningNames.AddRange(new[] { "hunt", "favors", "exptally" });
+        Run(host, "#script abort hunt|exptally");
+
+        Assert.False(host.StopAllCalled);
+        Assert.Equal(new[] { "hunt", "exptally" }, host.Stopped);
+    }
+
+    [Fact]
+    public void Pause_over_a_list_pauses_exactly_those_scripts()
+    {
+        var host = new FakeCommandHost();
+        host.RunningNames.AddRange(new[] { "hunt", "favors", "exptally" });
+        Run(host, "#script pause hunt|favors");
+
+        Assert.Equal(new[] { "hunt", "favors" }, host.Paused);
+    }
+
+    /// <summary>The sentinel the $scriptlist* vars yield when the filtered set
+    /// is empty. It has to mean "nothing", not "all" — otherwise
+    /// `#script abort $scriptlistpaused` with nothing paused would abort every
+    /// running script, the exact opposite of what the list said.</summary>
+    [Fact]
+    public void A_none_list_acts_on_nothing_rather_than_everything()
+    {
+        var host = new FakeCommandHost();
+        host.RunningNames.AddRange(new[] { "hunt", "favors" });
+        Run(host, "#script abort none");
+
+        Assert.False(host.StopAllCalled);
+        Assert.Empty(host.Stopped);
+    }
+
+    [Fact]
+    public void A_list_entry_that_is_not_running_is_simply_skipped()
+    {
+        var host = new FakeCommandHost();
+        host.RunningNames.AddRange(new[] { "hunt" });
+        Run(host, "#script abort hunt|ghost");
+
+        Assert.Equal(new[] { "hunt" }, host.Stopped);
+    }
+
+    [Fact]
+    public void A_list_still_honours_a_trailing_except()
+    {
+        var host = new FakeCommandHost();
+        host.RunningNames.AddRange(new[] { "hunt", "favors", "exptally" });
+        Run(host, "#script abort hunt|favors|exptally except favors");
+
+        Assert.Equal(new[] { "hunt", "exptally" }, host.Stopped);
+    }
+
+    /// <summary>A single name must keep taking the original fast path, so the
+    /// list support cannot change what every existing script already does.</summary>
+    [Fact]
+    public void A_single_name_still_takes_the_direct_path()
+    {
+        var host = new FakeCommandHost();
+        host.RunningNames.Add("hunt");
+        Run(host, "#script pause hunt");
+
+        Assert.True(host.PauseCalled);
+        Assert.Equal("hunt", host.PausedScript);
+    }
 
     [Fact]
     public void Abort_with_name_stops_that_script_and_starts_nothing()
