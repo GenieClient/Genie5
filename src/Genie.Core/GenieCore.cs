@@ -163,6 +163,20 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     public void PostCommand(string command)
         => RunOnLoop(() => Commands.ProcessInput(command));
 
+    /// <summary>
+    /// <see cref="PostCommand"/>, naming what produced the line so
+    /// <c>#config tracesends</c> can attribute it (public #306). Used by the
+    /// origins that are not ordinary typed input — a macro keypress, a mapper
+    /// walk verb — where "which subsystem sent this" is the whole question when
+    /// a command the user never typed reaches the game.
+    /// </summary>
+    public void PostCommand(string command, string origin)
+        => RunOnLoop(() =>
+        {
+            using var _ = Commands.PushOrigin(origin);
+            Commands.ProcessInput(command);
+        });
+
     /// <summary>Feed a synthetic protocol line to running scripts' matchers on
     /// the game thread — the automapper's <c>YOU HAVE ARRIVED!</c> /
     /// <c>AUTOMAPPER MOVEMENT FAILED</c> signals (AutoWalkService), which
@@ -685,6 +699,9 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                                    return;
                                }
                                cmd = Commanding.CommandBarDirective.Unescape(cmd);
+
+                               if (Config?.TraceSends == true)
+                                   RaiseEchoLine($"[send:script] {cmd}");
 
                                RaiseScriptOutput(cmd);
                                _typeAhead.NotifySent();
@@ -1468,6 +1485,13 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
         if (!localOnly)
         {
+            // #config tracesends (public #306): name every outgoing command and
+            // what produced it. A phantom send is by definition NOT echoed
+            // locally, so without this the user sees DR's "Please rephrase
+            // that command." with nothing above it to explain the send.
+            if (Config?.TraceSends == true)
+                RaiseEchoLine($"[send:{(origin.Length > 0 ? origin : userInput ? "typed" : "internal")}] {text}");
+
             // Let the mapper observe the outgoing command — it parses movement
             // directions ("n", "go bridge", etc.) so it can correlate the
             // subsequent room change with the direction we just moved.

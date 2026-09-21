@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Genie.Core.Classes;
 using Genie.Core.Commanding;
 
@@ -129,7 +129,10 @@ public sealed class TriggerEngineFinal
     {
         var expandedAction = ExpandAction(trigger.Action, match);
         if (trigger.Eval) expandedAction = EvalBraces(expandedAction);
-        _commandEngine?.ProcessInput(expandedAction, interactive: false);
+        if (_commandEngine is null) return;
+        // Name the origin so `#config tracesends` can attribute the send (#306).
+        using var _ = _commandEngine.PushOrigin("trigger");
+        _commandEngine.ProcessInput(expandedAction, interactive: false);
     }
 
     private static string ExpandAction(string action, Match match)

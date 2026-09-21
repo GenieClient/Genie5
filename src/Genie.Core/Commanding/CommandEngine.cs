@@ -124,6 +124,40 @@ public sealed class CommandEngine
     /// diagnostic log shows exactly what a script fired (e.g. <c>#goto 171</c>).</summary>
     public Action<string>? CommandObserved { get; set; }
 
+    /// <summary>
+    /// What produced the command currently being dispatched — "trigger",
+    /// "alias", "macro", … — or "" for ordinary typed input. Read by the
+    /// <c>#config tracesends</c> diagnostic (public #306) so a command the user
+    /// never typed names the subsystem that sent it.
+    ///
+    /// <para>Ambient rather than a parameter on <see cref="ProcessInput"/>:
+    /// there are ~20 call sites and all but a handful are ordinary typed input,
+    /// so threading it would be noise at nineteen places to gain information at
+    /// one. Set through <see cref="PushOrigin"/>, which restores the previous
+    /// value — alias expansion recurses back into ProcessInput, so a plain
+    /// assignment would leave the inner origin latched.</para>
+    /// </summary>
+    public string CurrentOrigin { get; private set; } = "";
+
+    /// <summary>Name the origin for the duration of one dispatch. Restores the
+    /// previous value on dispose, so nesting works.</summary>
+    public IDisposable PushOrigin(string origin) => new OriginScope(this, origin);
+
+    private sealed class OriginScope : IDisposable
+    {
+        private readonly CommandEngine _engine;
+        private readonly string        _previous;
+
+        public OriginScope(CommandEngine engine, string origin)
+        {
+            _engine  = engine;
+            _previous = engine.CurrentOrigin;
+            engine.CurrentOrigin = origin;
+        }
+
+        public void Dispose() => _engine.CurrentOrigin = _previous;
+    }
+
     public void ProcessInput(string input, string? echoOverride = null, bool interactive = true)
     {
         if (string.IsNullOrWhiteSpace(input)) return;
@@ -218,13 +252,13 @@ public sealed class CommandEngine
                     // mycommandchar gate keeps it off the wire — it is echoed and
                     // fed to triggers but never reaches the game.
                     if (ResolveOutboundCommand(command) is { } outbound)
-                        _host.SendToGame(outbound, true,
-                            echoOverride: applyOverride ? echoOverride : null);
+                        _host.SendToGame(outbound, true, CurrentOrigin,
+                            applyOverride ? echoOverride : null);
                 }
                 else
                 {
-                    _host.SendToGame(command, true,
-                        echoOverride: applyOverride ? echoOverride : null);
+                    _host.SendToGame(command, true, CurrentOrigin,
+                        applyOverride ? echoOverride : null);
                 }
             }
         }

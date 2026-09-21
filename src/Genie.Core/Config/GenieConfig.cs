@@ -1,4 +1,4 @@
-using Genie.Core.Runtime;
+﻿using Genie.Core.Runtime;
 using Genie.Core.Utility;
 using Genie.Core.Parsing;
 
@@ -27,6 +27,19 @@ public sealed class GenieConfig
     /// never set, which DR answers with "What were you referring to?"). Default
     /// on; <c>#config warnrawvars false</c> silences it.</summary>
     public bool WarnRawVars { get; set; } = true;
+
+    /// <summary>Echo every command leaving Genie with the ORIGIN that produced
+    /// it — typed / script / trigger / alias / macro / queue / plugin (public
+    /// #306). Off by default; <c>#config tracesends true</c> turns it on.
+    ///
+    /// <para>This exists because a whole class of bug — a command the user
+    /// never typed, going out unechoed — is otherwise undiagnosable from the
+    /// user's side. The reporter on #306 asked it directly ("is there a way to
+    /// tell what command it's trying to send?"), and #256 (the OOC verb
+    /// triple-send) would have been self-diagnosing with it. Phantom sends are
+    /// by definition NOT locally echoed, so the ordinary game window tells you
+    /// nothing; this prints them where you can see them.</para></summary>
+    public bool TraceSends { get; set; } = false;
 
     /// <summary>Genie 4 <c>mycommandchar</c> (Config.cs:17, default '/'):
     /// input starting with this char is echoed and run through the
@@ -708,6 +721,7 @@ public sealed class GenieConfig
         ("mycommandchar", MyCommandChar.ToString()),
         ("triggeroninput", TriggerOnInput.ToString()),
         ("warnrawvars", WarnRawVars.ToString()),
+        ("tracesends", TraceSends.ToString()),
         ("highlights", EnableHighlights.ToString()),
         ("triggers", EnableTriggers.ToString()),
         ("substitutes", EnableSubstitutes.ToString()),
@@ -861,7 +875,7 @@ public sealed class GenieConfig
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout", "objectscreatures", "objectsconfigbar" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
-        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "gamethread" }),
+        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "tracesends", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "gamethread" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
         ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsstreampriority", "ttsrate", "ttsvolume" }),
@@ -897,6 +911,7 @@ public sealed class GenieConfig
                 case "mycommandchar": MyCommandChar = FirstCharOrDefault(value, MyCommandChar); break;
                 case "triggeroninput": TriggerOnInput = ToBool(value); break;
                 case "warnrawvars": WarnRawVars = ToBool(value); break;
+                case "tracesends": TraceSends = ToBool(value); break;
                 case "highlights": EnableHighlights = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
                 case "triggers": EnableTriggers = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
                 case "substitutes": EnableSubstitutes = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;

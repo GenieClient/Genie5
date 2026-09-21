@@ -1,4 +1,4 @@
-using Genie.Core.Classes;
+﻿using Genie.Core.Classes;
 using Genie.Core.Commanding;
 
 namespace Genie.Core.Aliases;
@@ -75,7 +75,10 @@ public sealed class AliasEngine
         if (alias == null) return false;
 
         var args = parts.Length > 1 ? parts[1].Trim() : string.Empty;
-        _commandEngine?.ProcessInput(Expand(alias.Expansion, trimmed, args));
+        if (_commandEngine is null) return true;
+        // Name the origin so `#config tracesends` can attribute the send (#306).
+        using var _ = _commandEngine.PushOrigin("alias");
+        _commandEngine.ProcessInput(Expand(alias.Expansion, trimmed, args));
         return true;
     }
 

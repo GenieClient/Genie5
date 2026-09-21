@@ -960,7 +960,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         var macro = macros.Get(keyString);
         if (macro is null) return;
 
-        ViewModel.Core.ProcessInput(macro.Action);
+        // Named origin so `#config tracesends` attributes a macro keypress (#306).
+        ViewModel.Core.PostCommand(macro.Action, "macro");
         e.Handled = true;
     }
 
