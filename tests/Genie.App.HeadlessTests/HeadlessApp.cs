@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Markup.Xaml.Styling;
@@ -72,6 +72,14 @@ public class HeadlessApp : Application
         Resources.MergedDictionaries.Add(new ResourceInclude(new Uri("avares://Genie.App"))
         {
             Source = new Uri("avares://Genie5/Themes/ProportionalDockCollapseSkin.axaml")
+        });
+        // #346's cached DocumentControl host. Without it the harness renders
+        // Dock's STOCK document template — the one whose always-match recycling
+        // presenter is the bug — so a test could pass against behaviour
+        // production does not have, which is exactly how #331 shipped.
+        Resources.MergedDictionaries.Add(new ResourceInclude(new Uri("avares://Genie.App"))
+        {
+            Source = new Uri("avares://Genie5/Themes/DocumentControlCachedSkin.axaml")
         });
     }
 }

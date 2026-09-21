@@ -29,6 +29,12 @@
              IsCollapsable=false for TryRestoreHomeDock. Full writeup lives in
              the file header. -->
         <ResourceInclude Source="avares://Genie5/Themes/ProportionalDockCollapseSkin.axaml" />
+        <!-- #346: overrides the stock DocumentControl theme so it uses the
+             CACHED content template Dock ships but does not select. Without
+             this, a tool panel dropped into the Game group renders blank —
+             #80's recycling bug, on the document side. Full writeup in the
+             file header. -->
+        <ResourceInclude Source="avares://Genie5/Themes/DocumentControlCachedSkin.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>
