@@ -6160,10 +6160,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 {
                     var target = string.Join(" ", parts.Skip(1));
                     Echo(Mapper.SwitchZone(target)
-                        ? $"[mapper] Zone: {Mapper.ZoneName} (id {Mapper.CurrentZoneId})"
+                        ? $"[mapper] Zone: {Mapper.ZoneName} (id {Mapper.DisplayedZoneId})"
                         : $"[mapper] No zone matching '{target}'.");
                 }
-                else Echo($"[mapper] Current zone: {Mapper.ZoneName} (id {Mapper.CurrentZoneId})");
+                // DisplayedZoneId, not CurrentZoneId: this reports the map that
+                // is loaded, and CurrentZoneId is deliberately held at the
+                // character's zone while browsing (#273).
+                else Echo($"[mapper] Current zone: {Mapper.ZoneName} (id {Mapper.DisplayedZoneId})");
                 break;
 
             case "color":

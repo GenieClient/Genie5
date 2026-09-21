@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Linq;
 using Avalonia.Media;
@@ -44,6 +44,18 @@ public class MapperViewModel : ReactiveObject
     /// (e.g. "33"). Defaults to "0" off-map, like <c>$zoneid</c>. Shown on the
     /// status-bar location line when the user picks "Zone Number" mode (#66).</summary>
     [Reactive] public string CurrentZoneId { get; private set; } = "0";
+
+    /// <summary>The DISPLAYED zone's Genie 4 numeric id — always the map on
+    /// screen, never held. <c>#mapper zone</c> reports what it just loaded, so
+    /// it reads this rather than <see cref="CurrentZoneId"/> (#273).</summary>
+    [Reactive] public string DisplayedZoneId { get; private set; } = "0";
+
+    /// <summary>The CHARACTER's zone name, held across a browse the same way
+    /// <see cref="CurrentRoomId"/> / <see cref="CurrentZoneId"/> are (#273).
+    /// <see cref="ZoneName"/> follows the DISPLAYED map, which is what the map
+    /// panel's own header wants; the status-bar location line must not, or its
+    /// zone and room fields would name two different places at once.</summary>
+    [Reactive] public string CurrentZoneName { get; private set; } = "(disconnected)";
 
     private ObservableAsPropertyHelper<string>? _locationDisplay;
     /// <summary>Compact "Zone: … · Room: …" readout for the optional status-bar
@@ -905,7 +917,7 @@ public class MapperViewModel : ReactiveObject
         // it can react to the DisplaySettings toggle. Idempotent: the OAPH is
         // built once even if AttachDisplay is somehow called again.
         _locationDisplay ??= this
-            .WhenAnyValue(x => x.ZoneName, x => x.CurrentZoneId, x => x.CurrentRoomId)
+            .WhenAnyValue(x => x.CurrentZoneName, x => x.CurrentZoneId, x => x.CurrentRoomId)
             .CombineLatest(
                 display.WhenAnyValue(d => d.ZoneRoomShowNumber),
                 (parts, showNumber) =>
@@ -1516,9 +1528,29 @@ public class MapperViewModel : ReactiveObject
         // Mapper $roomid (#66) — the current node's id (what scripts/#goto use),
         // "0" off-map. Matches the $roomid script variable exactly, NOT the
         // server's $gameroomid.
-        CurrentRoomId = _engine.CurrentNode?.Id.ToString() ?? "0";
-        // $zoneid (#66) — the active zone's Genie 4 numeric id, "0" off-map.
-        CurrentZoneId = string.IsNullOrEmpty(_engine.ActiveZone.Genie4Id) ? "0" : _engine.ActiveZone.Genie4Id;
+        //
+        // Held while the user is browsing another map (#273). These three are
+        // documented as mirrors of $roomid / $zoneid and they feed the
+        // status-bar location line, so they have to answer the same question
+        // those variables do — "where is my character" — not "which map am I
+        // looking at". GenieCore.SyncMapperGlobals bails on the identical flag
+        // for the identical reason (GenieCore.cs:1978); this subscriber to the
+        // same CurrentNodeChanged event simply never got the guard, so during
+        // any legitimate browse the status bar and #goto disagreed, with
+        // nothing on screen saying the view was held.
+        //
+        // Everything else here — ZoneName, RoomCount, ActiveZone, ActiveNode,
+        // RenderTick — SHOULD follow the browsed map: that is the canvas the
+        // user is deliberately looking at.
+        DisplayedZoneId = string.IsNullOrEmpty(_engine.ActiveZone.Genie4Id) ? "0" : _engine.ActiveZone.Genie4Id;
+
+        if (!_engine.ViewIsBrowsing)
+        {
+            CurrentRoomId = _engine.CurrentNode?.Id.ToString() ?? "0";
+            // $zoneid (#66) — the active zone's Genie 4 numeric id, "0" off-map.
+            CurrentZoneId = string.IsNullOrEmpty(_engine.ActiveZone.Genie4Id) ? "0" : _engine.ActiveZone.Genie4Id;
+            CurrentZoneName = ZoneName;
+        }
 
         // Surface the live references for the canvas. Reference may not have
         // changed since last call (the engine mutates Nodes in place), so we
