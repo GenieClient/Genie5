@@ -159,6 +159,12 @@ jobs:
           fi
           size_mb=$(du -m publish/win-x64/Genie5.exe | cut -f1)
           echo "Genie5.exe: ${size_mb} MB"
+          # Baseline re-measured 2026-09-21 on .NET 10 (self-contained,
+          # single-file, win-x64): 60 MB. The previous ~45 MB figure predated
+          # the .NET 10 retarget, so the guard was comparing against a number
+          # no build had produced in months. 80 MB leaves ~33% headroom for
+          # ordinary growth while still catching a bundled symbol set or a
+          # second runtime.
           if [ "$size_mb" -gt 80 ]; then
-            echo "::warning::Genie5.exe is ${size_mb} MB — drift from the ~45 MB baseline. Check for accidentally-bundled debug symbols or extra runtimes."
+            echo "::warning::Genie5.exe is ${size_mb} MB — drift from the 60 MB baseline (measured 2026-09-21, .NET 10). Check for accidentally-bundled debug symbols or extra runtimes."
           fi
