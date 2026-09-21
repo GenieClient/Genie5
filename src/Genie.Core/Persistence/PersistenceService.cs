@@ -1,4 +1,4 @@
-using System.Text.Encodings.Web;
+﻿using System.Text.Encodings.Web;
 using System.Text.Json;
 using Genie.Core.Aliases;
 using Genie.Core.Classes;
@@ -153,6 +153,7 @@ public sealed class PersistenceService
             CaseSensitive = r.CaseSensitive,
             IsEnabled     = r.IsEnabled,
             ClassName     = r.ClassName,
+            WholeWord     = r.WholeWord,
         });
         File.WriteAllText(path, JsonSerializer.Serialize(data, _options));
     }

@@ -1,4 +1,4 @@
-using Genie.Core.Aliases;
+﻿using Genie.Core.Aliases;
 using Genie.Core.Classes;
 using Genie.Core.Gags;
 using Genie.Core.Highlights;
@@ -76,7 +76,7 @@ public static class LayeredRuleLoad
             foreach (var m in p.LoadSubstitutes(Path.Combine(dir, "substitutes.json")))
             {
                 s.Substitutes.RemoveRule(m.Pattern);
-                s.Substitutes.AddRule(m.Pattern, m.Replacement, m.CaseSensitive, m.IsEnabled, m.ClassName);
+                s.Substitutes.AddRule(m.Pattern, m.Replacement, m.CaseSensitive, m.IsEnabled, m.ClassName, m.WholeWord);
             }
         }
         catch { }
@@ -167,7 +167,7 @@ public static class LayeredRuleLoad
                 global.Substitutes.Rules, x => x.Pattern))
             {
                 substitutes.RemoveRule(r.Pattern);
-                substitutes.AddRule(r.Pattern, r.Replacement, r.CaseSensitive, r.IsEnabled, r.ClassName).Scope = scope;
+                substitutes.AddRule(r.Pattern, r.Replacement, r.CaseSensitive, r.IsEnabled, r.ClassName, r.WholeWord).Scope = scope;
             }
 
         if (gags is not null)

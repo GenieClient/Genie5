@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
@@ -83,6 +83,7 @@ public partial class SubstitutesPanel : UserControl
         ReplacementBox.Text          = rule.Replacement;
         ClassBox.Text                = rule.ClassName;
         CaseSensitiveCheck.IsChecked = rule.CaseSensitive;
+        WholeWordCheck.IsChecked     = rule.WholeWord;
         EnabledCheck.IsChecked       = rule.IsEnabled;
         ScopeBox.SelectedIndex       = ScopeEditing.ToIndex(rule.Scope);
         StatusText.Text              = string.Empty;
@@ -95,6 +96,7 @@ public partial class SubstitutesPanel : UserControl
         var replacement   = ReplacementBox.Text ?? string.Empty;
         var className     = ClassBox.Text?.Trim() ?? string.Empty;
         var caseSensitive = CaseSensitiveCheck.IsChecked == true;
+        var wholeWord     = WholeWordCheck.IsChecked == true;
         var enabled       = EnabledCheck.IsChecked == true;
 
         if (string.IsNullOrEmpty(pattern)) { StatusText.Text = "Pattern is required."; return; }
@@ -104,7 +106,7 @@ public partial class SubstitutesPanel : UserControl
 
         var existing = _engine.Rules.FirstOrDefault(r => r.Pattern == pattern);
         _engine.RemoveRule(pattern);
-        var added = _engine.AddRule(pattern, replacement, caseSensitive, enabled, className);
+        var added = _engine.AddRule(pattern, replacement, caseSensitive, enabled, className, wholeWord);
         added.Scope = _scopeCtx?.TwoLayers == true
             ? ScopeEditing.FromIndex(ScopeBox.SelectedIndex)
             : existing?.Scope ?? RuleScope.Character;
@@ -173,7 +175,7 @@ public partial class SubstitutesPanel : UserControl
         if (_engine is null) return;
         _engine.RemoveRule(rule.Pattern);
         _engine.AddRule(rule.Pattern, rule.Replacement, rule.CaseSensitive,
-                        isEnabled: false, rule.ClassName).Scope = RuleScope.Character;
+                        isEnabled: false, rule.ClassName, rule.WholeWord).Scope = RuleScope.Character;
         ClearForm();
         Refresh();
         _onChanged?.Invoke();
@@ -237,6 +239,7 @@ public partial class SubstitutesPanel : UserControl
         ReplacementBox.Text          = string.Empty;
         ClassBox.Text                = string.Empty;
         CaseSensitiveCheck.IsChecked = false;
+        WholeWordCheck.IsChecked     = false;
         EnabledCheck.IsChecked       = true;
         ScopeBox.SelectedIndex       = 0;   // new rules default to This character
         StatusText.Text              = string.Empty;

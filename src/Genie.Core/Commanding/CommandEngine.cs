@@ -2480,13 +2480,19 @@ public sealed class CommandEngine
 
         if (sub == "add")
         {
-            if (parts.Count < 4) { _host.Echo("Usage: #substitute add {pattern} {replacement} [{class}]"); return; }
+            // Trailing keyword, same shape as #trigger add's eval/matchall, so
+            // it cannot shift the positional class slot (public #245). Copied to
+            // a List because the caller hands this in read-only.
+            var args      = parts.ToList();
+            var wholeWord = ExtractFlag(args, "wholeword");
+            parts         = args;
+            if (parts.Count < 4) { _host.Echo("Usage: #substitute add {pattern} {replacement} [{class}] [wholeword]"); return; }
             var pattern     = parts[2];
             var replacement = parts[3];
             var cls         = parts.Count > 4 ? parts[4] : "";
             Substitutes.RemoveRule(pattern);
-            Substitutes.AddRule(pattern, replacement, false, true, cls);
-            EchoRule($"Substitute added: {pattern} → {replacement}");
+            Substitutes.AddRule(pattern, replacement, false, true, cls, wholeWord);
+            EchoRule($"Substitute added: {pattern} → {replacement}{(wholeWord ? " (whole word)" : "")}");
             return;
         }
 
@@ -2547,7 +2553,7 @@ public sealed class CommandEngine
                 return;
             }
             foreach (var m in models)
-                Substitutes.AddRule(m.Pattern, m.Replacement, m.CaseSensitive, m.IsEnabled, m.ClassName);
+                Substitutes.AddRule(m.Pattern, m.Replacement, m.CaseSensitive, m.IsEnabled, m.ClassName, m.WholeWord);
             SaveSubstitutes();
             EchoJsonHealed("substitutes.cfg", models.Count);
             return;

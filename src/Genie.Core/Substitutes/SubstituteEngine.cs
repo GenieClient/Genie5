@@ -11,9 +11,10 @@ public sealed class SubstituteRule
     private bool    _safe = true;
     private readonly StringComparison _cmp;
 
-    public SubstituteRule(string pattern, string replacement, bool caseSensitive = false, bool isEnabled = true, string className = "", bool safe = true)
+    public SubstituteRule(string pattern, string replacement, bool caseSensitive = false, bool isEnabled = true, string className = "", bool safe = true, bool wholeWord = false)
     {
         Pattern = pattern; Replacement = replacement; CaseSensitive = caseSensitive; IsEnabled = isEnabled; ClassName = className;
+        WholeWord = wholeWord;
         _cmp = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         _mayHaveVars = replacement.Contains('$');
         Rebuild(safe);
@@ -23,6 +24,16 @@ public sealed class SubstituteRule
     public bool   CaseSensitive { get; }
     public bool   IsEnabled     { get; set; }
     public string ClassName     { get; }
+
+    /// <summary>
+    /// Match only at word boundaries (public #245). A substitute for
+    /// <c>take</c> should not rewrite the inside of <c>mistake</c>, and without
+    /// this the only workaround was for the user to write the boundaries into
+    /// the pattern themselves — which means knowing that the pattern is a regex
+    /// at all, and that <c>#</c>b is the thing to reach for.
+    /// </summary>
+    public bool WholeWord { get; }
+
     /// <summary>Config layer this rule lives in (public #257) — which file it
     /// saves back to. Not serialized: scope IS the file it came from.</summary>
     public Persistence.RuleScope Scope { get; set; } = Persistence.RuleScope.Character;
@@ -63,7 +74,13 @@ public sealed class SubstituteRule
     {
         _safe = safe;
         var opts = RegexOptions.Compiled | (CaseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase);
-        try { _regex = RegexSafety.Build(Pattern, opts, safe); _hint = safe ? RegexSafety.LiteralHint(Pattern) : null; }
+        // Whole-word wraps the WHOLE pattern in a non-capturing group before
+        // anchoring it, so a pattern with alternation still means what it
+        // looks like: "\b(?:cat|dog)\b", not "\bcat|dog\b" (which would anchor
+        // only the first branch). The user's own capture groups keep their
+        // numbers, because the wrapper does not capture.
+        var pattern = WholeWord ? $@"\b(?:{Pattern})\b" : Pattern;
+        try { _regex = RegexSafety.Build(pattern, opts, safe); _hint = safe ? RegexSafety.LiteralHint(Pattern) : null; }
         catch { _regex = null; _hint = null; }
     }
 }
@@ -102,9 +119,9 @@ public sealed class SubstituteEngine
         set { if (_safetyEnabled == value) return; _safetyEnabled = value; foreach (var r in _rules) r.Rebuild(value); }
     }
 
-    public SubstituteRule AddRule(string pattern, string replacement, bool caseSensitive = false, bool isEnabled = true, string className = "")
+    public SubstituteRule AddRule(string pattern, string replacement, bool caseSensitive = false, bool isEnabled = true, string className = "", bool wholeWord = false)
     {
-        var rule = new SubstituteRule(pattern, replacement, caseSensitive, isEnabled, className, _safetyEnabled);
+        var rule = new SubstituteRule(pattern, replacement, caseSensitive, isEnabled, className, _safetyEnabled, wholeWord);
         _rules.Add(rule);
         Resnap();
         if (!string.IsNullOrEmpty(className)) Classes?.Ensure(className);

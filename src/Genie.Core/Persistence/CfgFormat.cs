@@ -1,4 +1,4 @@
-using Genie.Core.Aliases;
+﻿using Genie.Core.Aliases;
 using Genie.Core.Gags;
 using Genie.Core.Highlights;
 using Genie.Core.Macros;
@@ -49,7 +49,7 @@ public static class CfgFormat
 
     public static IEnumerable<string> SubstituteLines(IEnumerable<SubstituteRule> rules) =>
         rules.Select(r =>
-            $"#substitute add {ConfigPersistence.FormatArg(r.Pattern)} {ConfigPersistence.FormatArg(r.Replacement)} {ConfigPersistence.FormatArg(r.ClassName)}");
+            $"#substitute add {ConfigPersistence.FormatArg(r.Pattern)} {ConfigPersistence.FormatArg(r.Replacement)} {ConfigPersistence.FormatArg(r.ClassName)}{(r.WholeWord ? " wholeword" : "")}");
 
     public static IEnumerable<string> GagLines(IEnumerable<GagRule> rules) =>
         rules.Select(r =>

@@ -53,6 +53,8 @@
         <StackPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3"
                     Orientation="Horizontal" Spacing="16" Margin="0,2,0,4">
           <CheckBox Name="CaseSensitiveCheck" Content="Case sensitive"/>
+          <CheckBox Name="WholeWordCheck"     Content="Whole words only"
+                    ToolTip.Tip="Match only at word boundaries, so a substitute for &quot;take&quot; does not rewrite the inside of &quot;mistake&quot;. Same as the wholeword keyword on #substitute add."/>
           <CheckBox Name="EnabledCheck"       Content="Enabled" IsChecked="True"/>
           <StackPanel Name="ScopeGroup" Orientation="Horizontal" Spacing="6">
             <TextBlock Text="Scope:" VerticalAlignment="Center"/>

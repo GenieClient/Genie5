@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Genie.Core.Aliases;
 using Genie.Core.Classes;
 using Genie.Core.Gags;
@@ -104,7 +104,7 @@ public static class RuleFileLiveReload
                 substitutes.Clear();
                 var layered = ScopedRuleLoader.Layer(character, global, x => x.Pattern);
                 foreach (var (m, scope) in layered)
-                    substitutes.AddRule(m.Pattern, m.Replacement, m.CaseSensitive, m.IsEnabled, m.ClassName).Scope = scope;
+                    substitutes.AddRule(m.Pattern, m.Replacement, m.CaseSensitive, m.IsEnabled, m.ClassName, m.WholeWord).Scope = scope;
                 SyncScopedCfg(single, profileDir, globalDir, "substitutes.cfg",
                     sc => CfgFormat.SubstituteLines(substitutes.Rules.Where(r => sc is null || r.Scope == sc)));
                 return layered.Count;

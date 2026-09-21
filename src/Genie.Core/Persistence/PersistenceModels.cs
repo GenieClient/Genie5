@@ -1,4 +1,4 @@
-namespace Genie.Core.Persistence;
+﻿namespace Genie.Core.Persistence;
 
 public sealed class AliasPersistenceModel
 {
@@ -77,6 +77,10 @@ public sealed class SubstitutePersistenceModel
     public bool   CaseSensitive { get; set; }
     public bool   IsEnabled     { get; set; } = true;
     public string ClassName     { get; set; } = string.Empty;
+    /// <summary>Match at word boundaries only (public #245). Absent in files
+    /// written before it existed, which deserialize to false — the behaviour
+    /// those rules already had.</summary>
+    public bool   WholeWord     { get; set; }
 }
 
 public sealed class GagPersistenceModel
