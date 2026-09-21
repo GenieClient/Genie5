@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.Sockets;
 using System.Reactive.Subjects;
 using System.Text;
@@ -442,6 +442,12 @@ public sealed class GameConnection : IAsyncDisposable
     {
         var buffer  = new byte[8192];
         var pending = new StringBuilder(4096);
+        // One stateful decoder for the whole connection. Decoding each socket
+        // read independently splits any multi-byte UTF-8 sequence that straddles
+        // a read boundary into replacement characters; the decoder carries the
+        // partial sequence across reads instead (#280).
+        var decoder = Encoding.UTF8.GetDecoder();
+        var chars   = new char[Encoding.UTF8.GetMaxCharCount(buffer.Length)];
 
         try
         {
@@ -457,8 +463,8 @@ public sealed class GameConnection : IAsyncDisposable
                 // Stamp activity for the server-activity watchdog.
                 Volatile.Write(ref _lastServerActivityTicks, Environment.TickCount64);
 
-                var text = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                pending.Append(text);
+                int charCount = decoder.GetChars(buffer, 0, bytesRead, chars, 0);
+                pending.Append(chars, 0, charCount);
 
                 // Emit complete logical chunks: each complete XML element or
                 // bare-text segment between elements.  We flush whenever we see
