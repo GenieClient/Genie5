@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -75,6 +75,74 @@ public sealed class DialogButtonViewModel(DialogGridCell cell) : DialogControlVi
         base.Update(c);
         Caption      = c.Control.Value ?? c.Control.Text ?? "";
         ClosesDialog = c.Control.Type == DialogControlType.CloseButton;
+    }
+}
+
+/// <summary>
+/// A <c>&lt;link&gt;</c> control (#342). It carries a caption and a cmd, so
+/// before this existed it fell through to the label template and rendered as
+/// ordinary dead text — the caption was readable and the command unreachable,
+/// because only the button templates wire an activation handler.
+///
+/// <para>The dispatch behind it was already complete: <c>ServerDialogCommand</c>
+/// classifies the <c>url:</c> form and the controller routes it to the web-link
+/// safety prompt, with game commands going to the normal input path. What was
+/// missing was a control that could trigger any of it.</para>
+/// </summary>
+public sealed class DialogLinkViewModel(DialogGridCell cell) : DialogControlViewModel(cell)
+{
+    [Reactive] public string  Caption { get; set; } = "";
+    [Reactive] public string? Tooltip { get; set; }
+
+    /// <summary>True when the cmd opens a web page rather than sending a game
+    /// command — surfaced so the view can say so before the user clicks.</summary>
+    [Reactive] public bool IsExternal { get; set; }
+
+    public override void Update(DialogGridCell c)
+    {
+        base.Update(c);
+        Caption    = c.Control.Value ?? c.Control.Text ?? c.Control.Id;
+        IsExternal = c.Control.Cmd?.StartsWith("url:", StringComparison.OrdinalIgnoreCase) == true;
+        Tooltip    = Attr(c, "tooltip")
+                  ?? (IsExternal ? "Opens in your web browser" : c.Control.Cmd);
+    }
+}
+
+/// <summary>
+/// An <c>&lt;image&gt;</c> or <c>&lt;skin&gt;</c> control (#341).
+///
+/// <para>These carry neither <c>value</c> nor <c>text</c>, so falling through to
+/// the label template made every one of them an empty row that occupied a grid
+/// cell and showed nothing. <c>befriend</c> ("Friends and Enemies") is seven
+/// image controls and nothing else, and it arrives in the login block — so the
+/// dialog most users meet first opened as an essentially empty window.</para>
+///
+/// <para>This is the legible-placeholder half: the sprite name is rendered as
+/// text, and the control activates if it carries a cmd (the empath-facing
+/// <c>injuries-&lt;charnum&gt;</c> images carry <c>transfer …</c> commands and
+/// tooltips that were being dropped with the image). Real sprite rendering,
+/// reusing the injuries panel's mapping, is tracked separately as #345.</para>
+/// </summary>
+public sealed class DialogImageViewModel(DialogGridCell cell) : DialogControlViewModel(cell)
+{
+    /// <summary>What the server called the sprite — <c>name</c>, falling back to
+    /// <c>id</c>. Never empty: a blank row is the bug this replaces.</summary>
+    [Reactive] public string  Label   { get; set; } = "";
+    [Reactive] public string? Tooltip { get; set; }
+
+    /// <summary>True when the image carries a cmd, so the view renders it as
+    /// something clickable rather than as static text.</summary>
+    [Reactive] public bool IsActivatable { get; set; }
+
+    public override void Update(DialogGridCell c)
+    {
+        base.Update(c);
+        var name = Attr(c, "name");
+        Label = !string.IsNullOrWhiteSpace(name) ? name!
+              : !string.IsNullOrWhiteSpace(c.Control.Id) ? c.Control.Id
+              : "(image)";
+        IsActivatable = !string.IsNullOrWhiteSpace(c.Control.Cmd);
+        Tooltip       = Attr(c, "tooltip") ?? c.Control.Cmd;
     }
 }
 
@@ -357,6 +425,9 @@ public sealed class ServerDialogViewModel : ReactiveObject
         DialogControlType.DropDownBox => typeof(DialogComboViewModel),
         DialogControlType.StreamBox   => typeof(DialogStreamViewModel),
         DialogControlType.ProgressBar => typeof(DialogProgressViewModel),
+        DialogControlType.Link        => typeof(DialogLinkViewModel),
+        DialogControlType.Image or DialogControlType.Skin
+                                      => typeof(DialogImageViewModel),
         _                             => typeof(DialogLabelViewModel),
     };
 
@@ -371,6 +442,9 @@ public sealed class ServerDialogViewModel : ReactiveObject
         DialogControlType.DropDownBox => new DialogComboViewModel(cell),
         DialogControlType.StreamBox   => new DialogStreamViewModel(cell),
         DialogControlType.ProgressBar => new DialogProgressViewModel(cell),
+        DialogControlType.Link        => new DialogLinkViewModel(cell),
+        DialogControlType.Image or DialogControlType.Skin
+                                      => new DialogImageViewModel(cell),
         _                             => new DialogLabelViewModel(cell),
     };
 

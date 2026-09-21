@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Genie.App.ViewModels;
@@ -128,6 +128,112 @@ public class ServerDialogViewModelTests
 
         Assert.IsType<DialogTextBoxViewModel>(Find(vm, "thing"));
         Assert.Single(vm.Controls);
+    }
+
+    // ── Controls that used to fall through to the label template ─────────────
+
+    /// <summary>#341: an &lt;image&gt; carries neither value nor text, so the
+    /// label fallback made it an empty row that occupied a grid cell and showed
+    /// nothing. `befriend` is seven images and nothing else and arrives in the
+    /// login block, so the first dialog most users meet opened blank.</summary>
+    [Fact]
+    public void AnImageGetsItsOwnViewModelAndIsNeverBlank()
+    {
+        var vm = Build(State("befriend", "Friends and Enemies",
+        [
+            Ctl(DialogControlType.Image, "head", top: "10", left: "10",
+                attrs: new() { ["name"] = "head" }),
+        ]));
+
+        var image = Assert.IsType<DialogImageViewModel>(Find(vm, "head"));
+        Assert.Equal("head", image.Label);
+        Assert.False(image.IsActivatable);       // no cmd on this one
+    }
+
+    /// <summary>An image with no name at all still renders something — an
+    /// empty row is the bug, so the id is the fallback and "(image)" the
+    /// floor.</summary>
+    [Fact]
+    public void AnImageWithoutANameFallsBackToItsId()
+    {
+        var vm = Build(State("d", controls: [Ctl(DialogControlType.Image, "leftLeg")]));
+
+        Assert.Equal("leftLeg", ((DialogImageViewModel)Find(vm, "leftLeg")!).Label);
+    }
+
+    /// <summary>The empath-facing injuries variant puts a `transfer …` command
+    /// and a tooltip on its images; both were dropped with the image.</summary>
+    [Fact]
+    public void AnImageCarryingACommandIsActivatableAndFiresIt()
+    {
+        var vm = Build(State("injuries-12345", controls:
+        [
+            Ctl(DialogControlType.Image, "leftLeg",
+                cmd: "transfer Renucci internal left leg",
+                attrs: new() { ["name"] = "Injury2", ["tooltip"] = "Transfer this wound" }),
+        ]));
+
+        var image = Assert.IsType<DialogImageViewModel>(Find(vm, "leftLeg"));
+        Assert.True(image.IsActivatable);
+        Assert.Equal("Transfer this wound", image.Tooltip);
+
+        var sent = new List<ServerDialogAction>();
+        vm.ActionRequested += sent.Add;
+        vm.Activate("leftLeg");
+
+        Assert.Equal("transfer Renucci internal left leg", Assert.Single(sent).Value);
+    }
+
+    /// <summary>&lt;skin&gt; shares the image fallback and the same fix.</summary>
+    [Fact]
+    public void ASkinRendersThroughTheImageViewModel()
+    {
+        var vm = Build(State("d", controls:
+            [Ctl(DialogControlType.Skin, "bg", attrs: new() { ["name"] = "parchment" })]));
+
+        Assert.Equal("parchment", ((DialogImageViewModel)Find(vm, "bg")!).Label);
+    }
+
+    /// <summary>#342: a link DOES carry a caption, so it rendered — as plain
+    /// text. Only the button templates wire an activation handler, so its cmd
+    /// was unreachable even though the dispatch behind it was complete.</summary>
+    [Fact]
+    public void ALinkGetsItsOwnViewModelAndFiresItsGameCommand()
+    {
+        var vm = Build(State("quick-blank", controls:
+            [Ctl(DialogControlType.Link, "3", value: "Forums", cmd: "bbs")]));
+
+        var link = Assert.IsType<DialogLinkViewModel>(Find(vm, "3"));
+        Assert.Equal("Forums", link.Caption);
+        Assert.False(link.IsExternal);
+
+        var sent = new List<ServerDialogAction>();
+        vm.ActionRequested += sent.Add;
+        vm.Activate("3");
+
+        var action = Assert.Single(sent);
+        Assert.Equal("bbs", action.Value);
+        Assert.Equal(ServerDialogActionKind.GameCommand, action.Kind);
+    }
+
+    /// <summary>A `url:` link routes to the web-link path, not the game input —
+    /// the classification that already existed but had no control to trigger
+    /// it.</summary>
+    [Fact]
+    public void AUrlLinkIsMarkedExternalAndRoutesAsAWebLink()
+    {
+        var vm = Build(State("quick-simu", controls:
+            [Ctl(DialogControlType.Link, "1", value: "Game Info", cmd: "url:/dr/info/")]));
+
+        var link = Assert.IsType<DialogLinkViewModel>(Find(vm, "1"));
+        Assert.True(link.IsExternal);
+        Assert.Equal("Opens in your web browser", link.Tooltip);
+
+        var sent = new List<ServerDialogAction>();
+        vm.ActionRequested += sent.Add;
+        vm.Activate("1");
+
+        Assert.Equal(ServerDialogActionKind.WebLink, Assert.Single(sent).Kind);
     }
 
     // ── Activation ───────────────────────────────────────────────────────────

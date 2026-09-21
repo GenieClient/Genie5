@@ -19,6 +19,24 @@
       <Setter Property="MinWidth" Value="64"/>
       <Setter Property="Padding"  Value="10,3"/>
     </Style>
+    <!-- A <link> is a hyperlink, not a push button: no chrome, link colouring,
+         hand cursor (#342). It still routes through the same activation
+         handler every other clickable control uses. -->
+    <Style Selector="Button.dlglink">
+      <Setter Property="Background"      Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding"         Value="0"/>
+      <Setter Property="MinWidth"        Value="0"/>
+      <Setter Property="MinHeight"       Value="0"/>
+      <Setter Property="Cursor"          Value="Hand"/>
+      <Setter Property="Foreground"      Value="{DynamicResource Theme.Accent}"/>
+    </Style>
+    <Style Selector="Button.dlglink:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.dlglink TextBlock">
+      <Setter Property="TextDecorations" Value="Underline"/>
+    </Style>
   </UserControl.Styles>
 
   <!-- Type-matched, so a ContentControl bound to any control VM picks its own. -->
@@ -34,6 +52,41 @@
               IsEnabled="{Binding IsEnabled}"
               Tag="{Binding Id}"
               Click="OnControlActivated"/>
+    </DataTemplate>
+
+    <!-- #342: a link carried a caption but no activation handler, so it
+         rendered as dead text and its cmd was unreachable. The dispatch behind
+         it (url: vs game command, and the web-link safety prompt) was already
+         complete; this template is what can finally trigger it. -->
+    <DataTemplate DataType="vm:DialogLinkViewModel">
+      <Button Classes="dlglink"
+              Content="{Binding Caption}"
+              IsEnabled="{Binding IsEnabled}"
+              ToolTip.Tip="{Binding Tooltip}"
+              Tag="{Binding Id}"
+              Click="OnControlActivated"/>
+    </DataTemplate>
+
+    <!-- #341: <image>/<skin> carry neither value nor text, so the label
+         fallback rendered them as empty rows — `befriend` is seven images and
+         nothing else and opened as a blank window. Sprite names are at least
+         legible here, and an image carrying a cmd (the empath injuries
+         variant's `transfer …`) is clickable. Real sprites: #345. -->
+    <DataTemplate DataType="vm:DialogImageViewModel">
+      <Panel>
+        <Button Classes="dlglink"
+                Content="{Binding Label}"
+                IsEnabled="{Binding IsEnabled}"
+                IsVisible="{Binding IsActivatable}"
+                ToolTip.Tip="{Binding Tooltip}"
+                Tag="{Binding Id}"
+                Click="OnControlActivated"/>
+        <TextBlock Text="{Binding Label}"
+                   IsVisible="{Binding !IsActivatable}"
+                   ToolTip.Tip="{Binding Tooltip}"
+                   Opacity="0.75"
+                   VerticalAlignment="Center"/>
+      </Panel>
     </DataTemplate>
 
     <DataTemplate DataType="vm:DialogTextBoxViewModel">
