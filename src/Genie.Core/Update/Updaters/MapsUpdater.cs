@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Genie.Core.Mapper;
 using Genie.Core.Update.Sources;
 
@@ -315,6 +315,90 @@ public sealed class MapsUpdater : IUpdater
     // *.xml enumeration and DescribeInstalled never see it as a zone.
 
     private string ShaManifestPath => Path.Combine(_mapsDir, ".map-shas.json");
+
+    // ── Repair for the pre-d883728 lossy round-trip (public #352) ────────────
+
+    /// <summary>
+    /// Forget which upstream revisions are already installed, so the next
+    /// <see cref="ApplyAsync"/> rewrites EVERY zone instead of only the ones
+    /// whose upstream SHA moved.
+    ///
+    /// <para>Why this is needed at all: builds before <c>d883728</c> wrote zones
+    /// back through a lossy importer/exporter round-trip, which preserved each
+    /// arc's move text but dropped its exit TYPE and hidden flag (Direction has
+    /// no Go/Climb members) and dropped <c>&lt;description&gt;</c> elements
+    /// entirely. Fixing the updater does not repair folders it already damaged,
+    /// and an ordinary update never will: the updater skips zones whose SHA is
+    /// unchanged, so a damaged file that is current upstream is never revisited.
+    /// A stable zone stays broken indefinitely.</para>
+    ///
+    /// <para>The damage is invisible from inside Genie — the zone still draws
+    /// and travel mostly works, because the move text survived. What is lost is
+    /// exit typing (portals stop rendering as portals), hidden flags, and
+    /// descriptions.</para>
+    ///
+    /// <para>Measured on a live 122-zone folder: 9,524 damaged arcs, several
+    /// heavily used zones (Crossing, Riverhaven, Shard) with zero intact
+    /// go/climb arcs left. An ordinary update repaired one zone. Clearing the
+    /// manifest first repaired 91 of 122, and every count only grew — no node,
+    /// arc, label or description lost, and all 10,833 user metadata values
+    /// (notes, colours, roundtimes, server ids) came through untouched.</para>
+    /// </summary>
+    /// <returns>True if a manifest existed and was cleared.</returns>
+    public bool ForgetInstalledRevisions()
+    {
+        try
+        {
+            if (!File.Exists(ShaManifestPath)) return false;
+            File.Delete(ShaManifestPath);
+            return true;
+        }
+        catch
+        {
+            // Same posture as the loaders: a manifest we cannot remove is not
+            // worth failing a repair over. The caller reports what happened.
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Count arcs carrying the pre-<c>d883728</c> damage signature across the
+    /// installed zones: an arc whose <c>move</c> starts <c>go </c> or
+    /// <c>climb </c> while its <c>exit</c> says <c>none</c>.
+    ///
+    /// <para>That combination is always wrong — DR has no untyped portal — so
+    /// the detection needs no heuristics and cannot fire on a healthy folder.
+    /// It exists so the repair can report what it found rather than asking the
+    /// user to take a full rewrite on faith.</para>
+    /// </summary>
+    public int CountDamagedArcs()
+    {
+        if (!Directory.Exists(_mapsDir)) return 0;
+
+        var damaged = 0;
+        foreach (var file in Directory.EnumerateFiles(_mapsDir, "*.xml", SearchOption.TopDirectoryOnly))
+        {
+            try
+            {
+                foreach (var arc in System.Xml.Linq.XDocument.Load(file).Descendants("arc"))
+                {
+                    if (!string.Equals((string?)arc.Attribute("exit"), "none",
+                                       StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var move = (string?)arc.Attribute("move") ?? "";
+                    if (move.StartsWith("go ",    StringComparison.OrdinalIgnoreCase) ||
+                        move.StartsWith("climb ", StringComparison.OrdinalIgnoreCase))
+                        damaged++;
+                }
+            }
+            catch
+            {
+                // A zone we cannot parse is not evidence either way; the repair
+                // is safe to run regardless, so skip rather than abort the scan.
+            }
+        }
+        return damaged;
+    }
 
     private Dictionary<string, string> LoadShaManifest()
     {

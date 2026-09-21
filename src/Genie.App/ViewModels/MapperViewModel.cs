@@ -328,6 +328,12 @@ public class MapperViewModel : ReactiveObject
     /// </summary>
     public ReactiveCommand<Unit, Unit> UpdateMapsCommand { get; }
 
+    /// <summary>Full re-download of every zone, ignoring the installed-revision
+    /// manifest — the repair for maps damaged by pre-<c>d883728</c> updates
+    /// (public #352). An ordinary update cannot fix those, because it skips any
+    /// zone whose upstream SHA has not moved.</summary>
+    public ReactiveCommand<Unit, Unit> RepairMapsCommand { get; }
+
     /// <summary>
     /// Detach the Mapper into its own floating window. Wired by
     /// <c>MainWindowViewModel</c> to <c>GenieDockFactory.FloatTool("mapper")</c>
@@ -674,6 +680,7 @@ public class MapperViewModel : ReactiveObject
             (busy, dir) => !busy && !string.IsNullOrWhiteSpace(dir) && _zoneRepo is not null);
 
         UpdateMapsCommand = ReactiveCommand.CreateFromTask(UpdateMapsAsync, canRun);
+        RepairMapsCommand = ReactiveCommand.CreateFromTask(() => UpdateMapsAsync(repair: true), canRun);
 
         // Surface failures as a user-visible status line instead of swallowing.
         UpdateMapsCommand.ThrownExceptions.Subscribe(ex =>
@@ -681,6 +688,12 @@ public class MapperViewModel : ReactiveObject
             IsUpdating    = false;
             UpdateStatus  = "";
             UpdateSummary = $"Update failed: {ex.Message}";
+        });
+        RepairMapsCommand.ThrownExceptions.Subscribe(ex =>
+        {
+            IsUpdating    = false;
+            UpdateStatus  = "";
+            UpdateSummary = $"Repair failed: {ex.Message}";
         });
 
         FloatCommand = ReactiveCommand.Create(() => FloatRequested?.Invoke());
@@ -2219,7 +2232,20 @@ public class MapperViewModel : ReactiveObject
     }
 
     // ── UpdateMaps implementation ─────────────────────────────────────────
-    private async Task UpdateMapsAsync()
+    private Task UpdateMapsAsync() => UpdateMapsAsync(repair: false);
+
+    /// <summary>
+    /// Pull the latest zone XMLs. With <paramref name="repair"/> the installed-
+    /// revision manifest is cleared first, so EVERY zone is rewritten from
+    /// upstream rather than only the ones whose SHA moved (public #352).
+    ///
+    /// <para>That is the only way to undo the pre-<c>d883728</c> lossy
+    /// round-trip. A damaged zone that is current upstream is skipped by an
+    /// ordinary update forever, so the damage — dropped exit types, hidden
+    /// flags and descriptions — outlives any number of normal updates while the
+    /// map still draws and travel still mostly works.</para>
+    /// </summary>
+    private async Task UpdateMapsAsync(bool repair)
     {
         if (_zoneRepo is null || string.IsNullOrWhiteSpace(MapsDirectory))
             return;
@@ -2241,6 +2267,20 @@ public class MapperViewModel : ReactiveObject
                 extension: ".xml");
             var updater = new MapsUpdater(_zoneRepo, MapsDirectory, new[] { source });
 
+            // Count BEFORE the rewrite so the summary can state what was
+            // actually wrong rather than asking the user to take a full
+            // re-download on faith.
+            var damagedBefore = 0;
+            if (repair)
+            {
+                UpdateStatus  = "Checking installed zones for damaged exits...";
+                damagedBefore = await Task.Run(() => updater.CountDamagedArcs());
+                updater.ForgetInstalledRevisions();
+                UpdateStatus  = damagedBefore > 0
+                    ? $"Found {damagedBefore:N0} damaged arc(s) — re-downloading every zone..."
+                    : "No damaged exits found — re-downloading every zone anyway...";
+            }
+
             // Progress reports fire on the HTTP worker thread; marshal text
             // updates back to the UI thread so the binding update is safe.
             var progress = new Progress<UpdateProgress>(p =>
@@ -2248,7 +2288,9 @@ public class MapperViewModel : ReactiveObject
                     UpdateStatus = $"[{p.Current}/{p.Total}] {p.Item} — {p.Status}"));
 
             var result = await updater.ApplyAsync(progress);
-            UpdateSummary = result.Summary;
+            UpdateSummary = repair
+                ? $"{result.Summary}  (repair: {damagedBefore:N0} damaged arc(s) found before the rewrite)"
+                : result.Summary;
 
             // Bump room-count display in case the active zone's JSON was
             // refreshed on disk — the engine will pick up the new data the

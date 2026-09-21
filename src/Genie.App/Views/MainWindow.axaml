@@ -761,6 +761,15 @@
         <MenuItem Header="_Update from Official Repo..."
                   Command="{Binding Mapper.UpdateMapsCommand}"
                   ToolTip.Tip="Download the latest zone XML files from github.com/GenieClient/Maps and merge with your local maps directory."/>
+        <!-- #352: builds before d883728 wrote zones back through a lossy
+             round-trip that dropped exit types, hidden flags and descriptions.
+             An ordinary update can never repair that, because it skips any zone
+             whose upstream SHA has not moved — so a damaged file that is
+             current upstream stays damaged forever. This forgets the installed
+             -revision manifest so every zone is rewritten. -->
+        <MenuItem Header="_Repair Maps (full re-download)..."
+                  Command="{Binding Mapper.RepairMapsCommand}"
+                  ToolTip.Tip="Re-download EVERY zone, ignoring which revisions are already installed. Fixes maps damaged by older builds — missing portal/climb exit types, hidden flags and room descriptions — which a normal update cannot repair because it only rewrites zones that changed upstream. Your own notes, colours and roundtimes are preserved."/>
         <MenuItem Header="_Open Maps Folder"
                   Command="{Binding OpenMapsFolderCommand}"
                   ToolTip.Tip="Open the current Maps directory in your file browser so you can see / hand-edit the .xml zone files."/>
