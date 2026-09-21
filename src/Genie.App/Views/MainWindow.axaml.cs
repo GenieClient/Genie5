@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
@@ -130,6 +130,30 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     WindowStartupLocation = WindowStartupLocation.Manual;
                     Position = new PixelPoint(x, y);
                 }
+            };
+
+            // Genie 4 `@` / `\x` command-bar directives (#348). Core has already
+            // decided the line belongs here rather than in the game and has
+            // resolved the caret offset; this just writes it and focuses.
+            ViewModel!.WriteCommandBar = (text, caret, clearFirst) =>
+            {
+                if (ViewModel?.Command is not { } cmd) return;
+
+                var existing = clearFirst ? "" : cmd.CommandText ?? "";
+                var input    = FindCommandInput();
+                // Insert at the caret when the bar already holds something, the
+                // way Genie 4's ParseInputBox does — the `@` marker is about
+                // WHERE the caret lands, so appending would defeat the point of
+                // a partially typed line.
+                var at = clearFirst || input is null
+                    ? existing.Length
+                    : Math.Clamp(input.CaretIndex, 0, existing.Length);
+
+                cmd.CommandText = existing[..at] + text + existing[at..];
+
+                if (input is null) return;
+                input.Focus();
+                input.CaretIndex = at + caret;
             };
 
             // Magic Panels (Genie 4 SetMagicPanels): collapse the status bar's
@@ -983,6 +1007,14 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         AppendToCommandBar(string.Join(separator, lines));
     }
 
+    /// <summary>The command input. It has no x:Name in App.axaml, so it is
+    /// found by walking children — there is only one TextBox in the bottom
+    /// command grid, so the first hit is correct.</summary>
+    private TextBox? FindCommandInput() =>
+        this.GetVisualDescendants()
+            .OfType<TextBox>()
+            .FirstOrDefault(tb => tb.Watermark == "Enter command...");
+
     private void AppendToCommandBar(string selection)
     {
         if (ViewModel?.Command is not { } cmd) return;
@@ -992,12 +1024,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         cmd.CommandText = existing + separator + selection;
 
         // Focus the command bar so the user can edit or press Enter without
-        // an extra click. The TextBox has no x:Name in App.axaml, so look it
-        // up by walking children — there's only one in the bottom command
-        // grid so the first hit is correct.
-        var input = this.GetVisualDescendants()
-                        .OfType<TextBox>()
-                        .FirstOrDefault(tb => tb.Watermark == "Enter command...");
+        // an extra click.
+        var input = FindCommandInput();
         if (input is not null)
         {
             input.Focus();

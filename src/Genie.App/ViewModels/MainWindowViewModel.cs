@@ -969,6 +969,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// to the main window. Null until the view wires it up.</summary>
     public Action<double, double, int, int, bool>? ApplyWindowGeometry { get; set; }
 
+    /// <summary>Set by <c>MainWindow</c>: writes text into the command input and
+    /// places the caret, for Genie 4's `@` / `\x` directives (public #348).
+    /// Arguments are (text, caretIndex, clearFirst). Null until the view wires
+    /// it up — the directive is then a no-op rather than a crash, which is the
+    /// right failure for a headless host with no command bar.</summary>
+    public Action<string, int, bool>? WriteCommandBar { get; set; }
+
     /// <summary>
     /// Directory the <see cref="SessionRecorder"/> writes raw-XML captures to
     /// (`{AppData}/Genie5/Logs/`). Exposed via <see cref="OpenRecordingsFolderCommand"/>
@@ -5066,6 +5073,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // SFX backend: play gate-passed absolute paths from trigger/highlight
         // sounds and #play.
         _core.SoundRequested += path => _audio.Play(path);
+
+        // Genie 4 `@` / `\x` command-bar directives (#348). Core decides a line
+        // belongs in the input rather than the game; the view owns the TextBox
+        // and the caret, so the write hops through the hook MainWindow sets.
+        _core.CommandBarRequested += d =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                WriteCommandBar?.Invoke(d.Text, d.CaretIndex, d.ClearFirst));
 
         // #beep / #bell → system alert bell (already PlaySounds-gated in Core).
         _core.BeepRequested += () => _audio.Beep();

@@ -1,4 +1,4 @@
-using System.Reactive.Linq;
+﻿using System.Reactive.Linq;
 using System.Reflection;
 using Genie.Core.AI;
 using Genie.Core.Aliases;
@@ -672,6 +672,20 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             typeAhead:     _typeAhead,
             sendCommand:   cmd => RunOnLoop(() =>
                            {
+                               // Genie 4 command-bar directives (#348). Scripts
+                               // do NOT pass through SendToGame — this delegate
+                               // is their sink — and Genie 4 gates the directive
+                               // for every origin, script `put` included. Handled
+                               // here rather than at each `_sendCommand` call
+                               // site, which is the same reason the mycommandchar
+                               // mirror notes this delegate covers them all.
+                               if (Commanding.CommandBarDirective.TryParse(cmd, out var scriptDirective))
+                               {
+                                   CommandBarRequested?.Invoke(scriptDirective);
+                                   return;
+                               }
+                               cmd = Commanding.CommandBarDirective.Unescape(cmd);
+
                                RaiseScriptOutput(cmd);
                                _typeAhead.NotifySent();
                                // Offline (no live connection) the game-bound send is
@@ -1406,8 +1420,35 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         return true;
     }
 
+    /// <summary>
+    /// Genie 4's command-bar directives asked for a line (public #348): put
+    /// <c>Text</c> in the command input with the caret at <c>CaretIndex</c>,
+    /// replacing what the bar holds when <c>ClearFirst</c> is set and inserting
+    /// at the caret otherwise. Nothing is sent to the game.
+    /// </summary>
+    public event Action<Commanding.CommandBarDirective.Result>? CommandBarRequested;
+
     void ICommandHost.SendToGame(string text, bool userInput, string origin, string? echoOverride)
     {
+        // Genie 4 command-bar directives — `@` (caret marker) and `\x` (clear the
+        // input first). Gated HERE, at the one sink every origin funnels
+        // through, exactly as Genie 4 gates it in ClassCommand_SendText: a
+        // macro, a trigger action, an alias expansion and a script `put` must
+        // all behave the same, or `#macro {F1} {look @}` would work while the
+        // identical text from a trigger sent a literal "look @" to DR.
+        //
+        // Runs BEFORE the echo below: the text never reaches the game, so
+        // echoing it as a sent command would be a lie.
+        if (Commanding.CommandBarDirective.TryParse(text, out var directive))
+        {
+            CommandBarRequested?.Invoke(directive);
+            return;
+        }
+
+        // Not a directive, but it may still carry an escaped marker — `look
+        // \@home` has to arrive as "look @home", not with the backslash.
+        text = Commanding.CommandBarDirective.Unescape(text);
+
         // Local echo of user-typed commands so the player can see what they sent.
         // Script/alias commands are not echoed here — scripts have their own echo path.
         // When echoOverride is provided (e.g. UI link click passing the friendly
