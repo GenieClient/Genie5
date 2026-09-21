@@ -1,0 +1,27 @@
+<Project>
+
+  <!-- ===================================================================
+       Shared build properties for every project in the repo (#282).
+
+       Before this file, the target framework, nullable setting and implicit
+       usings were duplicated across seven csproj files, so a retarget meant
+       seven edits that had to agree. The next one (.NET 12, late 2027) is a
+       one-line change here.
+
+       LangVersion is deliberately ABSENT. Genie.Core and
+       Genie.Plugins.Abstractions used to set `latest`, which tracks the SDK
+       rather than the target framework — so under an SDK 11 those two projects
+       would silently move to a newer C# while Genie.App and the three test
+       projects stayed on the net10.0 default. Every project now sits on the
+       TFM default, which moves only when TargetFramework below moves.
+       =================================================================== -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <!-- Source projects opt in; the test projects set this back to disable in
+         their own csproj so test files keep their explicit using lists. -->
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

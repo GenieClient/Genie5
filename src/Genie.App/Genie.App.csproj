@@ -1,10 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Genie.App</RootNamespace>
     <!-- Genie5 (not Genie): matches the Velopack packId, so the portable
          launcher stub, the real exe in current\, and the process name all read

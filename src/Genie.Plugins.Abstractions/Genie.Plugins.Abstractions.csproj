@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <!-- The Genie 5 plugin API contract — a tiny, dependency-free assembly that
        both the host (Genie.Core) and external plugin DLLs reference. Keeping it
@@ -6,10 +6,6 @@
        Genie.Core. This is the assembly whose API gets versioned/frozen for the
        public plugin ecosystem. -->
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <LangVersion>latest</LangVersion>
     <RootNamespace>Genie.Plugins</RootNamespace>
     <AssemblyName>Genie.Plugins.Abstractions</AssemblyName>
     <Version>1.0.0</Version>

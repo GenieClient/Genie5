@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <!-- The console test harness (20 modes: DR / WIZ / LICH / REPLAY / DROP /
        COMPARE / …). It used to live INSIDE Genie.Core as top-level statements,
@@ -15,9 +15,6 @@
        LICH and the rest are documented at the top of TestHarness.cs). -->
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <OutputType>Exe</OutputType>
     <AssemblyName>Genie.TestHarness</AssemblyName>
