@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -138,6 +138,62 @@ public class TimeTrackerTests
         Assert.Equal(Visibility.BelowHorizon, sky.MoonVisibility("Yavash"));
         Assert.Equal(Visibility.Unknown, sky.MoonVisibility("Xibar"));
         Assert.Equal(1, sky.BodiesUp());   // the planet; moons excluded
+    }
+
+    /// <summary>#355: an unrecognised wording is a gap in the grammar, not the end
+    /// of the block. Before the fix the scan stopped at the first non-canonical
+    /// line, so everything after it was discarded — measured at 48% of bodies
+    /// captured across 304 recorded blocks, with 32% capturing none at all.</summary>
+    [Fact]
+    public void Obs_sky_scan_survives_an_unrecognised_line()
+    {
+        var sky = new SkyState();
+        var now = DateTimeOffset.UtcNow;
+        sky.Feed("The following heavenly bodies are visible:", now);
+        sky.Feed("Something the parser has never seen before happens.", now);
+        sky.Feed("The planet Dawgolesh is unobscured by clouds.", now);
+        sky.Feed("Katamba is obscured by clouds.", now);
+        sky.Feed("Roundtime: 1 sec.", now);
+
+        Assert.Equal(Visibility.Clear,  sky.Bodies["Dawgolesh"]);
+        Assert.Equal(Visibility.Cloudy, sky.MoonVisibility("Katamba"));
+    }
+
+    /// <summary>#355: every partial-cloud wording observed in the recorded
+    /// corpus resolves to the same body key the clear wording produces.</summary>
+    [Theory]
+    [InlineData("Two-thirds of the planet Szeldia is blocked by cloud cover above.", "Szeldia")]
+    [InlineData("Two-thirds of the early afternoon sun is blocked by cloud cover above.", "early afternoon sun")]
+    [InlineData("You focus your enhanced sight, through some of the cloud cover, upon the planet Yoakena.", "Yoakena")]
+    [InlineData("A rather large cloud has covered nearly a third of the Wolf.", "Wolf")]
+    [InlineData("One half of the Raven has been obscured by clouds above.", "Raven")]
+    [InlineData("A cloud has obscured parts of the Magpie.", "Magpie")]
+    [InlineData("Most of the Cat is obscured from view.", "Cat")]
+    [InlineData("Clouds obscure the sky where the Heart should appear.", "Heart")]
+    [InlineData("The clouds covering the planet Dawgolesh melt away under your gaze.", "Dawgolesh")]
+    public void Obs_sky_reads_every_partial_cloud_wording(string line, string body)
+    {
+        var sky = new SkyState();
+        var now = DateTimeOffset.UtcNow;
+        sky.Feed("The following heavenly bodies are visible:", now);
+        Assert.True(sky.Feed(line, now));
+        Assert.Equal(Visibility.Cloudy, sky.Bodies[body]);
+    }
+
+    /// <summary>#355: a clouded moon keeps a real visibility, so the (cloudy)
+    /// suffix on its row no longer silently disappears.</summary>
+    [Fact]
+    public void Obs_sky_partial_cloud_still_counts_a_moon()
+    {
+        var sky = new SkyState();
+        var now = DateTimeOffset.UtcNow;
+        sky.Feed("The following heavenly bodies are visible:", now);
+        sky.Feed("A cloud has obscured parts of Katamba.", now);
+        sky.Feed("Most of the planet Szeldia is obscured from view.", now);
+        sky.Feed("", now);
+
+        Assert.Equal(Visibility.Cloudy, sky.MoonVisibility("Katamba"));
+        Assert.Equal(1, sky.BodiesUp());   // Szeldia; moons excluded
     }
 
     // ── extension end-to-end (fake host) ────────────────────────────────────────

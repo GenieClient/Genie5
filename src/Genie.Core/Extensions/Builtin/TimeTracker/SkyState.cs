@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace Genie.Core.Extensions.Builtin;
 
@@ -24,11 +24,59 @@ internal sealed class SkyState
     public string FavoredLine   = "";
 
     private bool _inScan;
+    private int  _unrecognisedInScan;
     private bool _expectCondLine;
+
+    // ── obs sky body grammar (#355) ──────────────────────────────────────────
+    // DR states each body's visibility in one of many phrasings. The three
+    // canonical ones are handled by BodyRe; every "partially clouded" wording
+    // needs its own pattern, because they put the body name in a different
+    // place each time. Measured over 304 recorded blocks, the cloudy wordings
+    // below account for the majority of the lines the old single pattern
+    // dropped — and dropping one used to end the whole scan.
+    //
+    // Each pattern captures the body name in group 1, after an optional
+    // "the planet " / "the " prefix, so "the planet Szeldia" and "the Wolf"
+    // both normalise to the same key the clear wording produces.
+    private const string Body = @"(?:[Tt]he planet |[Tt]he )?(.+?)";
 
     private static readonly Regex BodyRe = new(
         @"^(?:The planet |The )?(.+?) is (unobscured by clouds|obscured by clouds|below the horizon)\.$",
         RegexOptions.Compiled);
+
+    /// <summary>Partial/total cloud wordings, all of which mean "up, but
+    /// clouded". Tried in order after <see cref="BodyRe"/> misses. The
+    /// Piercing Gaze forms ("you focus your enhanced sight", "the clouds …
+    /// melt away") report seeing THROUGH cloud cover, so the sky is still
+    /// cloudy — the gaze changes what you can read, not the weather.</summary>
+    private static readonly Regex[] CloudyRes =
+    {
+        // "Two-thirds of the planet Szeldia is blocked by cloud cover above."
+        // "Two-thirds of the early afternoon sun is blocked by cloud cover above."
+        new($@"^.+? of {Body} is blocked by cloud cover above\.$", RegexOptions.Compiled),
+        // "One half of the Raven has been obscured by clouds above."
+        new($@"^.+? of {Body} has been obscured by clouds above\.$", RegexOptions.Compiled),
+        // "A rather large cloud has covered nearly a third of the Wolf."
+        new($@"^A .*?cloud has covered .+? of {Body}\.$", RegexOptions.Compiled),
+        // "A cloud has obscured parts of the Magpie."
+        new($@"^A .*?cloud has obscured parts of {Body}\.$", RegexOptions.Compiled),
+        // "Most of the Cat is obscured from view."
+        new($@"^.+? of {Body} is obscured from view\.$", RegexOptions.Compiled),
+        // "Clouds obscure the sky where the Heart should appear."
+        new($@"^Clouds obscure the sky where {Body} should appear\.$", RegexOptions.Compiled),
+        // "You focus your enhanced sight, through some of the cloud cover, upon the planet Yoakena."
+        new($@"^You focus your enhanced sight,.*? upon {Body}\.$", RegexOptions.Compiled),
+        // "The clouds covering the planet Dawgolesh melt away under your gaze."
+        new($@"^The clouds covering {Body} melt away under your gaze\.$", RegexOptions.Compiled),
+    };
+
+    /// <summary>Safety valve: how many consecutive lines the scan tolerates
+    /// without recognising a body before it gives up. The real terminators are
+    /// "Roundtime:" and a blank line, both of which always follow an
+    /// <c>obs sky</c>; this only stops a block with neither from swallowing the
+    /// rest of the session. A real block's body lines are contiguous, so no
+    /// genuine reading comes close to the limit.</summary>
+    private const int MaxUnrecognisedInScan = 12;
     private static readonly Regex FavoredRe = new(
         @"^(.+?) spells are favou?red\.$", RegexOptions.Compiled);
     private static readonly Regex DominantRe = new(
@@ -43,8 +91,9 @@ internal sealed class SkyState
         if (t == "The following heavenly bodies are visible:")
         {
             Bodies.Clear();
-            SkyCapturedAt = now;
-            _inScan = true;
+            SkyCapturedAt       = now;
+            _inScan             = true;
+            _unrecognisedInScan = 0;
             return true;
         }
         if (_inScan)
@@ -58,9 +107,23 @@ internal sealed class SkyState
             if (b.Success)
             {
                 Bodies[b.Groups[1].Value.Trim()] = Parse(b.Groups[2].Value);
+                _unrecognisedInScan = 0;
                 return true;
             }
-            _inScan = false;
+            foreach (var re in CloudyRes)
+            {
+                var c = re.Match(t);
+                if (!c.Success) continue;
+                Bodies[c.Groups[1].Value.Trim()] = Visibility.Cloudy;
+                _unrecognisedInScan = 0;
+                return true;
+            }
+            // An unrecognised line is a wording we don't know yet, NOT the end
+            // of the block (#355): ending the scan here discarded every body
+            // after the first partial-cloud line — over half the sky. Skip it
+            // and keep reading; only the real terminators above stop the scan.
+            if (++_unrecognisedInScan >= MaxUnrecognisedInScan)
+                _inScan = false;
         }
 
         if (t == "You glance up at the sky." || t == "You scan the sky from horizon to horizon.")
