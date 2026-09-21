@@ -44,7 +44,7 @@ jobs:
     # body — keeping the in-repo file as the full changelog. Runs on Linux so
     # awk/sed are guaranteed; the result is shared with every platform job.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Slice out the current version's notes
         shell: bash
         run: |
@@ -69,7 +69,7 @@ jobs:
           echo "----- release body for $tag -----"
           cat RELEASE_BODY.md
       - name: Upload extracted body
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-body
           path: RELEASE_BODY.md
@@ -90,11 +90,11 @@ jobs:
       contents: write
     steps:
       - name: Download extracted release body
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: release-body
       - name: Create (or update) the Release — no assets yet
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           prerelease: true
@@ -106,10 +106,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -125,7 +125,7 @@ jobs:
       # The sign job downloads this artifact and submits it to SignPath's REST API.
       - name: Upload unsigned artifact
         id: upload-unsigned
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: genie-win-x64-unsigned
           path: publish/win-x64/Genie5.exe
@@ -149,10 +149,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -161,14 +161,14 @@ jobs:
 
       - name: Download unsigned artifact from publish job
         if: vars.ENABLE_RELEASE_SIGNING != 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: genie-win-x64-unsigned
           path: publish/win-x64
 
       - name: Download signed artifact from sign job
         if: vars.ENABLE_RELEASE_SIGNING == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: genie-win-x64-signed
           path: publish/win-x64
@@ -254,19 +254,19 @@ jobs:
 
       - name: Upload unsigned Setup.exe for the sign-setup job
         if: vars.ENABLE_RELEASE_SIGNING == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: genie-win-setup-unsigned
           path: setup-hold/Genie5-Setup.exe
           if-no-files-found: error
 
       - name: Download extracted release body
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: release-body
 
       - name: Attach Velopack assets to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           prerelease: true
@@ -285,8 +285,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -342,12 +342,12 @@ jobs:
           [ -f Genie5.AppImage ] && mv Genie5.AppImage "04-Linux-Genie5.AppImage" || true
 
       - name: Download extracted release body
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: release-body
 
       - name: Attach Velopack Linux assets to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           prerelease: true
@@ -367,8 +367,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -449,12 +449,12 @@ jobs:
           [ -f Genie5-osx-Portable.zip ] && mv Genie5-osx-Portable.zip "02-macOS-Apple-Silicon-Genie5-Portable.zip" || true
 
       - name: Download extracted release body
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: release-body
 
       - name: Attach Velopack macOS arm64 assets to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           prerelease: true
@@ -474,8 +474,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -558,12 +558,12 @@ jobs:
           [ -f Genie5-osx-x64-Portable.zip ] && mv Genie5-osx-x64-Portable.zip "03-macOS-Intel-Genie5-Portable.zip" || true
 
       - name: Download extracted release body
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: release-body
 
       - name: Attach Velopack macOS x64 assets to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           prerelease: true
@@ -589,7 +589,7 @@ jobs:
     if: vars.ENABLE_RELEASE_SIGNING == 'true'
     steps:
       - name: Download unsigned artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: genie-win-x64-unsigned
           path: unsigned
@@ -659,7 +659,7 @@ jobs:
             "$REQUEST_URL/SignedArtifact"
 
       - name: Upload signed artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: genie-win-x64-signed
           path: signed/**
@@ -676,7 +676,7 @@ jobs:
       contents: write
     steps:
       - name: Download unsigned Setup.exe
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: genie-win-setup-unsigned
           path: unsigned
@@ -756,13 +756,13 @@ jobs:
     if: vars.ENABLE_RELEASE_SIGNING == 'true'
     steps:
       - name: Download signed artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: genie-win-x64-signed
           path: signed
 
       - name: Create / update GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: signed/**
           generate_release_notes: true
