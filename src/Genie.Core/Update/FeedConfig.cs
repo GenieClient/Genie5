@@ -1,4 +1,4 @@
-namespace Genie.Core.Update;
+﻿namespace Genie.Core.Update;
 
 /// <summary>
 /// Top-level on-disk schema for the update system. Loaded from
@@ -28,14 +28,17 @@ public sealed class FeedConfig
     public UpdatePolicy ScriptsPolicy { get; set; } = new();
 
     /// <summary>Out-of-the-box defaults: official Genie5 core, official Maps repo,
-    /// official Experience plugin, and the community scripts repo (disabled —
-    /// scripts act as your character, so pulling them is opt-in).</summary>
+    /// and the community scripts repo (disabled — scripts act as your character,
+    /// so pulling them is opt-in). Plugins ships EMPTY: the only entry it ever
+    /// carried was Plugin_EXPTrackerV5, whose id is retired now that Experience
+    /// tracking lives in Core, so seeding it only ever downloaded a DLL the
+    /// loader then refused to register (#281).</summary>
     public static FeedConfig CreateDefault() => new()
     {
         Core    = CoreFeed.Default(),
-        Maps    = new() { FeedEntry.OfficialMaps()       },
-        Plugins = new() { FeedEntry.OfficialExpTracker() },
-        Scripts = new() { FeedEntry.CommunityScripts()   },
+        Maps    = new() { FeedEntry.OfficialMaps()     },
+        Plugins = new(),
+        Scripts = new() { FeedEntry.CommunityScripts() },
     };
 }
 
@@ -153,10 +156,16 @@ public sealed class FeedEntry
         Enabled   = false,
     };
 
-    /// <summary>The default Plugin_EXPTrackerV5 release feed (single DLL asset).</summary>
-    public static FeedEntry OfficialExpTracker() => new()
+    /// <summary>
+    /// The retired Plugin_EXPTrackerV5 release feed. Experience tracking moved
+    /// into Core, so <c>genie.experience</c> is on <c>PluginManager</c>'s retired
+    /// list and a downloaded DLL is refused at registration. Kept only so
+    /// <see cref="FeedConfigStore"/> can recognise and drop the seeded row from
+    /// existing <c>update-feeds.json</c> files; it is no longer seeded (#281).
+    /// </summary>
+    public static FeedEntry RetiredExpTracker() => new()
     {
-        Id           = "official-exptracker",
+        Id           = RetiredExpTrackerId,
         Name         = "Plugin_EXPTrackerV5 (official)",
         Kind         = "github-releases",
         Owner        = "GenieClient",
@@ -164,4 +173,7 @@ public sealed class FeedEntry
         AssetPattern = "Plugin_EXPTrackerV5.dll",
         Enabled      = true,
     };
+
+    /// <summary>Feed id of the seeded row retired by #281.</summary>
+    public const string RetiredExpTrackerId = "official-exptracker";
 }

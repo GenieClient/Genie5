@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace Genie.Core.Update;
 
@@ -7,7 +7,7 @@ namespace Genie.Core.Update;
 /// <c>{ConfigDir}/update-feeds.json</c> where <c>ConfigDir</c> is resolved
 /// by <see cref="Config.GenieConfig.ConfigDir"/>. Missing or malformed
 /// files fall back to <see cref="FeedConfig.CreateDefault"/> so a fresh
-/// install always has the official Maps + EXPTracker feeds available.
+/// install always has the official Maps feed available.
 /// </summary>
 public sealed class FeedConfigStore
 {
@@ -55,6 +55,13 @@ public sealed class FeedConfigStore
             if (cfg.Scripts.Count == 0 && !json.Contains("\"scripts\"", StringComparison.OrdinalIgnoreCase))
                 cfg.Scripts.Add(FeedEntry.CommunityScripts());
 
+            // Migration (#281): drop the seeded Plugin_EXPTrackerV5 row. Its
+            // plugin id is retired now that Experience tracking is in Core, so
+            // the row can only ever download a DLL the loader refuses. Only the
+            // untouched seeded row is removed — if the user repointed it at
+            // another owner/repo, it is theirs and stays.
+            cfg.Plugins.RemoveAll(IsSeededExpTrackerRow);
+
             return cfg;
         }
         catch
@@ -65,6 +72,15 @@ public sealed class FeedConfigStore
             return FeedConfig.CreateDefault();
         }
     }
+
+    /// <summary>
+    /// True for the untouched seeded Plugin_EXPTrackerV5 row — matched on id AND
+    /// source, so a row the user repointed elsewhere is never silently removed.
+    /// </summary>
+    private static bool IsSeededExpTrackerRow(FeedEntry e) =>
+        string.Equals(e.Id,    FeedEntry.RetiredExpTrackerId,  StringComparison.OrdinalIgnoreCase)
+     && string.Equals(e.Owner, "GenieClient",                  StringComparison.OrdinalIgnoreCase)
+     && string.Equals(e.Repo,  "Plugin_EXPTrackerV5",          StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Persist the feed config to disk, creating the config directory if it
