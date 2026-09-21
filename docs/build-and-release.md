@@ -1,4 +1,4 @@
-# Build & Release
+﻿# Build & Release
 
 Genie 5 builds for Windows, macOS, and Linux from one source tree on .NET 10. The published artifact is **self-contained** — the .NET runtime and native libraries are bundled, so end users don't install anything.
 
@@ -74,10 +74,10 @@ Because these live in the csproj, the `dotnet publish -r <rid>` command above is
 Version metadata is set in [Genie.App.csproj](../src/Genie.App/Genie.App.csproj):
 
 ```xml
-<Version>5.0.0-beta.4</Version>        <!-- current tier; bump per release -->
+<Version>5.0.0-beta.9.5</Version>      <!-- current tier; bump per release -->
 <AssemblyVersion>5.0.0.0</AssemblyVersion>
 <FileVersion>5.0.0.0</FileVersion>
-<InformationalVersion>5.0.0-beta.4</InformationalVersion>
+<InformationalVersion>5.0.0-beta.9.5</InformationalVersion>
 ```
 
 To stamp a different version at publish time, override on the CLI:

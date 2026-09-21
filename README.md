@@ -66,6 +66,17 @@ See [backlog](docs/ROADMAP.md) for the full feature roadmap.
 
 ## Installation
 
+### Supported platforms
+
+These are the floors .NET 10 imposes, not aspirations — below them the runtime
+itself will not start.
+
+| Platform | Minimum | Notes |
+|---|---|---|
+| **Windows** | Windows 10 version 1809 (or an LTSC of that vintage) and Windows 11, x64 | Consumer Windows 10 is past its own end of life. Genie still runs there; treat it as best-effort. |
+| **macOS** | macOS 14, Apple Silicon or Intel | We keep shipping an Intel build for pre-2020 Macs even though many of them cannot reach macOS 14 — that build is best-effort on anything older. |
+| **Linux** | x64, glibc 2.27+ (Ubuntu 18.04-era or newer) | The AppImage additionally needs FUSE (`libfuse2`). |
+
 ### Download a pre-built build (recommended)
 
 Grab the [latest release](https://github.com/GenieClient/Genie5/releases/latest) and pick your platform:

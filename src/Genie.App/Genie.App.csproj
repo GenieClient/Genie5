@@ -55,7 +55,7 @@
     <!-- AvaloniaEdit backs the experimental editor-based Game window
          (GenieConfig.UseEditorGameWindow, default off). Pinned to 11.4.1: it
          floors at Avalonia >= 11.0.0 (no ceiling), so it resolves against our
-         11.3.11 pin without lifting it. 12.0.0 is NOT usable — it requires
+         Avalonia pin (11.3.18) without lifting it. 12.0.0 is NOT usable — it requires
          Avalonia 12 exactly, which would drag the whole app plus the
          Avalonia.ReactiveUI → ReactiveUI.Avalonia rename with it. -->
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="11.4.1" />
@@ -67,6 +67,8 @@
          ReactiveUI + Fody; only the dock Tool/Document/Factory classes use the
          MVVM base (ObservableObject). Pinned to 11.3.11.22 to match the
          windowed-mode skin (MdiDocumentWindowSkin) authored against that API.
+         (That is Dock's own version line — it is independent of the Avalonia
+         pin, which is 11.3.18.)
 
          #80 (FIXED, Themes/ToolControlCachedSkin.axaml): 11.3.11's stock ToolControl
          theme hosts the active tool in a single recycled ContentControl whose

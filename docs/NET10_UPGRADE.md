@@ -1,4 +1,4 @@
-# .NET 10 upgrade
+﻿# .NET 10 upgrade
 
 Genie 5 is moving from **.NET 8** to **.NET 10** during the beta line. This
 document is the what, the why, and what it means for users and contributors.
@@ -54,7 +54,7 @@ profiles, plugins, or layouts changes.
 
 Deliberately minimal — a retarget, not a rewrite:
 
-- All four projects: `net8.0` → `net10.0`.
+- All projects (three source, three test, one tool): `net8.0` → `net10.0`.
 - `Microsoft.Extensions.Logging*` packages: 8.0.0 → 10.0.10.
 - Avalonia patch bump within the same major line: 11.3.11 → 11.3.18
   (DataGrid stays at 11.3.13, the last patch published for its line).
@@ -71,3 +71,35 @@ and pulls a major ReactiveUI version bump with it. Coupling that to the runtime
 retarget would turn a low-risk change into a risky one. This upgrade keeps the
 UI stack on the still-maintained Avalonia 11.3 line; the Avalonia 12 move gets
 its own roadmap entry and its own timeline.
+
+## Publish knobs considered and rejected
+
+Recorded so they are not re-litigated. Each was evaluated against this app, not
+against the general case — most of them are good advice for a different shape of
+program.
+
+**`PublishTrimmed` / NativeAOT — structurally blocked, not merely risky.**
+Four separate things in Genie resolve types at runtime that a trimmer cannot
+see: plugins load through their own `AssemblyLoadContext`, the JavaScript engine
+(Jint) interops with host objects reflectively, persistence uses
+reflection-based JSON, and both the ReactiveUI.Fody weaver and Avalonia's XAML
+loader depend on metadata a trim pass removes. Trimming would not shrink this
+app; it would break plugin loading and `.js` scripts in ways that only show up
+at the user's machine.
+
+**`InvariantGlobalization` — the size win is not worth the failure mode.**
+It would drop ICU, but Genie compares, sorts and case-folds game text and user
+rule patterns. Invariant mode silently changes how some of those compare rather
+than failing loudly, and the class of bug that produces is a highlight or
+trigger that quietly stops matching for one user.
+
+**ServerGC — wrong profile.** It trades pause latency for throughput on
+many-core machines. This is an interactive client whose whole quality bar is
+that the game window never stutters; workstation GC is the right default and
+measurably so.
+
+## Supported OS floors
+
+See the **Supported platforms** table in the README — Windows 10 1809+ / 11
+(x64), macOS 14+ (Apple Silicon and Intel, the Intel build best-effort below
+14), Linux x64 with glibc 2.27+ and `libfuse2` for the AppImage.

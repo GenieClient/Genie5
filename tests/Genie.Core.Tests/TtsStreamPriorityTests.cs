@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Genie.Core.Config;
 using Genie.Core.Runtime;
 using Xunit;
@@ -18,9 +18,10 @@ public class TtsStreamPriorityTests
         new(new LocalDirectoryService("Genie5Test", AppContext.BaseDirectory));
 
     // NOTE: expected value is a string, not TtsUrgency — a Core enum inside
-    // [InlineData] breaks xUnit attribute discovery when the net8.0 tests run
-    // on a rolled-forward runtime (CustomAttributeFormatException resolving
-    // Genie.Core during discovery).
+    // [InlineData] breaks xUnit attribute discovery when the tests run on a
+    // rolled-forward runtime (CustomAttributeFormatException resolving
+    // Genie.Core during discovery). Kept after the .NET 10 retarget: the
+    // hazard is the roll-forward, not the old target framework.
     [Theory]
     [InlineData("whispers", "High")]
     [InlineData("death", "High")]
