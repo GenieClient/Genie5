@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using Genie.Core.Aliases;
@@ -35,6 +35,47 @@ public class ImportReportingTests
         var path = Path.Combine(Path.GetTempPath(), $"g4report_{Guid.NewGuid():N}.cfg");
         File.WriteAllLines(path, lines);
         return path;
+    }
+
+    // ── The implicit default class is a by-design skip, not a loss ───────
+
+    /// <summary>#354: every Genie 4 config carries "#class {default} {True}",
+    /// so classifying it as a drop meant a perfectly clean import ALWAYS
+    /// printed a NOT IMPORTED section. Users learn within two imports that the
+    /// section is noise and stop reading it — which restores exactly the
+    /// blindness the reporting was built to remove.</summary>
+    [Fact]
+    public void The_implicit_default_class_is_skipped_by_design_not_dropped()
+    {
+        var path   = WriteCfg("#class {default} {True}", "#class {hunting} {False}");
+        var engine = new Genie.Core.Classes.ClassEngine();
+
+        var r = Genie4Importer.ImportClasses(path, engine, ImportMode.Replace);
+        File.Delete(path);
+
+        Assert.Equal(1, r.Imported);                 // hunting
+        Assert.Equal(1, r.Skipped);                  // default
+        Assert.Equal(0, r.DroppedCount);             // …but nothing was LOST
+        Assert.Empty(r.Dropped);
+
+        var skip = Assert.Single(r.Skips);
+        Assert.Equal(ImportSkipKind.ByDesign, skip.Kind);
+        Assert.Contains("implicit", skip.Reason);
+    }
+
+    /// <summary>A malformed class line is still a genuine drop — the fix for
+    /// #354 split the two branches rather than softening both.</summary>
+    [Fact]
+    public void An_empty_class_name_is_still_a_drop()
+    {
+        var path   = WriteCfg("#class {} {True}");
+        var engine = new Genie.Core.Classes.ClassEngine();
+
+        var r = Genie4Importer.ImportClasses(path, engine, ImportMode.Replace);
+        File.Delete(path);
+
+        Assert.Equal(1, r.DroppedCount);
+        Assert.Equal(ImportSkipKind.Dropped, Assert.Single(r.Skips).Kind);
     }
 
     // ── A lost rule is reported, with enough detail to act on ────────────

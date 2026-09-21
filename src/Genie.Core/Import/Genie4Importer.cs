@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Genie.Core.Aliases;
 using Genie.Core.Classes;
 using Genie.Core.Gags;
@@ -893,9 +893,17 @@ public static class Genie4Importer
 
             var name  = args[0].Trim();
             var state = args[1].Trim().ToLowerInvariant();
-            if (string.IsNullOrEmpty(name) || name.Equals("default", StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrEmpty(name))
             {
-                log.Drop(lineNo, line, name.Length == 0 ? "class name is empty" : "the 'default' class is implicit");
+                log.Drop(lineNo, line, "class name is empty");
+                continue;
+            }
+            // Every Genie 4 config carries "#class {default} {True}". The default
+            // class always exists here, so declining it is by design, not a rule
+            // we failed to read — it must not land in the NOT IMPORTED section.
+            if (name.Equals("default", StringComparison.OrdinalIgnoreCase))
+            {
+                log.ByDesign(lineNo, line, "the 'default' class is implicit");
                 continue;
             }
             if (mode == ImportMode.AddOnly && existing.Contains(name)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
