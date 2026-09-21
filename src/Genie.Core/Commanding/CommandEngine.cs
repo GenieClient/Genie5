@@ -1,4 +1,4 @@
-using Genie.Core.Aliases;
+﻿using Genie.Core.Aliases;
 using Genie.Core.Classes;
 using Genie.Core.Config;
 using Genie.Core.Gags;
@@ -1639,7 +1639,6 @@ public sealed class CommandEngine
             }
             var draft = Dialogs.DialogGapReport.Build(row, BuildReportContext());
             _host.Echo($"Drafted “{draft.Title}” — review it in the browser and submit if it looks right.");
-            _host.Echo($"If the browser didn't open: {draft.Url}");
             try
             {
                 System.Diagnostics.Process.Start(
@@ -1647,7 +1646,17 @@ public sealed class CommandEngine
             }
             catch (Exception ex)
             {
-                _host.Echo($"#dialogs: could not open the browser ({ex.Message}) — use the link above.");
+                // Neither the launch message nor the prefill URL may be echoed:
+                // the message embeds the URL and the working directory (with the
+                // account name), and the URL is the whole encoded issue body
+                // (#307). Write the draft out and name the file instead.
+                var saved = Diagnostics.XmlGapReport.SaveDraft(
+                    new Diagnostics.XmlGapReport.Draft(draft.Title, draft.Body, draft.Labels, draft.Url),
+                    _config.LogDir);
+                _host.Echo($"#dialogs: could not open the browser — {Diagnostics.BrowserLaunch.SafeReason(ex)}.");
+                _host.Echo(saved is null
+                    ? "#dialogs: open https://github.com/GenieClient/Genie5/issues/new and describe the dialog."
+                    : $"#dialogs: the draft is saved at {saved} — open https://github.com/GenieClient/Genie5/issues/new and paste it.");
             }
             return;
         }

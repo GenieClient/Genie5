@@ -1,4 +1,4 @@
-using System.Reactive;
+﻿using System.Reactive;
 using System.Reactive.Linq;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -380,7 +380,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     /// <summary>Prefill new-issue URL for the pending XML-gap draft, opened by
     /// <see cref="ReportXmlGapCommand"/>. Empty when no gap is pending.</summary>
-    private string _pendingXmlGapUrl = "";
+    private Genie.Core.Diagnostics.XmlGapReport.Draft? _pendingXmlGapDraft;
 
     /// <summary>Tag types already surfaced this session — dedup so the same
     /// unknown element never re-prompts.</summary>
@@ -1809,8 +1809,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         DismissXmlGapNoticeCommand = ReactiveCommand.Create(() => { XmlGapNotice = ""; });
         ReportXmlGapCommand = ReactiveCommand.Create(() =>
         {
-            if (!string.IsNullOrEmpty(_pendingXmlGapUrl))
-                OpenUrl(_pendingXmlGapUrl, "the XML gap report");
+            if (_pendingXmlGapDraft is { } gapDraft)
+                OpenIssueDraft(gapDraft, "the XML gap report");
             XmlGapNotice = "";
         });
         _ = CheckForUpdatesInBackgroundAsync();
@@ -2666,7 +2666,40 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         }
         catch (Exception ex)
         {
-            GameText.AddSystemLine($"[help] could not open {label} ({ex.Message}). Visit {url} manually.");
+            // NEVER echo ex.Message here: .NET builds it as "…trying to start
+            // process '<url>' with working directory '<cwd>'", so it carries the
+            // whole URL plus the user's account name — and users paste these
+            // lines straight into public issue reports (#307).
+            GameText.AddSystemLine(
+                $"[help] could not open {label} — {Genie.Core.Diagnostics.BrowserLaunch.SafeReason(ex)}. " +
+                $"Visit {Genie.Core.Diagnostics.BrowserLaunch.ShortUrl(url)} manually.");
+        }
+    }
+
+    /// <summary>
+    /// Open a GitHub new-issue prefill URL for <paramref name="draft"/>. If the
+    /// browser handoff fails, the draft is written to the log directory and the
+    /// user is pointed at the file — the prefill URL carries the entire encoded
+    /// issue body, so it is neither printable nor retypable (#307).
+    /// </summary>
+    private void OpenIssueDraft(Genie.Core.Diagnostics.XmlGapReport.Draft draft, string label)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(draft.Url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            var reason = Genie.Core.Diagnostics.BrowserLaunch.SafeReason(ex);
+            var saved  = _core is null
+                ? null
+                : Genie.Core.Diagnostics.XmlGapReport.SaveDraft(draft, _core.Config.LogDir);
+
+            GameText.AddSystemLine($"[help] could not open {label} — {reason}.");
+            GameText.AddSystemLine(saved is null
+                ? "[help] open https://github.com/GenieClient/Genie5/issues/new and describe what you saw."
+                : $"[help] the draft is saved at {saved} — open https://github.com/GenieClient/Genie5/issues/new and paste it.");
         }
     }
 
@@ -4825,7 +4858,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     var fate  = Genie.Core.Parser.DrXmlParser.ClassifyTag(e.TagName);
                     var draft = Genie.Core.Diagnostics.XmlGapReport.Build(
                         e.TagName, fate, e.RawXml ?? "", BuildXmlGapContext($"live element <{e.TagName}>"));
-                    _pendingXmlGapUrl = draft.Url;
+                    _pendingXmlGapDraft = draft;
                     XmlGapNotice = $"Genie received an unrecognized game element: <{e.TagName}>. Help improve the parser — report it?";
                 }
                 catch (Exception ex) { ErrorLog.Log("XmlGapReport", ex); }

@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Linq;
 using Genie.Core.Capture;
 using Genie.Core.Parser;
 
@@ -85,6 +86,41 @@ Genie's parser received a `<{tag}>` element it does not currently consume — cl
         DrXmlParser.TagFate.Consumed    => "already consumed (no gap — informational)",
         _                               => "settings noise (drop-set)",
     };
+
+    /// <summary>
+    /// Write a draft to <paramref name="dir"/> as markdown and return the full
+    /// path, or null if it cannot be written. The fallback when the browser
+    /// handoff fails (#307): the prefill URL is far too long to echo or retype,
+    /// so the reviewable body goes to a file the user can open and paste.
+    /// </summary>
+    public static string? SaveDraft(Draft draft, string dir)
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(dir);
+            var slug = new string(draft.Title
+                .Select(c => char.IsLetterOrDigit(c) ? char.ToLowerInvariant(c) : '-')
+                .ToArray())
+                .Trim('-');
+            while (slug.Contains("--", StringComparison.Ordinal))
+                slug = slug.Replace("--", "-", StringComparison.Ordinal);
+            if (slug.Length > 60) slug = slug[..60].TrimEnd('-');
+            if (slug.Length == 0) slug = "draft";
+
+            var path = System.IO.Path.Combine(dir, $"issue-draft-{slug}.md");
+            System.IO.File.WriteAllText(path,
+                $"<!-- Labels: {draft.Labels} -->{Environment.NewLine}" +
+                $"# {draft.Title}{Environment.NewLine}{Environment.NewLine}" +
+                draft.Body + Environment.NewLine);
+            return path;
+        }
+        catch
+        {
+            // A failed browser launch must not become a failed write on top of
+            // it — the caller falls back to the short URL alone.
+            return null;
+        }
+    }
 
     private static string Truncate(string s, int max) =>
         s.Length <= max ? s : s[..max] + "\n… (truncated)";
