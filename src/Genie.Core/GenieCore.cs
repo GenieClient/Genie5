@@ -633,6 +633,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Substitutes    = new SubstituteEngine();
         Substitutes.Classes = Classes;
         Commands.Substitutes = Substitutes;  // wire #substitute command → engine
+        // $globals in substitute replacement text, resolved at match time
+        // (public #246). Same expansion typed input and trigger actions use, so
+        // $charactername means one thing across the whole client.
+        Substitutes.ExpandVariables = text => Scripts.ExpandGlobalVars(text);
         Commands.DialogTracker = _dialogTracker;   // wire #dialogs → session inventory (#156)
 
         Gags           = new GagEngine();

@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Genie.Core.Classes;
 using Genie.Core.Diagnostics;
 
@@ -15,6 +15,7 @@ public sealed class SubstituteRule
     {
         Pattern = pattern; Replacement = replacement; CaseSensitive = caseSensitive; IsEnabled = isEnabled; ClassName = className;
         _cmp = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        _mayHaveVars = replacement.Contains('$');
         Rebuild(safe);
     }
     public string Pattern       { get; }
@@ -26,11 +27,35 @@ public sealed class SubstituteRule
     /// saves back to. Not serialized: scope IS the file it came from.</summary>
     public Persistence.RuleScope Scope { get; set; } = Persistence.RuleScope.Character;
 
-    public string Apply(string line)
+    /// <summary>True when the replacement text contains a <c>$</c>, so it MAY
+    /// carry a global variable. Computed once at construction: the apply path
+    /// runs per rule per line, and the overwhelming majority of replacements
+    /// are literal text that must not pay for an expansion check.</summary>
+    private readonly bool _mayHaveVars;
+
+    public string Apply(string line) => Apply(line, expandVariables: null);
+
+    /// <summary>
+    /// Apply this rule. <paramref name="expandVariables"/> resolves
+    /// <c>$globals</c> in the replacement text at match time (public #246) —
+    /// replacing a name with <c>$charactername</c>, or tagging a line with
+    /// <c>$roomid</c>. Null (or a replacement with no <c>$</c>) keeps the
+    /// replacement literal, which is what every existing rule gets.
+    /// </summary>
+    public string Apply(string line, Func<string, string>? expandVariables)
     {
         if (_regex is null || !IsEnabled) return line;
         if (_safe && _hint is not null && !line.Contains(_hint, _cmp)) return line;
-        try { return _regex.Replace(line, Replacement); }
+
+        // Expanded at MATCH time, not at rule-add time: the whole point is that
+        // $roomid reads the room you are in now, not the one you were in when
+        // you wrote the rule. Only reached when the replacement actually holds a
+        // '$' AND this rule is about to fire.
+        var replacement = _mayHaveVars && expandVariables is not null
+            ? expandVariables(Replacement)
+            : Replacement;
+
+        try { return _regex.Replace(line, replacement); }
         catch (RegexMatchTimeoutException) { RegexSafety.ReportTimeout(PipelineStage.Substitutes); return line; }
     }
 
@@ -60,6 +85,13 @@ public sealed class SubstituteEngine
     /// <summary>Master enable (File ▸ Master Toggles / <c>#config substitutes</c>).
     /// When off, <see cref="Apply"/> returns lines untouched — rules stay loaded.</summary>
     public bool Enabled { get; set; } = true;
+
+    /// <summary>Resolves <c>$globals</c> in replacement text at match time
+    /// (public #246). Set by <c>GenieCore</c> to the same expansion typed input
+    /// and trigger actions use, so <c>$charactername</c> means the same thing
+    /// everywhere. Null in a bare engine (tests, .cfg replay), which keeps
+    /// replacements literal.</summary>
+    public Func<string, string>? ExpandVariables { get; set; }
 
     private bool _safetyEnabled = true;
     /// <summary>When true, substitute regexes run with a match-timeout + literal
@@ -94,7 +126,7 @@ public sealed class SubstituteEngine
         foreach (var rule in _snapshot)
         {
             if (Classes is not null && !Classes.IsActive(rule.ClassName)) continue;
-            line = rule.Apply(line);
+            line = rule.Apply(line, ExpandVariables);
         }
         return line;
     }
