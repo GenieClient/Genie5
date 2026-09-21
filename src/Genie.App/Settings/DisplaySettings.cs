@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Avalonia;
@@ -258,6 +258,48 @@ public sealed class DisplaySettings : ReactiveObject
     /// <summary>Convenience inverse for radio-button binding in the Layout menu.</summary>
     [JsonIgnore] public bool ScriptBarAtTop => !ScriptBarAtBottom;
 
+    /// <summary>
+    /// Whether the Script Bar may show at all (public #349). Genie 4's
+    /// <c>ShowScriptBarToolStripMenuItem</c> was a checkable parent, so the
+    /// strip could be hidden outright; Genie 5 was auto-hide-when-empty only,
+    /// which means a user running a long script had no way to reclaim the row.
+    /// <c>true</c> (default) keeps today's behaviour exactly — visible while
+    /// something is running.
+    /// </summary>
+    [Reactive] public bool   ShowScriptBar { get; set; } = true;
+
+    /// <summary>
+    /// Where the Icon Bar (posture + condition chips) docks. <c>true</c>
+    /// (default) = BOTTOM, below the vitals strip, where it has always sat.
+    /// <c>false</c> = TOP, below the menu — Genie 4 gave the Icon Bar its own
+    /// Dock Top / Dock Bottom submenu (#349).
+    /// </summary>
+    [Reactive] public bool   IconBarAtBottom { get; set; } = true;
+
+    /// <summary>Convenience inverse for radio-button binding in the Layout menu.</summary>
+    [JsonIgnore] public bool IconBarAtTop => !IconBarAtBottom;
+
+    /// <summary>
+    /// Where the vitals / Health strip docks. <c>true</c> (default) = BOTTOM,
+    /// the Wrayth-style strip at the foot of the window. <c>false</c> = TOP —
+    /// Genie 4's <c>HealthBar</c> had the same Dock Top / Dock Bottom pair
+    /// (#349).
+    /// </summary>
+    [Reactive] public bool   StatusBarAtBottom { get; set; } = true;
+
+    /// <summary>Convenience inverse for radio-button binding in the Layout menu.</summary>
+    [JsonIgnore] public bool StatusBarAtTop => !StatusBarAtBottom;
+
+    /// <summary>True iff the Icon Bar renders in its TOP slot.</summary>
+    [JsonIgnore] public bool ShowIconBarTop    => ShowIconBar && !IconBarAtBottom;
+    /// <summary>True iff the Icon Bar renders in its BOTTOM slot.</summary>
+    [JsonIgnore] public bool ShowIconBarBottom => ShowIconBar &&  IconBarAtBottom;
+
+    /// <summary>True iff the vitals strip renders in its TOP slot.</summary>
+    [JsonIgnore] public bool ShowStatusBarTop    => ShowStatusBar && !StatusBarAtBottom;
+    /// <summary>True iff the vitals strip renders in its BOTTOM slot.</summary>
+    [JsonIgnore] public bool ShowStatusBarBottom => ShowStatusBar &&  StatusBarAtBottom;
+
     // ── Per-tag visibility filters (Window → Game Window menu) ────────────
     // Each flag gates one class of line in the main Game window:
     //   ShowGameText   — server-emitted text (room descriptions, combat, NPC speech, …)
@@ -374,6 +416,25 @@ public sealed class DisplaySettings : ReactiveObject
 
         // Same for ScriptBarAtTop (JsonIgnore + derived) so the Layout menu's
         // Top radio button refreshes when the position flips (#357).
+        // #349: the Icon Bar / vitals strip compound slot flags are computed,
+        // so their inputs have to raise them explicitly or the realized slot
+        // never moves.
+        this.WhenAnyValue(x => x.ShowIconBar, x => x.IconBarAtBottom)
+            .Subscribe(_ =>
+            {
+                this.RaisePropertyChanged(nameof(IconBarAtTop));
+                this.RaisePropertyChanged(nameof(ShowIconBarTop));
+                this.RaisePropertyChanged(nameof(ShowIconBarBottom));
+            });
+
+        this.WhenAnyValue(x => x.ShowStatusBar, x => x.StatusBarAtBottom)
+            .Subscribe(_ =>
+            {
+                this.RaisePropertyChanged(nameof(StatusBarAtTop));
+                this.RaisePropertyChanged(nameof(ShowStatusBarTop));
+                this.RaisePropertyChanged(nameof(ShowStatusBarBottom));
+            });
+
         this.WhenAnyValue(x => x.ScriptBarAtBottom)
             .Subscribe(_ => this.RaisePropertyChanged(nameof(ScriptBarAtTop)));
         IsApplied = true;

@@ -1,0 +1,86 @@
+<!-- The Icon Bar (Genie 4 ComponentIconBar parity, #26), extracted from
+     MainWindow so it can be hosted in BOTH the top and bottom dock slots
+     (#349). Genie 4 gave this bar its own Dock Top / Dock Bottom submenu;
+     MainWindow declares one instance per slot and compound flags realize
+     exactly one, the same shape the hands strip and Script Bar use.
+
+     Placement and visibility belong to the host: this control is just the
+     chips. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Genie.App.ViewModels"
+             x:Class="Genie.App.Views.IconBarView"
+             x:DataType="vm:MainWindowViewModel">
+
+<Border Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
+        Padding="6,2"
+        Classes.offline="{Binding !IsConnected}">
+  <Border.Styles>
+    <Style Selector="Border.offline"><Setter Property="Opacity" Value="0.4"/></Style>
+    <Style Selector="Border.chip">
+      <Setter Property="CornerRadius" Value="3"/>
+      <Setter Property="Padding" Value="7,1"/>
+      <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+    <Style Selector="Border.chip TextBlock">
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+  </Border.Styles>
+  <!-- MinHeight pins the row to one chip's height (11px text + 1px chip     -->
+  <!-- padding + 1px chip border, top and bottom) so the strip keeps its     -->
+  <!-- height when every chip is hidden. Without it the panel measures 0     -->
+  <!-- and the docked strip shrinks ~19px, reflowing the whole window —      -->
+  <!-- which happens on every posture change, because the server clears the  -->
+  <!-- old posture in one indicator event and sets the new one in the next.  -->
+  <StackPanel Orientation="Horizontal" Spacing="4" MinHeight="20">
+    <Border Classes="chip" Background="#223042" BorderBrush="#3a5570"
+            IsVisible="{Binding IconBar.PostureText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+            ToolTip.Tip="Posture — what the server says your body is doing (dead beats everything, then standing / kneeling / sitting / prone).">
+      <TextBlock Text="{Binding IconBar.PostureText}" Foreground="#9fc0dd"/>
+    </Border>
+    <Border Classes="chip" Background="#4a3818" BorderBrush="#C09040"
+            IsVisible="{Binding IconBar.Stunned}"
+            ToolTip.Tip="Stunned — you can't act until it wears off.">
+      <TextBlock Text="STUNNED" Foreground="#ffd890"/>
+    </Border>
+    <Border Classes="chip" Background="#3a1010" BorderBrush="#8a2a2a"
+            IsVisible="{Binding IconBar.Bleeding}"
+            ToolTip.Tip="Bleeding — you have open wounds. HEALTH shows where.">
+      <TextBlock Text="BLEEDING" Foreground="#ffb0b0"/>
+    </Border>
+    <Border Classes="chip" Background="#22301a" BorderBrush="#6a8a30"
+            IsVisible="{Binding IconBar.Poisoned}"
+            ToolTip.Tip="Poisoned — venom is in your system.">
+      <TextBlock Text="POISONED" Foreground="#cfe08a"/>
+    </Border>
+    <Border Classes="chip" Background="#322a16" BorderBrush="#8a7430"
+            IsVisible="{Binding IconBar.Diseased}"
+            ToolTip.Tip="Diseased — infection is setting in.">
+      <TextBlock Text="DISEASED" Foreground="#e0cf8a"/>
+    </Border>
+    <Border Classes="chip" Background="#1d2a33" BorderBrush="#3f5a6e"
+            IsVisible="{Binding IconBar.Hidden}"
+            ToolTip.Tip="Hidden — you are concealed from view.">
+      <TextBlock Text="HIDDEN" Foreground="#9fc4da"/>
+    </Border>
+    <Border Classes="chip" Background="#2a1444" BorderBrush="#8040C0"
+            IsVisible="{Binding IconBar.Invisible}"
+            ToolTip.Tip="Invisible.">
+      <TextBlock Text="INVISIBLE" Foreground="#d0b0ff"/>
+    </Border>
+    <Border Classes="chip" Background="#2e2e2e" BorderBrush="{DynamicResource Theme.TextMuted}"
+            IsVisible="{Binding IconBar.Webbed}"
+            ToolTip.Tip="Webbed / immobilized — you can't move until you break free.">
+      <TextBlock Text="WEBBED" Foreground="#d8d8d8"/>
+    </Border>
+    <Border Classes="chip" Background="#143a14" BorderBrush="#40A040"
+            IsVisible="{Binding IconBar.Joined}"
+            ToolTip.Tip="Joined — you are following / grouped with another character.">
+      <TextBlock Text="JOINED" Foreground="#a8e0a8"/>
+    </Border>
+  </StackPanel>
+</Border>
+
+</UserControl>

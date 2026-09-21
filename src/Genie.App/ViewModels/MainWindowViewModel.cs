@@ -448,6 +448,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit>                    ScriptBarToTopCommand    { get; }
     /// <summary>Layout → Script Bar Position → Bottom. Docks it above the command bar (the Genie 5 arrangement).</summary>
     public ReactiveCommand<Unit, Unit>                    ScriptBarToBottomCommand { get; }
+    /// <summary>Layout ▸ Script Bar — Genie 4's checkable show/hide (#349).</summary>
+    public ReactiveCommand<Unit, Unit>                    ToggleScriptBarCommand   { get; }
+    /// <summary>Layout ▸ Icon Bar Position ▸ Top / Bottom (#349).</summary>
+    public ReactiveCommand<Unit, Unit>                    IconBarToTopCommand      { get; }
+    public ReactiveCommand<Unit, Unit>                    IconBarToBottomCommand   { get; }
+    /// <summary>Layout ▸ Health Bar Position ▸ Top / Bottom (#349).</summary>
+    public ReactiveCommand<Unit, Unit>                    StatusBarToTopCommand    { get; }
+    public ReactiveCommand<Unit, Unit>                    StatusBarToBottomCommand { get; }
 
     /// <summary>File → Record Session — toggle raw-XML capture on/off.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleRecordingCommand   { get; }
@@ -1977,6 +1985,37 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Display.Save(_displayPath);
         });
 
+        // #349 — the three Genie 4 Layout-menu items Genie 5 was missing.
+        ToggleScriptBarCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ShowScriptBar = !Display.ShowScriptBar;
+            Display.Save(_displayPath);
+        });
+
+        IconBarToTopCommand = ReactiveCommand.Create(() =>
+        {
+            Display.IconBarAtBottom = false;
+            Display.Save(_displayPath);
+        });
+
+        IconBarToBottomCommand = ReactiveCommand.Create(() =>
+        {
+            Display.IconBarAtBottom = true;
+            Display.Save(_displayPath);
+        });
+
+        StatusBarToTopCommand = ReactiveCommand.Create(() =>
+        {
+            Display.StatusBarAtBottom = false;
+            Display.Save(_displayPath);
+        });
+
+        StatusBarToBottomCommand = ReactiveCommand.Create(() =>
+        {
+            Display.StatusBarAtBottom = true;
+            Display.Save(_displayPath);
+        });
+
         // ── Session recorder ──────────────────────────────────────────────
         // Logs sit beside Config under {AppData}/Genie5/ to mirror the layout
         // TestHarness writes to. Always allocate the recorder (cheap — just
@@ -2097,11 +2136,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // shows when something is running, in whichever slot the user picked.
         this.WhenAnyValue(
                 x => x.ScriptBar.HasScripts,
-                x => x.Display.ScriptBarAtBottom)
+                x => x.Display.ScriptBarAtBottom,
+                x => x.Display.ShowScriptBar)
             .Subscribe(_ =>
             {
-                ShowScriptBarTop    = ScriptBar.HasScripts && !Display.ScriptBarAtBottom;
-                ShowScriptBarBottom = ScriptBar.HasScripts &&  Display.ScriptBarAtBottom;
+                // Three-way now (#349): something is running AND the user has
+                // not hidden the strip AND this is the chosen slot.
+                var shown = ScriptBar.HasScripts && Display.ShowScriptBar;
+                ShowScriptBarTop    = shown && !Display.ScriptBarAtBottom;
+                ShowScriptBarBottom = shown &&  Display.ScriptBarAtBottom;
             });
 
         // ── Per-dockable toggle commands ───────────────────────────────────

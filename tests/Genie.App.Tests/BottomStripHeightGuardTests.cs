@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text.RegularExpressions;
 using Xunit;
@@ -17,16 +17,20 @@ namespace Genie.App.Tests;
 /// </summary>
 public class BottomStripHeightGuardTests
 {
-    private static string MainWindowXaml()
+    /// <summary>Read one of the app's view files by name. Takes a name rather
+    /// than hardcoding MainWindow because the strips these tests guard move
+    /// between files as markup is extracted for reuse - the icon-bar chips went
+    /// to IconBarView with #349 - and the floor has to follow the markup, not
+    /// the file it started in.</summary>
+    private static string ViewXaml(string fileName)
     {
-        var dir = AppContext.BaseDirectory;
-        for (var d = new DirectoryInfo(dir); d is not null; d = d.Parent)
+        for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null; d = d.Parent)
         {
-            var candidate = Path.Combine(d.FullName, "src", "Genie.App", "Views", "MainWindow.axaml");
+            var candidate = Path.Combine(d.FullName, "src", "Genie.App", "Views", fileName);
             if (File.Exists(candidate)) return File.ReadAllText(candidate);
         }
         throw new FileNotFoundException(
-            $"Could not locate src/Genie.App/Views/MainWindow.axaml walking up from {AppContext.BaseDirectory}");
+            $"Could not locate src/Genie.App/Views/{fileName} walking up from {AppContext.BaseDirectory}");
     }
 
     [Fact]
@@ -34,15 +38,17 @@ public class BottomStripHeightGuardTests
     {
         Assert.Matches(
             new Regex(@"<controls:StatusSlotPanel[^>]*\bMinHeight=""(1[9-9]|[2-9]\d)"""),
-            MainWindowXaml());
+            ViewXaml("MainWindow.axaml"));
     }
 
     [Fact]
     public void Icon_bar_chip_strip_keeps_its_height_floor()
     {
         // The #259 fix: the chip StackPanel directly under the IconBar border.
+        // Lives in IconBarView.axaml since #349 extracted the bar so both dock
+        // slots could share one copy.
         Assert.Matches(
             new Regex(@"<StackPanel Orientation=""Horizontal"" Spacing=""4"" MinHeight=""(1[9-9]|[2-9]\d)"""),
-            MainWindowXaml());
+            ViewXaml("IconBarView.axaml"));
     }
 }

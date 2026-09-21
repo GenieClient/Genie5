@@ -210,6 +210,36 @@
                     Command="{Binding ScriptBarToBottomCommand}"
                     ToolTip.Tip="Dock the script bar at the bottom of the window, just above the command bar."/>
         </MenuItem>
+        <!-- #349: Genie 4 gave the Icon Bar and the Health bar the same
+             Dock Top / Dock Bottom pair the Script Bar has. -->
+        <MenuItem Header="Ico_n Bar Position"
+                  ToolTip.Tip="Where the character status chips dock. Only applies while the Icon Bar is shown."
+                  IsEnabled="{Binding Display.ShowIconBar}">
+          <MenuItem Header="_Top"
+                    ToggleType="Radio" GroupName="IconBarPos"
+                    IsChecked="{Binding Display.IconBarAtTop, Mode=OneWay}"
+                    Command="{Binding IconBarToTopCommand}"
+                    ToolTip.Tip="Dock the icon bar at the top of the window, below the menu."/>
+          <MenuItem Header="_Bottom"
+                    ToggleType="Radio" GroupName="IconBarPos"
+                    IsChecked="{Binding Display.IconBarAtBottom, Mode=OneWay}"
+                    Command="{Binding IconBarToBottomCommand}"
+                    ToolTip.Tip="Dock the icon bar at the bottom of the window, below the vitals strip."/>
+        </MenuItem>
+        <MenuItem Header="_Health Bar Position"
+                  ToolTip.Tip="Where the vitals strip docks. Only applies while the Status Bar is shown."
+                  IsEnabled="{Binding Display.ShowStatusBar}">
+          <MenuItem Header="_Top"
+                    ToggleType="Radio" GroupName="HealthBarPos"
+                    IsChecked="{Binding Display.StatusBarAtTop, Mode=OneWay}"
+                    Command="{Binding StatusBarToTopCommand}"
+                    ToolTip.Tip="Dock the vitals strip at the top of the window, below the menu."/>
+          <MenuItem Header="_Bottom"
+                    ToggleType="Radio" GroupName="HealthBarPos"
+                    IsChecked="{Binding Display.StatusBarAtBottom, Mode=OneWay}"
+                    Command="{Binding StatusBarToBottomCommand}"
+                    ToolTip.Tip="Dock the vitals strip at the bottom of the window, its usual place."/>
+        </MenuItem>
 
         <Separator/>
 
@@ -219,6 +249,15 @@
                   IsChecked="{Binding Display.ShowStatusBar}"
                   Command="{Binding ToggleStatusBarCommand}"
                   ToolTip.Tip="Show/hide the Wrayth-style vitals strip at the bottom of the window"/>
+        <!-- #349: Genie 4's ShowScriptBarToolStripMenuItem was a checkable
+             parent, so the strip could be hidden outright. Genie 5 was
+             auto-hide-when-empty only, which left no way to reclaim the row
+             during a long-running script. -->
+        <MenuItem Header="Script _Bar"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.ShowScriptBar, Mode=OneWay}"
+                  Command="{Binding ToggleScriptBarCommand}"
+                  ToolTip.Tip="Show/hide the running-script chip strip. When shown it still only appears while at least one script is running."/>
         <MenuItem Header="I_con Bar"
                   ToggleType="CheckBox"
                   IsChecked="{Binding Display.ShowIconBar, Mode=OneWay}"
@@ -824,6 +863,16 @@
     <views:ScriptBarView DockPanel.Dock="Top"
                          IsVisible="{Binding ShowScriptBarTop}"/>
 
+    <!-- Top slots for the Icon Bar and vitals strip (#349). Genie 4 gave both
+         a Dock Top / Dock Bottom submenu; each is declared in both slots and
+         the compound flags realize exactly one, so nothing is ever drawn
+         twice. Declared here, directly under the menu, because DockPanel hands
+         out edges in declaration order. -->
+    <views:StatusBarView DockPanel.Dock="Top"
+                         IsVisible="{Binding Display.ShowStatusBarTop}"/>
+    <views:IconBarView   DockPanel.Dock="Top"
+                         IsVisible="{Binding Display.ShowIconBarTop}"/>
+
     <!-- ── Hands / prepared-spell strip (Wrayth-style) ──────────────────── -->
     <!-- Two declarations, one at top, one at bottom — IsVisible picks which     -->
     <!-- one is realized based on Display.HandsAtBottom. Both bind to the same   -->
@@ -1104,83 +1153,13 @@
     </Border>
 
     <!-- ── Icon Bar (Genie 4 ComponentIconBar parity, #26) ──────────────── -->
-    <!-- Character status chips: posture (dead > standing > kneeling >        -->
-    <!-- sitting > prone, G4 priority) + condition flags, all fed by          -->
-    <!-- IndicatorEvent via IconBarViewModel. Declared BEFORE the vitals      -->
-    <!-- status bar so DockPanel stacks it BELOW it (very bottom edge).       -->
-    <!-- Dims while disconnected (G4 grayed icons). Layout ▸ Icon Bar.        -->
-    <Border DockPanel.Dock="Bottom"
-            IsVisible="{Binding Display.ShowIconBar}"
-            Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
-            Padding="6,2"
-            Classes.offline="{Binding !IsConnected}">
-      <Border.Styles>
-        <Style Selector="Border.offline"><Setter Property="Opacity" Value="0.4"/></Style>
-        <Style Selector="Border.chip">
-          <Setter Property="CornerRadius" Value="3"/>
-          <Setter Property="Padding" Value="7,1"/>
-          <Setter Property="BorderThickness" Value="1"/>
-        </Style>
-        <Style Selector="Border.chip TextBlock">
-          <Setter Property="FontSize" Value="11"/>
-          <Setter Property="FontWeight" Value="SemiBold"/>
-          <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-      </Border.Styles>
-      <!-- MinHeight pins the row to one chip's height (11px text + 1px chip     -->
-      <!-- padding + 1px chip border, top and bottom) so the strip keeps its     -->
-      <!-- height when every chip is hidden. Without it the panel measures 0     -->
-      <!-- and the docked strip shrinks ~19px, reflowing the whole window —      -->
-      <!-- which happens on every posture change, because the server clears the  -->
-      <!-- old posture in one indicator event and sets the new one in the next.  -->
-      <StackPanel Orientation="Horizontal" Spacing="4" MinHeight="20">
-        <Border Classes="chip" Background="#223042" BorderBrush="#3a5570"
-                IsVisible="{Binding IconBar.PostureText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                ToolTip.Tip="Posture — what the server says your body is doing (dead beats everything, then standing / kneeling / sitting / prone).">
-          <TextBlock Text="{Binding IconBar.PostureText}" Foreground="#9fc0dd"/>
-        </Border>
-        <Border Classes="chip" Background="#4a3818" BorderBrush="#C09040"
-                IsVisible="{Binding IconBar.Stunned}"
-                ToolTip.Tip="Stunned — you can't act until it wears off.">
-          <TextBlock Text="STUNNED" Foreground="#ffd890"/>
-        </Border>
-        <Border Classes="chip" Background="#3a1010" BorderBrush="#8a2a2a"
-                IsVisible="{Binding IconBar.Bleeding}"
-                ToolTip.Tip="Bleeding — you have open wounds. HEALTH shows where.">
-          <TextBlock Text="BLEEDING" Foreground="#ffb0b0"/>
-        </Border>
-        <Border Classes="chip" Background="#22301a" BorderBrush="#6a8a30"
-                IsVisible="{Binding IconBar.Poisoned}"
-                ToolTip.Tip="Poisoned — venom is in your system.">
-          <TextBlock Text="POISONED" Foreground="#cfe08a"/>
-        </Border>
-        <Border Classes="chip" Background="#322a16" BorderBrush="#8a7430"
-                IsVisible="{Binding IconBar.Diseased}"
-                ToolTip.Tip="Diseased — infection is setting in.">
-          <TextBlock Text="DISEASED" Foreground="#e0cf8a"/>
-        </Border>
-        <Border Classes="chip" Background="#1d2a33" BorderBrush="#3f5a6e"
-                IsVisible="{Binding IconBar.Hidden}"
-                ToolTip.Tip="Hidden — you are concealed from view.">
-          <TextBlock Text="HIDDEN" Foreground="#9fc4da"/>
-        </Border>
-        <Border Classes="chip" Background="#2a1444" BorderBrush="#8040C0"
-                IsVisible="{Binding IconBar.Invisible}"
-                ToolTip.Tip="Invisible.">
-          <TextBlock Text="INVISIBLE" Foreground="#d0b0ff"/>
-        </Border>
-        <Border Classes="chip" Background="#2e2e2e" BorderBrush="{DynamicResource Theme.TextMuted}"
-                IsVisible="{Binding IconBar.Webbed}"
-                ToolTip.Tip="Webbed / immobilized — you can't move until you break free.">
-          <TextBlock Text="WEBBED" Foreground="#d8d8d8"/>
-        </Border>
-        <Border Classes="chip" Background="#143a14" BorderBrush="#40A040"
-                IsVisible="{Binding IconBar.Joined}"
-                ToolTip.Tip="Joined — you are following / grouped with another character.">
-          <TextBlock Text="JOINED" Foreground="#a8e0a8"/>
-        </Border>
-      </StackPanel>
-    </Border>
+    <!-- Character status chips: posture + condition flags, fed by             -->
+    <!-- IndicatorEvent via IconBarViewModel. Declared BEFORE the vitals       -->
+    <!-- status bar so DockPanel stacks it BELOW it (very bottom edge).        -->
+    <!-- Markup lives in Views/IconBarView.axaml so BOTH dock slots share one  -->
+    <!-- copy (#349); ShowIconBarTop / ShowIconBarBottom realize exactly one.  -->
+    <views:IconBarView DockPanel.Dock="Bottom"
+                       IsVisible="{Binding Display.ShowIconBarBottom}"/>
 
     <!-- ── #statusbar slot row (Genie 4 StatusStrip parity, #111) ────────── -->
     <!-- Ten positional cells fed by #statusbar / #status [N] {text} via      -->
@@ -1272,72 +1251,13 @@
       </controls:StatusSlotPanel>
     </Border>
 
-    <!-- ── Status bar (Wrayth-style, docks below the command bar) ───────── -->
-    <!-- Declared BEFORE the command bar so DockPanel puts it at the very     -->
-    <!-- bottom edge. Toggle via View → Toggle Status Bar.                    -->
-    <!-- The mana column collapses when Magic Panels is off (View → Magic
-         Panels) — Genie 4's SetMagicPanels drops the bar row from 5 columns
-         to 4 so the remaining vitals stretch equally. The column-width flip
-         lives in code-behind (ColumnDefinition isn't bindable from XAML);
-         the IsVisible on the mana cell hides the content, the width change
-         reclaims the space. -->
-    <Grid x:Name="StatusBarGrid"
-          DockPanel.Dock="Bottom"
-          IsVisible="{Binding Display.ShowStatusBar}"
-          ColumnDefinitions="*,*,*,*,*"
-          Margin="4,2,4,4">
-
-      <Grid Grid.Column="0" Margin="0,0,2,0">
-        <ProgressBar Value="{Binding Vitals.Health}" Maximum="100"
-                     AutomationProperties.Name="Health"
-                     Foreground="#C04040" Background="#3a1010" Height="18"
-                     CornerRadius="3"/>
-        <TextBlock Text="{Binding Vitals.Health, StringFormat='health {0}%'}"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontSize="11" Foreground="#fff" FontWeight="SemiBold"/>
-      </Grid>
-
-      <Grid Grid.Column="1" Margin="2,0"
-            IsVisible="{Binding Display.ShowMagicPanels}">
-        <ProgressBar Value="{Binding Vitals.Mana}" Maximum="100"
-                     AutomationProperties.Name="Mana"
-                     Foreground="#4060C0" Background="#172040" Height="18"
-                     CornerRadius="3"/>
-        <TextBlock Text="{Binding Vitals.Mana, StringFormat='mana {0}%'}"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontSize="11" Foreground="#fff" FontWeight="SemiBold"/>
-      </Grid>
-
-      <Grid Grid.Column="2" Margin="2,0">
-        <ProgressBar Value="{Binding Vitals.Stamina}" Maximum="100"
-                     AutomationProperties.Name="Fatigue"
-                     Foreground="#C09040" Background="#4a3818" Height="18"
-                     CornerRadius="3"/>
-        <TextBlock Text="{Binding Vitals.Stamina, StringFormat='fatigue {0}%'}"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontSize="11" Foreground="#fff" FontWeight="SemiBold"/>
-      </Grid>
-
-      <Grid Grid.Column="3" Margin="2,0">
-        <ProgressBar Value="{Binding Vitals.Spirit}" Maximum="100"
-                     AutomationProperties.Name="Spirit"
-                     Foreground="#40A040" Background="#143a14" Height="18"
-                     CornerRadius="3"/>
-        <TextBlock Text="{Binding Vitals.Spirit, StringFormat='spirit {0}%'}"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontSize="11" Foreground="#fff" FontWeight="SemiBold"/>
-      </Grid>
-
-      <Grid Grid.Column="4" Margin="2,0,0,0">
-        <ProgressBar Value="{Binding Vitals.Concentration}" Maximum="100"
-                     AutomationProperties.Name="Concentration"
-                     Foreground="#8040C0" Background="#2a1444" Height="18"
-                     CornerRadius="3"/>
-        <TextBlock Text="{Binding Vitals.Concentration, StringFormat='concentration {0}%'}"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontSize="11" Foreground="#fff" FontWeight="SemiBold"/>
-      </Grid>
-    </Grid>
+    <!-- ── Vitals / Health strip (Wrayth-style bars) ────────────────────── -->
+    <!-- Markup lives in Views/StatusBarView.axaml so BOTH dock slots share    -->
+    <!-- one copy (#349). The Magic Panels column flip moved into that         -->
+    <!-- control's code-behind, since a by-name lookup from here would find    -->
+    <!-- whichever slot happened to be realized.                               -->
+    <views:StatusBarView DockPanel.Dock="Bottom"
+                         IsVisible="{Binding Display.ShowStatusBarBottom}"/>
 
     <!-- ── Zone / Room location line (#66, opt-in via View → Zone / Room ID) ── -->
     <!-- Declared AFTER the vitals strip so DockPanel stacks it just ABOVE it.   -->

@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
@@ -156,14 +156,12 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 input.CaretIndex = at + caret;
             };
 
-            // Magic Panels (Genie 4 SetMagicPanels): collapse the status bar's
-            // mana column so the other four vitals stretch equally — G4 flips
-            // TableLayoutPanelBars.ColumnCount 5 ↔ 4. Done here because
-            // ColumnDefinition.Width can't be data-bound from XAML; the mana
-            // cell's own IsVisible binding hides the content.
-            d(ViewModel!.Display.WhenAnyValue(x => x.ShowMagicPanels)
-                .Subscribe(show => StatusBarGrid.ColumnDefinitions[1].Width =
-                    show ? new GridLength(1, GridUnitType.Star) : new GridLength(0)));
+            // Magic Panels (Genie 4 SetMagicPanels) moved into StatusBarView's
+            // own code-behind with #349: the vitals strip is now declared once
+            // per dock slot, so a by-name lookup from here would have found
+            // whichever instance happened to be realized and the mana-column
+            // collapse would silently stop applying once the bar moved to the
+            // top. Each instance now wires its own.
 
             // Align Input to Game Window (Genie 4 SizeInputToGame — horizontal
             // only): pad the command bar's side margins so it spans the Game
