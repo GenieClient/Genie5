@@ -1,4 +1,4 @@
-namespace Genie.Core.Events;
+﻿namespace Genie.Core.Events;
 
 // ── Base ─────────────────────────────────────────────────────────────────────
 
@@ -471,6 +471,12 @@ public sealed record CloseDialogEvent(string Id) : GameEvent;
 
 /// <summary>DR brings the dialog window with this id to the front.</summary>
 public sealed record ExposeDialogEvent(string Id) : GameEvent;
+
+/// <summary>DR brings the STREAM window with this id to the front —
+/// <c>&lt;exposeStream id='ShopWindow'/&gt;</c> (#310). The stream-window
+/// counterpart of <see cref="ExposeDialogEvent"/>. Like <see cref="WindowEvent"/>
+/// this is a routing hint: it names a window, it does not carry content.</summary>
+public sealed record ExposeStreamEvent(string Id) : GameEvent;
 
 // ── Unknown ──────────────────────────────────────────────────────────────────
 

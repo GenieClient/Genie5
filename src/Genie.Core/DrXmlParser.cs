@@ -1,4 +1,4 @@
-using System.Xml;
+﻿using System.Xml;
 using System.Reactive.Subjects;
 using Genie.Core.Events;
 using Genie.Core.Models;
@@ -1311,7 +1311,7 @@ public sealed class DrXmlParser : IDisposable
         "a", "app", "b", "casttime", "cleardynastream", "clearstream", "dynastream",
         "closedialog", "compass", "component", "container",
         "crtrstatus", "d", "dialogdata", "dir", "endsetup", "exposedialog",
-        "image", "indicator", "inv", "opendialog",
+        "exposestream", "image", "indicator", "inv", "opendialog",
         "left", "nav", "openwindow", "output", "popbold", "popstream",
         "preset", "progressbar", "prompt", "pushbold", "pushstream",
         "resource", "right", "roundtime", "settingsinfo", "spell", "spelltime",
@@ -1824,6 +1824,15 @@ public sealed class DrXmlParser : IDisposable
             case "exposedialog":
                 if (r["id"] is { Length: > 0 } exposeId)
                     _events.OnNext(new ExposeDialogEvent(exposeId));
+                break;
+
+            // <exposeStream id='ShopWindow'/> — the stream-window counterpart
+            // of exposeDialog (#310). A routing hint only: it names a window to
+            // raise and carries no content, so it is typed here for consumers
+            // rather than left to fall through as an unknown tag.
+            case "exposestream":
+                if (r["id"] is { Length: > 0 } exposeStreamId)
+                    _events.OnNext(new ExposeStreamEvent(exposeStreamId));
                 break;
 
             // ── Injury reading (one body region) ─────────────────────────────
