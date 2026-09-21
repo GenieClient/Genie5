@@ -2143,7 +2143,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // of those has happened must not leave it stuck showing an empty
         // library — build Core first via beforeShow, the same on-demand
         // pattern Genie4ImportCommand uses. See also EnsureScriptsPanelReady.
-        ToggleScriptsCommand  = MakeToggleCommand("scripts",   v => ScriptsVisible  = v, beforeShow: EnsureScriptsPanelReady);
+        //
+        // preferFloating: the Script Manager's registered home is the 22%-wide
+        // right column it shares with Backpack/Experience/etc, and it is a
+        // four-pane view (library tree + running list + detail + log) — at that
+        // width it's unusable (public #359). Until the user docks it somewhere
+        // themselves, it opens as its own window, at whatever size and position
+        // they last gave it.
+        ToggleScriptsCommand  = MakeToggleCommand("scripts",   v => ScriptsVisible  = v, beforeShow: EnsureScriptsPanelReady, preferFloating: true);
         ToggleSceneCommand    = MakeToggleCommand("scene",     v => SceneVisible    = v);
         ToggleMobsCommand     = MakeToggleCommand("mobs",      v => MobsVisible     = v);
         TogglePlayersCommand  = MakeToggleCommand("players",   v => PlayersVisible  = v);
@@ -3949,7 +3956,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// menu's check mark and the dock's true state aligned even if the user
     /// closed a tool by some other means (e.g. the X on its tab).
     /// </summary>
-    private ReactiveCommand<Unit, Unit> MakeToggleCommand(string toolId, Action<bool> updateBool, Action? beforeShow = null)
+    /// <param name="preferFloating">Open the tool in its own window when the
+    /// factory says it has no docked placement of the user's own
+    /// (<see cref="GenieDockFactory.PrefersFloatingReopen"/>). For panels whose
+    /// registered home is too cramped to be a sensible first impression, and so
+    /// that a panel the user chose to float comes back floating (public #359).
+    /// Once they dock it somewhere, that docked spot wins on every later
+    /// reopen.</param>
+    private ReactiveCommand<Unit, Unit> MakeToggleCommand(
+        string toolId, Action<bool> updateBool, Action? beforeShow = null, bool preferFloating = false)
         => ReactiveCommand.Create(() =>
         {
             if (DockFactory is not GenieDockFactory factory) return;
@@ -3957,7 +3972,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             // Only run beforeShow on the transition TO visible — a hide should
             // never have a side effect meant for "the panel is about to be seen".
             if (newVisible) beforeShow?.Invoke();
-            factory.SetToolVisibility(toolId, newVisible);
+            if (newVisible && preferFloating && factory.PrefersFloatingReopen(toolId))
+                factory.ShowToolFloating(toolId);
+            else
+                factory.SetToolVisibility(toolId, newVisible);
             // The Opened/Closed events also push this; explicitly setting it
             // here covers cases where the event already fired with the same
             // value (no PropertyChanged would otherwise refresh the binding).
@@ -5172,7 +5190,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 if (DockFactory is GenieDockFactory factory &&
                     !factory.IsToolVisible("scripts"))
                 {
-                    factory.SetToolVisibility("scripts", true);
+                    // Same float preference as Scripts → Script Manager — this
+                    // is documented as the typed equivalent of that menu item,
+                    // so the two must not place the panel differently (#359).
+                    if (factory.PrefersFloatingReopen("scripts"))
+                        factory.ShowToolFloating("scripts");
+                    else
+                        factory.SetToolVisibility("scripts", true);
                     ScriptsVisible = true;
                 }
             });

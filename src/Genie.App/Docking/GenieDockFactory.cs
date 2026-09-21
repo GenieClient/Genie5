@@ -109,6 +109,39 @@ public class GenieDockFactory : Factory
     private readonly Dictionary<string, LastKnownLocation> _lastKnownPositions =
         new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Screen geometry of a floating window, in the units
+    /// <see cref="CaptureFloatingWindows"/> already uses on both ends: Position
+    /// in physical pixels, Width/Height in DIPs.</summary>
+    private readonly record struct FloatBounds(double X, double Y, double Width, double Height);
+
+    /// <summary>
+    /// Where each tool's floating window last sat, for the whole session.
+    /// <see cref="CapturePosition"/> deliberately refuses to record a float's
+    /// ephemeral dock parent (#35), which left float geometry with nowhere to
+    /// live: a panel the user dragged out, sized and positioned came back at
+    /// Dock's default placement on every reopen (public #359). Written by
+    /// <see cref="CaptureFloatBounds"/> whenever a float is about to go away,
+    /// replayed by <see cref="ApplyRememberedFloatBounds"/> on the next float.
+    ///
+    /// <para>A saved layout's <see cref="FloatingWindowSnapshot"/> remains the
+    /// authority across restarts — <see cref="RestoreFloatingWindows"/> applies
+    /// it after this cache, so an explicit layout always wins.</para>
+    /// </summary>
+    private readonly Dictionary<string, FloatBounds> _lastFloatBounds =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Tools whose most recent placement was a floating window rather
+    /// than a dock. Maintained alongside <see cref="_lastKnownPositions"/> —
+    /// which of the two is fresher is what <see cref="PrefersFloatingReopen"/>
+    /// needs to know.</summary>
+    private readonly HashSet<string> _floatedLast =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Below these a captured/snapshot float geometry is treated as
+    /// degenerate rather than merely small, and ignored.</summary>
+    private const double MinFloatWidth  = 100;
+    private const double MinFloatHeight = 80;
+
     // ── Plugin-created windows ───────────────────────────────────────────────
     // Plugins surface their own panels by writing to a named window
     // (IPluginHost.SetWindow / EchoToWindow). We key each by a canonical
@@ -218,6 +251,10 @@ public class GenieDockFactory : Factory
                     Background           = new SolidColorBrush(Color.FromRgb(0x1f, 0x1f, 0x1f)),
                     TransparencyLevelHint = new[] { WindowTransparencyLevel.None },
                 };
+                // Remember where the user put this float before it goes away —
+                // the chrome's X names no tool id, so the window has to tell us
+                // which ones it holds while it still knows (public #359).
+                w.BeforeClose = () => CaptureFloatBoundsForHost(w);
                 return w;
             }
         };
@@ -485,10 +522,15 @@ public class GenieDockFactory : Factory
         // window, so keep it wired exactly as the tabbed path does.
         HostWindowLocator = new Dictionary<string, Func<IHostWindow?>>
         {
-            [nameof(IDockWindow)] = () => new GenieHostWindow
+            [nameof(IDockWindow)] = () =>
             {
-                Background            = new SolidColorBrush(Color.FromRgb(0x1f, 0x1f, 0x1f)),
-                TransparencyLevelHint = new[] { WindowTransparencyLevel.None },
+                var w = new GenieHostWindow
+                {
+                    Background            = new SolidColorBrush(Color.FromRgb(0x1f, 0x1f, 0x1f)),
+                    TransparencyLevelHint = new[] { WindowTransparencyLevel.None },
+                };
+                w.BeforeClose = () => CaptureFloatBoundsForHost(w);
+                return w;
             }
         };
 
@@ -1503,6 +1545,11 @@ public class GenieDockFactory : Factory
             // drag-redocked custom position. The matching capture for X-button
             // close happens via the DockableAdded hook (the panel's position
             // was recorded the last time it entered the tree).
+            //
+            // A float's geometry has nowhere else to live — CapturePosition
+            // refuses floats by design (#35) — so grab it first. No-op when the
+            // tool is docked.
+            CaptureFloatBounds(id);
             CapturePosition(current);
 
             // Close the instance actually in the tree, not our stored reference
@@ -1644,6 +1691,8 @@ public class GenieDockFactory : Factory
         // title bar back over the main app shows dock indicators so the user
         // can re-dock it wherever they want.
         FloatDockable(current);
+        _floatedLast.Add(id);
+        ApplyRememberedFloatBounds(id);
     }
 
     /// <summary>
@@ -1735,8 +1784,8 @@ public class GenieDockFactory : Factory
                     // from a degenerate model must not blow the float up to a
                     // giant default or park it off-screen. Position and size
                     // are validated independently.
-                    bool sizeOk = double.IsFinite(f.Width)  && f.Width  >= 100
-                               && double.IsFinite(f.Height) && f.Height >= 80;
+                    bool sizeOk = double.IsFinite(f.Width)  && f.Width  >= MinFloatWidth
+                               && double.IsFinite(f.Height) && f.Height >= MinFloatHeight;
                     bool posOk  = double.IsFinite(f.X) && double.IsFinite(f.Y);
 
                     if (sizeOk) { w.Width = f.Width; w.Height = f.Height; }
@@ -1759,6 +1808,94 @@ public class GenieDockFactory : Factory
             }
         }
     }
+
+    /// <summary>
+    /// Remember where a floating tool's window currently sits so a later reopen
+    /// can put it back there (public #359). No-op when the tool isn't floating,
+    /// so callers can fire it unconditionally on any close path.
+    ///
+    /// <para>Geometry comes off the REALIZED window for the same reason
+    /// <see cref="CaptureFloatingWindows"/> reads it there: Dock doesn't
+    /// reliably sync X/Y/Width/Height back into the IDockWindow model, so a
+    /// moved float can leave the model at 0/NaN. A maximized/minimized float is
+    /// skipped — its bounds describe the screen, not the user's chosen size, and
+    /// the previously cached normal-state geometry is the better answer.</para>
+    /// </summary>
+    private void CaptureFloatBounds(string id)
+    {
+        if (FindWindowHosting(id) is not { } w) return;
+
+        double x = w.X, y = w.Y, width = w.Width, height = w.Height;
+        if (w.Host is Avalonia.Controls.Window host)
+        {
+            if (host.WindowState != Avalonia.Controls.WindowState.Normal) return;
+            x = host.Position.X;
+            y = host.Position.Y;
+            if (host.Bounds.Width  > 0) width  = host.Bounds.Width;
+            if (host.Bounds.Height > 0) height = host.Bounds.Height;
+        }
+
+        if (!double.IsFinite(x) || !double.IsFinite(y)) return;
+        if (!double.IsFinite(width)  || width  < MinFloatWidth)  return;
+        if (!double.IsFinite(height) || height < MinFloatHeight) return;
+
+        _lastFloatBounds[id] = new FloatBounds(x, y, width, height);
+        _floatedLast.Add(id);
+    }
+
+    /// <summary>
+    /// Capture float geometry for every tool a host window holds, called just
+    /// before that window closes. This is the X-button path: nobody names an id,
+    /// so we discover them from the window's own layout while it's still
+    /// attached to the root (see <see cref="GenieHostWindow.BeforeClose"/>).
+    /// </summary>
+    private void CaptureFloatBoundsForHost(GenieHostWindow host)
+    {
+        if (_root?.Windows is not { } windows) return;
+        foreach (var w in windows)
+        {
+            if (!ReferenceEquals(w.Host, host) || w.Layout is not { } layout) continue;
+            var ids = new List<string>();
+            CollectLeafToolIds(layout, ids);
+            foreach (var id in ids) CaptureFloatBounds(id);
+        }
+    }
+
+    /// <summary>
+    /// Put a freshly-floated tool back at the geometry it had the last time it
+    /// floated this session (public #359). No-op when nothing was recorded — the
+    /// float then keeps Dock's default placement, exactly as before.
+    /// </summary>
+    private void ApplyRememberedFloatBounds(string id)
+    {
+        if (!_lastFloatBounds.TryGetValue(id, out var b)) return;
+        if (FindWindowHosting(id) is not { } w) return;
+
+        w.X = b.X; w.Y = b.Y; w.Width = b.Width; w.Height = b.Height;
+
+        // The HostWindow is already presented, so push through to the realized
+        // OS window as well and clamp — same two-step RestoreFloatingWindows
+        // uses, and the clamp matters just as much here: the remembered spot may
+        // be on a monitor that has since been unplugged.
+        if (w.Host is Avalonia.Controls.Window host)
+        {
+            host.Width    = b.Width;
+            host.Height   = b.Height;
+            host.Position = new Avalonia.PixelPoint((int)b.X, (int)b.Y);
+            if (host is GenieHostWindow g) g.ClampToVisibleScreen();
+        }
+    }
+
+    /// <summary>
+    /// True when a tool should be reopened as a floating window rather than
+    /// docked: it was floating the last time it was placed, or it has never been
+    /// placed at all (no docked position was ever captured). Callers opt in per
+    /// tool — it's for panels whose registered home is too cramped to be a
+    /// sensible first impression, like the Script Manager's 22%-wide side column
+    /// holding a four-pane view (public #359).
+    /// </summary>
+    public bool PrefersFloatingReopen(string id)
+        => _floatedLast.Contains(id) || !_lastKnownPositions.ContainsKey(id);
 
     /// <summary>The floating <see cref="IDockWindow"/> whose layout currently
     /// hosts the given tool id, or null if the tool isn't floating.</summary>
@@ -1875,6 +2012,10 @@ public class GenieDockFactory : Factory
         var current = FindByIdInTree(_root, id);
         if (current is null || !IsToolFloating(id)) return;
 
+        // Remember the float's geometry first — re-docking is not a statement
+        // about where the user wants it when they float it again (public #359).
+        CaptureFloatBounds(id);
+
         // Drop the floating instance, then restore to home. After the close the
         // id is gone from the tree, so SetToolVisibility sees it as hidden and
         // runs its restore branch instead of early-returning.
@@ -1899,6 +2040,8 @@ public class GenieDockFactory : Factory
         var dockable = entry.Dockable;
         InitDockable(dockable, _root);
         FloatDockable(dockable);
+        _floatedLast.Add(id);
+        ApplyRememberedFloatBounds(id);
     }
 
     /// <summary>
@@ -1992,6 +2135,12 @@ public class GenieDockFactory : Factory
         _lastKnownPositions[id] = new LastKnownLocation(
             parent.Id, idx, grandparentId, parentAlignment, parentProportion,
             idxInGrandparent, anchorSiblingId, grandparentOrientation);
+
+        // We got here past the floating guard above, so this tool is docked and
+        // this is now its freshest placement — a docked panel must not be
+        // reopened as a float on the strength of a stale float record (#359).
+        // The remembered geometry stays cached for the next deliberate float.
+        _floatedLast.Remove(id);
     }
 
     /// <summary>

@@ -79,6 +79,30 @@ public sealed class GenieHostWindow : HostWindow
         };
     }
 
+    /// <summary>
+    /// Invoked just before this window closes, while its <c>IDockWindow</c> is
+    /// still attached to the root and still knows which tools it hosts. Set by
+    /// <see cref="GenieDockFactory"/>'s host-window locator, which uses it to
+    /// remember the float's geometry so a later reopen lands in the same place
+    /// (public #359). The X on a float's chrome is the only close path that
+    /// names no tool id, so without this hook that geometry is simply lost.
+    /// </summary>
+    public Action? BeforeClose { get; set; }
+
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        // Ahead of the base call on purpose: Dock's OnClosing detaches the
+        // window from the root, after which the hosted tool ids — and the
+        // geometry we want against them — are no longer discoverable.
+        if (!e.Cancel)
+        {
+            try { BeforeClose?.Invoke(); }
+            catch (Exception ex) { Diagnostics.ErrorLog.Log("GenieHostWindow.BeforeClose", ex); }
+        }
+
+        base.OnClosing(e);
+    }
+
     /// <summary>Run the chrome injections (minimize button + flyout item) once the
     /// visual tree can serve them. The chrome materializes on a layout pass that
     /// can land AFTER the Opened-time Loaded dispatch, and a missed one-shot left
