@@ -28,7 +28,7 @@
     </Style>
   </Window.Styles>
 
-  <Grid RowDefinitions="Auto,*,Auto" Margin="8">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="8">
 
     <!-- ════════════════════════════════════════════════════════════════
          Profile scope: which character's configs are being edited.
@@ -60,13 +60,30 @@
         </Border>
         <Border Grid.Column="3" Margin="6,0,0,0" Padding="6,2"
                 Background="{DynamicResource Theme.WarningBg}" CornerRadius="3"
-                ToolTip.Tip="Editing a different profile — saved to disk, applies on next connect">
-          <TextBlock Text="{Binding EditingLabel}" Foreground="{DynamicResource Theme.Warning}"/>
+                IsVisible="{Binding !IsEditingConnectedProfile}"
+                ToolTip.Tip="Editing a profile that is not connected — saved to disk, applies on next connect">
+          <TextBlock Text="DRAFT" Foreground="{DynamicResource Theme.Warning}" FontWeight="SemiBold"/>
         </Border>
       </Grid>
     </Border>
 
-    <TabControl Grid.Row="1" TabStripPlacement="Top">
+    <!-- #350: in draft mode the dialog edits a COPY of the rules, and before
+         this banner nothing said so. Adding a couple of triggers and macros and
+         trying them is the natural first thing to do with a new client; offline
+         that produced zero feedback and zero effect, which is indistinguishable
+         from the feature being broken — and is how it was reported. The banner
+         states the consequence rather than the state, because "draft" on its
+         own means nothing to someone about to press the key they just bound.
+         It also covers the sharp edge in the other direction: selecting a
+         different profile WHILE connected silently switches to draft too. -->
+    <Border Grid.Row="1" Background="{DynamicResource Theme.WarningBg}" CornerRadius="3"
+            Padding="8,5" Margin="0,0,0,6"
+            IsVisible="{Binding DraftNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <TextBlock Text="{Binding DraftNotice}" TextWrapping="Wrap"
+                 Foreground="{DynamicResource Theme.Warning}"/>
+    </Border>
+
+    <TabControl Grid.Row="2" TabStripPlacement="Top">
 
       <!-- ════════════════════════════════════════════════════════════════
            Layout — per-window display settings (title, font, fg/bg, redirect).
@@ -128,7 +145,7 @@
 
     </TabControl>
 
-    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right"
                 Spacing="8" Margin="0,8,4,0">
       <Button Content="Close" Command="{Binding CloseCommand}" MinWidth="80"/>
     </StackPanel>

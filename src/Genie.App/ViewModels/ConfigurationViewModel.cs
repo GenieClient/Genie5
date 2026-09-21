@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.IO;
 using System.Reactive;
 using System.Reactive.Linq;
@@ -64,8 +64,18 @@ public class ConfigurationViewModel : ReactiveObject
     /// path scoping + live-vs-draft engine selection.</summary>
     [Reactive] public ConnectionProfile? SelectedProfile { get; set; }
 
-    /// <summary>Display string ("Editing: Renucci" or "Editing: (no profile)").</summary>
+    /// <summary>Display string naming BOTH the profile and the editing mode —
+    /// "Editing: Renucci (live)" or "Editing: Renucci (draft)". The mode half
+    /// matters more than the name (public #350): before it, the label read
+    /// identically whether the dialog was writing to the live engines or to a
+    /// draft copy, so a user adding triggers before their first connection got
+    /// no feedback and no effect, which is indistinguishable from the feature
+    /// being broken — and is how it was reported.</summary>
     public extern string EditingLabel { [ObservableAsProperty] get; }
+
+    /// <summary>The draft-mode banner text, or "" when editing live. Bound
+    /// directly to a banner's visibility as well as its content.</summary>
+    public extern string DraftNotice { [ObservableAsProperty] get; }
 
     /// <summary>True when the picker is on the same profile that's currently
     /// connected — edits in the dialog write directly to the live engines.</summary>
@@ -113,20 +123,43 @@ public class ConfigurationViewModel : ReactiveObject
             .Subscribe(_ => ClearDrafts());
 
         this.WhenAnyValue(x => x.SelectedProfile)
-            .Select(p => p is null ? "Editing: (no profile / global)" : $"Editing: {p.Name}")
+            .Select(p =>
+            {
+                var live = IsLive(p);
+                return p is null
+                    ? $"Editing: (no profile / global) ({(live ? "live" : "draft")})"
+                    : $"Editing: {p.Name} ({(live ? "live" : "draft")})";
+            })
             .ToPropertyEx(this, x => x.EditingLabel);
 
         this.WhenAnyValue(x => x.SelectedProfile)
-            .Select(p => p is not null && _connectedProfile is not null && p.Id == _connectedProfile.Id)
+            .Select(IsLive)
             .ToPropertyEx(this, x => x.IsEditingConnectedProfile);
+
+        // The banner under the profile bar. Deliberately states the CONSEQUENCE
+        // rather than the state — "draft" alone means nothing to someone whose
+        // first act with a new client is to add a trigger and press the key.
+        this.WhenAnyValue(x => x.SelectedProfile)
+            .Select(p => IsLive(p)
+                ? ""
+                : "These edits are saved to disk but are NOT active in this session — " +
+                  "they apply the next time you connect to this profile. " +
+                  "Triggers, macros and aliases added here will not fire until then.")
+            .ToPropertyEx(this, x => x.DraftNotice);
 
         CloseCommand = ReactiveCommand.Create(() => { RequestClose?.Invoke(); });
     }
 
     // ── Engine refs — live when on the connected profile, draft otherwise ────
 
-    private bool EditingConnected =>
-        _connectedProfile is not null && SelectedProfile?.Id == _connectedProfile.Id;
+    private bool EditingConnected => IsLive(SelectedProfile);
+
+    /// <summary>True when <paramref name="profile"/> is the one currently
+    /// connected, so the dialog writes to the LIVE engines. Shared by the
+    /// engine accessors and by the labels, so the badge can never disagree with
+    /// where the edits are actually going.</summary>
+    private bool IsLive(ConnectionProfile? profile) =>
+        _connectedProfile is not null && profile?.Id == _connectedProfile.Id;
 
     public HighlightEngine?     HighlightEngine     => EditingConnected ? _core?.Highlights     : GetDraftHighlights();
     public NameHighlightEngine? NameHighlightEngine => EditingConnected ? _core?.NameHighlights : GetDraftNames();
