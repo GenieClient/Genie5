@@ -1,4 +1,4 @@
-using Genie.Core.Combat;
+﻿using Genie.Core.Combat;
 using Genie.Core.Config;
 using Genie.Core.Events;
 using Genie.Core.Models;
@@ -285,6 +285,13 @@ public sealed class GameStateEngine : IDisposable
     {
         // health2 (the injuries-dialog bar) folds onto health here — it is the
         // same figure and it arrives BEFORE the first minivitals bar.
+        //
+        // One bar per event, never a bundle (#333). A 45-minute recording's 653
+        // minivitals blocks decomposed as mana 338, stamina 259, concentration
+        // 38, health 18 — so DR sends whichever vital changed, not a full set.
+        // This switch is already per-bar and must stay that way: anything that
+        // treated a block as "here are all the vitals" would zero the ones the
+        // server simply did not mention.
         switch (VitalBars.Normalize(pb.BarId))
         {
             case "health":        _state.Vitals.Health         = pb.Value; break;

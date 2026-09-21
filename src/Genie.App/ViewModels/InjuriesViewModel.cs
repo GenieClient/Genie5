@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
@@ -122,6 +122,13 @@ public sealed class InjuriesViewModel : ReactiveObject
     public InjuryCell RightLeg  { get; } = new("rightLeg",  "R Leg",  "Right Leg", 0.83);
     public InjuryCell LeftLeg   { get; } = new("leftLeg",   "L Leg",  "Left Leg",  0.83);
     public InjuryCell RightFoot { get; } = new("rightFoot", "R Foot", "Right Foot");
+    // KEPT deliberately, though DR appears never to send it (#333): a 1.7 MB
+    // recorded session carried 15 injury slots with rightFoot present and
+    // leftFoot at zero occurrences. It stays for two reasons — the grid is
+    // exactly 4x4 and dropping a cell would leave a hole in the doll, and an
+    // absent slot costs nothing at runtime (it renders healthy and updates
+    // correctly if DR ever does send one). Removing it would be a cosmetic
+    // regression traded for no gain.
     public InjuryCell LeftFoot  { get; } = new("leftFoot",  "L Foot", "Left Foot");
     public InjuryCell Nsys      { get; } = new("nsys",      "Nerves", "Nervous System");
 
