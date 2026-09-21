@@ -633,10 +633,6 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Substitutes    = new SubstituteEngine();
         Substitutes.Classes = Classes;
         Commands.Substitutes = Substitutes;  // wire #substitute command → engine
-        // $globals in substitute replacement text, resolved at match time
-        // (public #246). Same expansion typed input and trigger actions use, so
-        // $charactername means one thing across the whole client.
-        Substitutes.ExpandVariables = text => Scripts.ExpandGlobalVars(text);
         Commands.DialogTracker = _dialogTracker;   // wire #dialogs → session inventory (#156)
 
         Gags           = new GagEngine();
@@ -718,6 +714,13 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             echo:          msg => RunOnLoop(() => RaiseScriptOutput(msg)),
             handleHashCmd: cmd => RunOnLoop(() => Commands.ProcessInput(cmd, interactive: false)),
             injectGameLine: line => RunOnLoop(() => InjectParsedLine(line)));
+
+        // $globals in substitute replacement text, resolved at match time
+        // (public #246). Same expansion typed input and trigger actions use, so
+        // $charactername means one thing across the whole client. Wired HERE
+        // rather than beside the engine's other wiring because it captures
+        // Scripts, which does not exist until the line above.
+        Substitutes.ExpandVariables = Scripts.ExpandGlobalVars;
 
         // Script-issued `/commands` get the same client-side offer as typed
         // input: built-in extensions first (the engine calls
@@ -1014,6 +1017,9 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             lf.CreateLogger<GameStateEngine>());
         // Live config for RoundTimeOffset (applied to each RoundTimeEvent).
         stateEngine.Config = Config;
+        // Events the engine synthesizes from plain text join the same stream
+        // parser events go out on (public #277), so a consumer subscribes once.
+        stateEngine.Emit = e => _gameEventsRelay.OnNext(e);
 
         _connection  = connection;
         _parser      = parser;

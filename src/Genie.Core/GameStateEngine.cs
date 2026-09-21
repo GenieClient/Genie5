@@ -23,6 +23,12 @@ public sealed class GameStateEngine : IDisposable
     /// <c>State.Combat.Assess</c> (public #313).</summary>
     private readonly AssessTracker           _assess;
 
+    /// <summary><c>perceive health</c> block state machine (public #277). Lives
+    /// here for the same reason the assess tracker does: it is a plain-TEXT
+    /// block, so it cannot live in the XML parser, and the engine is already
+    /// the thing that sees every text line with its stream attached.</summary>
+    private readonly Health.PerceiveHealthParser _perceive;
+
     public Models.GameState State => _state;
 
     /// <summary>
@@ -33,6 +39,17 @@ public sealed class GameStateEngine : IDisposable
     /// so a <c>#config roundtimeoffset</c> change applies to the next RT.
     /// </summary>
     public GenieConfig? Config { get; set; }
+
+    /// <summary>
+    /// Publishes events the engine SYNTHESIZES from plain text — today only
+    /// <see cref="PatientHealthEvent"/> (public #277), which has no XML tag to
+    /// come from. Wired by <c>GenieCore</c> to the same relay parser events go
+    /// out on, so a consumer subscribes once and sees both.
+    ///
+    /// <para>Safe from feedback: the engine subscribes to the PARSER's stream,
+    /// not to the relay it emits on.</para>
+    /// </summary>
+    public Action<GameEvent>? Emit { get; set; }
 
     public GameStateEngine(
         IObservable<GameEvent> gameEvents,
@@ -46,6 +63,7 @@ public sealed class GameStateEngine : IDisposable
         // Shares the engine's clock so a test (or a replay) that fakes time
         // sees a consistent CapturedAt.
         _assess = new AssessTracker(state.Combat.Assess, () => _utcNow());
+        _perceive = new Health.PerceiveHealthParser(() => _utcNow());
         _subscription = gameEvents.Subscribe(Apply);
     }
 
@@ -431,6 +449,25 @@ public sealed class GameStateEngine : IDisposable
 
         var text = te.Text;
         if (string.IsNullOrEmpty(text)) return;
+
+        // perceive health / "<patient>'s injuries include" (public #277). The
+        // block has no stream of its own — it arrives as ordinary main-stream
+        // game text — so it is fed from here. Scoped to `main` deliberately: a
+        // thought or a whisper quoting one of these lines must not open a block
+        // or contribute a wound to somebody's chart.
+        if (string.Equals(te.Stream, "main", StringComparison.OrdinalIgnoreCase))
+        {
+            // NOT gated on Feed's return value: a terminator both closes the
+            // block and reports false, because the terminator is not part of
+            // the block and still has to reach its own consumers. Gating on it
+            // would drop exactly the readings that ended the normal way.
+            _perceive.Feed(text);
+            if (_perceive.TakeCompleted() is { } chart)
+            {
+                _state.PatientHealth[chart.Patient] = chart;
+                Emit?.Invoke(new PatientHealthEvent(chart));
+            }
+        }
 
         if (text.Contains("Showing all skills", StringComparison.Ordinal))
         {

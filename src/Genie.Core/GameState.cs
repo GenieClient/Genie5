@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 
 namespace Genie.Core.Models;
 
@@ -218,6 +218,19 @@ public sealed class GameState
     /// entries so consumers can tell "healed" from "never reported".
     /// </summary>
     public ConcurrentDictionary<string, InjuryReading> Injuries { get; } = new();
+
+    /// <summary>
+    /// Latest <c>perceive health</c> reading per patient (public #277), keyed
+    /// by the name DR used - or <c>"self"</c> for the player's own.
+    ///
+    /// <para>Additive, and deliberately a different shape from
+    /// <see cref="Injuries"/>: that one is a single self-keyed region map fed
+    /// by the injuries dialog, which can only ever report severity 1-3 on one
+    /// axis. This carries any patient on the true 1-13 ladder with all four
+    /// axes, which is the data the dialog structurally cannot express. Neither
+    /// feeds the other.</para>
+    /// </summary>
+    public ConcurrentDictionary<string, Health.PatientHealth> PatientHealth { get; } = new();
 
     // Misc UI state
     public string ActiveStream   { get; set; } = "main";

@@ -268,6 +268,19 @@ public enum InjuryKind
 /// </summary>
 public sealed record InjuryEvent(string Area, InjuryKind Kind, int Severity) : GameEvent;
 
+/// <summary>
+/// A completed <c>perceive health</c> reading (public #277) - any patient, the
+/// true 1-13 severity ladder, and all four Fresh/Scars x External/Internal
+/// axes at once.
+///
+/// <para>Deliberately separate from <see cref="InjuryEvent"/> rather than an
+/// extension of it. The dialog event is a DISPLAY snapshot of the player's own
+/// body under whichever axis their display mode selects; this is a medical
+/// chart for a named patient. Folding them together would mean one of the two
+/// lying about what it carries.</para>
+/// </summary>
+public sealed record PatientHealthEvent(Health.PatientHealth Health) : GameEvent;
+
 // ── Inventory ────────────────────────────────────────────────────────────────
 
 public enum Hand { Left, Right }
