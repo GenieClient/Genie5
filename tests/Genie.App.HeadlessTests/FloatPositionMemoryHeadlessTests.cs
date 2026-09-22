@@ -36,10 +36,20 @@ public class FloatPositionMemoryHeadlessTests
         public Window              Main    { get; }
 
         private readonly string _dir;
+        private readonly bool   _ownsDir;
 
-        public Harness()
+        /// <summary>The data root this instance reads and writes. Hand it to a
+        /// second Harness to simulate a relaunch against the same install.</summary>
+        public string DataDir => _dir;
+
+        public Harness() : this(null) { }
+
+        /// <param name="dataDir">Reuse an existing data root — the "restart the
+        /// app" case. The borrower does not delete it on dispose.</param>
+        public Harness(string? dataDir)
         {
-            _dir = Path.Combine(Path.GetTempPath(), "genie_float_pos_" + Guid.NewGuid().ToString("N"));
+            _ownsDir = dataDir is null;
+            _dir = dataDir ?? Path.Combine(Path.GetTempPath(), "genie_float_pos_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_dir);
             Vm      = new MainWindowViewModel(startup: null, dataDirectoryOverride: _dir);
             Factory = (GenieDockFactory)Vm.DockFactory!;
@@ -93,8 +103,19 @@ public class FloatPositionMemoryHeadlessTests
             foreach (var w in (Root.Windows ?? new System.Collections.Generic.List<IDockWindow>()).ToList())
                 if (w.Host is Window host) { try { host.Close(); } catch { /* teardown */ } }
             try { Main.Close(); } catch { /* teardown */ }
-            try { Directory.Delete(_dir, recursive: true); } catch { /* best effort */ }
+            if (_ownsDir)
+                try { Directory.Delete(_dir, recursive: true); } catch { /* best effort */ }
         }
+    }
+
+    /// <summary>A data root the test owns and deletes itself, so a Harness that
+    /// borrows it (the "relaunch" case) can't pull it out from under the next
+    /// one on dispose.</summary>
+    private static string NewDataDir()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "genie_float_pos_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        return dir;
     }
 
     /// <summary>Move + resize a float the way a user drags and stretches it.</summary>
@@ -256,5 +277,178 @@ public class FloatPositionMemoryHeadlessTests
         Harness.Pump(h.Main);
         Assert.True(h.Factory.IsToolVisible("scripts"));
         Assert.Null(h.FloatFor("scripts"));
+    }
+
+    // ── Every panel honors "I had this floating" ─────────────────────────────
+    // The #359 fix cached float geometry for every tool but only CONSULTED the
+    // cache for the Script Manager (the one toggle passing preferFloating), so
+    // every other panel still snapped back into its dock on reopen.
+
+    [AvaloniaFact]
+    public void Any_panel_floated_last_reopens_floating_from_the_menu()
+    {
+        using var h = new Harness();
+
+        h.Factory.FloatTool("thoughts");
+        Harness.Pump(h.Main);
+        Place(h.FloatFor("thoughts")!, 240, 180, 620, 460);
+
+        // Window → Thoughts, twice: off, then back on.
+        h.Vm.ToggleThoughtsCommand.Execute().Subscribe();
+        Harness.Pump(h.Main);
+        Assert.False(h.Factory.IsToolVisible("thoughts"));
+
+        h.Vm.ToggleThoughtsCommand.Execute().Subscribe();
+        Harness.Pump(h.Main);
+
+        var again = h.FloatFor("thoughts");
+        Assert.NotNull(again);
+        Assert.Equal(240, again!.Position.X);
+        Assert.Equal(180, again.Position.Y);
+    }
+
+    [AvaloniaFact]
+    public void A_docked_panel_still_reopens_docked()
+    {
+        using var h = new Harness();
+
+        // Never floated: the menu toggle must not start opening it as a window.
+        h.Vm.ToggleThoughtsCommand.Execute().Subscribe();
+        Harness.Pump(h.Main);
+        h.Vm.ToggleThoughtsCommand.Execute().Subscribe();
+        Harness.Pump(h.Main);
+
+        Assert.True(h.Factory.IsToolVisible("thoughts"));
+        Assert.Null(h.FloatFor("thoughts"));
+    }
+
+    [AvaloniaFact]
+    public void Docking_a_floated_panel_takes_the_preference_back()
+    {
+        using var h = new Harness();
+
+        h.Factory.FloatTool("thoughts");
+        Harness.Pump(h.Main);
+        h.Factory.RedockTool("thoughts");
+        Harness.Pump(h.Main);
+
+        h.Vm.ToggleThoughtsCommand.Execute().Subscribe();
+        Harness.Pump(h.Main);
+        h.Vm.ToggleThoughtsCommand.Execute().Subscribe();
+        Harness.Pump(h.Main);
+
+        Assert.True(h.Factory.IsToolVisible("thoughts"));
+        Assert.Null(h.FloatFor("thoughts"));
+    }
+
+    [AvaloniaFact]
+    public void The_mapper_toggle_honors_a_float_too()
+    {
+        using var h = new Harness();
+
+        // With a user-defined default layout the Mapper's bespoke toggle docks
+        // it rather than auto-floating — that layout owns placement. A float the
+        // user made since is still fresher, and must win.
+        h.Vm.Display.GlobalDefaultLayout = "Hunting";
+
+        h.Factory.FloatTool("mapper");
+        Harness.Pump(h.Main);
+        Place(h.FloatFor("mapper")!, 330, 140, 720, 560);
+
+        h.Vm.ToggleMapperCommand.Execute().Subscribe();
+        Harness.Pump(h.Main);
+        h.Vm.ToggleMapperCommand.Execute().Subscribe();
+        Harness.Pump(h.Main);
+
+        var again = h.FloatFor("mapper");
+        Assert.NotNull(again);
+        Assert.Equal(330, again!.Position.X);
+        Assert.Equal(140, again.Position.Y);
+    }
+
+    // ── Across a restart ─────────────────────────────────────────────────────
+    // Both caches used to be plain in-memory dictionaries, so even the Script
+    // Manager forgot everything the moment the app closed.
+
+    [AvaloniaFact]
+    public void Float_placement_survives_a_restart()
+    {
+        var dir = NewDataDir();
+
+        using (var first = new Harness(dir))
+        {
+            first.Factory.ShowToolFloating("scripts");
+            Harness.Pump(first.Main);
+            Place(first.FloatFor("scripts")!, 505, 305, 880, 620);
+
+            // What MainWindow.OnClosing does.
+            first.Vm.PersistFloatMemoryNow();
+            Assert.NotEmpty(Directory.GetFiles(dir, "float-memory.json", SearchOption.AllDirectories));
+        }
+
+        using var second = new Harness(dir);
+        Assert.True(second.Factory.FloatedLast("scripts"));
+
+        second.Vm.ToggleScriptsCommand.Execute().Subscribe();
+        Harness.Pump(second.Main);
+
+        var restored = second.FloatFor("scripts");
+        Assert.NotNull(restored);
+        Assert.Equal(505, restored!.Position.X);
+        Assert.Equal(305, restored.Position.Y);
+        Assert.Equal(880, restored.Width,  precision: 0);
+        Assert.Equal(620, restored.Height, precision: 0);
+
+        try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
+    }
+
+    [AvaloniaFact]
+    public void A_restart_does_not_tear_a_docked_panel_out_of_the_layout()
+    {
+        var dir = NewDataDir();
+
+        using (var first = new Harness(dir))
+        {
+            first.Factory.FloatTool("thoughts");
+            Harness.Pump(first.Main);
+            Place(first.FloatFor("thoughts")!, 275, 195, 600, 430);
+            first.Vm.PersistFloatMemoryNow();
+        }
+
+        // Thoughts ships docked, and the startup layout has just put it there —
+        // that placement is fresher than last session's float.
+        using var second = new Harness(dir);
+        Assert.True(second.Factory.IsToolVisible("thoughts"));
+        Assert.Null(second.FloatFor("thoughts"));
+        Assert.False(second.Factory.FloatedLast("thoughts"));
+
+        // The GEOMETRY is still remembered, though — floating it again lands
+        // where the user had it rather than at Dock's default placement.
+        second.Factory.FloatTool("thoughts");
+        Harness.Pump(second.Main);
+        var again = second.FloatFor("thoughts");
+        Assert.NotNull(again);
+        Assert.Equal(275, again!.Position.X);
+        Assert.Equal(195, again.Position.Y);
+
+        try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
+    }
+
+    [AvaloniaFact]
+    public void A_corrupt_memory_file_costs_nothing_but_the_memory()
+    {
+        var dir = NewDataDir();
+        Directory.CreateDirectory(Path.Combine(dir, "Config"));
+        File.WriteAllText(Path.Combine(dir, "Config", "float-memory.json"), "{ not json at all");
+
+        using (var h = new Harness(dir))
+        {
+            Assert.False(h.Factory.FloatedLast("scripts"));
+            h.Vm.ToggleScriptsCommand.Execute().Subscribe();
+            Harness.Pump(h.Main);
+            Assert.True(h.Factory.IsToolVisible("scripts"));
+        }
+
+        try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
     }
 }

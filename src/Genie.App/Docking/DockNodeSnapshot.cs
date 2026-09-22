@@ -63,3 +63,20 @@ public sealed class FloatingWindowSnapshot
     public double Width  { get; set; }
     public double Height { get; set; }
 }
+
+/// <summary>
+/// One tool's remembered float placement — where its window sat the last time
+/// it floated, and whether floating was that tool's most recent placement.
+///
+/// <para>This is the persistable shape of <c>GenieDockFactory</c>'s in-memory
+/// float caches (public #359). Geometry uses the same units the rest of the
+/// docking code does: position in physical pixels, size in DIPs. NaN means
+/// "no geometry recorded" — a tool can be floated-last without usable bounds
+/// if its window was maximized at every close.</para>
+/// </summary>
+public sealed record FloatMemoryEntry(
+    double X,
+    double Y,
+    double Width,
+    double Height,
+    bool   FloatedLast);

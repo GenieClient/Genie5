@@ -1691,7 +1691,7 @@ public class GenieDockFactory : Factory
         // title bar back over the main app shows dock indicators so the user
         // can re-dock it wherever they want.
         FloatDockable(current);
-        _floatedLast.Add(id);
+        MarkFloatedLast(id);
         ApplyRememberedFloatBounds(id);
     }
 
@@ -1841,6 +1841,7 @@ public class GenieDockFactory : Factory
 
         _lastFloatBounds[id] = new FloatBounds(x, y, width, height);
         _floatedLast.Add(id);
+        FloatMemoryChanged?.Invoke();
     }
 
     /// <summary>
@@ -1895,7 +1896,93 @@ public class GenieDockFactory : Factory
     /// holding a four-pane view (public #359).
     /// </summary>
     public bool PrefersFloatingReopen(string id)
-        => _floatedLast.Contains(id) || !_lastKnownPositions.ContainsKey(id);
+        => FloatedLast(id) || !_lastKnownPositions.ContainsKey(id);
+
+    /// <summary>
+    /// True when the tool's freshest placement was a floating window. This is
+    /// the half of <see cref="PrefersFloatingReopen"/> that every panel honors:
+    /// a panel the user deliberately dragged out comes back out, at its
+    /// remembered geometry. The other half — "never placed at all, so don't
+    /// drop it into a cramped registered home" — stays opt-in per tool, because
+    /// applying it everywhere would change first-open behavior for panels whose
+    /// docked home is exactly right.
+    /// </summary>
+    public bool FloatedLast(string id) => _floatedLast.Contains(id);
+
+    /// <summary>
+    /// Record geometry for every tool currently in a floating window. The
+    /// per-window close hooks cover the ordinary cases, but application
+    /// shutdown tears windows down in no guaranteed order — so the host calls
+    /// this once, while the tree is still whole, before persisting.
+    /// </summary>
+    public void CaptureAllFloatBounds()
+    {
+        if (_root?.Windows is not { } windows) return;
+        foreach (var w in windows.ToList())
+        {
+            if (w.Layout is not { } layout) continue;
+            var ids = new List<string>();
+            CollectLeafToolIds(layout, ids);
+            foreach (var id in ids) CaptureFloatBounds(id);
+        }
+    }
+
+    /// <summary>Add <paramref name="id"/> to the floated-last set and tell the
+    /// host something worth persisting moved.</summary>
+    private void MarkFloatedLast(string id)
+    {
+        if (_floatedLast.Add(id)) FloatMemoryChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Raised whenever <see cref="_lastFloatBounds"/> or <see cref="_floatedLast"/>
+    /// actually changes. The host debounces this into a write of
+    /// <c>Config/float-memory.json</c> so float placement survives a restart —
+    /// the caches themselves are in-memory and know nothing about disk.
+    /// </summary>
+    public event Action? FloatMemoryChanged;
+
+    /// <summary>
+    /// The float memory in a shape the host can serialize: every tool we have
+    /// geometry or a floated-last flag for. Ids with neither are omitted.
+    /// </summary>
+    public IReadOnlyDictionary<string, FloatMemoryEntry> ExportFloatMemory()
+    {
+        var map = new Dictionary<string, FloatMemoryEntry>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (id, b) in _lastFloatBounds)
+            map[id] = new FloatMemoryEntry(b.X, b.Y, b.Width, b.Height, _floatedLast.Contains(id));
+        foreach (var id in _floatedLast)
+            if (!map.ContainsKey(id))
+                map[id] = new FloatMemoryEntry(double.NaN, double.NaN, double.NaN, double.NaN, true);
+        return map;
+    }
+
+    /// <summary>
+    /// Seed the float caches from a previous session's persisted memory. Call
+    /// this AFTER the layout has been built.
+    ///
+    /// <para>Geometry is always taken — remembering how big the user made a
+    /// window costs nothing even if the panel is currently docked. The
+    /// floated-last FLAG, though, is only taken for a tool that isn't in the
+    /// docked tree right now: whatever the startup layout just did with a
+    /// visible panel is fresher than last session's opinion, and re-marking a
+    /// visibly-docked panel as "floated last" would tear it out of the dock on
+    /// the next reopen. A saved layout's <see cref="FloatingWindowSnapshot"/>
+    /// still wins over all of this, exactly as it does over the live cache.</para>
+    /// </summary>
+    public void ImportFloatMemory(IReadOnlyDictionary<string, FloatMemoryEntry> memory)
+    {
+        foreach (var (id, e) in memory)
+        {
+            if (double.IsFinite(e.X) && double.IsFinite(e.Y) &&
+                double.IsFinite(e.Width)  && e.Width  >= MinFloatWidth &&
+                double.IsFinite(e.Height) && e.Height >= MinFloatHeight)
+                _lastFloatBounds[id] = new FloatBounds(e.X, e.Y, e.Width, e.Height);
+
+            if (e.FloatedLast && (_root is null || FindByIdInTree(_root, id) is null))
+                _floatedLast.Add(id);
+        }
+    }
 
     /// <summary>The floating <see cref="IDockWindow"/> whose layout currently
     /// hosts the given tool id, or null if the tool isn't floating.</summary>
@@ -2040,7 +2127,7 @@ public class GenieDockFactory : Factory
         var dockable = entry.Dockable;
         InitDockable(dockable, _root);
         FloatDockable(dockable);
-        _floatedLast.Add(id);
+        MarkFloatedLast(id);
         ApplyRememberedFloatBounds(id);
     }
 
@@ -2140,7 +2227,7 @@ public class GenieDockFactory : Factory
         // this is now its freshest placement — a docked panel must not be
         // reopened as a float on the strength of a stale float record (#359).
         // The remembered geometry stays cached for the next deliberate float.
-        _floatedLast.Remove(id);
+        if (_floatedLast.Remove(id)) FloatMemoryChanged?.Invoke();
     }
 
     /// <summary>

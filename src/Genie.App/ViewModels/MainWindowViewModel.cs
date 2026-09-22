@@ -959,6 +959,16 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private readonly string _configDir;
     private readonly string _defaultMapsDir;
 
+    /// <summary>Where the dock's float memory is persisted —
+    /// <c>{Config}/float-memory.json</c>. See
+    /// <see cref="Settings.FloatMemoryStore"/>.</summary>
+    private readonly string _floatMemoryPath;
+
+    /// <summary>Debounce for <see cref="ScheduleFloatMemorySave"/>. The factory
+    /// raises its change event on every dock/undock, and a layout build walks
+    /// every tool — far too chatty to write through on each one.</summary>
+    private Avalonia.Threading.DispatcherTimer? _floatMemorySaveTimer;
+
     /// <summary>
     /// In-memory MDI geometry held across a Window-menu mode toggle within a
     /// single session. Captured when leaving windowed mode so toggling back
@@ -1172,6 +1182,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _configDir    = dir.Current.ValidateDirectory("Config");
         _profilesPath = Path.Combine(_configDir, "profiles.json");
         _displayPath  = Path.Combine(_configDir, "display.json");
+        _floatMemoryPath = Path.Combine(_configDir, Settings.FloatMemoryStore.FileName);
         _pathsPath    = Path.Combine(_configDir, "paths.json");
         // Recordings live as a sibling to Config (not under it) — same parent
         // dir, so {AppData}/Genie5/{Config, Logs, Maps, Profiles}/ is the layout.
@@ -1418,6 +1429,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // (the Layout menu, or the per-profile / global default layout on
         // connect via ApplyDefaultLayoutForConnect).
         DockLayout  = factory.BuildDefaultLayout();
+        // Float memory (public #359) is restored AFTER the layout is built, so
+        // a panel the startup layout just docked keeps that placement and only
+        // the panels it left closed inherit last session's "I had this floating"
+        // decision. See GenieDockFactory.ImportFloatMemory for the precedence.
+        factory.ImportFloatMemory(Settings.FloatMemoryStore.Load(_floatMemoryPath));
+        factory.FloatMemoryChanged += ScheduleFloatMemorySave;
         // Out-of-box default: the Mapper floats in its own window rather than
         // docking at the centre-bottom. Arm the pending-float flag; the window
         // floats it from MainWindow.OnOpened, once the dock tree + owner window
@@ -2164,7 +2181,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         {
             if (DockFactory is not GenieDockFactory factory) return;
             var newVisible = !factory.IsToolVisible("mapper");
-            if (newVisible && !HasUserDefinedDefaultLayout())
+            // FloatedLast first: a user with a saved default layout normally
+            // keeps their docked Mapper, but if they floated it this session
+            // (or last, via the persisted memory) that's the fresher choice.
+            if (newVisible && (factory.FloatedLast("mapper") || !HasUserDefinedDefaultLayout()))
                 factory.ShowToolFloating("mapper");
             else
                 factory.SetToolVisibility("mapper", newVisible);
@@ -4039,13 +4059,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// menu's check mark and the dock's true state aligned even if the user
     /// closed a tool by some other means (e.g. the X on its tab).
     /// </summary>
-    /// <param name="preferFloating">Open the tool in its own window when the
-    /// factory says it has no docked placement of the user's own
-    /// (<see cref="GenieDockFactory.PrefersFloatingReopen"/>). For panels whose
-    /// registered home is too cramped to be a sensible first impression, and so
-    /// that a panel the user chose to float comes back floating (public #359).
-    /// Once they dock it somewhere, that docked spot wins on every later
-    /// reopen.</param>
+    /// <param name="preferFloating">Also open the tool in its own window when it
+    /// has NEVER been placed anywhere (<see cref="GenieDockFactory.PrefersFloatingReopen"/>) —
+    /// for panels whose registered home is too cramped to be a sensible first
+    /// impression, like the Script Manager's 22%-wide column. Opt-in, because it
+    /// changes a panel's very first open.
+    /// <para>Independent of this flag, EVERY panel reopens floating when it was
+    /// floating the last time it was placed (<see cref="GenieDockFactory.FloatedLast"/>,
+    /// public #359). Once the user docks it somewhere, that docked spot wins on
+    /// every later reopen.</para></param>
     private ReactiveCommand<Unit, Unit> MakeToggleCommand(
         string toolId, Action<bool> updateBool, Action? beforeShow = null, bool preferFloating = false)
         => ReactiveCommand.Create(() =>
@@ -4055,7 +4077,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             // Only run beforeShow on the transition TO visible — a hide should
             // never have a side effect meant for "the panel is about to be seen".
             if (newVisible) beforeShow?.Invoke();
-            if (newVisible && preferFloating && factory.PrefersFloatingReopen(toolId))
+            // Floated last → comes back floating, for EVERY panel: that's the
+            // user's most recent statement about where this thing belongs.
+            // preferFloating additionally covers "never placed anywhere", which
+            // is opt-in because it changes a panel's very first open.
+            if (newVisible && (factory.FloatedLast(toolId)
+                               || (preferFloating && factory.PrefersFloatingReopen(toolId))))
                 factory.ShowToolFloating(toolId);
             else
                 factory.SetToolVisibility(toolId, newVisible);
@@ -4065,7 +4092,55 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             updateBool(newVisible);
         });
 
-    /// <summary>Build Core on demand (see <see cref="EnsureCoreBuilt"/>) before
+    // ── Float memory persistence (public #359) ──────────────────────────────
+
+    /// <summary>How long to wait for the dock to settle before writing float
+    /// memory. A drag-redock raises several change events in a row, and the
+    /// initial layout build raises one per tool.</summary>
+    private static readonly TimeSpan FloatMemorySaveDelay = TimeSpan.FromSeconds(2);
+
+    /// <summary>Restart the debounce; the write happens when the dock goes
+    /// quiet. Cheap to call on every change event, which is the point.</summary>
+    private void ScheduleFloatMemorySave()
+    {
+        if (_floatMemorySaveTimer is null)
+        {
+            _floatMemorySaveTimer = new Avalonia.Threading.DispatcherTimer
+            {
+                Interval = FloatMemorySaveDelay,
+            };
+            _floatMemorySaveTimer.Tick += (_, _) =>
+            {
+                _floatMemorySaveTimer!.Stop();
+                WriteFloatMemory();
+            };
+        }
+        // Stop-then-start is what makes it a debounce rather than a repeat.
+        _floatMemorySaveTimer.Stop();
+        _floatMemorySaveTimer.Start();
+    }
+
+    /// <summary>
+    /// Capture the geometry of every open float and write the memory now,
+    /// cancelling any pending debounce. Called from
+    /// <c>MainWindow.OnClosing</c>: shutdown closes host windows in no
+    /// guaranteed order, so we snapshot while the tree is still whole rather
+    /// than trusting the per-window close hooks to all have fired.
+    /// </summary>
+    public void PersistFloatMemoryNow()
+    {
+        _floatMemorySaveTimer?.Stop();
+        if (DockFactory is GenieDockFactory factory) factory.CaptureAllFloatBounds();
+        WriteFloatMemory();
+    }
+
+    private void WriteFloatMemory()
+    {
+        if (DockFactory is not GenieDockFactory factory) return;
+        Settings.FloatMemoryStore.Save(_floatMemoryPath, factory.ExportFloatMemory());
+    }
+
+        /// <summary>Build Core on demand (see <see cref="EnsureCoreBuilt"/>) before
     /// the Script Manager panel is shown. The panel is fully Core-driven —
     /// script library scan, running-scripts list, folder open — but Core is
     /// otherwise built lazily on first connect/command, so showing the panel

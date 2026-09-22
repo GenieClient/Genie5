@@ -594,6 +594,13 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         base.OnClosing(e);
         // Window geometry + windowed-mode layout are no longer auto-saved on
         // close — they persist only when the user saves a layout profile.
+        //
+        // Float memory is the exception, and deliberately so: it records where
+        // a panel's window SAT, not which panels are open, so writing it can't
+        // resurrect an arrangement the user didn't ask for. Done before the
+        // cancel checks because shutdown closes host windows in no guaranteed
+        // order; a cancelled close just means we wrote the same thing twice.
+        ViewModel?.PersistFloatMemoryNow();
         if (e.Cancel)            return;   // something upstream already vetoed
         if (_closeConfirmed)     return;   // second pass after user said Yes
         if (ViewModel?.IsConnected != true) return;
