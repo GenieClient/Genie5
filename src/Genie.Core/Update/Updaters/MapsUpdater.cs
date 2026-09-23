@@ -59,6 +59,7 @@ public sealed class MapsUpdater : IUpdater
         int changedCount = 0;
         var notesLines   = new List<string>();
         var recorded     = LoadShaManifest();
+        var changes      = new List<UpdateChange>();
 
         foreach (var source in _sources)
         {
@@ -81,6 +82,7 @@ public sealed class MapsUpdater : IUpdater
                 if (!File.Exists(localPath))
                 {
                     newCount++;
+                    changes.Add(new UpdateChange(entry.Name, IsNew: true));
                     continue;
                 }
 
@@ -99,6 +101,7 @@ public sealed class MapsUpdater : IUpdater
                      appliedSha != entry.Sha))
                 {
                     changedCount++;
+                    changes.Add(new UpdateChange(entry.Name, IsNew: false));
                 }
             }
         }
@@ -113,7 +116,8 @@ public sealed class MapsUpdater : IUpdater
         return new UpdateCheckResult(
             UpdateAvailable: total > 0,
             LatestVersion:   summary,
-            Notes:           notesLines.Count > 0 ? string.Join("\n", notesLines) : null);
+            Notes:           notesLines.Count > 0 ? string.Join("\n", notesLines) : null,
+            Changes:         changes);
     }
 
     /// <summary>

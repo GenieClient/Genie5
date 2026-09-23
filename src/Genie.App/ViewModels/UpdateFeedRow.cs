@@ -22,7 +22,7 @@ namespace Genie.App.ViewModels;
 public sealed class UpdateFeedRow : ReactiveObject
 {
     private readonly FeedEntry                                                _feed;
-    private readonly Func<FeedEntry, CancellationToken, Task<string>>         _check;
+    private readonly Func<FeedEntry, CancellationToken, Task<(string Status, string? Details)>> _check;
     private readonly Func<FeedEntry, IProgress<UpdateProgress>?, CancellationToken, Task<string>> _apply;
     private readonly Action<FeedEntry, bool>                                  _toggle;
     private readonly Action<FeedEntry>                                        _remove;
@@ -47,6 +47,11 @@ public sealed class UpdateFeedRow : ReactiveObject
     [Reactive] public string Status   { get; private set; } = "";
     [Reactive] public bool   IsBusy   { get; private set; }
 
+    /// <summary>Hover text for the status line — the per-file list from the
+    /// last Check (which files are new / changed). Null hides the tooltip;
+    /// cleared on Update since the list is stale once files are pulled.</summary>
+    [Reactive] public string? StatusDetails { get; private set; }
+
     /// <summary>0–100 fill for the row's inline progress bar.</summary>
     [Reactive] public double Progress              { get; private set; }
 
@@ -64,7 +69,7 @@ public sealed class UpdateFeedRow : ReactiveObject
 
     public UpdateFeedRow(
         FeedEntry                                                                feed,
-        Func<FeedEntry, CancellationToken, Task<string>>                         check,
+        Func<FeedEntry, CancellationToken, Task<(string Status, string? Details)>> check,
         Func<FeedEntry, IProgress<UpdateProgress>?, CancellationToken, Task<string>> apply,
         Action<FeedEntry, bool>                                                  toggle,
         Action<FeedEntry>                                                        remove)
@@ -97,8 +102,9 @@ public sealed class UpdateFeedRow : ReactiveObject
         ProgressIndeterminate = true;
         try
         {
-            Status = "Checking…";
-            Status = await _check(_feed, CancellationToken.None);
+            Status        = "Checking…";
+            StatusDetails = null;
+            (Status, StatusDetails) = await _check(_feed, CancellationToken.None);
         }
         catch (Exception ex) { Status = $"Error: {ex.Message}"; }
         finally
@@ -112,6 +118,7 @@ public sealed class UpdateFeedRow : ReactiveObject
     {
         IsBusy         = true;
         ProgressActive = true;
+        StatusDetails  = null;
         try
         {
             var progress = new Progress<UpdateProgress>(p =>

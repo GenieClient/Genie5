@@ -28,9 +28,14 @@
         </StackPanel>
 
         <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0" Spacing="3">
+          <!-- Hover lists the files the last Check found new / changed
+               (StatusDetails is null otherwise, so no tooltip appears). -->
           <TextBlock Text="{Binding Status}"
                      FontSize="11" Foreground="{DynamicResource Theme.Success}"
-                     TextWrapping="Wrap"/>
+                     TextWrapping="Wrap"
+                     Background="Transparent"
+                     ToolTip.Tip="{Binding StatusDetails}"
+                     ToolTip.ShowDelay="250"/>
           <!-- Inline bar: determinate for Maps (real N/M), marquee for the
                unmeasured plugin steps and Check polls. Hidden at rest. -->
           <ProgressBar Minimum="0" Maximum="100"

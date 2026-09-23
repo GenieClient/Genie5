@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Genie.Core.Update;
 using Genie.Core.Update.Sources;
 using Genie.Core.Update.Updaters;
 using Xunit;
@@ -134,6 +135,9 @@ public class ScriptsUpdaterTests : IDisposable
         Assert.True(before.UpdateAvailable);
         Assert.Contains("2 new", before.LatestVersion);
         Assert.Equal(0, source.Downloads);
+        Assert.Equal(
+            new[] { new UpdateChange("a.cmd", true), new UpdateChange("sub/b.cmd", true) },
+            before.Changes!.OrderBy(c => c.Name));
 
         await updater.ApplyAsync();
         File.WriteAllText(Path.Combine(_dir, "a.cmd"), "drifted\n");
@@ -141,6 +145,7 @@ public class ScriptsUpdaterTests : IDisposable
         var after = await updater.CheckAsync();
         Assert.True(after.UpdateAvailable);
         Assert.Contains("1 changed", after.LatestVersion);
+        Assert.Equal(new[] { new UpdateChange("a.cmd", false) }, after.Changes);
     }
 
     [Fact]

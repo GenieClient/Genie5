@@ -50,6 +50,7 @@ public sealed class ScriptsUpdater : IUpdater
         int newCount     = 0;
         int changedCount = 0;
         var notesLines   = new List<string>();
+        var changes      = new List<UpdateChange>();
 
         foreach (var source in _sources)
         {
@@ -73,6 +74,7 @@ public sealed class ScriptsUpdater : IUpdater
                 if (!File.Exists(localPath))
                 {
                     newCount++;
+                    changes.Add(new UpdateChange(entry.Name, IsNew: true));
                     continue;
                 }
 
@@ -80,6 +82,7 @@ public sealed class ScriptsUpdater : IUpdater
                     GithubContentsSource.GitBlobSha1(localPath) != entry.Sha)
                 {
                     changedCount++;
+                    changes.Add(new UpdateChange(entry.Name, IsNew: false));
                 }
             }
         }
@@ -94,7 +97,8 @@ public sealed class ScriptsUpdater : IUpdater
         return new UpdateCheckResult(
             UpdateAvailable: total > 0,
             LatestVersion:   summary,
-            Notes:           notesLines.Count > 0 ? string.Join("\n", notesLines) : null);
+            Notes:           notesLines.Count > 0 ? string.Join("\n", notesLines) : null,
+            Changes:         changes);
     }
 
     /// <summary>

@@ -294,7 +294,7 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
 
     private enum Kind { Maps, Plugins, Scripts }
 
-    private async Task<string> CheckOneAsync(FeedEntry feed, Kind kind, CancellationToken ct)
+    private async Task<(string Status, string? Details)> CheckOneAsync(FeedEntry feed, Kind kind, CancellationToken ct)
     {
         try
         {
@@ -302,14 +302,57 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
             var r = await u.CheckAsync(ct);
             feed.LastChecked = DateTimeOffset.UtcNow;
             _store.Save(_config);
-            return r.UpdateAvailable
+            var status = r.UpdateAvailable
                 ? $"Update available: {u.CurrentVersion} → {r.LatestVersion}"
                 : $"Up to date ({u.CurrentVersion}).";
+            return (status, FormatChanges(r.Changes, r.Notes));
         }
         catch (Exception ex)
         {
-            return $"Check failed: {ex.Message}";
+            return ($"Check failed: {ex.Message}", null);
         }
+    }
+
+    /// <summary>Most file names listed per section in the hover text before
+    /// collapsing to "…and N more" — keeps the tooltip on-screen for a first
+    /// pull of a large repo (hundreds of "new" files).</summary>
+    private const int MaxChangesListed = 40;
+
+    /// <summary>
+    /// Build the status line's hover text: changed files, then new files,
+    /// each alphabetised, plus any per-source listing errors. Null when there
+    /// is nothing to show so the tooltip stays hidden.
+    /// </summary>
+    internal static string? FormatChanges(IReadOnlyList<UpdateChange>? changes, string? notes)
+    {
+        var sb = new System.Text.StringBuilder();
+
+        void Section(string title, IEnumerable<UpdateChange> items)
+        {
+            var names = items.Select(c => c.Name)
+                             .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                             .ToList();
+            if (names.Count == 0) return;
+            if (sb.Length > 0) sb.AppendLine();
+            sb.AppendLine($"{title} ({names.Count}):");
+            foreach (var n in names.Take(MaxChangesListed))
+                sb.AppendLine($"  {n}");
+            if (names.Count > MaxChangesListed)
+                sb.AppendLine($"  …and {names.Count - MaxChangesListed} more");
+        }
+
+        if (changes is { Count: > 0 })
+        {
+            Section("Changed", changes.Where(c => !c.IsNew));
+            Section("New",     changes.Where(c =>  c.IsNew));
+        }
+        if (!string.IsNullOrWhiteSpace(notes))
+        {
+            if (sb.Length > 0) sb.AppendLine();
+            sb.AppendLine(notes);
+        }
+
+        return sb.Length == 0 ? null : sb.ToString().TrimEnd();
     }
 
     private async Task<string> ApplyOneAsync(

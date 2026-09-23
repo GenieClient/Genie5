@@ -50,10 +50,18 @@ public interface IUpdater
 ///   latest version is strictly newer than the installed one.</param>
 /// <param name="LatestVersion">The latest version string (informational).</param>
 /// <param name="Notes">Optional human-readable release notes / change summary.</param>
+/// <param name="Changes">
+///   Per-file detail for file-list updaters (Maps, Scripts): which remote files
+///   are new or changed. Null for release-shaped updaters. Drives the hover
+///   list on the Updates dialog's status line.</param>
 public sealed record UpdateCheckResult(
-    bool      UpdateAvailable,
-    string    LatestVersion,
-    string?   Notes);
+    bool                          UpdateAvailable,
+    string                        LatestVersion,
+    string?                       Notes,
+    IReadOnlyList<UpdateChange>?  Changes = null);
+
+/// <summary>One file a check found out of date — new locally, or changed upstream.</summary>
+public sealed record UpdateChange(string Name, bool IsNew);
 
 /// <summary>Result of an apply pass.</summary>
 /// <param name="Succeeded">True if the apply completed without any per-item failures.</param>
