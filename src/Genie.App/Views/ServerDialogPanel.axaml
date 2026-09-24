@@ -15,6 +15,13 @@
              x:DataType="vm:ServerDialogViewModel">
 
   <UserControl.Styles>
+    <!-- The per-window font (Configuration → Layout) arrives as the inherited
+         font on this panel. Several Fluent control themes pin their own
+         FontSize, which beats inheritance, so re-point them at the panel's. -->
+    <Style Selector="Button, TextBox, ComboBox, CheckBox, RadioButton, NumericUpDown">
+      <Setter Property="FontFamily" Value="{Binding $parent[UserControl].FontFamily}"/>
+      <Setter Property="FontSize"   Value="{Binding $parent[UserControl].FontSize}"/>
+    </Style>
     <Style Selector="Button.dlgbtn">
       <Setter Property="MinWidth" Value="64"/>
       <Setter Property="Padding"  Value="10,3"/>

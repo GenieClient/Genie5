@@ -172,6 +172,10 @@ public class GenieDockFactory : Factory
     public static string ServerDialogId(string dialogId) =>
         ServerDialogPrefix + (dialogId ?? "").Trim().ToLowerInvariant();
 
+    /// <summary>True if an id is a server-dialog window id (#156).</summary>
+    public static bool IsServerDialogId(string? id) =>
+        id is not null && id.StartsWith(ServerDialogPrefix, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Canonical dock id for a plugin window of the given display name.</summary>
     public static string PluginWindowId(string name) =>
         PluginWindowPrefix + (name ?? "").Trim().ToLowerInvariant();
@@ -914,6 +918,13 @@ public class GenieDockFactory : Factory
                         return _tools.TryGetValue(migrated, out var m) ? m.Dockable : null;
                     return CreatePluginWindowTool(n.Id, n.Title);
                 }
+                // A server dialog window from a saved layout (#156): recreate
+                // it in its saved spot with its saved title so the arrangement
+                // survives a restart. It fills when DR next sends the dialog;
+                // the host hides it again if its mapping no longer renders
+                // (ReconcileServerDialogWindows).
+                if (IsServerDialogId(n.Id))
+                    return CreateServerDialogTool(n.Id.Substring(ServerDialogPrefix.Length), n.Title);
                 return null;   // unregistered id — skip
             default:
                 return null;
@@ -2446,18 +2457,7 @@ public class GenieDockFactory : Factory
         var id = ServerDialogId(dialogId);
         if (!_serverDialogTools.TryGetValue(id, out var tool))
         {
-            var vm = new ServerDialogViewModel(dialogId)
-            {
-                Title = string.IsNullOrWhiteSpace(title) ? dialogId : title!,
-            };
-            // Public #233: register so Configuration → Layout offers per-window
-            // settings for it, same as a dynamic plugin window.
-            var settings = _vm.WindowSettings.Register(id, vm.Title);
-            tool = new ServerDialogTool(vm, id, vm.Title, settings);
-
-            _serverDialogTools[id] = tool;
-            _tools[id]             = (tool, PluginWindowParentId);
-            tool.WindowMenu        = BuildWindowMenu(id, tool);
+            tool = CreateServerDialogTool(dialogId, title);
             show = true;
         }
         else if (!string.IsNullOrWhiteSpace(title))
@@ -2467,6 +2467,55 @@ public class GenieDockFactory : Factory
 
         if (show && !IsToolVisible(id)) SetToolVisibility(id, true);
         return tool.ViewModel;
+    }
+
+    /// <summary>
+    /// The font a server dialog starts with: the UI's own proportional font,
+    /// not the monospaced game font the text windows default to — these are
+    /// real controls with captions, and that is how they rendered before they
+    /// had per-window settings at all.
+    /// </summary>
+    internal static (string Family, double Size) ServerDialogDefaultFont()
+    {
+        var family = Avalonia.Media.FontManager.Current.DefaultFontFamily.Name;
+        var size   = Avalonia.Application.Current?.TryGetResource(
+                         "ControlContentThemeFontSize", null, out var v) == true
+                     && v is double d && d > 0 ? d : 14d;
+        return (family, size);
+    }
+
+    /// <summary>What <see cref="Genie.Core.Layout.WindowSettingsStore.Register(string,string)"/>
+    /// used to give every window, dialogs included. Before #156's settings work
+    /// a dialog's row was dropped on load, so a row still carrying exactly this
+    /// was never a user choice — it is migrated to the proportional default
+    /// rather than turning every dialog monospace on upgrade.</summary>
+    private const string LegacyMonoFamily = "Cascadia Mono,Consolas,Courier New,monospace";
+
+    /// <summary>Create + register a server-dialog VM/Tool (no show). Shared by
+    /// the runtime path and snapshot restore.</summary>
+    private ServerDialogTool CreateServerDialogTool(string dialogId, string? title)
+    {
+        var id = ServerDialogId(dialogId);
+        var vm = new ServerDialogViewModel(dialogId)
+        {
+            Title = string.IsNullOrWhiteSpace(title) ? dialogId : title!.Trim(),
+        };
+        // Public #233: register so Configuration → Layout offers per-window
+        // settings for it, same as a dynamic plugin window. A row persisted in
+        // windows.json is held by the store until now and applied here.
+        var (family, size) = ServerDialogDefaultFont();
+        var settings = _vm.WindowSettings.Register(id, vm.Title, family, size);
+        if (settings.FontFamily == LegacyMonoFamily && settings.FontSize == 13)
+        {
+            settings.FontFamily = family;
+            settings.FontSize   = size;
+        }
+        var tool = new ServerDialogTool(vm, id, vm.Title, settings);
+
+        _serverDialogTools[id] = tool;
+        _tools[id]             = (tool, PluginWindowParentId);
+        tool.WindowMenu        = BuildWindowMenu(id, tool);
+        return tool;
     }
 
     /// <summary>Bring an already-created dialog window to the front

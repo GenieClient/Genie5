@@ -41,6 +41,10 @@ public enum ConfigFieldUpdated
     /// (<c>#config mapperdebug</c>) — GenieCore attaches/detaches the engine's
     /// diagnostic sink.</summary>
     MapperDebug,
+    /// <summary>Server-driven dialog master toggle changed
+    /// (<c>#config serverdialogs</c>, #156) — the host hides every dialog window
+    /// when it goes off and re-renders the mapped ones when it comes back on.</summary>
+    ServerDialogs,
     /// <summary>"Always show scrollbars" changed (<c>#config alwaysshowscrollbars</c>,
     /// public #365) — the host mirrors it into display.json, which applies it.</summary>
     AlwaysShowScrollbars

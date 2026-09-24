@@ -183,6 +183,15 @@ public class ConfigurationViewModel : ReactiveObject
         EditingConnected ? _core?.Scripts.Globals : null;
 
     /// <summary>
+    /// Server-dialog layout mappings (#156) for the selected profile: the live
+    /// table while editing the connected profile — so an edit re-renders an
+    /// open window at once, via <see cref="Genie.Core.Dialogs.ServerDialogMappings.Changed"/>
+    /// — otherwise a draft read from that profile's <c>dialogmappings.json</c>.
+    /// </summary>
+    public Genie.Core.Dialogs.ServerDialogMappings? DialogMappings =>
+        EditingConnected ? _core?.DialogMappings : GetDraftDialogMappings();
+
+    /// <summary>
     /// Per-window display settings. Currently always the live app-wide store
     /// — per-profile draft layouts could be added later but in practice users
     /// expect consistent window appearance regardless of which character is
@@ -344,6 +353,19 @@ public class ConfigurationViewModel : ReactiveObject
         var engine = ClassEngine;
         if (engine is null) return;
         SyncCfg("classes.cfg", () => CfgFormat.ClassLines(engine.GetAll()));
+    }
+
+    /// <summary>Persist the Server Dialogs panel's edits to the selected
+    /// profile's <c>dialogmappings.json</c>.</summary>
+    public void OnDialogMappingsChanged()
+    {
+        if (EditingConnected && _core is not null)
+        {
+            _core.SaveDialogMappings();
+            return;
+        }
+        if (_draftDialogMappings is { } draft)
+            TrySave(() => draft.Save(PathFor(Genie.Core.Dialogs.ServerDialogMappings.FileName)));
     }
 
     public void OnWindowSettingsChanged()
@@ -584,6 +606,7 @@ public class ConfigurationViewModel : ReactiveObject
     private MacroEngine?         _draftMacros;
     private ClassEngine?         _draftClasses;
     private VariableStore?       _draftVariables;
+    private Genie.Core.Dialogs.ServerDialogMappings? _draftDialogMappings;
 
     private void ClearDrafts()
     {
@@ -597,6 +620,7 @@ public class ConfigurationViewModel : ReactiveObject
         _draftMacros      = null;
         _draftClasses     = null;
         _draftVariables   = null;
+        _draftDialogMappings = null;
         _draftGlobalScope  = null;
         _draftProfileScope = null;
         _draftScopesBuilt  = false;
@@ -611,6 +635,7 @@ public class ConfigurationViewModel : ReactiveObject
         this.RaisePropertyChanged(nameof(MacroEngine));
         this.RaisePropertyChanged(nameof(ClassEngine));
         this.RaisePropertyChanged(nameof(VariableStore));
+        this.RaisePropertyChanged(nameof(DialogMappings));
     }
 
     private HighlightEngine GetDraftHighlights()
@@ -677,6 +702,16 @@ public class ConfigurationViewModel : ReactiveObject
         try { var (g, c) = DraftScopes(); LayeredRuleLoad.ApplyLayered(g, c, classes: _draftClasses); }
         catch { }
         return _draftClasses;
+    }
+
+    private Genie.Core.Dialogs.ServerDialogMappings GetDraftDialogMappings()
+    {
+        if (_draftDialogMappings is not null) return _draftDialogMappings;
+        _draftDialogMappings = new Genie.Core.Dialogs.ServerDialogMappings();
+        // Profile file only — the mapping has no global layer (v1).
+        _draftDialogMappings.Load(Path.Combine(_profileDirResolver(SelectedProfile),
+            Genie.Core.Dialogs.ServerDialogMappings.FileName));
+        return _draftDialogMappings;
     }
 
     private VariableStore GetDraftVariables()

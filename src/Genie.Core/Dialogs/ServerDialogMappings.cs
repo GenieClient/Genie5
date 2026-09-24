@@ -98,6 +98,22 @@ public sealed class ServerDialogMappings
     private readonly HashSet<string> _deferred = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _prompted = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// A persisted decision changed — raised with the dialog id after
+    /// <see cref="Set"/> or a successful <see cref="Remove"/>, outside the lock.
+    /// The host re-resolves that dialog so an edit in the settings grid (or
+    /// <c>#dialogs forget</c>) takes effect on an already-open window instead
+    /// of waiting for the server's next delta. Not raised by <see cref="Load"/>:
+    /// a load replaces the whole table at connect, before any window exists.
+    /// May fire off the UI thread.
+    /// </summary>
+    public event Action<string>? Changed;
+
+    /// <summary>The whole table was replaced by <see cref="Load"/> — a connect
+    /// to (possibly) a different profile. The host reconciles every dialog
+    /// window it already has, such as ones restored from a saved layout.</summary>
+    public event Action? Reloaded;
+
     // ── Resolution ───────────────────────────────────────────────────────────
 
     /// <summary>
@@ -188,6 +204,7 @@ public sealed class ServerDialogMappings
             _mappings[mapping.Id] = Clone(mapping);
             _deferred.Remove(mapping.Id);
         }
+        Changed?.Invoke(mapping.Id);
     }
 
     /// <summary>Drop a mapping so the dialog is asked about again — the settings
@@ -195,12 +212,15 @@ public sealed class ServerDialogMappings
     public bool Remove(string dialogId)
     {
         if (string.IsNullOrEmpty(dialogId)) return false;
+        bool removed;
         lock (_gate)
         {
             _deferred.Remove(dialogId);
             _prompted.Remove(dialogId);
-            return _mappings.Remove(dialogId);
+            removed = _mappings.Remove(dialogId);
         }
+        if (removed) Changed?.Invoke(dialogId);
+        return removed;
     }
 
     /// <summary>Note the server's title for a dialog, for the settings grid.</summary>
@@ -232,7 +252,15 @@ public sealed class ServerDialogMappings
     /// </summary>
     public bool Load(string path)
     {
-        if (!File.Exists(path)) return false;
+        if (!File.Exists(path))
+        {
+            // No file = no decisions for this profile. Clearing matters on a
+            // reconnect as a different character: without it the previous
+            // profile's table carried over and was then SAVED into this one.
+            lock (_gate) _mappings.Clear();
+            Reloaded?.Invoke();
+            return false;
+        }
         try
         {
             var loaded = JsonSerializer.Deserialize<List<ServerDialogMapping>>(
@@ -251,6 +279,7 @@ public sealed class ServerDialogMappings
                     _mappings[m.Id] = m;
                 }
             }
+            Reloaded?.Invoke();
             return true;
         }
         catch { return false; }

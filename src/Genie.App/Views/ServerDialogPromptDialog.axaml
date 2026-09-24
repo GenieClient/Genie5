@@ -18,7 +18,7 @@
                FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"/>
 
     <TextBlock TextWrapping="Wrap" Opacity="0.85"
-               Text="DragonRealms wants to show a window Genie hasn't seen before. Where should it go? Your answer is saved with this profile; to change it later, type #dialogs forget and the window's id and Genie will ask again."/>
+               Text="DragonRealms wants to show a window Genie hasn't seen before. Where should it go? Your answer is saved with this profile. To change it later, go to Configuration, Layout, Server Dialogs, or type #dialogs forget and the window's id."/>
 
     <Border BorderThickness="1" BorderBrush="{DynamicResource Theme.Border}"
             Padding="8" CornerRadius="3">

@@ -1828,8 +1828,14 @@
     <!-- Server-driven dialog window (#156): DR describes the controls over    -->
     <!-- <dialogData>, the grid is inferred from its pixel coordinates, and     -->
     <!-- the panel renders real controls rather than lines of text.            -->
+    <!-- Per-window font: set on the tool-bound wrapper as the inheritable
+         TextElement properties, because a binding on the panel itself would
+         resolve against the ViewModel it takes as its DataContext. -->
     <DataTemplate DataType="docking:ServerDialogTool">
-      <views:ServerDialogPanel DataContext="{Binding ViewModel}"/>
+      <Panel TextElement.FontFamily="{Binding DialogFontFamily}"
+             TextElement.FontSize="{Binding DialogFontSize}">
+        <views:ServerDialogPanel DataContext="{Binding ViewModel}"/>
+      </Panel>
     </DataTemplate>
 
     <DataTemplate DataType="docking:PluginWindowTool">

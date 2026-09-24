@@ -1,0 +1,66 @@
+<!-- Configuration → Server Dialogs (#156). The settings grid for the per-profile
+     Dialog Layout Mapping: every dialog the first-seen chooser has an answer
+     for, where it renders, whether it opens on its own. Before this the only
+     way to change an answer was #dialogs forget or hand-editing
+     dialogmappings.json. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Genie.App.Views.ServerDialogsPanel">
+
+  <Grid RowDefinitions="Auto,Auto,*">
+
+    <StackPanel Grid.Row="0" Spacing="4" Margin="4,4,4,0">
+      <CheckBox Name="MasterCheck"
+                Content="Show server dialog windows"
+                IsCheckedChanged="OnMasterChanged"
+                ToolTip.Tip="Master switch (#config serverdialogs). Off: no dialog window opens and no chooser appears. The contents keep updating in the background, so switching it back on shows every dialog up to date. The answers below are kept either way."/>
+      <TextBlock Name="MasterHint" Foreground="Gray" FontStyle="Italic"
+                 TextWrapping="Wrap" IsVisible="False"
+                 Text="Connect to change the master switch — it lives in settings.cfg with the rest of #config."/>
+    </StackPanel>
+
+    <TextBlock Grid.Row="1" Margin="4,8,4,0" TextWrapping="Wrap" Opacity="0.85"
+               Text="The first time DragonRealms sends a window Genie hasn't seen, Genie asks where it should go. Your answers are listed here, saved with this profile. Forget one and Genie asks again the next time DragonRealms sends it."/>
+
+    <Grid Grid.Row="2" RowDefinitions="*,Auto" Margin="4">
+      <DataGrid Name="ItemsList"
+                Grid.Row="0"
+                Margin="0,4,0,4"
+                IsReadOnly="True"
+                SelectionMode="Single"
+                CanUserSortColumns="True"
+                GridLinesVisibility="Horizontal"
+                HeadersVisibility="Column"
+                x:CompileBindings="False"
+                SelectionChanged="OnSelectionChanged">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Dialog"    Binding="{Binding Title}"    Width="*"/>
+          <DataGridTextColumn Header="Id"        Binding="{Binding Id}"       Width="Auto"/>
+          <DataGridTextColumn Header="Where"     Binding="{Binding Where}"    Width="Auto"/>
+          <DataGridTextColumn Header="Auto-open" Binding="{Binding AutoOpen}" Width="Auto"/>
+        </DataGrid.Columns>
+      </DataGrid>
+
+      <Grid Grid.Row="1" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto"
+            Margin="0,4,0,0">
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Where:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+        <ComboBox  Grid.Row="0" Grid.Column="1" Name="ModeBox" MinWidth="220" Margin="0,0,0,4"
+                   HorizontalAlignment="Left"/>
+
+        <CheckBox  Grid.Row="1" Grid.Column="1" Name="AutoOpenCheck" Margin="0,0,0,4"
+                   Content="Open it automatically when DragonRealms sends it"
+                   ToolTip.Tip="Off: the window still fills in, but stays closed until you open it from Window → Server Dialogs."/>
+
+        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="0,2,0,4">
+          <Button Content="Save"   Click="OnSave"/>
+          <Button Content="Forget" Click="OnForget"
+                  ToolTip.Tip="Drop this answer. Genie asks again the next time DragonRealms sends the window (same as #dialogs forget)."/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="3" Grid.Column="1" Name="StatusText" Margin="0,6,0,0"
+                   Foreground="Gray" FontStyle="Italic" TextWrapping="Wrap"/>
+      </Grid>
+    </Grid>
+
+  </Grid>
+</UserControl>

@@ -243,7 +243,10 @@ public sealed class PersistenceService
             FlashOnActivity = s.FlashOnActivity,
             IfClosed     = s.IfClosed,
             HasIfClosed  = true,    // value above is authoritative
-        });
+        })
+        // Rows for dynamic windows that have not opened this session (#156):
+        // written back verbatim so a save cannot drop them.
+        .Concat(store.Held.Where(h => !store.All.ContainsKey(h.Id)));
         File.WriteAllText(path, JsonSerializer.Serialize(data, _options));
     }
 

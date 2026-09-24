@@ -405,6 +405,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// (#echo &gt;name, #link, #window) — split out of Plugin Windows, which
     /// used to list both.</summary>
     public System.Collections.ObjectModel.ObservableCollection<PluginWindowMenuItem> ScriptWindowMenuItems { get; } = new();
+    /// <summary>Server-driven dialog windows created this session (Window →
+    /// Server Dialogs, #156) — how a dialog mapped with auto-open off, or one
+    /// the user closed, is found again. Rebuilt when the Window menu opens.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<PluginWindowMenuItem> ServerDialogMenuItems { get; } = new();
     public ReactiveCommand<Unit, Unit> OpenPluginsFolderCommand { get; }
     public ReactiveCommand<Unit, Unit> ReloadPluginsCommand     { get; }
     public ReactiveCommand<Unit, Unit> RefreshPluginListCommand { get; }
@@ -1492,6 +1496,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             // TTS hooks for the Text-to-Speech tab — this VM owns the TtsService.
             cfgVm.SpeakSample     = text => _tts?.Speak(text, Services.TtsPriority.High);
             cfgVm.TtsVoiceChanged = () => _tts?.Reset();
+            // Server Dialogs grid: the windows a dialog can be put beside.
+            cfgVm.DialogTargetWindows = dialogId =>
+                (DockFactory as GenieDockFactory)?.DialogTargetWindows(dialogId)
+                ?? (IReadOnlyList<(string, string)>)Array.Empty<(string, string)>();
             cfgVm.TtsInstallVoice = () => InstallTtsVoiceAsync(Services.VoiceCatalog.Default);
             await ShowConfigurationDialog.Handle(cfgVm);
         });
@@ -3330,9 +3338,96 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     {
         core.ServerDialogs.Changes.Subscribe(change =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => OnServerDialogChanged(core, change)));
+
+        // A decision changed under an existing window — the settings grid,
+        // #dialogs forget, or the first-seen chooser itself — so apply it now
+        // rather than on the server's next delta.
+        core.DialogMappings.Changed += id =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ReapplyServerDialog(core, id));
+        core.DialogMappings.Reloaded += () =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ReconcileServerDialogWindows(core));
+        core.Config.ConfigChanged += field =>
+        {
+            if (field == Genie.Core.Config.ConfigFieldUpdated.ServerDialogs)
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => ReconcileServerDialogWindows(core));
+        };
+    }
+
+    /// <summary>
+    /// Bring one dialog's window in line with its current mapping: hidden when
+    /// it should not render (ignored, forgotten and awaiting a new answer, or
+    /// the <c>serverdialogs</c> master toggle off), otherwise re-rendered from
+    /// the engine's state. A forgotten dialog is NOT prompted for here — the
+    /// chooser comes up on DR's next delta, not while the user is mid-edit in
+    /// Configuration.
+    /// </summary>
+    private void ReapplyServerDialog(GenieCore core, string dialogId)
+    {
+        if (DockFactory is not GenieDockFactory factory) return;
+        var state = core.ServerDialogs.Get(dialogId);
+        var how   = core.DialogMappings.Resolve(dialogId, state?.Location);
+
+        // A different answer about WHERE it goes: forget where the old answer
+        // put it, so the window actually moves. An auto-open-only edit keeps
+        // the user's placement.
+        // A window that was on screen comes straight back in its new place,
+        // whatever its auto-open setting says.
+        var reshow = false;
+        var key = PlacementKey(how);
+        if (_serverDialogPlacementKeys.TryGetValue(dialogId, out var was) && was != key)
+        {
+            reshow = factory.IsToolVisible(GenieDockFactory.ServerDialogId(dialogId));
+            factory.ResetServerDialogPlacement(dialogId);
+        }
+        _serverDialogPlacementKeys[dialogId] = key;
+
+        if (!core.Config.ServerDialogs || !how.ShouldRender)
+        {
+            factory.HideServerDialog(dialogId);
+            return;
+        }
+        if (state is not null)
+            OnServerDialogChanged(core,
+                new ServerDialogChange(dialogId, ServerDialogChangeKind.Data, state));
+        if (reshow) factory.ExposeServerDialog(dialogId);
+    }
+
+    /// <summary>
+    /// Re-check every dialog window at once — after the mapping table reloads
+    /// at connect (windows restored from a saved layout may belong to dialogs
+    /// this profile ignores) and when <c>serverdialogs</c> flips. Turning it
+    /// back on re-renders everything the engine buffered meanwhile.
+    /// </summary>
+    private void ReconcileServerDialogWindows(GenieCore core)
+    {
+        if (DockFactory is not GenieDockFactory factory) return;
+
+        foreach (var (dockId, _, _) in factory.ServerDialogWindows())
+        {
+            var dialogId = dockId.Substring(GenieDockFactory.ServerDialogPrefix.Length);
+            // A window restored from a saved layout has no engine state until
+            // DR sends the dialog; only hide it here, never re-render.
+            var how = core.DialogMappings.Resolve(dialogId, core.ServerDialogs.Get(dialogId)?.Location);
+            if (!core.Config.ServerDialogs || !how.ShouldRender)
+                factory.HideServerDialog(dialogId);
+        }
+
+        if (!core.Config.ServerDialogs) return;
+        foreach (var state in core.ServerDialogs.Snapshot())
+            OnServerDialogChanged(core,
+                new ServerDialogChange(state.Id, ServerDialogChangeKind.Data, state));
     }
 
     private readonly HashSet<string> _hookedServerDialogs = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The mode (and target window) each dialog was last rendered
+    /// under, to tell a placement change from an auto-open-only edit.</summary>
+    private readonly Dictionary<string, string> _serverDialogPlacementKeys = new(StringComparer.OrdinalIgnoreCase);
+
+    private static string PlacementKey(ServerDialogDisposition how) =>
+        how.Mode == ServerDialogMode.ExistingWindow
+            ? $"{how.Mode}|{how.Target?.Trim().ToLowerInvariant()}"
+            : how.Mode.ToString();
 
     private async void OnServerDialogChanged(GenieCore core, ServerDialogChange change)
     {
@@ -3344,6 +3439,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 return;
             }
             if (change.State is null || DockFactory is not GenieDockFactory factory) return;
+
+            // Master toggle off: no windows, no choosers. The engine keeps
+            // merging, so turning it back on opens every dialog up to date.
+            if (!core.Config.ServerDialogs) return;
 
             var state = change.State;
             var how   = core.DialogMappings.Resolve(state.Id, state.Location);
@@ -3364,8 +3463,19 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
             // AutoOpen off means populate silently and let the Window menu open
             // it; DR having closed the dialog likewise shouldn't re-surface it.
-            var show = how.AutoOpen && state.IsOpen;
-            var vm   = factory.GetOrCreateServerDialog(state.Id, state.Title, show);
+            // "Where DR suggests" reads the server's placement hints, "Existing
+            // window" goes beside the chosen window; "Its own window" keeps the
+            // right-column default.
+            var show      = how.AutoOpen && state.IsOpen;
+            var placement = how.Mode switch
+            {
+                ServerDialogMode.WhereDrProposes =>
+                    ServerDialogPlacement.From(state.Location, state.Width, state.Height),
+                ServerDialogMode.ExistingWindow  => ServerDialogPlacement.With(how.Target),
+                _                                => ServerDialogPlacement.Default,
+            };
+            var vm = factory.GetOrCreateServerDialog(state.Id, state.Title, show, placement);
+            _serverDialogPlacementKeys[state.Id] = PlacementKey(how);
 
             vm.SeparatorChar = core.Config.SeparatorChar;
             HookServerDialog(core, factory, vm);
@@ -3437,12 +3547,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Title    = state.Title,
         });
         core.SaveDialogMappings();
-
-        // Render immediately with whatever accumulated while we were asking.
-        var current = core.ServerDialogs.Get(state.Id);
-        if (current is not null)
-            OnServerDialogChanged(core,
-                new ServerDialogChange(state.Id, ServerDialogChangeKind.Data, current));
+        // Set raised DialogMappings.Changed, and ReapplyServerDialog renders
+        // whatever accumulated while we were asking.
     }
 
     /// and mutate the dock tree.</summary>
@@ -3640,6 +3746,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     {
         FillWindowToggleList(PluginWindowMenuItems, f => f.PluginWindows(pluginOwned: true));
         FillWindowToggleList(ScriptWindowMenuItems, f => f.PluginWindows(pluginOwned: false));
+        FillWindowToggleList(ServerDialogMenuItems, f => f.ServerDialogWindows());
     }
 
     private void FillWindowToggleList(

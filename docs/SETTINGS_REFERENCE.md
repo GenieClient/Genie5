@@ -79,6 +79,7 @@ setting; only `frontend` appears in `settings.cfg` and `#config list`).
 | `substitutes` | `True` | Master enable for the substitutes rule engine. |
 | `gags` | `True` | Master enable for the gags rule engine. |
 | `aliases` | `True` | Master enable for the aliases rule engine. |
+| `serverdialogs` | `True` | Master enable for server-driven dialog windows (bank, store, spells, …). Off: no dialog window opens and no first-seen chooser appears; contents keep buffering, so turning it back on shows each mapped dialog up to date. Per-dialog answers live in `dialogmappings.json` (Configuration → Layout → Server Dialogs). |
 
 ## Scripting
 

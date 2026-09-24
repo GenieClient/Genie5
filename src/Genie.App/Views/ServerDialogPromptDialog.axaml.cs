@@ -12,9 +12,9 @@ namespace Genie.App.Views;
 /// close box — the safe answer, since it decides nothing permanent.
 ///
 /// <para><see cref="ServerDialogMode.ExistingWindow"/> is deliberately absent:
-/// it needs a picker of existing windows, which belongs with the Server Dialogs
-/// settings grid. The mode works today by hand-editing
-/// <c>dialogmappings.json</c>.</para>
+/// the renderer does not yet draw a dialog inside another window, so it would
+/// change nothing on screen. The Server Dialogs settings grid leaves it out for
+/// the same reason.</para>
 /// </summary>
 public partial class ServerDialogPromptDialog : Window
 {

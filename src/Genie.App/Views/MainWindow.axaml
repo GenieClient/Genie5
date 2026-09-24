@@ -518,6 +518,24 @@
           </MenuItem.Styles>
         </MenuItem>
 
+        <!-- ── Server-driven dialog windows (#156) ─────────────────────── -->
+        <!-- Same shape as Plugin Windows: one checkbox per dialog window    -->
+        <!-- created this session. Where a dialog mapped with auto-open off  -->
+        <!-- is opened from.                                                 -->
+        <MenuItem Header="Server _Dialogs"
+                  Classes="plugin-windows-host"
+                  ItemsSource="{Binding ServerDialogMenuItems}"
+                  ToolTip.Tip="Windows DragonRealms describes itself (bank, store, spells, feats, profile, TDP). Each dialog shown this session appears here; toggle to show or hide it. Where each one lives is set in Configuration, Layout, Server Dialogs.">
+          <MenuItem.Styles>
+            <Style Selector="MenuItem:not(.plugin-windows-host)">
+              <Setter Property="Header"     Value="{Binding Title}"/>
+              <Setter Property="ToggleType" Value="CheckBox"/>
+              <Setter Property="IsChecked"  Value="{Binding IsVisible, Mode=OneWay}"/>
+              <Setter Property="Command"    Value="{Binding ToggleCommand}"/>
+            </Style>
+          </MenuItem.Styles>
+        </MenuItem>
+
       </MenuItem>
 
       <!-- ── Plugins ─────────────────────────────────────────────────────── -->

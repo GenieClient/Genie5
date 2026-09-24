@@ -327,6 +327,12 @@ public sealed class GenieConfig
     /// combat hits in bold + the <c>creatures</c> preset colour, in every window
     /// that shows them. On by default (Wrayth / Genie 3-4 parity).</summary>
     public bool MonsterBold { get; set; } = true;
+    /// <summary>Server-driven dialog windows master toggle (#156). Off = no
+    /// dialog window renders and no first-seen prompt appears; the state engine
+    /// keeps buffering, so turning it back on opens every mapped dialog up to
+    /// date. Per-dialog decisions live in <c>dialogmappings.json</c> and are
+    /// untouched either way. <c>#config serverdialogs on|off</c>.</summary>
+    public bool ServerDialogs { get; set; } = true;
     public bool ShowImages { get; set; } = true;
     public bool WebLinkSafety { get; set; } = true;
     public bool SizeInputToGame { get; set; }
@@ -811,6 +817,7 @@ public sealed class GenieConfig
         ("autowalkunfocusseconds", AutoWalkUnfocusSeconds.ToString()),
         ("showlinks", ShowLinks.ToString()),
         ("monsterbold", MonsterBold.ToString()),
+        ("serverdialogs", ServerDialogs.ToString()),
         ("showimages", ShowImages.ToString()),
         ("weblinksafety", WebLinkSafety.ToString()),
         ("connectscript", ConnectScript),
@@ -887,7 +894,7 @@ public sealed class GenieConfig
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
         ("Window / Input",   new[] { "alwaysontop", "alwaysshowscrollbars", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout", "objectscreatures", "objectsconfigbar" }),
-        ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
+        ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases", "serverdialogs" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "tracesends", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "scriptdebugwindow", "gamethread" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
@@ -1036,6 +1043,7 @@ public sealed class GenieConfig
                     break;
                 case "showlinks": ShowLinks = ToBool(value); break;
                 case "monsterbold": MonsterBold = ToBool(value); break;
+                case "serverdialogs": ServerDialogs = ToBool(value); Notify(ConfigFieldUpdated.ServerDialogs); break;
                 case "showimages": ShowImages = ToBool(value); Notify(ConfigFieldUpdated.ImagesEnabled); break;
                 case "sizeinputtogame": SizeInputToGame = ToBool(value); Notify(ConfigFieldUpdated.SizeInputToGame); break;
                 case "updatemapperscripts": UpdateMapperScripts = ToBool(value); Notify(ConfigFieldUpdated.UpdateMapperScripts); break;

@@ -99,6 +99,9 @@
           <TabItem Header="Settings">
             <views:LayoutSettingsPanel Name="LayoutSettingsPanelCtrl"/>
           </TabItem>
+          <TabItem Header="Server Dialogs">
+            <views:ServerDialogsPanel Name="ServerDialogsPanelCtrl"/>
+          </TabItem>
         </TabControl>
       </TabItem>
 

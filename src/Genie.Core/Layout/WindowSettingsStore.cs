@@ -7,6 +7,21 @@ public sealed class WindowSettingsStore
     private readonly Dictionary<string, WindowSettings> _settings = new();
     public IReadOnlyDictionary<string, WindowSettings> All => _settings;
 
+    /// <summary>
+    /// Persisted rows for ids nobody has registered yet this session — the
+    /// dynamic windows (server dialogs, plugin windows) that only register when
+    /// the server or a plugin first opens them, which is after windows.json
+    /// loads. <see cref="Register"/> applies a held row the moment its id
+    /// arrives, and the save writes held rows back out, so a window that simply
+    /// has not appeared yet this session keeps its fonts instead of losing them
+    /// at the next save. Before this they were dropped on load, which is why
+    /// per-dialog fonts were session-only.
+    /// </summary>
+    private readonly Dictionary<string, WindowSettingsPersistenceModel> _held = new();
+
+    /// <summary>Rows held for not-yet-registered ids, for the save path.</summary>
+    public IReadOnlyCollection<WindowSettingsPersistenceModel> Held => _held.Values;
+
     public WindowSettings Get(string id) => _settings.TryGetValue(id, out var s) ? s : Fallback;
 
     private static readonly WindowSettings Fallback = new()
@@ -45,17 +60,29 @@ public sealed class WindowSettingsStore
         new(StringComparer.OrdinalIgnoreCase) { "ooc" };
 
     public WindowSettings Register(string id, string defaultTitle)
+        => Register(id, defaultTitle, "Cascadia Mono,Consolas,Courier New,monospace", 13);
+
+    /// <summary>
+    /// Register with a window-specific default font — for a panel that is not
+    /// a monospaced text stream (the server dialogs render proportional
+    /// controls, so a monospace default would change how they look the first
+    /// time anyone opened Configuration → Layout). A row persisted for this id
+    /// and held since load wins over the defaults.
+    /// </summary>
+    public WindowSettings Register(string id, string defaultTitle,
+                                   string defaultFontFamily, double defaultFontSize)
     {
         DefaultIfClosed.TryGetValue(id, out var defIfClosed);
         var s = new WindowSettings
         {
             Id = id, DefaultTitle = defaultTitle, DisplayTitle = defaultTitle,
-            FontFamily = "Cascadia Mono,Consolas,Courier New,monospace",
-            FontSize = 13, Foreground = "Default", Background = "",
+            FontFamily = defaultFontFamily,
+            FontSize = defaultFontSize, Foreground = "Default", Background = "",
             Timestamp = false, IfClosed = defIfClosed,
             EchoToMain = !DefaultNoEchoToMain.Contains(id),
         };
         _settings[id] = s;
+        if (_held.Remove(id, out var held)) Apply(held);
         return s;
     }
 
@@ -75,7 +102,15 @@ public sealed class WindowSettingsStore
 
     public void Apply(WindowSettingsPersistenceModel m)
     {
-        if (!_settings.TryGetValue(m.Id, out var s)) return;
+        if (string.IsNullOrEmpty(m.Id)) return;
+        if (!_settings.TryGetValue(m.Id, out var s))
+        {
+            // Not registered yet — hold it for Register (see _held). A later
+            // load layer (profile over global) replaces an earlier held row,
+            // the same precedence a registered window gets.
+            _held[m.Id] = m;
+            return;
+        }
 
         // Rename migration: if the saved title is still the old shipped
         // default for a since-renamed window, drop it so the new DefaultTitle
