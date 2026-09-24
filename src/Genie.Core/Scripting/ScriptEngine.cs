@@ -3529,6 +3529,33 @@ public sealed class ScriptEngine
         while (nameEnd > nameStart)
         {
             var name = s[nameStart..nameEnd];
+
+            // Genie 4's built-in ".length" suffix (Script.cs ParseVariable:2450):
+            // %list.length is the number of pipe-separated elements in %list,
+            // i.e. count('|') + 1 — so an EMPTY list reads 1, which is G4's
+            // arithmetic and what the corpus loops are written against.
+            //
+            // Checked BEFORE the plain lookup at this candidate length, exactly
+            // as Genie 4 orders it, which means it SHADOWS a stored variable
+            // that happens to be named "list.length". That shadowing is the
+            // whole point: cyclic.cmd does
+            //     eval cyclics.length count("%cyclics","|")
+            //     if %c <= %cyclics.length then
+            // storing the pipe COUNT (2 for "a|b|c") and then reading it back
+            // expecting the built-in's count+1 (3). Without the built-in we
+            // returned the stored 2 and the loop silently skipped its last
+            // element — a wrong answer rather than a visible failure.
+            if (name.Length > 7 &&
+                name.EndsWith(".length", StringComparison.OrdinalIgnoreCase) &&
+                (nameEnd == j || !char.IsLetter(s[nameEnd])) &&
+                TryResolveVar(name[..^7], c, inst, out var listValue))
+            {
+                value    = (listValue.Count(ch => ch == '|') + 1)
+                           .ToString(CultureInfo.InvariantCulture);
+                resolved = true;
+                break;
+            }
+
             if (TryResolveVar(name, c, inst, out value))
             {
                 bool wordBoundary = nameEnd == j || !char.IsLetter(s[nameEnd]);

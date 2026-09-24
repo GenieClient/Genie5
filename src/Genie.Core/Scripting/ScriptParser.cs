@@ -130,6 +130,29 @@ public static class ScriptParser
     }
 
     /// <summary>
+    /// True when a sigil-leading line is an assignment rather than a value
+    /// being used in place — the name must be a plain variable name followed
+    /// by whitespace or <c>=</c>.
+    /// </summary>
+    /// <remarks>
+    /// Guards against eating a line that merely BEGINS with a variable, such
+    /// as <c>%cmd extra args</c> where the intent is the substituted value as
+    /// a game command. Genie 4 does not make that distinction and rewrites any
+    /// sigil-leading line; the corpus has no such line, and being narrower
+    /// here cannot turn a working script into a broken one — only the reverse.
+    /// </remarks>
+    private static bool IsAssignmentStart(string trimmed)
+    {
+        int i = 1;
+        while (i < trimmed.Length &&
+               (char.IsLetterOrDigit(trimmed[i]) || trimmed[i] is '_' or '.' or '-'))
+            i++;
+        if (i == 1) return false;                       // bare sigil, no name
+        if (i >= trimmed.Length) return false;          // name with no value
+        return trimmed[i] == ' ' || trimmed[i] == '\t' || trimmed[i] == '=';
+    }
+
+    /// <summary>
     /// Rewrites inline-body conditionals (`if X then stmt`, `elseif X then stmt`,
     /// `else stmt`) into block form, and translates `begin`/`end` to `{`/`}`.
     /// Runs after include expansion and before line numbering so the unified
@@ -142,6 +165,35 @@ public static class ScriptParser
         foreach (var (origin, lineNo, raw) in input)
         {
             var trimmed = raw.Trim();
+
+            // Genie 4's bare sigil assignment (Script.cs:3787-3799). A line
+            // that STARTS with a sigil is an assignment statement:
+            //
+            //   %Failure = 0     →  setvariable Failure 0
+            //   %item $0         →  setvariable item $0
+            //   $gvar = world    →  #var gvar world
+            //
+            // Rewritten here, at load, for the same reason Genie 4 does it
+            // here: by dispatch time the line has been %var/$var-substituted,
+            // so re-assigning an already-defined variable would arrive as
+            // "0 = 1" with nothing left to recognise. Ten lines in
+            // lumberjacking.cmd use this form; without the rewrite each one
+            // fell through to the default case and was sent to the game.
+            if (trimmed.Length > 1 && (trimmed[0] == '%' || trimmed[0] == '$') &&
+                IsAssignmentStart(trimmed))
+            {
+                var body = trimmed[1..];
+                // Genie 4 replaces EVERY " = " in the line; we replace only the
+                // first, so a value that itself contains " = " survives intact.
+                // No corpus line has one, so this is a deliberate, zero-impact
+                // improvement rather than a parity break.
+                int eq = body.IndexOf(" = ", StringComparison.Ordinal);
+                if (eq >= 0) body = body[..eq] + " " + body[(eq + 3)..];
+
+                var stmt = trimmed[0] == '%' ? "setvariable " + body : "#var " + body;
+                output.Add((origin, lineNo, LeadingIndent(raw) + stmt));
+                continue;
+            }
 
             // begin / end aliases. Only when the whole line is just that word.
             if (trimmed.Equals("begin", StringComparison.OrdinalIgnoreCase))
