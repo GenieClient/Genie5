@@ -59,6 +59,24 @@ public class ServerDialogPlacementTests
     }
 
     [Fact]
+    public void ExistingWindowGoesBesideItsTarget()
+    {
+        var p = ServerDialogPlacement.With(" experience ");
+        Assert.Equal(ServerDialogPlacementKind.WithWindow, p.Kind);
+        Assert.Equal("experience", p.Target);
+        Assert.False(p.Floats);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ExistingWindowWithNoTargetFallsBackToTheDefault(string? target)
+    {
+        Assert.Same(ServerDialogPlacement.Default, ServerDialogPlacement.With(target));
+    }
+
+    [Fact]
     public void TheDefaultDocksRight()
     {
         Assert.Equal(ServerDialogPlacementKind.DockRight, ServerDialogPlacement.Default.Kind);

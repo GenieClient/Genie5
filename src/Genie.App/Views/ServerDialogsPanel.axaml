@@ -44,8 +44,12 @@
       <Grid Grid.Row="1" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto"
             Margin="0,4,0,0">
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Where:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-        <ComboBox  Grid.Row="0" Grid.Column="1" Name="ModeBox" MinWidth="220" Margin="0,0,0,4"
-                   HorizontalAlignment="Left"/>
+        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="0,0,0,4">
+          <ComboBox Name="ModeBox" MinWidth="220" SelectionChanged="OnModeChanged"/>
+          <ComboBox Name="TargetBox" MinWidth="200" IsVisible="False"
+                    PlaceholderText="Pick a window…"
+                    ToolTip.Tip="The dialog opens as a tab in the same group as this window, wherever that window is — docked or floating."/>
+        </StackPanel>
 
         <CheckBox  Grid.Row="1" Grid.Column="1" Name="AutoOpenCheck" Margin="0,0,0,4"
                    Content="Open it automatically when DragonRealms sends it"

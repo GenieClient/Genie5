@@ -25,15 +25,20 @@ public partial class ServerDialogsPanel : UserControl
         public override string ToString() => Label;
     }
 
-    /// <summary>What the chooser offers, in the chooser's own words.
-    /// <see cref="ServerDialogMode.ExistingWindow"/> is not offered: the
-    /// renderer does not yet draw a dialog inside another window, so picking
-    /// it would change nothing on screen. A hand-edited one still shows (see
-    /// <see cref="ChoicesFor"/>) so saving doesn't silently rewrite it.</summary>
+    private sealed record TargetChoice(string Id, string Title)
+    {
+        public override string ToString() => Title;
+    }
+
+    /// <summary>What the grid offers. "Beside another window" is the
+    /// <see cref="ServerDialogMode.ExistingWindow"/> answer: the dialog opens as
+    /// a tab in the same group as the window picked in the second box. The
+    /// first-seen chooser does not offer it — it has no room for a picker.</summary>
     private static readonly ModeChoice[] Choices =
     {
         new(ServerDialogMode.NewWindow,       "Its own window"),
         new(ServerDialogMode.WhereDrProposes, "Where DR suggests"),
+        new(ServerDialogMode.ExistingWindow,  "Beside another window"),
         new(ServerDialogMode.Ignore,          "Never show it"),
     };
 
@@ -41,6 +46,7 @@ public partial class ServerDialogsPanel : UserControl
     private Action?               _onChanged;
     private GenieConfig?          _config;
     private Action?               _onConfigChanged;
+    private Func<string?, IReadOnlyList<(string Id, string Title)>>? _targets;
     private bool                  _loadingMaster;
 
     public ServerDialogsPanel()
@@ -50,12 +56,14 @@ public partial class ServerDialogsPanel : UserControl
     }
 
     public void Initialize(ServerDialogMappings? mappings, Action? onChanged,
-                           GenieConfig? config, Action? onConfigChanged)
+                           GenieConfig? config, Action? onConfigChanged,
+                           Func<string?, IReadOnlyList<(string Id, string Title)>>? targetWindows = null)
     {
         _mappings        = mappings;
         _onChanged       = onChanged;
         _config          = config;
         _onConfigChanged = onConfigChanged;
+        _targets         = targetWindows;
 
         _loadingMaster          = true;
         MasterCheck.IsEnabled   = config is not null;
@@ -67,27 +75,38 @@ public partial class ServerDialogsPanel : UserControl
         Refresh();
     }
 
-    public static string DescribeMode(ServerDialogMapping m) => m.Mode switch
+    /// <summary>The Where column. <paramref name="titleOf"/> turns a target's
+    /// dock id into its window title; an id it doesn't know is shown as-is (a
+    /// plugin window that hasn't opened this session, say).</summary>
+    public static string DescribeMode(ServerDialogMapping m, Func<string, string?>? titleOf = null) => m.Mode switch
     {
         ServerDialogMode.NewWindow       => "Its own window",
         ServerDialogMode.WhereDrProposes => "Where DR suggests",
         ServerDialogMode.ExistingWindow  => string.IsNullOrWhiteSpace(m.Target)
-                                                ? "Existing window"
-                                                : $"Existing window: {m.Target}",
+                                                ? "Beside another window"
+                                                : $"Beside {titleOf?.Invoke(m.Target!) ?? m.Target}",
         ServerDialogMode.Ignore          => "Never show it",
         _                                => m.Mode.ToString(),
     };
 
-    public static MappingRow ToRow(ServerDialogMapping m) => new(
+    public static MappingRow ToRow(ServerDialogMapping m, Func<string, string?>? titleOf = null) => new(
         m.Id,
         string.IsNullOrWhiteSpace(m.Title) ? m.Id : m.Title!,
-        DescribeMode(m),
+        DescribeMode(m, titleOf),
         m.Mode == ServerDialogMode.Ignore ? "—" : m.AutoOpen ? "✓" : "✗");
+
+    private IReadOnlyList<TargetChoice> TargetsFor(string? dialogId) =>
+        (_targets?.Invoke(dialogId) ?? Array.Empty<(string, string)>())
+            .Select(t => new TargetChoice(t.Id, t.Title))
+            .ToList();
+
+    private string? TitleOf(string targetId) =>
+        TargetsFor(null).FirstOrDefault(t => string.Equals(t.Id, targetId, StringComparison.OrdinalIgnoreCase))?.Title;
 
     private void Refresh()
     {
         var keep = (ItemsList.SelectedItem as MappingRow)?.Id;
-        var rows = _mappings?.All().Select(ToRow).ToList() ?? new List<MappingRow>();
+        var rows = _mappings?.All().Select(m => ToRow(m, TitleOf)).ToList() ?? new List<MappingRow>();
         ItemsList.ItemsSource = rows;
 
         if (keep is not null)
@@ -100,25 +119,32 @@ public partial class ServerDialogsPanel : UserControl
             StatusText.Text = "No answers saved for this profile yet.";
     }
 
-    private static IReadOnlyList<ModeChoice> ChoicesFor(ServerDialogMapping m) =>
-        m.Mode == ServerDialogMode.ExistingWindow
-            ? Choices.Append(new ModeChoice(ServerDialogMode.ExistingWindow,
-                  $"{DescribeMode(m)} (set by hand; shows as its own window for now)")).ToArray()
-            : Choices;
-
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_mappings is null || ItemsList.SelectedItem is not MappingRow row) return;
         var m = _mappings.Find(row.Id);
         if (m is null) return;
 
-        var choices = ChoicesFor(m);
-        ModeBox.ItemsSource    = choices;
-        ModeBox.SelectedItem   = choices.First(c => c.Mode == m.Mode);
-        ModeBox.IsEnabled      = true;
+        var targets = TargetsFor(m.Id).ToList();
+        // Keep a saved target the list doesn't know (a window not created this
+        // session) selectable, so Save doesn't silently drop it.
+        if (!string.IsNullOrWhiteSpace(m.Target)
+            && !targets.Any(t => string.Equals(t.Id, m.Target, StringComparison.OrdinalIgnoreCase)))
+            targets.Insert(0, new TargetChoice(m.Target!, m.Target!));
+        TargetBox.ItemsSource  = targets;
+        TargetBox.SelectedItem = targets.FirstOrDefault(t =>
+            string.Equals(t.Id, m.Target, StringComparison.OrdinalIgnoreCase));
+
+        ModeBox.SelectedItem    = Choices.First(c => c.Mode == m.Mode);
+        ModeBox.IsEnabled       = true;
         AutoOpenCheck.IsChecked = m.AutoOpen;
         AutoOpenCheck.IsEnabled = true;
-        StatusText.Text        = $"Dialog id: {m.Id}";
+        StatusText.Text         = $"Dialog id: {m.Id}";
+    }
+
+    private void OnModeChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        TargetBox.IsVisible = ModeBox.SelectedItem is ModeChoice { Mode: ServerDialogMode.ExistingWindow };
     }
 
     private void OnSave(object? sender, RoutedEventArgs e)
@@ -127,10 +153,22 @@ public partial class ServerDialogsPanel : UserControl
         if (ItemsList.SelectedItem is not MappingRow row) { StatusText.Text = "Select a dialog first."; return; }
         if (ModeBox.SelectedItem is not ModeChoice choice) return;
 
+        string? target = null;
+        if (choice.Mode == ServerDialogMode.ExistingWindow)
+        {
+            if (TargetBox.SelectedItem is not TargetChoice t)
+            {
+                StatusText.Text = "Pick the window to put it beside.";
+                return;
+            }
+            target = t.Id;
+        }
+
         var m = _mappings.Find(row.Id);
         if (m is null) { Refresh(); return; }
 
         m.Mode     = choice.Mode;
+        m.Target   = target;
         m.AutoOpen = AutoOpenCheck.IsChecked == true;
         _mappings.Set(m);
         _onChanged?.Invoke();
@@ -163,9 +201,10 @@ public partial class ServerDialogsPanel : UserControl
     private void ClearForm()
     {
         ItemsList.SelectedItem  = null;
-        ModeBox.ItemsSource     = Choices;
         ModeBox.SelectedItem    = null;
         ModeBox.IsEnabled       = false;
+        TargetBox.ItemsSource   = null;
+        TargetBox.IsVisible     = false;
         AutoOpenCheck.IsChecked = true;
         AutoOpenCheck.IsEnabled = false;
         StatusText.Text         = string.Empty;

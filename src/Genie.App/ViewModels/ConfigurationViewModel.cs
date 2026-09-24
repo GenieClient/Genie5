@@ -226,6 +226,10 @@ public class ConfigurationViewModel : ReactiveObject
     /// <inheritdoc cref="SpeakSample"/>
     public Action? TtsVoiceChanged { get; set; }
 
+    /// <summary>The windows a server dialog can be put beside, as (dock id,
+    /// title), for a given dialog id — handed in by the main window, which owns
+    /// the dock factory. Null offers no "Existing window" targets.</summary>
+    public Func<string?, IReadOnlyList<(string Id, string Title)>>? DialogTargetWindows { get; set; }
     /// <summary>The tab's Install voice… button (#369): download and activate the
     /// default voice, as <c>#tts install</c> does; completes with its success.</summary>
     public Func<System.Threading.Tasks.Task<bool>>? TtsInstallVoice { get; set; }

@@ -62,7 +62,8 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
         // Server dialog mappings (#156) — per profile, plus the global
         // serverdialogs master switch (settings.cfg, so null pre-connect).
         ServerDialogsPanelCtrl.Initialize(vm.DialogMappings, vm.OnDialogMappingsChanged,
-                                          vm.ScriptConfig, vm.OnScriptSettingsChanged);
+                                          vm.ScriptConfig, vm.OnScriptSettingsChanged,
+                                          vm.DialogTargetWindows);
 
         // WindowSettingsStore is always present — it's app-level state, not
         // per-profile, so no nullability check.

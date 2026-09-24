@@ -90,6 +90,13 @@ public class ServerDialogPlacementHeadlessTests
             Pump(Main);
         }
 
+        public void OpenBeside(string dialogId, string targetId)
+        {
+            Factory.GetOrCreateServerDialog(dialogId, dialogId, show: true,
+                ServerDialogPlacement.With(targetId));
+            Pump(Main);
+        }
+
         public void Dispose()
         {
             foreach (var w in (Root.Windows ?? new System.Collections.Generic.List<IDockWindow>()).ToList())
@@ -167,6 +174,85 @@ public class ServerDialogPlacementHeadlessTests
 
         Assert.Null(h.FloatFor(Id("rightfirst")));
         Assert.Equal("backpack-dock", h.DockedParentOf(Id("rightfirst")));
+    }
+
+    // ── "Existing window": a tab beside the chosen window ────────────────────
+
+    [AvaloniaFact]
+    public void Beside_a_docked_window_joins_its_group_right_after_it()
+    {
+        using var h = new Harness();
+        var group = h.DockedParentOf("combat");
+        Assert.NotNull(group);
+
+        h.OpenBeside("bank_debt", "combat");
+
+        Assert.Equal(group, h.DockedParentOf(Id("bank_debt")));
+        var dock = (IDock)FindById(h.Root, group!)!;
+        var kids = dock.VisibleDockables!.Select(k => k.Id).ToList();
+        Assert.Equal(kids.IndexOf("combat") + 1, kids.IndexOf(Id("bank_debt")));
+    }
+
+    [AvaloniaFact]
+    public void Beside_a_floating_window_joins_that_float()
+    {
+        using var h = new Harness();
+        h.Factory.FloatTool("thoughts");
+        Harness.Pump(h.Main);
+        var host = h.FloatFor("thoughts");
+        Assert.NotNull(host);
+
+        h.OpenBeside("bank_debt", "thoughts");
+
+        Assert.Same(host, h.FloatFor(Id("bank_debt")));
+    }
+
+    /// <summary>With the target closed, the dialog goes where the target
+    /// would open, so the pair lines up once it's reopened.</summary>
+    [AvaloniaFact]
+    public void Beside_a_closed_window_goes_to_that_windows_home()
+    {
+        using var h = new Harness();
+        h.Factory.SetToolVisibility("thoughts", false);
+        Harness.Pump(h.Main);
+        Assert.Null(h.DockedParentOf("thoughts"));
+
+        h.OpenBeside("bank_debt", "thoughts");
+        h.Factory.SetToolVisibility("thoughts", true);
+        Harness.Pump(h.Main);
+
+        Assert.NotNull(h.DockedParentOf(Id("bank_debt")));
+        Assert.Equal(h.DockedParentOf("thoughts"), h.DockedParentOf(Id("bank_debt")));
+    }
+
+    [AvaloniaFact]
+    public void An_unknown_target_falls_back_to_the_right_column()
+    {
+        using var h = new Harness();
+        h.OpenBeside("bank_debt", "no-such-window");
+
+        Assert.Equal("backpack-dock", h.DockedParentOf(Id("bank_debt")));
+    }
+
+    [AvaloniaFact]
+    public void The_picker_lists_windows_but_never_the_dialog_itself()
+    {
+        using var h = new Harness();
+        h.Open("bank_debt", "right");
+        h.Open("spellChoose", "right");
+
+        var ids = h.Factory.DialogTargetWindows("bank_debt").Select(t => t.Id).ToList();
+        Assert.Contains("experience", ids);
+        Assert.Contains(Id("spellChoose"), ids);
+        Assert.DoesNotContain(Id("bank_debt"), ids);
+    }
+
+    private static IDockable? FindById(IDockable node, string id)
+    {
+        if (string.Equals(node.Id, id, StringComparison.OrdinalIgnoreCase)) return node;
+        if (node is IDock d && d.VisibleDockables is { } kids)
+            foreach (var k in kids) if (FindById(k, id) is { } hit) return hit;
+        return null;
     }
 
     /// <summary>Changing a dialog's answer resets where the old one put it, so

@@ -2489,7 +2489,8 @@ public class GenieDockFactory : Factory
     ///   <item>the user floated it last → back out at its remembered geometry;</item>
     ///   <item>the user docked it somewhere → back to that spot;</item>
     ///   <item>otherwise, first appearance → where DR proposed: a centred float
-    ///         sized from its width/height, or docked left or right.</item>
+    ///         sized from its width/height, or docked left or right — or, for
+    ///         the "Existing window" answer, a tab beside the chosen window.</item>
     /// </list>
     /// </summary>
     private void ShowServerDialog(string id)
@@ -2521,6 +2522,10 @@ public class GenieDockFactory : Factory
             if (!_lastFloatBounds.ContainsKey(id)) SizeAndCenterFloat(id, placement);
             return;
         }
+        if (!_lastKnownPositions.ContainsKey(id)
+            && placement.Kind == Genie.Core.Dialogs.ServerDialogPlacementKind.WithWindow
+            && TryShowBesideWindow(id, placement.Target))
+            return;
 
         // Docked. The home only matters when there is no last-known spot.
         var home = placement.Kind == Genie.Core.Dialogs.ServerDialogPlacementKind.DockLeft
@@ -2529,6 +2534,59 @@ public class GenieDockFactory : Factory
         if (_tools.TryGetValue(id, out var entry) && entry.ParentId != home)
             _tools[id] = (entry.Dockable, home);
         SetToolVisibility(id, true);
+    }
+
+    /// <summary>
+    /// Show dialog window <paramref name="id"/> as a tab in the same group as
+    /// <paramref name="targetId"/> — right after it in the tab strip — wherever
+    /// that window currently is, docked or floating. When the target is closed,
+    /// the dialog goes to the group the target would open into (its registered
+    /// home), so the pairing still holds once the target is reopened. False when
+    /// neither exists, and the caller falls back to the default dock.
+    /// </summary>
+    private bool TryShowBesideWindow(string id, string? targetId)
+    {
+        if (_root is null || string.IsNullOrWhiteSpace(targetId)) return false;
+        if (string.Equals(id, targetId, StringComparison.OrdinalIgnoreCase)) return false;
+        if (!_tools.TryGetValue(id, out var entry)) return false;
+
+        var target = FindByIdInTree(_root, targetId);
+        IDock? group = target is null ? null : FindParentInTree(_root, target);
+        if (group is not (IToolDock or IDocumentDock))
+        {
+            group  = null;
+            target = null;
+            if (_tools.TryGetValue(targetId, out var home)
+                && FindByIdInTree(_root, home.ParentId) is IDock homeDock
+                and (IToolDock or IDocumentDock))
+                group = homeDock;
+        }
+        if (group is null) return false;
+
+        var dockable = entry.Dockable;
+        InitDockable(dockable, group);
+        var at = target is null ? -1 : group.VisibleDockables?.IndexOf(target) ?? -1;
+        if (at >= 0) InsertDockable(group, dockable, at + 1);
+        else         AddDockable(group, dockable);
+        Reveal(dockable);
+        return true;
+    }
+
+    /// <summary>
+    /// Every window a dialog can be put beside, as (dock id, title), sorted by
+    /// title — the Server Dialogs grid's "Existing window" picker. Built-in
+    /// tools, plugin windows and other dialog windows alike; a dialog is never
+    /// offered itself.
+    /// </summary>
+    public IReadOnlyList<(string Id, string Title)> DialogTargetWindows(string? forDialogId = null)
+    {
+        var self = forDialogId is null ? null : ServerDialogId(forDialogId);
+        return _tools
+            .Where(kv => !string.Equals(kv.Key, self, StringComparison.OrdinalIgnoreCase))
+            .Select(kv => (Id: kv.Key, Title: kv.Value.Dockable.Title ?? ""))
+            .Where(t => !string.IsNullOrWhiteSpace(t.Title))
+            .OrderBy(t => t.Title, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     /// <summary>

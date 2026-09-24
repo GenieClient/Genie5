@@ -16,12 +16,25 @@ public enum ServerDialogPlacementKind
     /// (<c>bank_debt</c>) that should not come back wherever they were last
     /// dragged.</summary>
     FloatAlwaysCentered,
+    /// <summary>A tab in the same group as another window, named by
+    /// <see cref="ServerDialogPlacement.Target"/> — the "Existing window"
+    /// answer. Not a DR hint; the user picks the window.</summary>
+    WithWindow,
 }
 
 /// <summary>A resolved placement plus the server's size hint, in pixels.</summary>
-public sealed record ServerDialogPlacement(ServerDialogPlacementKind Kind, int? Width, int? Height)
+public sealed record ServerDialogPlacement(ServerDialogPlacementKind Kind, int? Width, int? Height,
+                                           string? Target = null)
 {
     public static readonly ServerDialogPlacement Default = new(ServerDialogPlacementKind.DockRight, null, null);
+
+    /// <summary>Alongside the window with dock id <paramref name="target"/>
+    /// (<see cref="ServerDialogMode.ExistingWindow"/>). No target falls back to
+    /// the default rather than guessing one.</summary>
+    public static ServerDialogPlacement With(string? target) =>
+        string.IsNullOrWhiteSpace(target)
+            ? Default
+            : new(ServerDialogPlacementKind.WithWindow, null, null, target.Trim());
 
     public bool Floats => Kind is ServerDialogPlacementKind.Float
                                or ServerDialogPlacementKind.FloatAlwaysCentered;

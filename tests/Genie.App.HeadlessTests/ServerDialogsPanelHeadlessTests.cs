@@ -68,6 +68,36 @@ public class ServerDialogsPanelHeadlessTests
     }
 
     [AvaloniaFact]
+    public void Beside_another_window_saves_the_picked_target()
+    {
+        var m = new ServerDialogMappings();
+        m.Set(new ServerDialogMapping { Id = "bank_debt", Mode = ServerDialogMode.NewWindow, Title = "Bank Debt" });
+        using var h = new Hosted<ServerDialogsPanel>(new ServerDialogsPanel());
+        h.Panel.Initialize(m, () => { }, config: null, onConfigChanged: null,
+            targetWindows: _ => new (string, string)[] { ("experience", "Experience"), ("thoughts", "Thoughts") });
+        h.Pump();
+        Select(h, "bank_debt");
+
+        var mode   = h.Panel.FindControl<ComboBox>("ModeBox")!;
+        var target = h.Panel.FindControl<ComboBox>("TargetBox")!;
+        mode.SelectedItem = mode.Items.Cast<object>().Single(o => o.ToString() == "Beside another window");
+        h.Pump();
+        Assert.True(target.IsVisible);
+
+        h.ClickButton("Save");                        // no target picked yet
+        Assert.Equal(ServerDialogMode.NewWindow, m.Find("bank_debt")!.Mode);
+
+        target.SelectedItem = target.Items.Cast<object>().Single(o => o.ToString() == "Experience");
+        h.ClickButton("Save");
+
+        var saved = m.Find("bank_debt")!;
+        Assert.Equal(ServerDialogMode.ExistingWindow, saved.Mode);
+        Assert.Equal("experience", saved.Target);
+        Assert.Equal("Beside Experience",
+            h.Rows<ServerDialogsPanel.MappingRow>().Single(r => r.Id == "bank_debt").Where);
+    }
+
+    [AvaloniaFact]
     public void Forget_drops_the_answer_so_the_chooser_asks_again()
     {
         var (h, m, saves) = Make();
