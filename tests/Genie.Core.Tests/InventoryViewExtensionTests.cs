@@ -265,6 +265,211 @@ public class InventoryViewExtensionTests
         Assert.Contains(host.Echoed, e => e.Contains("already in progress"));
     }
 
+    /// <summary>Spin until <paramref name="done"/> or the budget runs out.</summary>
+    private static async Task WaitUntil(Func<bool> done, int budgetMs = 5000)
+    {
+        for (int waited = 0; waited < budgetMs && !done(); waited += 25)
+            await Task.Delay(25);
+        Assert.True(done(), "condition never became true");
+    }
+
+    // ── Scan lifecycle: nothing may wedge the FSM permanently ────────────────
+
+    [Fact]
+    public async Task A_scan_the_game_never_advances_times_out_and_unblocks()
+    {
+        var host = NewHost();
+        var ext  = new InventoryViewExtension();
+        ext.Initialize(host);
+        ext.ScanIdleTimeout = TimeSpan.FromMilliseconds(150);
+
+        ext.OnSlashCommand("/iv scan");
+        Feed(ext, "You have:");
+        Feed(ext, "  a backpack");
+        Feed(ext, "Roundtime: 0 secs.");   // → VaultStart, waiting on the vault book
+        Assert.True(ext.ScanInProgress);
+        // …and the game never answers (stunned, hands full, reworded message).
+
+        await WaitUntil(() => !ext.ScanInProgress);
+
+        Assert.Contains(host.Echoed, e => e.Contains("gave up waiting"));
+        Assert.Empty(ext.SnapshotCatalog());          // the partial rows went with it
+
+        // The whole point: /iv scan works again instead of echoing forever.
+        host.Sent.Clear();
+        ext.OnSlashCommand("/iv scan");
+        Assert.Contains("inventory list", host.Sent);
+        Assert.DoesNotContain(host.Echoed, e => e.Contains("already in progress"));
+    }
+
+    [Fact]
+    public async Task A_scan_the_game_is_still_feeding_is_not_timed_out()
+    {
+        var host = NewHost();
+        var ext  = new InventoryViewExtension();
+        ext.Initialize(host);
+        ext.ScanIdleTimeout = TimeSpan.FromMilliseconds(400);
+
+        ext.OnSlashCommand("/iv scan");
+        Feed(ext, "You have:");
+        // A long list trickling in over more than one timeout window must survive:
+        // every catalogued line pushes the deadline out.
+        for (int i = 0; i < 6; i++)
+        {
+            await Task.Delay(150);
+            Feed(ext, $"  item {i}");
+        }
+        Assert.True(ext.ScanInProgress);
+        Assert.Equal(6, ext.SnapshotCatalog().Single(c => c.Source == "Inventory").Items.Count);
+
+        ext.OnSlashCommand("/iv cancel");
+    }
+
+    [Fact]
+    public void Cancel_drops_a_stuck_scan_and_its_partial_rows()
+    {
+        var host = NewHost();
+        var ext  = new InventoryViewExtension();
+        ext.Initialize(host);
+
+        ext.OnSlashCommand("/iv scan");
+        Feed(ext, "You have:");
+        Feed(ext, "  a backpack");
+        Assert.True(ext.ScanInProgress);
+        Assert.NotEmpty(ext.SnapshotCatalog());       // half a scan sitting in memory
+
+        Assert.True(ext.OnSlashCommand("/iv cancel"));
+        Assert.False(ext.ScanInProgress);
+        Assert.Contains(host.Echoed, e => e.Contains("scan cancelled"));
+        Assert.Empty(ext.SnapshotCatalog());          // and discarded, not persisted
+
+        ext.OnSlashCommand("/iv cancel");             // idempotent
+        Assert.Contains(host.Echoed, e => e.Contains("no scan is running"));
+    }
+
+    [Fact]
+    public void Reload_is_refused_mid_scan_so_the_scan_is_not_orphaned()
+    {
+        var host = NewHost();
+        var ext  = new InventoryViewExtension();
+        ext.Initialize(host);
+
+        ext.OnSlashCommand("/iv scan");
+        Feed(ext, "You have:");
+        ext.OnSlashCommand("/iv reload");             // would swap _characterData out
+        Assert.Contains(host.Echoed, e => e.Contains("reload skipped"));
+        Assert.DoesNotContain(host.Echoed, e => e.Contains("data reloaded"));
+
+        // The scan still lands in the live catalog rather than a detached object.
+        Feed(ext, "  a backpack");
+        Feed(ext, "Roundtime: 1 sec.");
+        Feed(ext, "What were you referring to?");
+        Feed(ext, "What were you referring to?");
+        Feed(ext, "The home contains:");
+        ext.OnPrompt();
+
+        Assert.Contains(host.Echoed, e => e.Contains("Scan Complete"));
+        Assert.Equal("a backpack",
+            Assert.Single(ext.SnapshotCatalog().Single(c => c.Source == "Inventory").Items).Tap);
+    }
+
+    [Fact]
+    public void A_character_switch_mid_scan_leaves_no_partial_rows_behind()
+    {
+        var host = NewHost();
+        var ext  = new InventoryViewExtension();
+        ext.Initialize(host);
+
+        ext.OnSlashCommand("/iv scan");
+        Feed(ext, "You have:");
+        Feed(ext, "  a backpack");
+        Assert.NotEmpty(ext.SnapshotCatalog());
+
+        ext.OnReset();                                // switched to another character
+        Assert.False(ext.ScanInProgress);
+        Assert.Empty(ext.SnapshotCatalog());
+
+        // Renucci's truncated Inventory must not ride along into Naper's save.
+        host.Vars["charactername"] = "Naper";
+        RunScan(ext, "  a sword");
+        Assert.All(ext.SnapshotCatalog(), c => Assert.Equal("Naper", c.Name));
+    }
+
+    [Fact]
+    public void A_combat_roundtime_before_the_list_does_not_end_the_inventory_phase()
+    {
+        var host = NewHost();
+        var ext  = new InventoryViewExtension();
+        ext.Initialize(host);
+
+        ext.OnSlashCommand("/iv scan");
+        Feed(ext, "You have:");
+        // Busy room: a swing and ITS roundtime arrive before the list does. Taking
+        // that roundtime as the terminator would file an empty Inventory and move
+        // on to the vault book.
+        Feed(ext, "The Shard sentinel swings a mace at you!");
+        Feed(ext, "Roundtime: 5 secs.");
+
+        // The real list still arrives, and is still catalogued.
+        Feed(ext, "  a backpack");
+        Feed(ext, "     -a gem");
+        Feed(ext, "Roundtime: 1 sec.");           // the list's own roundtime ends it
+        Feed(ext, "What were you referring to?");
+        Feed(ext, "What were you referring to?");
+        Feed(ext, "The home contains:");
+        ext.OnPrompt();
+
+        Assert.Contains(host.Echoed, e => e.Contains("Scan Complete"));
+        var inv = ext.SnapshotCatalog().Single(c => c.Source == "Inventory");
+        Assert.Equal("a backpack", Assert.Single(inv.Items).Tap);
+        Assert.Equal("a gem", Assert.Single(inv.Items[0].Items).Tap);
+    }
+
+    [Fact]
+    public void An_empty_inventory_still_ends_on_its_own_roundtime()
+    {
+        var host = NewHost();
+        var ext  = new InventoryViewExtension();
+        ext.Initialize(host);
+
+        ext.OnSlashCommand("/iv scan");
+        Feed(ext, "You have:");
+        Feed(ext, "Roundtime: 1 sec.");           // nothing between: carrying nothing
+        Feed(ext, "What were you referring to?");
+        Feed(ext, "What were you referring to?");
+        Feed(ext, "The home contains:");
+        ext.OnPrompt();
+
+        Assert.Contains(host.Echoed, e => e.Contains("Scan Complete"));
+        Assert.Empty(ext.SnapshotCatalog().Single(c => c.Source == "Inventory").Items);
+    }
+
+    [Fact]
+    public void Unindented_main_stream_chatter_is_not_catalogued_mid_scan()
+    {
+        var host = NewHost();
+        var ext  = new InventoryViewExtension();
+        ext.Initialize(host);
+
+        ext.OnSlashCommand("/iv scan");
+        Feed(ext, "You have:");
+        Feed(ext, "  a backpack");
+        // Real main-stream traffic arriving mid-list: list entries carry an indent,
+        // game prose never does.
+        Feed(ext, "The Shard sentinel strides north, his hand on his mace.");
+        Feed(ext, "Ice Cold Natarian entered an ebony and steel gate.");
+        Feed(ext, "     -a gem");
+        Feed(ext, "Roundtime: 1 sec.");
+        Feed(ext, "What were you referring to?");
+        Feed(ext, "What were you referring to?");
+        Feed(ext, "The home contains:");
+        ext.OnPrompt();
+
+        var inv = ext.SnapshotCatalog().Single(c => c.Source == "Inventory");
+        Assert.Equal("a backpack", Assert.Single(inv.Items).Tap);
+        Assert.Equal("a gem", Assert.Single(inv.Items[0].Items).Tap);
+    }
+
     [Fact]
     public void Non_main_stream_lines_are_ignored_mid_scan()
     {

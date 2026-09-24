@@ -39,7 +39,12 @@ public class InventoryViewViewModel : ReactiveObject
     [Reactive] public string RemoveHeader { get; private set; } = "Remove";
     private bool _removeArmed;
 
+    /// <summary>A scan is running: Scan and Reload are disabled, Cancel is
+    /// enabled. Mirrors the extension's ScanInProgress via ScanStateChanged.</summary>
+    [Reactive] public bool IsScanning { get; private set; }
+
     public ReactiveCommand<Unit, Unit> ScanCommand        { get; }
+    public ReactiveCommand<Unit, Unit> CancelScanCommand  { get; }
     public ReactiveCommand<Unit, Unit> ReloadCommand      { get; }
     public ReactiveCommand<Unit, Unit> ExportCommand      { get; }
     public ReactiveCommand<Unit, Unit> WikiCommand        { get; }
@@ -69,9 +74,16 @@ public class InventoryViewViewModel : ReactiveObject
 
     public InventoryViewViewModel()
     {
-        ScanCommand   = ReactiveCommand.Create(() => { _ext?.StartScan(); });
-        ReloadCommand = ReactiveCommand.Create(() => { _ext?.ReloadFromDisk(); });
-        ExportCommand = ReactiveCommand.Create(() => { _ext?.ExportCsv(); });
+        // Scan and Reload are meaningless (Reload actively harmful) mid-scan, and
+        // an ungated Scan button was how a wedged scan turned into a wall of
+        // "a scan is already in progress." in the game window.
+        var idle     = this.WhenAnyValue(vm => vm.IsScanning).Select(b => !b);
+        var scanning = this.WhenAnyValue(vm => vm.IsScanning);
+
+        ScanCommand       = ReactiveCommand.Create(() => { _ext?.StartScan(); },  idle);
+        CancelScanCommand = ReactiveCommand.Create(() => { _ext?.CancelScan(); }, scanning);
+        ReloadCommand     = ReactiveCommand.Create(() => { _ext?.ReloadFromDisk(); }, idle);
+        ExportCommand     = ReactiveCommand.Create(() => { _ext?.ExportCsv(); });
 
         var hasItemSelection = this.WhenAnyValue(vm => vm.SelectedNode)
             .Select(n => n is { Kind: InventoryNodeKind.Item });
@@ -118,6 +130,9 @@ public class InventoryViewViewModel : ReactiveObject
             OpenRequested?.Invoke();
         });
         _ext.ItemInfoUpdated += () => Dispatcher.UIThread.Post(ApplyItemInfo);
+        _ext.ScanStateChanged += () => Dispatcher.UIThread.Post(
+            () => IsScanning = _ext?.ScanInProgress ?? false);
+        IsScanning = _ext.ScanInProgress;
         RefreshSnapshot();
     }
 

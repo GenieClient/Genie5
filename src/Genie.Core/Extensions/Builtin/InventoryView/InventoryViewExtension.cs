@@ -44,11 +44,40 @@ public sealed class InventoryViewExtension : IGameExtension
     private List<CharacterData> _characterData = new();
 
     // ── Scan state (mirrors the Genie 4 plugin's FSM fields) ──────────────────
-    private string? _scanMode;            // null = not scanning; else the FSM phase
+    /// <summary>null = not scanning; else the FSM phase. Written on the parser
+    /// thread, read from the UI thread (<see cref="ScanInProgress"/>, the Scan
+    /// button) and from the watchdog task — volatile so those reads can't see a
+    /// stale phase.</summary>
+    private volatile string? _scanMode;
     private int _level = 1;               // current container depth while scanning
     private CharacterData? _currentData;  // character+source being filled
     private ItemData? _lastItem;          // last node added (the parent-walk anchor)
     private bool _debug;
+
+    /// <summary>The character whose rows the in-flight scan is filling, so an
+    /// abandoned scan can drop exactly what it added.</summary>
+    private string _scanCharacter = "";
+    /// <summary>Has the <c>inventory list</c> response produced an item yet, and
+    /// has anything else pushed in ahead of it? Together they tell the list's own
+    /// closing roundtime apart from a combat roundtime landing mid-list.</summary>
+    private bool _invItemsSeen, _invChatterSeen;
+    /// <summary>UTC ticks after which an unadvanced scan is abandoned. Every phase
+    /// change and every catalogued line pushes it out (<see cref="TouchScan"/>).</summary>
+    private long _scanDeadlineTicks;
+
+    /// <summary>Which scan the watchdog belongs to, so a watchdog left sleeping by
+    /// a cancelled scan retires instead of guarding the next one.</summary>
+    private int _scanGeneration;
+    /// <summary>Serializes the claim on ending a scan — <c>/iv cancel</c>, the
+    /// watchdog and a character switch can race for it.</summary>
+    private readonly object _scanLifecycle = new();
+
+    /// <summary>How long one scan step may go without the game advancing it before
+    /// the scan gives up. Every FSM phase blocks on specific trigger text, so a
+    /// stun, a full pair of hands, a disconnect, or simply a reworded server
+    /// message would otherwise park the scan forever — and with it every later
+    /// <c>/iv scan</c>. Settable for tests.</summary>
+    internal TimeSpan ScanIdleTimeout { get; set; } = TimeSpan.FromSeconds(45);
 
     // ── UI-facing surface ──────────────────────────────────────────────────────
     /// <summary>The catalog changed (scan complete, reload, repair, or character
@@ -64,6 +93,12 @@ public sealed class InventoryViewExtension : IGameExtension
     /// <summary>A background wiki batch landed — freshly-resolved weight/size
     /// data is readable via <see cref="ItemInfo"/>. Raised off-thread.</summary>
     public event Action? ItemInfoUpdated;
+
+    /// <summary>A scan started or stopped (completed, cancelled, or timed out) —
+    /// the App gates its Scan/Cancel/Reload buttons on
+    /// <see cref="ScanInProgress"/>. Raised on the parser or watchdog thread; UI
+    /// subscribers marshal.</summary>
+    public event Action? ScanStateChanged;
 
     private WikiItemInfoCache? _itemInfo;
     private PlazaShopService? _plaza;
@@ -158,7 +193,8 @@ public sealed class InventoryViewExtension : IGameExtension
     /// <summary>A character SWITCH mid-session: abandon any in-flight scan (its
     /// trigger text will never arrive). The catalog itself is cross-character by
     /// design and survives.</summary>
-    public void OnReset() => _scanMode = null;
+    public void OnReset() =>
+        AbandonScan("InventoryView: scan abandoned (character switch); the catalog is unchanged.");
 
     // ── /iv command handling ───────────────────────────────────────────────────
     public bool OnSlashCommand(string input)
@@ -176,6 +212,8 @@ public sealed class InventoryViewExtension : IGameExtension
         switch (verb)
         {
             case "scan":   StartScan();                                   break;
+            case "cancel":
+            case "stop":   CancelScan();                                  break;
             case "open":
             case "list":   RequestOpen(arg, search: false);               break;
             case "search": RequestOpen(arg, search: true);                break;
@@ -197,6 +235,7 @@ public sealed class InventoryViewExtension : IGameExtension
     {
         _host.Echo("Inventory View options:");
         _host.Echo("/iv scan             -- scan the current character (person, vault, deeds, home, trader) and save.");
+        _host.Echo("/iv cancel           -- abandon a scan that is stuck waiting on the game.");
         _host.Echo("/iv open [character] -- open the Inventory View window (Window menu), optionally filtered.");
         _host.Echo("/iv search <text>    -- open the window with <text> in the search box.");
         _host.Echo("/iv reload           -- reload InventoryView.xml from disk (after scanning on another instance).");
@@ -223,12 +262,65 @@ public sealed class InventoryViewExtension : IGameExtension
         LoadSettings();                       // pick up other instances' data first
         var me = Global("charactername");
         lock (_sync) _characterData.RemoveAll(c => c.Name == me);
-        _scanMode = "Start";
+        _scanCharacter = me;
+        SetPhase("Start");
+        StartWatchdog(Interlocked.Increment(ref _scanGeneration));
+        ScanStateChanged?.Invoke();
         _host.SendCommand("inventory list");
+    }
+
+    /// <summary>User-facing abandon (<c>/iv cancel</c> and the window's Cancel
+    /// button). Reverts the catalog to what is on disk — a scan only persists at
+    /// <see cref="CompleteScan"/>, so nothing committed is lost.</summary>
+    public void CancelScan()
+    {
+        if (_scanMode is null)
+        {
+            _host.Echo("InventoryView: no scan is running.");
+            return;
+        }
+        AbandonScan("InventoryView: scan cancelled; the catalog is unchanged.");
+    }
+
+    /// <summary>Drop an in-flight scan and restore the on-disk catalog, discarding
+    /// the partial rows the scan had already added under
+    /// <see cref="_scanCharacter"/>. Without this an interrupted scan left a
+    /// truncated catalog behind that the next <see cref="SaveSettings"/> persisted
+    /// as if it were real. No-op when no scan is running; may run on the watchdog
+    /// thread.</summary>
+    private void AbandonScan(string? message)
+    {
+        lock (_scanLifecycle)          // only one of cancel/watchdog/switch may end it
+        {
+            if (_scanMode is null) return;
+            _scanMode = null;
+        }
+        lock (_sync)
+        {
+            _characterData.RemoveAll(c =>
+                string.Equals(c.Name, _scanCharacter, StringComparison.OrdinalIgnoreCase));
+            _currentData = null;
+            _lastItem    = null;
+            _level       = 1;
+        }
+        _scanCharacter = "";
+        LoadSettings();          // the scan never saved, so disk is the pre-scan truth
+        if (message is not null) _host.Echo(message);
+        ScanStateChanged?.Invoke();
+        CatalogChanged?.Invoke();
     }
 
     public void ReloadFromDisk()
     {
+        // Reloading swaps _characterData wholesale, which would orphan the
+        // CharacterData an in-flight scan is filling: the scan would go on writing
+        // into a detached object and then "complete" having catalogued nothing.
+        if (_scanMode is not null)
+        {
+            _host.Echo("InventoryView: a scan is in progress — reload skipped " +
+                       "(wait for it to finish, or /iv cancel).");
+            return;
+        }
         LoadSettings();
         _host.Echo("InventoryView data reloaded.");
         CatalogChanged?.Invoke();
@@ -407,9 +499,10 @@ public sealed class InventoryViewExtension : IGameExtension
                 if (trimtext == "You have:")    // start of "inventory list"
                 {
                     _host.Echo("Scanning Inventory.");
-                    _scanMode    = "Inventory";
+                    SetPhase("Inventory");
                     _currentData = NewSource("Inventory");
                     _level       = 1;
+                    _invItemsSeen = _invChatterSeen = false;
                 }
                 break;
 
@@ -417,13 +510,26 @@ public sealed class InventoryViewExtension : IGameExtension
                 if (text.StartsWith("[Use INVENTORY HELP")) { /* skip */ }
                 else if (text.StartsWith("Roundtime:"))     // end of "inventory list"
                 {
-                    // Inventory list applies an RT proportional to item count. Wait
-                    // it out (non-blocking) before grabbing the vault book.
-                    int seconds = ParseRoundtime(trimtext);
-                    _scanMode = "VaultStart";
-                    PauseForRtThenSend(seconds, "get my vault book");
+                    // Combat roundtimes land on the main stream too, and one
+                    // arriving before the list did would cut the scan short with an
+                    // empty Inventory. Accept a roundtime as the terminator once the
+                    // list has actually produced items — or when nothing has pushed
+                    // in ahead of it, so a genuinely empty inventory still ends.
+                    if (_invItemsSeen || !_invChatterSeen)
+                    {
+                        // Inventory list applies an RT proportional to item count. Wait
+                        // it out (non-blocking) before grabbing the vault book.
+                        int seconds = ParseRoundtime(trimtext);
+                        SetPhase("VaultStart", extraSeconds: seconds);
+                        PauseForRtThenSend(seconds, "get my vault book");
+                    }
+                    else if (_debug)
+                        _host.Echo("[IV dbg] ignored a roundtime that arrived before the list");
                 }
-                else AddItems(text, InventoryLevel, rootStorage: false);
+                else if (AddItems(text, InventoryLevel, rootStorage: false))
+                    _invItemsSeen = true;
+                else
+                    _invChatterSeen = true;
                 break;
 
             case "VaultStart":
@@ -435,7 +541,7 @@ public sealed class InventoryViewExtension : IGameExtension
                 }
                 else if (trimtext == "Vault Inventory:")
                 {
-                    _scanMode    = "Vault";
+                    SetPhase("Vault");
                     _currentData = NewSource("Vault");
                     _level       = 1;
                 }
@@ -444,7 +550,7 @@ public sealed class InventoryViewExtension : IGameExtension
                          trimtext == "The vault book is filled with blank pages pre-printed with branch office letterhead.  An advertisement touting the services of Rundmolen Bros. Storage Co. is pasted on the inside cover.")
                 {
                     _host.Echo("Skipping Vault.");
-                    _scanMode = "DeedStart";
+                    SetPhase("DeedStart");
                     _host.SendCommand("get my deed register");
                 }
                 break;
@@ -452,7 +558,7 @@ public sealed class InventoryViewExtension : IGameExtension
             case "Vault":
                 if (text.StartsWith("The last note in your book indicates that your vault contains"))
                 {
-                    _scanMode = "DeedStart";
+                    SetPhase("DeedStart");
                     _host.SendCommand("stow my vault book");
                     _host.SendCommand("get my deed register");
                 }
@@ -469,7 +575,7 @@ public sealed class InventoryViewExtension : IGameExtension
                 }
                 else if (trimtext == "Page -- Deed")
                 {
-                    _scanMode    = "Deed";
+                    SetPhase("Deed");
                     _currentData = NewSource("Deed");
                     _level       = 1;
                 }
@@ -477,7 +583,7 @@ public sealed class InventoryViewExtension : IGameExtension
                          trimtext.StartsWith("You haven't stored any deeds in this register."))
                 {
                     _host.Echo("Skipping Deed Register.");
-                    _scanMode = "HomeStart";
+                    SetPhase("HomeStart");
                     _host.SendCommand("home recall");
                 }
                 break;
@@ -486,7 +592,7 @@ public sealed class InventoryViewExtension : IGameExtension
                 if (trimtext.StartsWith("Currently stored"))
                 {
                     _host.SendCommand("stow my deed register");
-                    _scanMode = "HomeStart";
+                    SetPhase("HomeStart");
                     _host.SendCommand("home recall");
                 }
                 else
@@ -496,6 +602,7 @@ public sealed class InventoryViewExtension : IGameExtension
                     string tap = idx >= 0 ? trimtext.Substring(idx + 3) : trimtext;
                     lock (_sync)
                         _lastItem = _currentData!.AddItem(new ItemData { Tap = tap, Storage = false });
+                    TouchScan();
                 }
                 break;
 
@@ -503,7 +610,7 @@ public sealed class InventoryViewExtension : IGameExtension
                 if (trimtext == "The home contains:")
                 {
                     _host.Echo("Scanning Home.");
-                    _scanMode    = "Home";
+                    SetPhase("Home");
                     _currentData = NewSource("Home");
                     _level       = 1;
                 }
@@ -534,6 +641,7 @@ public sealed class InventoryViewExtension : IGameExtension
                             ? holder.AddItem(new ItemData { Tap = tap })
                             : _currentData!.AddItem(new ItemData { Tap = tap });
                     }
+                    TouchScan();
                 }
                 else                                          // a piece of furniture
                 {
@@ -542,6 +650,7 @@ public sealed class InventoryViewExtension : IGameExtension
                         ? trimtext.Substring(Math.Min(idx + 2, trimtext.Length)) : trimtext;
                     lock (_sync)
                         _lastItem = _currentData!.AddItem(new ItemData { Tap = tap, Storage = true });
+                    TouchScan();
                 }
                 break;
 
@@ -554,7 +663,7 @@ public sealed class InventoryViewExtension : IGameExtension
                 }
                 else if (trimtext == "in the known realms since 402.")
                 {
-                    _scanMode    = "Trader";
+                    SetPhase("Trader");
                     _currentData = NewSource("TraderStorage");
                     _level       = 1;
                 }
@@ -581,7 +690,7 @@ public sealed class InventoryViewExtension : IGameExtension
     {
         if (Global("guild") == "Trader")
         {
-            _scanMode = "TraderStart";
+            SetPhase("TraderStart");
             _host.SendCommand("get my storage book");
         }
         else CompleteScan();
@@ -589,7 +698,9 @@ public sealed class InventoryViewExtension : IGameExtension
 
     private void CompleteScan()
     {
-        _scanMode = null;
+        lock (_scanLifecycle) _scanMode = null;
+        _scanCharacter = "";
+        ScanStateChanged?.Invoke();
         _host.Echo("Scan Complete.");
         // Re-emit through the parse pipeline so scripts can
         // `waitforre ^InventoryView scan complete`.
@@ -598,6 +709,53 @@ public sealed class InventoryViewExtension : IGameExtension
         CatalogChanged?.Invoke();
         if (OpenRequested is not null) OpenRequested("");
         else                           EchoSummary();
+    }
+
+    // ── Scan watchdog ──────────────────────────────────────────────────────────
+    /// <summary>Move to <paramref name="phase"/> and restart the idle clock.
+    /// <paramref name="extraSeconds"/> covers a phase that legitimately waits
+    /// (the roundtime pause before the vault book).</summary>
+    private void SetPhase(string? phase, int extraSeconds = 0)
+    {
+        _scanMode = phase;
+        TouchScan(extraSeconds);
+    }
+
+    /// <summary>"The scan is still making progress" — push the abandon deadline
+    /// out. Called on every phase change and every line actually catalogued, so a
+    /// long vault list keeps the scan alive while pure chatter does not.</summary>
+    private void TouchScan(int extraSeconds = 0) =>
+        Interlocked.Exchange(ref _scanDeadlineTicks,
+            (DateTime.UtcNow + ScanIdleTimeout + TimeSpan.FromSeconds(extraSeconds)).Ticks);
+
+    /// <summary>One task per scan: sleep until the deadline, and if nothing has
+    /// pushed it out by then, abandon the scan. Re-sleeps whenever
+    /// <see cref="TouchScan"/> moved the deadline while it waited.</summary>
+    private void StartWatchdog(int generation)
+    {
+        var token = _cts.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (_scanMode is { } phase &&
+                       Volatile.Read(ref _scanGeneration) == generation)
+                {
+                    var remaining =
+                        new DateTime(Interlocked.Read(ref _scanDeadlineTicks), DateTimeKind.Utc)
+                        - DateTime.UtcNow;
+                    if (remaining <= TimeSpan.Zero)
+                    {
+                        AbandonScan(
+                            $"InventoryView: scan gave up waiting for the game (stuck at \"{phase}\"). " +
+                            "The catalog is unchanged — /iv scan to try again.");
+                        return;
+                    }
+                    await Task.Delay(remaining, token).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException) { }   // shutdown
+        });
     }
 
     // ── Tree building ──────────────────────────────────────────────────────────
@@ -623,15 +781,37 @@ public sealed class InventoryViewExtension : IGameExtension
     private static readonly Regex IndentRun = new(@" {2,}", RegexOptions.Compiled);
 
     /// <summary>Split one raw list line (merged or classic) into items and add
-    /// each to the tree.</summary>
-    private void AddItems(string rawText, Func<int, int> levelFromSpaces, bool rootStorage)
+    /// each to the tree. Returns false when the line was not list output at all —
+    /// the Inventory phase uses that to spot a roundtime it should not trust.</summary>
+    private bool AddItems(string rawText, Func<int, int> levelFromSpaces, bool rootStorage)
     {
+        // The item phases are otherwise "anything that isn't the terminator is an
+        // item", so every main-stream line that arrives mid-scan — combat, arrivals,
+        // room text — was being catalogued. Real list output always carries its
+        // leading indent (that is what the level schemes read); game prose never
+        // does. Anything unindented is somebody else's line, so drop it.
+        if (!StartsIndented(rawText))
+        {
+            if (_debug) _host.Echo($"[IV dbg] skipped (not indented): {rawText.Trim()}");
+            return false;
+        }
+        bool added = false;
         foreach (var (level, tap) in SplitMergedItems(rawText, levelFromSpaces))
         {
             if (_debug) _host.Echo($"[IV dbg] lvl={level}: {tap}");
             lock (_sync) AddAtLevel(level, tap, rootStorage);
+            TouchScan();
+            added = true;
         }
+        return added;
     }
+
+    /// <summary>Does this raw line open with the indent every list entry carries?
+    /// Deliberately checked on the RAW text — <see cref="SplitMergedItems"/> keeps
+    /// its trimmed-line fallback because <see cref="RepairMergedTaps"/> feeds it
+    /// stored taps that have no indent left.</summary>
+    private static bool StartsIndented(string rawText) =>
+        rawText.Length >= 2 && rawText[0] == ' ' && rawText[1] == ' ';
 
     /// <summary>
     /// DR's current inventory output drops the newlines between items — the whole

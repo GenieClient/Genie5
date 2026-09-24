@@ -89,6 +89,9 @@
               ToolTip.Tip="Search player-shop listings for the selected item (DR Service Plaza data)"/>
       <Button Classes="ivaction" Content="Export"       Command="{Binding ExportCommand}"
               ToolTip.Tip="Export the whole catalog to a CSV file"/>
+      <Button Classes="ivaction" Content="Cancel Scan"  Command="{Binding CancelScanCommand}"
+              IsVisible="{Binding IsScanning}"
+              ToolTip.Tip="Abandon a scan that is stuck waiting on the game (/iv cancel)."/>
       <Button Classes="ivaction" Content="Scan"         Command="{Binding ScanCommand}"
               ToolTip.Tip="Scan the current character (person, vault, deeds, home, trader) — /iv scan"/>
       <Button Classes="ivaction" Content="Reload"       Command="{Binding ReloadCommand}"
