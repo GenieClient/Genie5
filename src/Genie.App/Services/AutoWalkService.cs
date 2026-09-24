@@ -356,10 +356,16 @@ public sealed partial class AutoWalkService : ReactiveObject
             return false;
         }
 
-        var moves = _mapEngine.FindPath(origin, destination);
+        // The built-in walker can't execute `script <name>` arcs (#253) — plan
+        // without them, and say so when one was the only way through.
+        var moves = _mapEngine.FindPath(origin, destination, allowScriptMoves: false);
         if (moves is null)
         {
-            FlashStatus($"No path to '{destination.Title}'.");
+            var viaScript = _mapEngine.FindPath(origin, destination)?.FirstOrDefault(Genie.Core.Mapper.MoveVerb.IsScriptMove);
+            FlashStatus(viaScript is null
+                ? $"No path to '{destination.Title}'."
+                : $"No path to '{destination.Title}' without a scripted leg ('{viaScript}'). " +
+                  "Genie's own walker can't run those; with automapper.cmd installed and #config automapperscript on, #goto hands the walk to it.");
             EmitAutomapperSignal(Genie.Core.Mapper.AutomapperSignals.DestinationNotFound);
             return false;
         }

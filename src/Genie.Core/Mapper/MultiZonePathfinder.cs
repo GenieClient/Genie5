@@ -124,6 +124,9 @@ public sealed class MultiZonePathfinder
             {
                 if (!exit.DestinationId.HasValue) continue;
                 if (!zone.Nodes.TryGetValue(exit.DestinationId.Value, out var nextNode)) continue;
+                // Cross-zone walks always run on the built-in walker, which can't
+                // execute a `script <name>` arc (#253) — never route through one.
+                if (MoveVerb.IsScriptMove(exit.MoveCommand)) continue;
 
                 var req = ExitRequirement.Parse(exit.Requires);
                 if (!req.IsMet(_skills, _characterClass, _characterLevel)) continue;
@@ -155,6 +158,7 @@ public sealed class MultiZonePathfinder
                 {
                     if (!string.Equals(conn.FromRoom, current.room, StringComparison.OrdinalIgnoreCase))
                         continue;
+                    if (MoveVerb.IsScriptMove(conn.Verb)) continue;   // #253, as above
 
                     var req = ExitRequirement.Parse(conn.Requires);
                     if (!req.IsMet(_skills, _characterClass, _characterLevel)) continue;

@@ -1089,8 +1089,15 @@ public sealed class AutoMapperEngine
     /// Phase 1 of the AutoMapper feature work continues to function
     /// without any per-character state.
     /// </para>
+    /// <para>
+    /// <paramref name="allowScriptMoves"/> false (the built-in walker, #253) skips
+    /// <c>script &lt;name&gt;</c> arcs, which only the community automapper.cmd
+    /// can execute — a route must never be planned through a leg the walker
+    /// would send to the game as text. The automapper hand-off keeps them.
+    /// Self-arcs never win: they can't improve on the room's own distance.
+    /// </para>
     /// </summary>
-    public IReadOnlyList<string>? FindPath(MapNode start, MapNode destination)
+    public IReadOnlyList<string>? FindPath(MapNode start, MapNode destination, bool allowScriptMoves = true)
     {
         if (start.Id == destination.Id) return Array.Empty<string>();
 
@@ -1116,6 +1123,7 @@ public sealed class AutoMapperEngine
                 if (!exit.DestinationId.HasValue) continue;
                 var destId = exit.DestinationId.Value;
                 if (!_zone.Nodes.TryGetValue(destId, out _)) continue;
+                if (!allowScriptMoves && MoveVerb.IsScriptMove(exit.MoveCommand)) continue;
 
                 // Check the exit's requirement against the character.
                 // ExitRequirement.Empty (or no Requires text) always passes.

@@ -31,6 +31,18 @@ public static class MoveVerb
     /// "slow south" → "south", "rt north" → "north"); return it unchanged if it
     /// carries no such prefix. Only strips when the prefix is followed by a space
     /// and a non-empty remainder, so "slower" or a bare "rt" are left alone.</summary>
+    /// <summary>A <c>script &lt;name&gt;</c> move directive (public #253), e.g. the Astral
+    /// Plane's <c>move="script apmove"</c>. Genie 4 handed these to the community
+    /// <c>automapper.cmd</c>, which runs the named script; the built-in walker can't,
+    /// and would send the text to the game as a command. Pacing prefixes
+    /// (<c>rt</c> / <c>slow</c> / <c>room</c>) are looked through.</summary>
+    public static bool IsScriptMove(string? verb)
+    {
+        var v = Normalize(verb);
+        return v.Length > 7 && v.StartsWith("script ", StringComparison.OrdinalIgnoreCase)
+               && v[7..].Trim().Length > 0;
+    }
+
     public static string Normalize(string? verb)
     {
         if (string.IsNullOrWhiteSpace(verb)) return verb ?? string.Empty;
