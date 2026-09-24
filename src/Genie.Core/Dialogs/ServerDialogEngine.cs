@@ -37,12 +37,17 @@ public sealed class ServerDialogState
         string? dialogType, bool resident, bool isOpen,
         IReadOnlyList<DialogControl> controls,
         IReadOnlyDictionary<string, string> streams,
-        long revision)
+        long revision,
+        IReadOnlyDictionary<string, IReadOnlyList<LinkSpan>>? streamLinks = null)
     {
         Id = id; Title = title; Location = location; Width = width; Height = height;
         DialogType = dialogType; Resident = resident; IsOpen = isOpen;
         Controls = controls; Streams = streams; Revision = revision;
+        StreamLinks = streamLinks ?? EmptyLinks;
     }
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<LinkSpan>> EmptyLinks =
+        new Dictionary<string, IReadOnlyList<LinkSpan>>();
 
     public string  Id         { get; }
     public string? Title      { get; }
@@ -63,6 +68,10 @@ public sealed class ServerDialogState
 
     /// <summary>Text routed into this dialog's streamBoxes, keyed by control id.</summary>
     public IReadOnlyDictionary<string, string> Streams { get; }
+
+    /// <summary>Clickable spans inside <see cref="Streams"/>, same keys, offsets
+    /// into that stream's text. A stream with no links has no entry.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<LinkSpan>> StreamLinks { get; }
 
     /// <summary>Bumped on every change — cheap staleness check for a renderer.</summary>
     public long Revision { get; }
@@ -118,6 +127,9 @@ public sealed class ServerDialogEngine
     // matching the plugin's document cache: <dynaStream id='spellInfo'>…</> can
     // arrive before the dialog that displays it exists.
     private readonly Dictionary<string, string> _streams = new(StringComparer.OrdinalIgnoreCase);
+
+    // Link spans per stream, offsets into _streams' text (#156).
+    private readonly Dictionary<string, List<LinkSpan>> _streamLinks = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly Subject<ServerDialogChange> _changes = new();
     private long _revision;
@@ -209,23 +221,40 @@ public sealed class ServerDialogEngine
     {
         if (string.IsNullOrEmpty(e.StreamId)) return;
         NotifyStream(e.StreamId, () =>
-            _streams[e.StreamId] = _streams.TryGetValue(e.StreamId, out var prior)
-                ? prior + e.Text
-                : e.Text);
+        {
+            var prior = _streams.TryGetValue(e.StreamId, out var p) ? p : "";
+            _streams[e.StreamId] = prior + e.Text;
+            if (e.Links is { Count: > 0 } links)
+            {
+                // Appended block: its spans move along by what was already there.
+                if (!_streamLinks.TryGetValue(e.StreamId, out var list))
+                    _streamLinks[e.StreamId] = list = new List<LinkSpan>();
+                foreach (var l in links)
+                    list.Add(l with { Start = l.Start + prior.Length });
+            }
+        });
     }
 
     /// <summary>Replace a named streamBox's text outright.</summary>
     public void SetStream(string controlId, string text)
     {
         if (string.IsNullOrEmpty(controlId)) return;
-        NotifyStream(controlId, () => _streams[controlId] = text ?? "");
+        NotifyStream(controlId, () =>
+        {
+            _streams[controlId] = text ?? "";
+            _streamLinks.Remove(controlId);
+        });
     }
 
     /// <summary><c>&lt;clearStream&gt;</c> / <c>&lt;clearDynaStream&gt;</c>.</summary>
     public void ClearStream(string controlId)
     {
         if (string.IsNullOrEmpty(controlId)) return;
-        NotifyStream(controlId, () => _streams.Remove(controlId));
+        NotifyStream(controlId, () =>
+        {
+            _streams.Remove(controlId);
+            _streamLinks.Remove(controlId);
+        });
     }
 
     /// <summary>Drop everything — a disconnect invalidates every dialog, since
@@ -237,6 +266,7 @@ public sealed class ServerDialogEngine
             if (_dialogs.Count == 0 && _streams.Count == 0) return;
             _dialogs.Clear();
             _streams.Clear();
+            _streamLinks.Clear();
             _revision++;
         }
         _changes.OnNext(new ServerDialogChange("", ServerDialogChangeKind.Reset, null));
@@ -308,12 +338,17 @@ public sealed class ServerDialogEngine
     private ServerDialogState Snapshot(Entry e)
     {
         var streams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var links   = new Dictionary<string, IReadOnlyList<LinkSpan>>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in e.ControlKeys)
+        {
             if (_streams.TryGetValue(key, out var text)) streams[key] = text;
+            if (_streamLinks.TryGetValue(key, out var spans) && spans.Count > 0)
+                links[key] = spans.ToArray();
+        }
 
         return new ServerDialogState(
             e.Id, e.Title, e.Location, e.Width, e.Height, e.DialogType,
-            e.Resident, e.IsOpen, e.Controls.ToList(), streams, e.Revision);
+            e.Resident, e.IsOpen, e.Controls.ToList(), streams, e.Revision, links);
     }
 
     private static string? NullIfEmpty(string? s) => string.IsNullOrEmpty(s) ? null : s;

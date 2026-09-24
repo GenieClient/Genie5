@@ -132,11 +132,36 @@
     </DataTemplate>
 
     <DataTemplate DataType="vm:DialogStreamViewModel">
-      <!-- Fed by dynaStream (#324), never by the main text pipeline. -->
+      <!-- Fed by dynaStream (#324), never by the main text pipeline. Sized as
+           DR asked (NaN = to content); links inside it are clickable (#156 —
+           spellChoose's list is one link per spell). -->
       <Border BorderThickness="1" BorderBrush="{DynamicResource Theme.Border}"
-              MinHeight="80" MaxHeight="380" MinWidth="180">
-        <ScrollViewer HorizontalScrollBarVisibility="Auto">
-          <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" Margin="4"/>
+              Width="{Binding BoxWidth}" Height="{Binding BoxHeight}"
+              MinHeight="80" MinWidth="180">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <ItemsControl ItemsSource="{Binding Lines}" Margin="4">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:DialogStreamLine">
+                <ItemsControl ItemsSource="{Binding Segments}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:DialogStreamSegment">
+                      <Panel>
+                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap"
+                                   IsVisible="{Binding !IsLink}"/>
+                        <Button Classes="dlglink" Content="{Binding Text}"
+                                IsVisible="{Binding IsLink}"
+                                Tag="{Binding Link}"
+                                Click="OnStreamLinkActivated"/>
+                      </Panel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </ScrollViewer>
       </Border>
     </DataTemplate>

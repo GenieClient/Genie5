@@ -278,9 +278,80 @@ public sealed class DialogComboViewModel(DialogGridCell cell) : DialogControlVie
     public override string? LiveValue => Selected;
 }
 
+/// <summary>One run of a streamBox line: plain text, or a clickable link.</summary>
+public sealed record DialogStreamSegment(string Text, LinkSpan? Link)
+{
+    public bool IsLink => Link is not null;
+}
+
+/// <summary>One line of a streamBox, as segments.</summary>
+public sealed record DialogStreamLine(IReadOnlyList<DialogStreamSegment> Segments);
+
 public sealed class DialogStreamViewModel(DialogGridCell cell) : DialogControlViewModel(cell)
 {
-    [Reactive] public string Text { get; set; } = "";
+    [Reactive] public string Text { get; private set; } = "";
+
+    /// <summary>The same text split into lines of plain and link segments, for
+    /// the view. Links are what make spellChoose work: its list is one link per
+    /// spell, and clicking one is the only way to choose (#156).</summary>
+    public ObservableCollection<DialogStreamLine> Lines { get; } = [];
+
+    /// <summary>The size DR asked for, in pixels; NaN = size to content. The
+    /// box used to ignore it and cap at 80–380px, so spellChoose's 380px-tall
+    /// lists opened as 80px slivers.</summary>
+    [Reactive] public double BoxWidth  { get; private set; } = double.NaN;
+    [Reactive] public double BoxHeight { get; private set; } = double.NaN;
+
+    public override void Update(DialogGridCell c)
+    {
+        base.Update(c);
+        BoxWidth  = Pixels(c.Control.Width);
+        BoxHeight = Pixels(c.Control.Height);
+    }
+
+    private static double Pixels(string? raw) =>
+        int.TryParse(raw, System.Globalization.NumberStyles.None,
+                     System.Globalization.CultureInfo.InvariantCulture, out var n) && n > 0
+            ? n : double.NaN;
+
+    public void SetContent(string text, IReadOnlyList<LinkSpan>? links)
+    {
+        text ??= "";
+        if (text == Text && Lines.Count > 0 && links is null) return;
+        Text = text;
+        Lines.Clear();
+        foreach (var line in Split(text, links ?? Array.Empty<LinkSpan>()))
+            Lines.Add(line);
+    }
+
+    /// <summary>Cut <paramref name="text"/> into lines, and each line into
+    /// plain/link segments. A link that crosses a line break is clipped to each
+    /// line it touches.</summary>
+    public static IEnumerable<DialogStreamLine> Split(string text, IReadOnlyList<LinkSpan> links)
+    {
+        var ordered = links.Where(l => l.Length > 0).OrderBy(l => l.Start).ToList();
+        var lineStart = 0;
+        while (lineStart <= text.Length)
+        {
+            var nl      = text.IndexOf('\n', lineStart);
+            var lineEnd = nl < 0 ? text.Length : nl;
+            var segs    = new List<DialogStreamSegment>();
+            var pos     = lineStart;
+            foreach (var l in ordered)
+            {
+                var s = Math.Max(l.Start, pos);
+                var e = Math.Min(l.Start + l.Length, lineEnd);
+                if (e <= s) continue;
+                if (s > pos) segs.Add(new(text[pos..s], null));
+                segs.Add(new(text[s..e], l));
+                pos = e;
+            }
+            if (lineEnd > pos) segs.Add(new(text[pos..lineEnd].TrimEnd('\r'), null));
+            if (segs.Count > 0 || nl >= 0) yield return new DialogStreamLine(segs);
+            if (nl < 0) break;
+            lineStart = nl + 1;
+        }
+    }
 }
 
 public sealed class DialogProgressViewModel(DialogGridCell cell) : DialogControlViewModel(cell)
@@ -317,9 +388,18 @@ public sealed class ServerDialogViewModel : ReactiveObject
         DialogId      = dialogId;
         SeparatorChar = separatorChar;
         Title         = dialogId;
+        Bespoke       = ServerDialogOverrides.Create(this);
     }
 
     public string DialogId { get; }
+
+    /// <summary>A hand-built view for this dialog (#156 Phase 2), or null for
+    /// the generic grid. Fed the same snapshots; clicks come back through
+    /// <see cref="Activate"/>.</summary>
+    public IServerDialogBespoke? Bespoke { get; }
+
+    /// <summary>True when the generic grid renders this dialog.</summary>
+    public bool IsGeneric => Bespoke is null;
 
     /// <summary>The command separator in force — server-authored commands are
     /// escaped against it so they cannot fan out (see
@@ -375,7 +455,10 @@ public sealed class ServerDialogViewModel : ReactiveObject
 
         // streamBox content arrives separately, via dynaStream (#324).
         foreach (var vm in Controls.Concat(BottomControls).OfType<DialogStreamViewModel>())
-            vm.Text = state.Streams.TryGetValue(vm.Id, out var text) ? text : "";
+            vm.SetContent(state.Streams.TryGetValue(vm.Id, out var text) ? text : "",
+                          state.StreamLinks.TryGetValue(vm.Id, out var links) ? links : null);
+
+        Bespoke?.Apply(state);
     }
 
     private void Sync(
@@ -469,6 +552,19 @@ public sealed class ServerDialogViewModel : ReactiveObject
         if (_byId.TryGetValue(controlId, out var vm) &&
             vm is DialogButtonViewModel { ClosesDialog: true })
             CloseRequested?.Invoke();
+    }
+
+    /// <summary>
+    /// A link inside a streamBox was clicked. Resolved like a control's cmd —
+    /// against the siblings, separator-escaped — and a web link goes through
+    /// the same <c>url:</c> path, so the host's safety prompt still applies.
+    /// </summary>
+    public void ActivateStreamLink(LinkSpan link)
+    {
+        ArgumentNullException.ThrowIfNull(link);
+        var cmd = link.IsUrl ? "url:" + link.Command : link.Command;
+        var action = ServerDialogCommand.Resolve(cmd, _controls, LiveValues(), SeparatorChar);
+        if (action.CanSend) ActionRequested?.Invoke(action);
     }
 
     /// <summary>

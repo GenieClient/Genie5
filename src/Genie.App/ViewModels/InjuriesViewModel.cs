@@ -36,6 +36,9 @@ public sealed class InjuriesViewModel : ReactiveObject
         private readonly string _regionId;
         private readonly double _figureCrop;
 
+        /// <summary>DR's region id ("rightArm") — the dialog image's id.</summary>
+        public string RegionId => _regionId;
+
         /// <summary>Short grid label ("R Arm").</summary>
         public string Label    { get; }
         /// <summary>Full region name for tooltips + the summary list ("Right Arm").</summary>
@@ -65,8 +68,8 @@ public sealed class InjuriesViewModel : ReactiveObject
             UpdateSprites(Controls.InjurySprites.Get(regionId, InjuryKind.None, 0));
         }
 
-        internal InjuryKind Kind     { get; private set; } = InjuryKind.None;
-        internal int        Severity { get; private set; }
+        public InjuryKind Kind     { get; private set; } = InjuryKind.None;
+        public int        Severity { get; private set; }
 
         internal void Set(InjuryKind kind, int severity)
         {

@@ -42,6 +42,66 @@ public class DynaStreamTests
         Assert.Equal("Fire Shards", e.Text);
     }
 
+    // ── Links survive as spans (#156 — spellChoose's list) ───────────────────
+
+    [Fact]
+    public void AnACmdLinkBecomesAGameCommandSpan()
+    {
+        var e = Assert.Single(Feed(
+            "<dynaStream id='spells'><a cmd='choose 1'>Fire Shards</a></dynaStream>\n")
+            .OfType<DynaStreamEvent>());
+
+        var link = Assert.Single(e.Links!);
+        Assert.Equal("Fire Shards", e.Text.Substring(link.Start, link.Length));
+        Assert.Equal("choose 1", link.Command);
+        Assert.False(link.IsUrl);
+    }
+
+    [Fact]
+    public void ADLinkWithoutCmdSendsItsOwnText()
+    {
+        var e = Assert.Single(Feed(
+            "<dynaStream id='spells'>Pick <d>BANK DEBT</d> now</dynaStream>\n")
+            .OfType<DynaStreamEvent>());
+
+        var link = Assert.Single(e.Links!);
+        Assert.Equal("Pick BANK DEBT now", e.Text);
+        Assert.Equal("BANK DEBT", link.Command);
+        Assert.Equal(5, link.Start);
+    }
+
+    [Fact]
+    public void AnAHrefLinkIsAUrlSpan()
+    {
+        var e = Assert.Single(Feed(
+            "<dynaStream id='box'><a href='https://elanthipedia.play.net'>Wiki</a></dynaStream>\n")
+            .OfType<DynaStreamEvent>());
+
+        var link = Assert.Single(e.Links!);
+        Assert.True(link.IsUrl);
+        Assert.Equal("https://elanthipedia.play.net", link.Command);
+    }
+
+    /// <summary>Entities shrink when decoded; spans after them must move too.</summary>
+    [Fact]
+    public void SpansStayOnTheirTextAfterEntitiesAreDecoded()
+    {
+        var e = Assert.Single(Feed(
+            "<dynaStream id='spells'>Friends &amp;&amp; Enemies: <d cmd='choose 1'>Fire &amp; Ice</d></dynaStream>\n")
+            .OfType<DynaStreamEvent>());
+
+        var link = Assert.Single(e.Links!);
+        Assert.Equal("Fire & Ice", e.Text.Substring(link.Start, link.Length));
+    }
+
+    [Fact]
+    public void PlainBodiesCarryNoLinks()
+    {
+        var e = Assert.Single(Feed("<dynaStream id='spells'>Fire Shards</dynaStream>\n")
+            .OfType<DynaStreamEvent>());
+        Assert.Null(e.Links);
+    }
+
     [Fact]
     public void EntitiesInTheBodyAreDecoded()
     {

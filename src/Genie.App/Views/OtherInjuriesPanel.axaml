@@ -1,0 +1,72 @@
+<!-- Bespoke view for injuries-<charnum> (#156 Phase 2, public #345): another
+     character's wounds, drawn with the Injuries panel's sprites in the same
+     4-column grid. A part DR attached a transfer cmd to is a button; the click
+     goes back through the host dialog VM, so it is resolved and escaped like
+     every other dialog command. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Genie.App.ViewModels"
+             x:Class="Genie.App.Views.OtherInjuriesPanel"
+             x:DataType="vm:OtherInjuriesViewModel">
+
+  <UserControl.Styles>
+    <!-- A body part is a flat button: the sprite is the affordance, and a
+         non-transferable part must not look pressable. -->
+    <Style Selector="Button.part">
+      <Setter Property="Background"      Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="BorderBrush"     Value="Transparent"/>
+      <Setter Property="Padding"         Value="2,3"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="Button.part:disabled /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.part:pointerover /template/ ContentPresenter">
+      <Setter Property="BorderBrush" Value="{DynamicResource Theme.Accent}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer>
+    <StackPanel Spacing="6" Margin="8">
+      <TextBlock Text="{Binding Subject}" FontWeight="SemiBold"/>
+      <TextBlock FontSize="11" Opacity="0.8" TextWrapping="Wrap"
+                 IsVisible="{Binding AnyTransfer}"
+                 Text="Click an injured part to transfer it."/>
+
+      <ItemsControl ItemsSource="{Binding Parts}" MaxWidth="260" HorizontalAlignment="Left">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="4"/>
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:OtherInjuriesViewModel+Part">
+            <Button Classes="part"
+                    IsEnabled="{Binding CanTransfer}"
+                    ToolTip.Tip="{Binding Tip}"
+                    ToolTip.ShowOnDisabled="True"
+                    Tag="{Binding}"
+                    Click="OnPartClicked">
+              <StackPanel Spacing="2">
+                <Image Source="{Binding Cell.Sprite}" Height="52" Stretch="Uniform"
+                       Opacity="{Binding Cell.SpriteOpacity}"/>
+                <TextBlock Text="{Binding Cell.Label}" FontSize="9" HorizontalAlignment="Center"
+                           Foreground="{Binding Cell.Foreground}"/>
+              </StackPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Text="No injuries." Opacity="0.7" IsVisible="{Binding IsEmpty}"/>
+      <ItemsControl ItemsSource="{Binding Injured}" IsVisible="{Binding !IsEmpty}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <TextBlock Text="{Binding}" FontSize="11" TextWrapping="Wrap"/>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

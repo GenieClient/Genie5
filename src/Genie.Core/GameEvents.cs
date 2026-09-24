@@ -317,7 +317,8 @@ public sealed record ClearStreamEvent(string StreamId) : GameEvent;
 /// how a server dialog's streamBox gets its content (#156). Markup inside the
 /// body is stripped to plain text.
 /// </summary>
-public sealed record DynaStreamEvent(string StreamId, string Text) : GameEvent;
+public sealed record DynaStreamEvent(string StreamId, string Text,
+    IReadOnlyList<LinkSpan>? Links = null) : GameEvent;
 
 // ── Prompt ───────────────────────────────────────────────────────────────────
 

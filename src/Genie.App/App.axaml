@@ -1834,8 +1834,17 @@
     <DataTemplate DataType="docking:ServerDialogTool">
       <Panel TextElement.FontFamily="{Binding DialogFontFamily}"
              TextElement.FontSize="{Binding DialogFontSize}">
-        <views:ServerDialogPanel DataContext="{Binding ViewModel}"/>
+        <!-- A dialog with a bespoke view (#156 Phase 2) renders that instead
+             of the generic grid; see ServerDialogOverrides. -->
+        <views:ServerDialogPanel DataContext="{Binding ViewModel}"
+                                 IsVisible="{Binding ViewModel.IsGeneric}"/>
+        <ContentControl Content="{Binding ViewModel.Bespoke}"
+                        IsVisible="{Binding !ViewModel.IsGeneric}"/>
       </Panel>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:OtherInjuriesViewModel">
+      <views:OtherInjuriesPanel/>
     </DataTemplate>
 
     <DataTemplate DataType="docking:PluginWindowTool">

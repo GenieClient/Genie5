@@ -117,6 +117,13 @@ public sealed partial class DrXmlParser : IDisposable
     // stack and emits the resulting LinkSpan with IsUrl=true.
     private readonly Stack<(int Start, string? Href)> _urlStack = new();
 
+    // Links inside a <dynaStream> body (#156). The body buffers in
+    // _componentBuffer, not _textLineBuffer, so its <d>/<a> tags bookmark that
+    // buffer instead; offsets are RAW body offsets, re-based onto the cleaned
+    // text when the stream closes (see BuildDynaStream).
+    private readonly Stack<(int Start, string? Cmd, bool IsUrl)> _dynaLinkStack = new();
+    private readonly List<(int Start, int End, string Cmd, bool IsUrl)> _dynaLinks = new();
+
     // ── Bold tracking ──────────────────────────────────────────────────────
     // <pushBold/> marks "bold from here"; <popBold/> closes it. Both are
     // self-closing markers (NOT paired open/close), so neither has children
@@ -1622,6 +1629,18 @@ public sealed partial class DrXmlParser : IDisposable
             // The text body flows through normal accumulation; we just
             // bookmark the start position and remember the cmd. On </d>
             // we'll know the span length.
+            case "d" when _inDynaStream:
+                _dynaLinkStack.Push((_componentBuffer.Length, r["cmd"], false));
+                break;
+
+            // Inside a dynaStream an <a> may carry either cmd= (a game command —
+            // the spell list's form) or href= (a web link).
+            case "a" when _inDynaStream:
+                _dynaLinkStack.Push(r["cmd"] is { Length: > 0 } acmd
+                    ? (_componentBuffer.Length, acmd, false)
+                    : (_componentBuffer.Length, r["href"], true));
+                break;
+
             case "d":
             {
                 // DR's protocol does not nest <d> tags in practice. If one
@@ -1873,27 +1892,7 @@ public sealed partial class DrXmlParser : IDisposable
             {
                 var area = r["id"] ?? "";
                 if (area.Length == 0) break;
-                var imageName = r["name"] ?? "";
-                InjuryKind kind = InjuryKind.None;
-                int severity = 0;
-                if (imageName.StartsWith("Injury", StringComparison.OrdinalIgnoreCase))
-                {
-                    kind = InjuryKind.Wound;
-                    int.TryParse(imageName.AsSpan("Injury".Length), out severity);
-                }
-                else if (imageName.StartsWith("Scar", StringComparison.OrdinalIgnoreCase))
-                {
-                    kind = InjuryKind.Scar;
-                    int.TryParse(imageName.AsSpan("Scar".Length), out severity);
-                }
-                else if (imageName.Length > "Nsys".Length
-                         && imageName.StartsWith("Nsys", StringComparison.OrdinalIgnoreCase)
-                         && int.TryParse(imageName.AsSpan("Nsys".Length), out severity))
-                {
-                    kind = severity > 0 ? InjuryKind.Damage : InjuryKind.None;
-                }
-                // anything else (name echoes the region id) → healthy
-                if (kind == InjuryKind.None) severity = 0;
+                var (kind, severity) = InjuryImageName.Decode(r["name"]);
                 _events.OnNext(new InjuryEvent(area, kind, severity));
                 break;
             }
@@ -2011,6 +2010,8 @@ public sealed partial class DrXmlParser : IDisposable
                 }
                 _dynaStreamId = dynaId;
                 _componentBuffer.Clear();
+                _dynaLinkStack.Clear();
+                _dynaLinks.Clear();
                 _inDynaStream = true;
                 break;
             }
@@ -2084,11 +2085,13 @@ public sealed partial class DrXmlParser : IDisposable
                 _inDynaStream = false;
                 var dynaBody = _componentBuffer.ToString();
                 _componentBuffer.Clear();
-                // Markup inside the body (spell <a> links) is stripped to text;
-                // a richer form can come later if a renderer needs the links.
-                _events.OnNext(new DynaStreamEvent(
-                    _dynaStreamId ?? "",
-                    System.Net.WebUtility.HtmlDecode(StripBasicXml(dynaBody))));
+                // Markup is stripped to text, but <d>/<a> links survive as
+                // spans (#156): spellChoose's list is one link per spell, and
+                // clicking one is the only way to choose.
+                var (dynaText, dynaLinks) = BuildDynaStream(dynaBody, _dynaLinks);
+                _dynaLinks.Clear();
+                _dynaLinkStack.Clear();
+                _events.OnNext(new DynaStreamEvent(_dynaStreamId ?? "", dynaText, dynaLinks));
                 _dynaStreamId = null;
                 break;
             }
@@ -2156,6 +2159,21 @@ public sealed partial class DrXmlParser : IDisposable
                     EmitLine(invAppended);
                 break;
             }
+
+            case "d" when _inDynaStream:
+            case "a" when _inDynaStream:
+                if (_dynaLinkStack.TryPop(out var dl))
+                {
+                    var end = _componentBuffer.Length;
+                    // <d>TEXT</d> with no cmd sends its own text, as in the
+                    // main window; an <a> with neither cmd nor href is inert.
+                    var dcmd = dl.Cmd is { Length: > 0 } c
+                        ? c
+                        : !dl.IsUrl ? _componentBuffer.ToString(dl.Start, end - dl.Start) : null;
+                    if (end > dl.Start && !string.IsNullOrWhiteSpace(dcmd))
+                        _dynaLinks.Add((dl.Start, end, dcmd!, dl.IsUrl));
+                }
+                break;
 
             case "d":
                 // Close a clickable link. Compute the span length from the
@@ -2400,6 +2418,36 @@ public sealed partial class DrXmlParser : IDisposable
             else
                 return s;
         }
+    }
+
+    /// <summary>
+    /// Clean a dynaStream body (strip residual markup, decode entities) while
+    /// keeping its link spans pointing at the right characters. Each piece
+    /// between link boundaries is cleaned on its own and the spans re-based on
+    /// the cleaned text — cleaning the whole body first would shift every offset
+    /// by however many characters an entity or a stray tag took up.
+    /// </summary>
+    internal static (string Text, IReadOnlyList<LinkSpan>? Links) BuildDynaStream(
+        string body, IReadOnlyList<(int Start, int End, string Cmd, bool IsUrl)> rawLinks)
+    {
+        static string Clean(string s) => System.Net.WebUtility.HtmlDecode(StripBasicXml(s));
+        if (rawLinks.Count == 0) return (Clean(body), null);
+
+        var sb    = new System.Text.StringBuilder();
+        var spans = new List<LinkSpan>();
+        var pos   = 0;
+        foreach (var l in rawLinks.OrderBy(l => l.Start))
+        {
+            if (l.Start < pos || l.End > body.Length) continue;   // overlapping / out of range
+            sb.Append(Clean(body[pos..l.Start]));
+            var start = sb.Length;
+            sb.Append(Clean(body[l.Start..l.End]));
+            if (sb.Length > start)
+                spans.Add(new LinkSpan(start, sb.Length - start, l.Cmd, l.IsUrl));
+            pos = l.End;
+        }
+        sb.Append(Clean(body[pos..]));
+        return (sb.ToString(), spans.Count > 0 ? spans : null);
     }
 
     private static string StripBasicXml(string input)

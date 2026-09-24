@@ -102,6 +102,12 @@ public partial class ServerDialogPanel : UserControl
         if (IdOf(sender) is { } id) _vm?.Activate(id);
     }
 
+    private void OnStreamLinkActivated(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.Tag is Genie.Core.Events.LinkSpan link)
+            _vm?.ActivateStreamLink(link);
+    }
+
     private void OnRadioSelected(object? sender, RoutedEventArgs e)
     {
         if (IdOf(sender) is not { } id) return;
