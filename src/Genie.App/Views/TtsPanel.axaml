@@ -9,6 +9,17 @@
   <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="4">
     <StackPanel Margin="4" Spacing="4">
 
+      <!-- Offline banner (#369): with no session the whole tab is disabled, and the
+           reason used to be one grey line under the sliders. Shown at the top, in
+           the same place and shape as the scope banner below. -->
+      <Border Name="OfflineBanner" IsVisible="False"
+              Background="{DynamicResource Theme.AccentBg}" CornerRadius="3" Padding="8,4" Margin="0,0,0,4">
+        <TextBlock Name="OfflineText"
+                   Text="Connect to a game to edit these settings — they load with the session."
+                   AutomationProperties.Name="Text-to-speech settings unavailable"
+                   Foreground="{DynamicResource Theme.Warning}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+      </Border>
+
       <!-- Scope banner — these settings are app-wide, shared by every profile. -->
       <Border Background="{DynamicResource Theme.AccentBg}" CornerRadius="3" Padding="8,4" Margin="0,0,0,4">
         <TextBlock Text="Text-to-speech settings are global (settings.cfg) — also scriptable via #tts and #config."
@@ -40,8 +51,27 @@
                 AutomationProperties.Name="Test voice"
                 AutomationProperties.HelpText="Speak a sample line with the selected voice."
                 ToolTip.Tip="Speak a sample line with the selected voice."/>
+        <Button Name="InstallButton" Content="Install voice…" Click="OnInstall"
+                AutomationProperties.Name="Install voice"
+                AutomationProperties.HelpText="Download the free offline default voice — the same as #tts install."
+                ToolTip.Tip="Download the free offline default voice — the same as #tts install. Progress shows in the game window."/>
       </StackPanel>
-      <TextBlock Name="VoiceHint" Foreground="Gray" FontStyle="Italic" TextWrapping="Wrap"/>
+      <TextBlock Name="VoiceHint" Foreground="Gray" FontStyle="Italic" TextWrapping="Wrap"
+                 AutomationProperties.Name="Voice status"/>
+
+      <!-- Voice folder (#369) — the ttsvoicedir key, which was command-line only. -->
+      <TextBlock Text="Voice folder:" Margin="0,4,0,0"/>
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
+        <TextBox Grid.Column="0" Name="VoiceDirBox" IsReadOnly="True"
+                 AutomationProperties.Name="Voice folder"
+                 ToolTip.Tip="Where voices are installed and looked for (#config ttsvoicedir)."/>
+        <Button Grid.Column="1" Name="BrowseVoiceDirButton" Content="Browse…" Click="OnBrowseVoiceDir"
+                AutomationProperties.Name="Choose voice folder"
+                ToolTip.Tip="Pick a folder that holds Piper voice models."/>
+        <Button Grid.Column="2" Name="DefaultVoiceDirButton" Content="Default" Click="OnDefaultVoiceDir"
+                AutomationProperties.Name="Use the default voice folder"
+                ToolTip.Tip="Go back to the default Voices folder."/>
+      </Grid>
 
       <Grid ColumnDefinitions="60,*,44" RowDefinitions="Auto,Auto" Margin="0,4,0,0">
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Rate:" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -56,7 +86,8 @@
         <TextBlock Grid.Row="1" Grid.Column="2" Name="VolumeValue" VerticalAlignment="Center" HorizontalAlignment="Right"/>
       </Grid>
 
-      <TextBlock Name="StatusText" Foreground="Gray" FontStyle="Italic" Margin="0,4,0,0"/>
+      <TextBlock Name="StatusText" Foreground="Gray" FontStyle="Italic" Margin="0,4,0,0" TextWrapping="Wrap"
+                 AutomationProperties.Name="Text-to-speech status"/>
 
     </StackPanel>
   </ScrollViewer>

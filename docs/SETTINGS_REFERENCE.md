@@ -119,7 +119,7 @@ setting; only `frontend` appears in `settings.cfg` and `#config list`).
 | --- | --- | --- |
 | `muted` | `False` | Mute all sound playback (the inverse of the internal PlaySounds flag). |
 | `ttsvoice` | *(empty)* | Selected TTS voice — the folder name under `ttsvoicedir`; empty = first installed voice found. Set by `#tts use`. |
-| `ttsvoicedir` | `Voices` | Local dir holding sherpa-onnx Piper voice models (backs `#speak` and per-stream read-aloud). |
+| `ttsvoicedir` | `Voices` | Local dir holding sherpa-onnx Piper voice models (backs `#speak` and per-stream read-aloud). Also set from Configuration ▸ Text-to-Speech (Browse… / Default). |
 | `ttsread` | `False` | Master switch for per-stream read-aloud (auto-speak game text); `#speak` works regardless. |
 | `ttsreadstreams` | `whispers,talk,thoughts,death` | Comma-separated streams read aloud when `ttsread` is on. |
 | `ttsstreampriority` | *(empty)* | Per-stream read-aloud urgency overrides — CSV of `stream:low\|normal\|high` pairs; empty = built-in defaults. |

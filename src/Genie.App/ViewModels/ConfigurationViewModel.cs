@@ -217,6 +217,10 @@ public class ConfigurationViewModel : ReactiveObject
     /// <inheritdoc cref="SpeakSample"/>
     public Action? TtsVoiceChanged { get; set; }
 
+    /// <summary>The tab's Install voice… button (#369): download and activate the
+    /// default voice, as <c>#tts install</c> does; completes with its success.</summary>
+    public Func<System.Threading.Tasks.Task<bool>>? TtsInstallVoice { get; set; }
+
     // ── Persistence hooks (called by every panel after an edit) ──────────────
 
     public void OnHighlightsChanged()

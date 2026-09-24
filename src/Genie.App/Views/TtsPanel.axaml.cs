@@ -4,6 +4,7 @@ using System.Linq;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Genie.Core.Config;
 
 namespace Genie.App.Views;
@@ -23,6 +24,7 @@ public partial class TtsPanel : UserControl
     private Action?         _onChanged;
     private Action<string>? _speakSample;
     private Action?         _voiceChanged;
+    private Func<System.Threading.Tasks.Task<bool>>? _installVoice;
     private bool            _loading;
 
     private readonly List<(string Id, CheckBox Check, ComboBox Priority)> _rows = new();
@@ -109,24 +111,25 @@ public partial class TtsPanel : UserControl
     /// itself with a hint, mirroring the Scripts tab. <paramref name="speakSample"/>
     /// and <paramref name="voiceChanged"/> come from the main window (which owns
     /// the TtsService); null just disables the Test button.
+    /// <paramref name="installVoice"/> runs the <c>#tts install</c> download of the
+    /// default voice and completes with its success; null disables Install voice….
     /// </summary>
     public void Initialize(GenieConfig? config, Action? onChanged = null,
-                           Action<string>? speakSample = null, Action? voiceChanged = null)
+                           Action<string>? speakSample = null, Action? voiceChanged = null,
+                           Func<System.Threading.Tasks.Task<bool>>? installVoice = null)
     {
         _config       = config;
         _onChanged    = onChanged;
         _speakSample  = speakSample;
         _voiceChanged = voiceChanged;
+        _installVoice = installVoice;
 
         IsEnabled = config is not null;
-        if (config is null)
-        {
-            StatusText.Text = "Connect to a game first — TTS settings load with the session.";
-            return;
-        }
+        OfflineBanner.IsVisible = config is null;
+        StatusText.Text = string.Empty;
+        if (config is null) return;
 
         LoadForm(config);
-        StatusText.Text = string.Empty;
     }
 
     private void BuildStreamRows()
@@ -222,9 +225,75 @@ public partial class TtsPanel : UserControl
         bool any = items.Count > 0;
         VoiceCombo.IsEnabled = any;
         TestButton.IsEnabled = any && _speakSample is not null;
+        InstallButton.IsEnabled = _installVoice is not null;
+        VoiceDirBox.Text = voiceDir;
         VoiceHint.Text = any
             ? ""
-            : "No voices installed — run #tts install to download a free offline voice.";
+            : "No voices installed yet — use Install voice… (or #tts install) to download a free offline voice.";
+    }
+
+    /// <summary>Re-read the voice list after the folder or the installed set
+    /// changed, without the combo's selection handler writing config back.</summary>
+    private void ReloadVoices()
+    {
+        if (_config is null) return;
+        _loading = true;
+        try { LoadVoices(_config); }
+        finally { _loading = false; }
+    }
+
+    private async void OnInstall(object? sender, RoutedEventArgs e)
+    {
+        if (_installVoice is null) return;
+        var voice = Services.VoiceCatalog.Default;
+        InstallButton.IsEnabled = false;
+        StatusText.Text = $"Downloading {voice.DisplayName} (about {voice.ApproxMb} MB) — progress shows in the game window.";
+        bool ok = false;
+        try { ok = await _installVoice(); }
+        catch { /* the installer reports its own failure in the game window */ }
+        ReloadVoices();
+        StatusText.Text = ok
+            ? $"Installed {voice.DisplayName} — it is now the active voice."
+            : "The voice didn't install — see the game window for why.";
+    }
+
+    private async void OnBrowseVoiceDir(object? sender, RoutedEventArgs e)
+    {
+        if (_config is null || TopLevel.GetTopLevel(this) is not { } top) return;
+        var start = System.IO.Directory.Exists(_config.TtsVoiceDir)
+            ? await top.StorageProvider.TryGetFolderFromPathAsync(_config.TtsVoiceDir)
+            : null;
+        var picked = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title                  = "Select the folder that holds your voices",
+            SuggestedStartLocation = start,
+            AllowMultiple          = false,
+        });
+        if (picked.FirstOrDefault()?.TryGetLocalPath() is { } path)
+            SetVoiceDir(path);
+    }
+
+    private void OnDefaultVoiceDir(object? sender, RoutedEventArgs e) => SetVoiceDir(DefaultVoiceDirRaw);
+
+    /// <summary><c>GenieConfig.TtsVoiceDirRaw</c>'s shipped default — relative, so
+    /// it resolves under the data directory like every other default folder.</summary>
+    private const string DefaultVoiceDirRaw = "Voices";
+
+    /// <summary>Apply a voice folder exactly as <c>#config ttsvoicedir</c> does,
+    /// then drop the cached synth engine and re-list what that folder holds.</summary>
+    private void SetVoiceDir(string path)
+    {
+        if (_config is null) return;
+        try { _config.SetSetting("ttsvoicedir", path); }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Couldn't use that folder: {ex.Message}";
+            return;
+        }
+        _voiceChanged?.Invoke();
+        _onChanged?.Invoke();
+        ReloadVoices();
+        StatusText.Text = $"Voice folder: {_config.TtsVoiceDir}";
     }
 
     /// <summary>Rebuild <c>ttsreadstreams</c> from the checked known rows plus

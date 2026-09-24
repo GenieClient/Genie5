@@ -1488,6 +1488,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             // TTS hooks for the Text-to-Speech tab — this VM owns the TtsService.
             cfgVm.SpeakSample     = text => _tts?.Speak(text, Services.TtsPriority.High);
             cfgVm.TtsVoiceChanged = () => _tts?.Reset();
+            cfgVm.TtsInstallVoice = () => InstallTtsVoiceAsync(Services.VoiceCatalog.Default);
             await ShowConfigurationDialog.Handle(cfgVm);
         });
 
@@ -4634,6 +4635,42 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// mute / priority / rate / volume / stop / status). Runs on the engine (UI) thread; the
     /// actual download runs off-thread and reports back via UI-marshaled system
     /// lines.</summary>
+    /// <summary>Download and activate <paramref name="voice"/> — <c>#tts install</c>
+    /// and the Text-to-Speech tab's Install voice… button (#369). The download runs
+    /// off-thread, reports progress as UI-marshaled system lines, and completes
+    /// with its success once the voice is active.</summary>
+    private Task<bool> InstallTtsVoiceAsync(Services.VoiceInfo voice)
+    {
+        if (_core is null) return Task.FromResult(false);
+        var core     = _core;
+        var voiceDir = core.Config.TtsVoiceDir;
+        var done     = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _ = Task.Run(async () =>
+        {
+            bool ok = false;
+            try
+            {
+                ok = await _voiceInstaller.InstallAsync(
+                    voice, voiceDir,
+                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => GameText.AddSystemLine(msg)));
+            }
+            catch (Exception ex)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => GameText.AddSystemLine($"[tts] install failed: {ex.Message}"));
+            }
+            if (!ok) { done.TrySetResult(false); return; }
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                // Installing a voice signals intent to use it — make it active.
+                core.Config.TtsVoice = voice.Id;
+                _tts?.Reset();
+                GameText.AddSystemLine($"[tts] active voice: {voice.DisplayName}.");
+                done.TrySetResult(true);
+            });
+        });
+        return done.Task;
+    }
+
     private void HandleTtsCommand(string args)
     {
         if (_core is null) return;
@@ -4655,20 +4692,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     Echo($"[tts] unknown voice '{parts[1]}'. See #tts voices.");
                     return;
                 }
-                _ = Task.Run(async () =>
-                {
-                    var ok = await _voiceInstaller.InstallAsync(
-                        voice, voiceDir,
-                        msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => GameText.AddSystemLine(msg)));
-                    if (ok)
-                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                        {
-                            // Installing a voice signals intent to use it — make it active.
-                            _core.Config.TtsVoice = voice.Id;
-                            _tts?.Reset();
-                            GameText.AddSystemLine($"[tts] active voice: {voice.DisplayName}.");
-                        });
-                });
+                _ = InstallTtsVoiceAsync(voice);
                 break;
             }
 
