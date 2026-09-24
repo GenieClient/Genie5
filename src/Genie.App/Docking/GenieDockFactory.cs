@@ -167,6 +167,15 @@ public class GenieDockFactory : Factory
     private readonly Dictionary<string, ServerDialogTool> _serverDialogTools =
         new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The placement each dialog window was last asked for, keyed by
+    /// dock id — so an <c>&lt;exposeDialog&gt;</c> reopens it the same way.</summary>
+    private readonly Dictionary<string, Genie.Core.Dialogs.ServerDialogPlacement> _serverDialogPlacements =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Left-column home for a <c>location='left'</c> dialog: tabbed
+    /// with Room, the top of the left column in the shipped layout.</summary>
+    private const string ServerDialogLeftParentId = "room-dock";
+
     /// <summary>Canonical dock id for a dialog id, so the panel round-trips
     /// through saved layouts.</summary>
     public static string ServerDialogId(string dialogId) =>
@@ -2452,7 +2461,8 @@ public class GenieDockFactory : Factory
     /// the Window menu.</para>
     /// </summary>
     public ServerDialogViewModel GetOrCreateServerDialog(
-        string dialogId, string? title = null, bool show = true)
+        string dialogId, string? title = null, bool show = true,
+        Genie.Core.Dialogs.ServerDialogPlacement? placement = null)
     {
         var id = ServerDialogId(dialogId);
         if (!_serverDialogTools.TryGetValue(id, out var tool))
@@ -2465,8 +2475,117 @@ public class GenieDockFactory : Factory
             tool.ViewModel.Title = title!;
         }
 
-        if (show && !IsToolVisible(id)) SetToolVisibility(id, true);
+        _serverDialogPlacements[id] = placement ?? Genie.Core.Dialogs.ServerDialogPlacement.Default;
+        if (show) ShowServerDialog(id);
         return tool.ViewModel;
+    }
+
+    /// <summary>
+    /// Show a dialog window, honouring its placement only where the user has
+    /// not placed it themselves (#156, "Where DR proposes"):
+    /// <list type="number">
+    ///   <item>already visible → just surface it (restores a minimized float);</item>
+    ///   <item><c>force-center</c> → a float centred over the main window, every time;</item>
+    ///   <item>the user floated it last → back out at its remembered geometry;</item>
+    ///   <item>the user docked it somewhere → back to that spot;</item>
+    ///   <item>otherwise, first appearance → where DR proposed: a centred float
+    ///         sized from its width/height, or docked left or right.</item>
+    /// </list>
+    /// </summary>
+    private void ShowServerDialog(string id)
+    {
+        if (!_serverDialogTools.ContainsKey(id)) return;
+        var placement = _serverDialogPlacements.TryGetValue(id, out var p)
+            ? p : Genie.Core.Dialogs.ServerDialogPlacement.Default;
+
+        if (IsToolVisible(id))
+        {
+            SetToolVisibility(id, true);
+            return;
+        }
+
+        if (placement.Kind == Genie.Core.Dialogs.ServerDialogPlacementKind.FloatAlwaysCentered)
+        {
+            ShowToolFloating(id);
+            SizeAndCenterFloat(id, placement);
+            return;
+        }
+        if (FloatedLast(id))
+        {
+            ShowToolFloating(id);          // applies the remembered bounds
+            return;
+        }
+        if (!_lastKnownPositions.ContainsKey(id) && placement.Floats)
+        {
+            ShowToolFloating(id);
+            if (!_lastFloatBounds.ContainsKey(id)) SizeAndCenterFloat(id, placement);
+            return;
+        }
+
+        // Docked. The home only matters when there is no last-known spot.
+        var home = placement.Kind == Genie.Core.Dialogs.ServerDialogPlacementKind.DockLeft
+            ? ServerDialogLeftParentId
+            : PluginWindowParentId;
+        if (_tools.TryGetValue(id, out var entry) && entry.ParentId != home)
+            _tools[id] = (entry.Dockable, home);
+        SetToolVisibility(id, true);
+    }
+
+    /// <summary>
+    /// Drop everything remembered about where a dialog window was — docked
+    /// spot, float geometry — and close it, so the next show places it afresh.
+    /// Used when its mapping changes, so switching a dialog to "Where DR
+    /// suggests" actually moves it rather than leaving it where the old
+    /// answer put it.
+    /// </summary>
+    public void ResetServerDialogPlacement(string dialogId)
+    {
+        var id = ServerDialogId(dialogId);
+        if (!_serverDialogTools.ContainsKey(id)) return;
+        if (IsToolVisible(id)) SetToolVisibility(id, false);
+        _lastKnownPositions.Remove(id);
+        var changed = _lastFloatBounds.Remove(id) | _floatedLast.Remove(id);
+        if (changed) FloatMemoryChanged?.Invoke();
+    }
+
+    /// <summary>Default size for a float whose dialog sent no usable
+    /// width/height — roughly a small Wrayth dialog.</summary>
+    private const double ServerDialogFloatWidth = 320, ServerDialogFloatHeight = 240;
+
+    /// <summary>Room for the float's own chrome (title bar, borders) on top
+    /// of the content size DR asked for.</summary>
+    private const double ServerDialogChromeHeight = 36, ServerDialogChromeWidth = 16;
+
+    /// <summary>Size a freshly floated dialog from the server's hint and centre
+    /// it over the main window, clamped onto a visible screen.</summary>
+    private void SizeAndCenterFloat(string id, Genie.Core.Dialogs.ServerDialogPlacement placement)
+    {
+        if (FindWindowHosting(id) is not { } w) return;
+
+        var width  = (placement.Width  ?? ServerDialogFloatWidth)  + ServerDialogChromeWidth;
+        var height = (placement.Height ?? ServerDialogFloatHeight) + ServerDialogChromeHeight;
+        w.Width  = width;
+        w.Height = height;
+
+        var main = (Avalonia.Application.Current?.ApplicationLifetime
+                        as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        if (main is not null)
+        {
+            // Position is in device pixels, sizes in DIPs.
+            var scale = main.RenderScaling;
+            var x = main.Position.X + (main.Bounds.Width  - width)  / 2 * scale;
+            var y = main.Position.Y + (main.Bounds.Height - height) / 2 * scale;
+            w.X = x; w.Y = y;
+            if (w.Host is Avalonia.Controls.Window hostWin)
+                hostWin.Position = new Avalonia.PixelPoint((int)x, (int)y);
+        }
+
+        if (w.Host is Avalonia.Controls.Window host)
+        {
+            host.Width  = width;
+            host.Height = height;
+            if (host is GenieHostWindow g) g.ClampToVisibleScreen();
+        }
     }
 
     /// <summary>
@@ -2520,11 +2639,7 @@ public class GenieDockFactory : Factory
 
     /// <summary>Bring an already-created dialog window to the front
     /// (<c>&lt;exposeDialog&gt;</c>).</summary>
-    public void ExposeServerDialog(string dialogId)
-    {
-        var id = ServerDialogId(dialogId);
-        if (_serverDialogTools.ContainsKey(id)) SetToolVisibility(id, true);
-    }
+    public void ExposeServerDialog(string dialogId) => ShowServerDialog(ServerDialogId(dialogId));
 
     /// <summary>Hide a dialog window without discarding its state
     /// (<c>&lt;closeDialog&gt;</c>).</summary>
