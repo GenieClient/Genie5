@@ -293,14 +293,17 @@ public sealed class CommandEngine
         switch (parts[0].ToLowerInvariant())
         {
             case "echo":
-                if (parts.Count > 1)
-                {
-                    EchoArgs.Parse(parts, 1, out var window, out var color, out var mono, out var msg);
-                    if (window != null)         _host.EchoTo(msg, window, color);
-                    else if (color != null || mono) _host.EchoMain(msg, color, mono);
-                    else                        _host.Echo(msg);
-                }
+            {
+                // No arg-count guard (public #360): a bare "#echo" echoes a blank
+                // line, as Genie 4 does (Core/Command.cs:273 — ParseAllArgs over a
+                // one-element array is "" + NewLine). Scripts use it for vertical
+                // spacing in banners and ASCII art; EchoArgs yields "" here.
+                EchoArgs.Parse(parts, 1, out var window, out var color, out var mono, out var msg);
+                if (window != null)         _host.EchoTo(msg, window, color);
+                else if (color != null || mono) _host.EchoMain(msg, color, mono);
+                else                        _host.Echo(msg);
                 break;
+            }
             case "log":
             {
                 // Genie 4 #log — append text to a file under <LogDir> (Core/Command.cs:366,
