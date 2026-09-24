@@ -444,22 +444,49 @@ public static partial class DefaultHighlights
         // between them in a single forward pass. Filter out invalid spans
         // (out-of-bounds, zero-length) defensively — the parser shouldn't
         // emit any, but better than crashing the renderer.
-        List<LinkSpan>? sortedLinks = null;
-        if (LinksEnabled && links is { Count: > 0 })
-        {
-            sortedLinks = new List<LinkSpan>(links.Count);
-            foreach (var span in links)
-            {
-                if (span.Length <= 0) continue;
-                if (span.Start < 0 || span.Start >= text.Length) continue;
-                if (span.Start + span.Length > text.Length) continue;
-                sortedLinks.Add(span);
-            }
-            sortedLinks.Sort((a, b) => a.Start.CompareTo(b.Start));
-        }
+        return new StyleMap(brushes, backgrounds, bolds, ValidLinks(text, links));
+    }
 
-        return new StyleMap(brushes, backgrounds, bolds,
-                            (IReadOnlyList<LinkSpan>?)sortedLinks ?? []);
+    /// <summary>The link spans a renderer should draw: in bounds, non-empty and
+    /// start-ordered — or none at all when links are switched off
+    /// (<see cref="LinksEnabled"/>). Shared by the highlight map, the echo-line
+    /// emitters and the AvaloniaEdit renderer so all of them agree.</summary>
+    public static IReadOnlyList<LinkSpan> ValidLinks(string text, IReadOnlyList<LinkSpan>? links)
+    {
+        if (!LinksEnabled || links is not { Count: > 0 } || string.IsNullOrEmpty(text)) return [];
+        var sorted = new List<LinkSpan>(links.Count);
+        foreach (var span in links)
+        {
+            if (span.Length <= 0) continue;
+            if (span.Start < 0 || span.Start >= text.Length) continue;
+            if (span.Start + span.Length > text.Length) continue;
+            sorted.Add(span);
+        }
+        sorted.Sort((a, b) => a.Start.CompareTo(b.Start));
+        return sorted;
+    }
+
+    /// <summary>
+    /// An unhighlighted line with clickable spans — echo lines (<c>#echo</c>, script
+    /// output) carrying <c>{display:command}</c> inline links (public #362). Text
+    /// between links comes from <paramref name="makeRun"/> so it keeps the echo
+    /// line's own colour / font; each link is the same clickable inline game text
+    /// uses.
+    /// </summary>
+    public static IReadOnlyList<Inline> PlainWithLinks(string text, IReadOnlyList<LinkSpan> validLinks,
+                                                       Func<string, Run> makeRun)
+    {
+        var inlines = new List<Inline>();
+        int cursor = 0;
+        foreach (var link in validLinks)
+        {
+            if (link.Start < cursor) continue;   // overlapping — defensive
+            if (link.Start > cursor) inlines.Add(makeRun(text[cursor..link.Start]));
+            inlines.Add(MakeLinkRun(text.Substring(link.Start, link.Length), link.Command, link.IsUrl));
+            cursor = link.Start + link.Length;
+        }
+        if (cursor < text.Length) inlines.Add(makeRun(text[cursor..]));
+        return inlines;
     }
 
     /// <summary>

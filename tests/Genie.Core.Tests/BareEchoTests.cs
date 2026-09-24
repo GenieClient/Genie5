@@ -84,6 +84,18 @@ public class BareEchoTests : IDisposable
         Assert.Equal(("", "Log"), Assert.Single(host.EchoToCalls));
     }
 
+    /// <summary>Public #362: inline {display:command} markup reaches the window
+    /// intact from a quoted typed #echo. A bare {…} is Genie 4 argument grouping
+    /// (Utility.ParseArgs strips the braces in Genie 4 too), so the quoted form —
+    /// or a script's echo / put #echo — is how a menu line keeps its markup.</summary>
+    [Fact]
+    public void Quoted_echo_keeps_inline_link_markup_intact()
+    {
+        var host = Run("#echo \"Go {north:north} or {south:go south}\"");
+
+        Assert.Equal(new[] { "Go {north:north} or {south:go south}" }, host.Echoes);
+    }
+
     [Fact]
     public void Script_bare_echo_prints_a_blank_line()
     {

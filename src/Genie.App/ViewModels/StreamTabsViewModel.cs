@@ -325,6 +325,10 @@ public class StreamBuffer(string name) : ReactiveObject, Controls.IScrollHoldSin
         // Genie 4). The spans are ABSOLUTE offsets into the raw text, so shift
         // them right by the prefix length or the styling lands on the wrong
         // characters (mirrors GameTextViewModel.AddLine).
+        // #362: {display:command} inline links, before the timestamp shift.
+        if (Genie.Core.Parsing.InlineClickMarkup.MightContain(line))
+            (line, links, bolds, presets) = Genie.Core.Parsing.InlineClickMarkup.Apply(line, links, bolds, presets);
+
         if (Settings?.Timestamp == true)
         {
             var prefix = WindowTimestamp.Prefix();

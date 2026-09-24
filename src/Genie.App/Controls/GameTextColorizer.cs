@@ -45,7 +45,11 @@ internal sealed class GameLineEntry
     /// <summary>Validated, start-ordered link spans for this line — the same list
     /// the legacy emit pass walks, so <c>ShowLinks=false</c> and malformed spans are
     /// already filtered out. Empty for echo lines.</summary>
-    internal IReadOnlyList<LinkSpan> Links => Line.IsEcho ? NoLinks : Map.Links;
+    internal IReadOnlyList<LinkSpan> Links => Line.IsEcho ? _echoLinks ??= DefaultHighlights.ValidLinks(Line.Text, Line.Links) : Map.Links;
+
+    // Echo lines skip the highlight map, but can still carry {display:command}
+    // inline links (#362) — validated the same way, once.
+    private IReadOnlyList<LinkSpan>? _echoLinks;
 }
 
 /// <summary>
@@ -101,7 +105,7 @@ internal sealed class GameTextColorizer : DocumentColorizingTransformer
 
         if (meta.IsEcho)
         {
-            ColorizeEchoLine(meta, start, end);
+            ColorizeEchoLine(meta, start, end, entry.Links);
             return;
         }
 
@@ -154,17 +158,33 @@ internal sealed class GameTextColorizer : DocumentColorizingTransformer
     /// <see cref="TextLine.Inlines"/> where the run's own Foreground beats the
     /// class style.
     /// </summary>
-    private void ColorizeEchoLine(TextLine meta, int start, int end)
+    private void ColorizeEchoLine(TextLine meta, int start, int end, IReadOnlyList<LinkSpan> links)
     {
         var fg    = meta.EchoForeground() ?? FindResource(Settings.DisplaySettings.EchoBrushKey) as IBrush;
         var style = FindResource(Settings.DisplaySettings.EchoFontStyleKey) as FontStyle? ?? FontStyle.Italic;
 
-        ChangeLinePart(start, end, el =>
+        void Paint(int from, int to)
         {
-            if (fg is not null) el.TextRunProperties.SetForegroundBrush(fg);
-            var tf = el.TextRunProperties.Typeface;
-            el.TextRunProperties.SetTypeface(new Typeface(tf.FontFamily, style, tf.Weight, tf.Stretch));
-        });
+            if (from >= to) return;
+            ChangeLinePart(from, to, el =>
+            {
+                if (fg is not null) el.TextRunProperties.SetForegroundBrush(fg);
+                var tf = el.TextRunProperties.Typeface;
+                el.TextRunProperties.SetTypeface(new Typeface(tf.FontFamily, style, tf.Weight, tf.Stretch));
+            });
+        }
+
+        // #362: inline link ranges are owned by GameLinkGenerator's element, as on
+        // game-text lines — paint only the echo text between them.
+        int cursor = start;
+        foreach (var link in links)
+        {
+            int ls = start + link.Start, le = Math.Min(end, ls + link.Length);
+            if (ls < cursor) continue;
+            Paint(cursor, Math.Min(ls, end));
+            cursor = le;
+        }
+        Paint(cursor, end);
     }
 
     private void Apply(int from, int to, IBrush? fg, IBrush? bg, bool bold, bool mono)

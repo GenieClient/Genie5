@@ -61,7 +61,7 @@ public class PluginWindowViewModel : ReactiveObject, Controls.IScrollHoldSink
         Lines.Clear();
         if (string.IsNullOrEmpty(content)) return;
         foreach (var line in content.Replace("\r\n", "\n").Split('\n'))
-            Lines.Add(new TextLine(line, StreamColor.Main, Window: Title));
+            Lines.Add(Line(line));
         Trim();
     }
 
@@ -69,7 +69,7 @@ public class PluginWindowViewModel : ReactiveObject, Controls.IScrollHoldSink
     /// Keeps the panel growing like a log.</summary>
     public void AppendLine(string text)
     {
-        Lines.Add(new TextLine(text ?? "", StreamColor.Main, Window: Title));
+        Lines.Add(Line(text ?? ""));
         Trim();
     }
 
@@ -78,9 +78,17 @@ public class PluginWindowViewModel : ReactiveObject, Controls.IScrollHoldSink
     /// ProcessInput path) when clicked.</summary>
     public void AppendLink(string text, string command)
     {
-        Lines.Add(new TextLine(text, StreamColor.Main,
-                               Links: new[] { new LinkSpan(0, text.Length, command) }, Window: Title));
+        Lines.Add(Line(text, new[] { new LinkSpan(0, text.Length, command) }));
         Trim();
+    }
+
+    /// <summary>A panel line after the #362 <c>{display:command}</c> inline-link
+    /// pass — script menus are the main users of it.</summary>
+    private TextLine Line(string text, IReadOnlyList<LinkSpan>? links = null)
+    {
+        if (Genie.Core.Parsing.InlineClickMarkup.MightContain(text))
+            (text, links, _, _) = Genie.Core.Parsing.InlineClickMarkup.Apply(text, links);
+        return new TextLine(text, StreamColor.Main, Links: links, Window: Title);
     }
 
     /// <summary>Empty the panel (<c>#clear &gt;Name</c>, or the owning plugin

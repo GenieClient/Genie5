@@ -336,6 +336,12 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
         // The link/bold/preset spans are ABSOLUTE offsets into the text, so they
         // must be shifted right by the prefix length or highlights and clickable
         // links would land on the wrong characters.
+        // #362: Genie 4 {display:command} inline links — game text, #echo, script
+        // output and diagnostics alike, as Genie 4 runs it beside highlights. Before
+        // the timestamp, so the prefix shift below moves the new spans too.
+        if (!isPrompt && Genie.Core.Parsing.InlineClickMarkup.MightContain(text))
+            (text, links, bolds, presets) = Genie.Core.Parsing.InlineClickMarkup.Apply(text, links, bolds, presets);
+
         if (!isPrompt && Settings?.Timestamp == true)
         {
             var prefix = WindowTimestamp.Prefix();
@@ -468,9 +474,17 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
 
     public void AddEcho(string text, string? color, bool mono)
     {
+        // #362: styled echoes carry {display:command} inline links too.
+        IReadOnlyList<LinkSpan>? links = null;
+        if (Genie.Core.Parsing.InlineClickMarkup.MightContain(text))
+            (text, links, _, _) = Genie.Core.Parsing.InlineClickMarkup.Apply(text);
         if (Settings?.Timestamp == true)              // #90: stamp echoes too
-            text = WindowTimestamp.Prefix() + text;
-        Lines.Add(new TextLine(text, StreamColor.System, EchoColor: color, Mono: mono));
+        {
+            var prefix = WindowTimestamp.Prefix();
+            text  = prefix + text;
+            links = links?.Select(s => s with { Start = s.Start + prefix.Length }).ToList();
+        }
+        Lines.Add(new TextLine(text, StreamColor.System, links, EchoColor: color, Mono: mono));
         TrimScrollback();
         _lastLineWasPrompt = false;
     }
@@ -516,12 +530,13 @@ public record TextLine(string Text, StreamColor Color,
             // an echo line, so this branch owns both #echo cases).
             if (IsEcho)
             {
+                // #362: an echo carrying {display:command} inline links keeps its
+                // echo styling between the links; each link is a clickable inline.
+                var echoLinks = DefaultHighlights.ValidLinks(Text, Links);
+                if (echoLinks.Count > 0)
+                    return DefaultHighlights.PlainWithLinks(Text, echoLinks, EchoRun);
                 if (EchoColor is null && !Mono) return [new Run(Text)];
-                var run = new Run(Text);
-                if (Mono) run.FontFamily = MonoFont;
-                if (EchoColor is not null && TryParseColor(EchoColor, out var c))
-                    run.Foreground = new SolidColorBrush(c);
-                return [run];
+                return [EchoRun(Text)];
             }
 
             // Game text: full highlighting. A <output class="mono"> block —
@@ -534,6 +549,17 @@ public record TextLine(string Text, StreamColor Color,
                     inl.FontFamily = MonoFont;
             return inlines;
         }
+    }
+
+    /// <summary>A run of this echo line's text, carrying its explicit colour and
+    /// mono font (the AXAML <c>.echo</c> class supplies the default italic + colour).</summary>
+    private Run EchoRun(string text)
+    {
+        var run = new Run(text);
+        if (Mono) run.FontFamily = MonoFont;
+        if (EchoColor is not null && TryParseColor(EchoColor, out var c))
+            run.Foreground = new SolidColorBrush(c);
+        return run;
     }
 
     /// <summary>The explicit <c>#echo</c> colour as a brush, or null when the line

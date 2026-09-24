@@ -136,6 +136,22 @@ Regex captures from `matchre`/`waitforre`/actions land in the current `$0..$9` f
 | `include foo.js` / `js <expr>` / `jscall <var> <expr>` | JavaScript interop on the embedded Jint engine: `include` loads a `.js` function library for the script run, `js` calls into it, `jscall` stores the result in `%var`. Standalone `.js` scripts are also supported — see [javascript-scripts.md](javascript-scripts.md). |
 | `plugin …` | Parsed for Genie 4 parity; execution is not supported. |
 
+#### Inline click links — `{display:command}`
+
+Any output line containing `{display:command}` shows `display` as a clickable link that runs `command`. It works anywhere on the line and as many times as it appears, which makes one-line menus possible:
+
+```
+echo Go {north:north} or {south:go south}
+```
+
+This renders as "Go north or south", with two independent links. Genie 4 behaviour, applied to every surface: game text, `echo` / `put #echo` output, the Game window, stream windows and script/plugin windows.
+
+- **Genie 4's pattern, quirks included:** the display runs to the *last* colon, so `{HP: 50:look}` shows "HP: 50" and runs `look`. A command can't contain a colon.
+- **No escaping.** A literal `{a:b}` in output becomes a link. DragonRealms' own text never has that shape.
+- **Typed `#echo` needs quotes:** `#echo "Go {north:north}"`. A bare `{…}` on a typed command line is Genie 4 argument grouping, and the braces are stripped before the text is shown (Genie 4 does the same). A script's `echo` and `put #echo` keep the text as written.
+- With **Show Links** off (`#config showlinks off`), the markup still collapses to its display text, but nothing is clickable.
+
+
 ## Variables and scope
 
 Two namespaces, by prefix:
