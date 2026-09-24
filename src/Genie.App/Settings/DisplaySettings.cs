@@ -178,6 +178,16 @@ public sealed class DisplaySettings : ReactiveObject
     [Reactive] public bool AlwaysOnTop { get; set; }
 
     /// <summary>
+    /// Keep every scrollbar at full width instead of letting it auto-hide to a
+    /// thin line when idle (public #365). Global — see
+    /// <see cref="ScrollBarAutoHide"/>. Mirrored into
+    /// <c>settings.cfg alwaysshowscrollbars</c> (<c>GenieConfig.AlwaysShowScrollbars</c>)
+    /// so <c>#config alwaysshowscrollbars on|off</c> drives it; this display.json
+    /// value is the authority when the two disagree. Default off (stock Avalonia).
+    /// </summary>
+    [Reactive] public bool AlwaysShowScrollbars { get; set; }
+
+    /// <summary>
     /// Whether the character's guild is appended to the window title
     /// ("Genie 5 — Connected — Name — Guild"). Off hides the guild slot even
     /// when a guild is known. Default on.
@@ -389,6 +399,11 @@ public sealed class DisplaySettings : ReactiveObject
         // next launch, and once now so a persisted "off" applies at startup.
         this.WhenAnyValue(x => x.ShowWindowBanners)
             .Subscribe(Genie.App.Docking.BannerChrome.SetVisible);
+
+        // Same shape for #365: pushed now so a persisted "on" applies at startup,
+        // and on every change so the setting takes effect without a restart.
+        this.WhenAnyValue(x => x.AlwaysShowScrollbars)
+            .Subscribe(ScrollBarAutoHide.SetAlwaysVisible);
 
         // The hands-strip visibility/position bools are computed properties
         // (JsonIgnore — derived from ShowHandsBar + HandsAtBottom). ReactiveUI's

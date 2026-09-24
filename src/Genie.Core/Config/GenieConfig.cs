@@ -335,6 +335,12 @@ public sealed class GenieConfig
     /// writes back here. When the stores disagree at core build, display.json
     /// wins.</summary>
     public bool AlwaysOnTop { get; set; }
+    /// <summary>Keep scrollbars at full width instead of auto-hiding (public #365).
+    /// Genie 5 key mirroring <c>DisplaySettings.AlwaysShowScrollbars</c> the same
+    /// way <see cref="AlwaysOnTop"/> does: display.json wins at core build, and
+    /// <c>#config alwaysshowscrollbars on|off</c> applies live via
+    /// <see cref="ConfigFieldUpdated.AlwaysShowScrollbars"/>.</summary>
+    public bool AlwaysShowScrollbars { get; set; }
     public bool CheckForUpdates { get; set; } = true;
     public bool AutoUpdate { get; set; }
     public string ScriptExtension { get; set; } = "cmd";
@@ -714,6 +720,7 @@ public sealed class GenieConfig
     public IReadOnlyList<(string Key, string Value)> ToConfigPairs() => new (string, string)[]
     {
         ("alwaysontop", AlwaysOnTop.ToString()),
+        ("alwaysshowscrollbars", AlwaysShowScrollbars.ToString()),
         ("classicconnect", ClassicConnect.ToString()),
         ("scriptchar", ScriptChar.ToString()),
         ("separatorchar", SeparatorChar.ToString()),
@@ -872,7 +879,7 @@ public sealed class GenieConfig
     {
         ("Connection",       new[] { "activitytimeout", "classicconnect", "conndebug", "connectscript", "flagscheck", "frontend", "reconnect" }),
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
-        ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
+        ("Window / Input",   new[] { "alwaysontop", "alwaysshowscrollbars", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout", "objectscreatures", "objectsconfigbar" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "tracesends", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "gamethread" }),
@@ -1026,6 +1033,7 @@ public sealed class GenieConfig
                 case "sizeinputtogame": SizeInputToGame = ToBool(value); Notify(ConfigFieldUpdated.SizeInputToGame); break;
                 case "updatemapperscripts": UpdateMapperScripts = ToBool(value); Notify(ConfigFieldUpdated.UpdateMapperScripts); break;
                 case "alwaysontop": AlwaysOnTop = ToBool(value); Notify(ConfigFieldUpdated.AlwaysOnTop); break;
+                case "alwaysshowscrollbars": AlwaysShowScrollbars = ToBool(value); Notify(ConfigFieldUpdated.AlwaysShowScrollbars); break;
                 case "weblinksafety": WebLinkSafety = ToBool(value); break;
                 case "autowalkpauseonunfocus": AutoWalkPauseOnUnfocus = ToBool(value); break;
                 case "autowalkunfocusseconds":

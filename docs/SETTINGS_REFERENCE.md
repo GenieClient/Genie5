@@ -39,6 +39,7 @@ setting; only `frontend` appears in `settings.cfg` and `#config list`).
 | Key | Default | What it does |
 | --- | --- | --- |
 | `alwaysontop` | `False` | Keep the main window above all other applications. |
+| `alwaysshowscrollbars` | `False` | Keep scrollbars at full width instead of shrinking them to a thin line when idle. Also in Display Settings. |
 | `ignoreclosealert` | `False` | Skip the confirmation alert when closing the app. |
 | `keepinputtext` | `False` | Keep the typed command in the input box after sending instead of clearing it. |
 | `sizeinputtogame` | `False` | Size the input box to match the game window width. |

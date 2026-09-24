@@ -40,5 +40,8 @@ public enum ConfigFieldUpdated
     /// <summary>Automapper room-resolution trace toggle changed
     /// (<c>#config mapperdebug</c>) — GenieCore attaches/detaches the engine's
     /// diagnostic sink.</summary>
-    MapperDebug
+    MapperDebug,
+    /// <summary>"Always show scrollbars" changed (<c>#config alwaysshowscrollbars</c>,
+    /// public #365) — the host mirrors it into display.json, which applies it.</summary>
+    AlwaysShowScrollbars
 }

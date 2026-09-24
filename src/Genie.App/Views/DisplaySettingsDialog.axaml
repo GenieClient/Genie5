@@ -4,7 +4,7 @@
         x:Class="Genie.App.Views.DisplaySettingsDialog"
         x:DataType="vm:DisplaySettingsViewModel"
         Title="Display Settings"
-        Width="500" Height="480"
+        Width="500" Height="512"
         CanResize="False"
         WindowStartupLocation="CenterOwner">
 
@@ -69,6 +69,10 @@
           <CheckBox Content="Italicize local echoes (typed commands, #echo, scripts)"
                     IsChecked="{Binding EchoItalic}"
                     Margin="0,4,0,0"/>
+
+          <!-- #365: full-width scrollbars instead of the idle thin line. -->
+          <CheckBox Content="Always show scrollbars (don't shrink them to a thin line)"
+                    IsChecked="{Binding AlwaysShowScrollbars}"/>
 
           <Separator Margin="0,4,0,4"/>
 

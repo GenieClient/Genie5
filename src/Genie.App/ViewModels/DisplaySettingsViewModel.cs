@@ -43,6 +43,7 @@ public class DisplaySettingsViewModel : ReactiveObject
     [Reactive] public Color  GameColor  { get; set; }
     [Reactive] public Color  EchoColor  { get; set; }
     [Reactive] public bool   EchoItalic { get; set; }
+    [Reactive] public bool   AlwaysShowScrollbars { get; set; }
     [Reactive] public string FontFamily { get; set; }
     [Reactive] public double FontSize   { get; set; }
 
@@ -93,6 +94,7 @@ public class DisplaySettingsViewModel : ReactiveObject
         GameColor  = TryParseColor(live.GameColorHex, Avalonia.Media.Color.FromRgb(0xCC, 0xCC, 0xCC));
         EchoColor  = TryParseColor(live.EchoColorHex, Avalonia.Media.Color.FromRgb(0x88, 0xBB, 0xCC));
         EchoItalic = live.EchoItalic;
+        AlwaysShowScrollbars = live.AlwaysShowScrollbars;
         FontFamily = currentFont;
         FontSize   = live.FontSize;
         EditorPath = live.EditorPath;
@@ -121,6 +123,7 @@ public class DisplaySettingsViewModel : ReactiveObject
         _live.GameColorHex = "#" + GameColor.ToString().Substring(3); // drop alpha → #RRGGBB
         _live.EchoColorHex = "#" + EchoColor.ToString().Substring(3);
         _live.EchoItalic   = EchoItalic;
+        _live.AlwaysShowScrollbars = AlwaysShowScrollbars;
         _live.FontFamily   = FontFamily;
         _live.FontSize     = FontSize;
         _live.EditorPath   = EditorPath ?? "";
@@ -250,6 +253,7 @@ public class DisplaySettingsViewModel : ReactiveObject
         GameColor  = TryParseColor(d.GameColorHex, Colors.LightGray);
         EchoColor  = TryParseColor(d.EchoColorHex, Avalonia.Media.Color.FromRgb(0x88, 0xBB, 0xCC));
         EchoItalic = d.EchoItalic;
+        AlwaysShowScrollbars = d.AlwaysShowScrollbars;
         FontFamily = d.FontFamily.Split(',')[0].Trim();
         FontSize   = d.FontSize;
         EditorPath = d.EditorPath;

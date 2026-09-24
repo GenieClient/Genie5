@@ -1466,7 +1466,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         DisplaySettingsCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var ok = await ShowDisplaySettingsDialog.Handle(Display);
-            if (ok) Display.Save(_displayPath);
+            if (!ok) return;
+            Display.Save(_displayPath);
+            // Mirror #365's toggle into settings.cfg so #config alwaysshowscrollbars
+            // and #config list report what the dialog just set.
+            if (_core is not null && _core.Config.AlwaysShowScrollbars != Display.AlwaysShowScrollbars)
+            {
+                _core.Config.AlwaysShowScrollbars = Display.AlwaysShowScrollbars;
+                _core.Config.Save();
+            }
         });
 
         ConfigurationCommand = ReactiveCommand.CreateFromTask(async () =>
@@ -5415,6 +5423,22 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // display.json is the authority: push it into the live config so
         // #config alwaysontop / #config list report what the window is doing.
         _core.Config.AlwaysOnTop = Display.AlwaysOnTop;
+
+        // "Always show scrollbars" (public #365) — the same two-store shape as
+        // always-on-top: display.json is the authority and applies it; the
+        // settings.cfg key is the #config alias.
+        _core.Config.ConfigChanged += field =>
+        {
+            if (field != Genie.Core.Config.ConfigFieldUpdated.AlwaysShowScrollbars) return;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (_core is null || Display.AlwaysShowScrollbars == _core.Config.AlwaysShowScrollbars) return;
+                Display.AlwaysShowScrollbars = _core.Config.AlwaysShowScrollbars;
+                Display.Save(_displayPath);
+                GameText.AddSystemLine($"[display] always show scrollbars {(Display.AlwaysShowScrollbars ? "on" : "off")}");
+            });
+        };
+        _core.Config.AlwaysShowScrollbars = Display.AlwaysShowScrollbars;
 
         // #goto / #go2 … from the command bar or a script — resolve the room
         // against the active zone and start an attended walk. UI-thread-bound
