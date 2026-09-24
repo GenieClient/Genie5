@@ -24,48 +24,53 @@ namespace Genie.Core.Health;
 /// perceive block is surrounded by ordinary game output, so "not part of this
 /// block" is the common case, not an error.</para>
 /// </summary>
-public sealed class PerceiveHealthParser
+public sealed partial class PerceiveHealthParser
 {
     // ── Grammar ──────────────────────────────────────────────────────────────
 
     /// <summary>Block openers. DR uses the possessive form for a patient and
     /// "Your" for the player.</summary>
-    private static readonly Regex SelfOpenRe = new(
-        @"^Your injuries include", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex SelfOpenRe = SelfOpenRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^Your injuries include", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex SelfOpenRegex();
 
-    private static readonly Regex PatientOpenRe = new(
-        @"^(?<name>.+?)'s injuries include", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex PatientOpenRe = PatientOpenRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(?<name>.+?)'s injuries include", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex PatientOpenRegex();
 
     /// <summary>The patient identity DR prints after a perceive / mind-inward
     /// open, before the block itself.</summary>
-    private static readonly Regex PresenceRe = new(
-        @"^\s*The presence of (?<name>.+?)[.,]\s*$", RegexOptions.Compiled);
+    private static readonly Regex PresenceRe = PresenceRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*The presence of (?<name>.+?)[.,]\s*$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex PresenceRegex();
 
     /// <summary>Paired regions — "Wounds to the LEFT ARM:". Checked before the
     /// single-word form, which would otherwise capture only "LEFT".</summary>
-    private static readonly Regex SidedRegionRe = new(
-        @"^\s*Wounds to the (?<side>LEFT|RIGHT) (?<part>\w+):\s*$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex SidedRegionRe = SidedRegionRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*Wounds to the (?<side>LEFT|RIGHT) (?<part>\w+):\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex SidedRegionRegex();
 
-    private static readonly Regex RegionRe = new(
-        @"^\s*Wounds to the (?<part>\w+):\s*$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex RegionRe = RegionRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*Wounds to the (?<part>\w+):\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex RegionRegex();
 
     /// <summary>An axis reading. The severity may arrive bare
     /// (<c>-- harmful</c>) or with the numeric suffix DR shows in some display
     /// modes (<c>-- harmful (5/13)</c>); both forms are accepted.</summary>
-    private static readonly Regex AxisRe = new(
-        @"^\s*(?<kind>Fresh|Scars)\s+(?<depth>External|Internal):.*?--\s*(?<severity>[a-z ]+?)\s*(?:\(\d+/\d+\))?\s*$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex AxisRe = AxisRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*(?<kind>Fresh|Scars)\s+(?<depth>External|Internal):.*?--\s*(?<severity>[a-z ]+?)\s*(?:\(\d+/\d+\))?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex AxisRegex();
 
     /// <summary>Vitality line — the percentage DR prints in parentheses.</summary>
-    private static readonly Regex VitalityRe = new(
-        @"\((?<pct>\d{1,3})%\)", RegexOptions.Compiled);
+    private static readonly Regex VitalityRe = VitalityRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\((?<pct>\d{1,3})%\)", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex VitalityRegex();
 
     /// <summary>Block terminators. "has/have … vitality" is the one the
     /// community script waits on (<c>waitforre ^You .+ vitality</c>).</summary>
-    private static readonly Regex VitalityLineRe = new(
-        @"\b(?:has|have)\b.*\bvitality\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex VitalityLineRe = VitalityLineRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\b(?:has|have)\b.*\bvitality\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex VitalityLineRegex();
 
     /// <summary>The canonical thirteen rungs, in order. Index + 1 is the
     /// severity, so the ladder is defined once and read both ways.</summary>

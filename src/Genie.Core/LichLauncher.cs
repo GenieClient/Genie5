@@ -27,7 +27,7 @@ public enum LichLaunchOutcome
 /// owns that process and should stop it on disconnect / character change via
 /// <see cref="LichLauncher.TryStop"/>. Start time is used to ignore leftover
 /// <c>temp/debug-*.log</c> files from earlier Lich runs when mirroring logs.</summary>
-public sealed record LichLaunchResult(
+public sealed partial record LichLaunchResult(
     LichLaunchOutcome Outcome,
     string Message,
     int? ProcessId = null,
@@ -53,13 +53,15 @@ public sealed record LichLaunchResult(
 /// <see cref="Config.GenieConfig.LichAutoLaunch"/> is on and the mode is
 /// <see cref="ConnectionMode.LichProxy"/>.
 /// </summary>
-public static class LichLauncher
+public static partial class LichLauncher
 {
-    private static readonly Regex CharacterPlaceholder =
-        new(@"\{character\}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex CharacterPlaceholder = CharacterPlaceholderRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\{character\}", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex CharacterPlaceholderRegex();
 
-    private static readonly Regex PortPlaceholder =
-        new(@"\{port\}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex PortPlaceholder = PortPlaceholderRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\{port\}", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex PortPlaceholderRegex();
 
     /// <summary>
     /// Expands <c>{character}</c> and <c>{port}</c> placeholders in a

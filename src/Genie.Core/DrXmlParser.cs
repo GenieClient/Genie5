@@ -2322,6 +2322,9 @@ public sealed partial class DrXmlParser : IDisposable
     // ── Utility ──────────────────────────────────────────────────────────────
 
     // Matches ANSI escape sequences like ESC[1m, ESC[0m, ESC[31m, etc.
+    /// <summary>Where a bold creature's phrase ends in a room-objects line (#285: built once).</summary>
+    private static readonly System.Buffers.SearchValues<char> PhraseEndChars = System.Buffers.SearchValues.Create(",.");
+
     private static readonly System.Text.RegularExpressions.Regex _ansiRe = AnsiRegex();
     [System.Text.RegularExpressions.GeneratedRegex(@"\x1B\[[0-9;]*[A-Za-z]", System.Text.RegularExpressions.RegexOptions.None)]
     private static partial System.Text.RegularExpressions.Regex AnsiRegex();
@@ -2347,7 +2350,8 @@ public sealed partial class DrXmlParser : IDisposable
         {
             var start = Math.Clamp(span.Start, 0, raw.Length);
             var from  = Math.Clamp(span.Start + span.Length, start, raw.Length);
-            var end   = raw.IndexOfAny(new[] { ',', '.' }, from);
+            var end   = raw.AsSpan(from).IndexOfAny(PhraseEndChars);
+            if (end >= 0) end += from;
             if (end < 0) end = raw.Length;
 
             // Cap the phrase at the START of the next bold creature. DR separates

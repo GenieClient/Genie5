@@ -21,7 +21,7 @@ namespace Genie.Core.Extensions.Builtin;
 /// with BRIEFEXP ON emits <c>Stealth:  550 73% [ 5/34]</c> where another emits
 /// <c>Stealth:  550 73% dabbling</c>.</para>
 /// </summary>
-public sealed class ExperienceExtension : IGameExtension
+public sealed partial class ExperienceExtension : IGameExtension
 {
     public string Name        => "Experience";
     public string Version     => "2.0";
@@ -56,7 +56,7 @@ public sealed class ExperienceExtension : IGameExtension
     public event Action<int>? TdpUpdated;
 
     private readonly Dictionary<string, SkillInfo> _skills = new(StringComparer.OrdinalIgnoreCase);
-    private readonly record struct SkillInfo(int Rank, int Percent, int Mindstate);
+    private readonly partial record struct SkillInfo(int Rank, int Percent, int Mindstate);
 
     // Guards _skills structural access. Writes (Apply's insert, the empty-clear's
     // Remove) run on the connection read-loop thread; the /exp console command and
@@ -160,11 +160,15 @@ public sealed class ExperienceExtension : IGameExtension
         return idx >= 0 ? idx : order.Length + OrderOf(name) / 100;  // omitted → after listed, G4-relative
     }
 
-    private static readonly Regex TagRe    = new("<[^>]*>", RegexOptions.Compiled);
-    private static readonly Regex DigitsRe = new(@"\d+", RegexOptions.Compiled);
-    private static readonly Regex SkillLineRe = new(
-        @"([A-Z][A-Za-z '\-]+?):\s+(\d+)\s+(\d+)%\s+([a-z][a-z ]*?)(?=\s*\(|\s{2,}|$)",
-        RegexOptions.Compiled);
+    private static readonly Regex TagRe = TagRegex();
+    [System.Text.RegularExpressions.GeneratedRegex("<[^>]*>", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex TagRegex();
+    private static readonly Regex DigitsRe = DigitsRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\d+", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex DigitsRegex();
+    private static readonly Regex SkillLineRe = SkillLineRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"([A-Z][A-Za-z '\-]+?):\s+(\d+)\s+(\d+)%\s+([a-z][a-z ]*?)(?=\s*\(|\s{2,}|$)", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex SkillLineRegex();
 
     /// <summary>BRIEFEXP-ON form of the live pulse: the mindstate arrives as
     /// <c>[ 5/34]</c> instead of the word ("dabbling"). <c>BRIEFEXP</c> is a
@@ -172,18 +176,19 @@ public sealed class ExperienceExtension : IGameExtension
     /// stale between manual <c>exp</c> dumps while another's updated live — the
     /// full-dump text table always spells the mindstate out, which is why the
     /// manual path kept working. Matches Lich's <c>BriefExpOn</c> pattern.</summary>
-    private static readonly Regex SkillLineBriefRe = new(
-        @"([A-Z][A-Za-z '\-]*?):\s+(\d+)\s+(\d+)%\s*\[\s*(\d+)\s*/\s*34\s*\]",
-        RegexOptions.Compiled);
-    private static readonly Regex TdpRe = new(
-        @"Time Development Points:\s*(\d+)", RegexOptions.Compiled);
+    private static readonly Regex SkillLineBriefRe = SkillLineBriefRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"([A-Z][A-Za-z '\-]*?):\s+(\d+)\s+(\d+)%\s*\[\s*(\d+)\s*/\s*34\s*\]", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex SkillLineBriefRegex();
+    private static readonly Regex TdpRe = TdpRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"Time Development Points:\s*(\d+)", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex TdpRegex();
 
     /// <summary>The <c>exp rexp</c> component body: <c>Rested EXP Stored: 5:58 hours
     /// Usable This Cycle: 5:56 hours  Cycle Refreshes: 17:11 hours</c>. Values can be
     /// bare ("6 hours") or H:MM; the " hours" suffix is dropped on capture.</summary>
-    private static readonly Regex RestedRe = new(
-        @"Rested EXP Stored:\s*(.+?)\s+Usable This Cycle:\s*(.+?)\s+Cycle Refreshes:\s*(.+)$",
-        RegexOptions.Compiled);
+    private static readonly Regex RestedRe = RestedRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"Rested EXP Stored:\s*(.+?)\s+Usable This Cycle:\s*(.+?)\s+Cycle Refreshes:\s*(.+)$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex RestedRegex();
 
     public void Initialize(IExtensionHost host) => _host = host;
     public void OnCommandSent(string command) { }

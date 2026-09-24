@@ -3823,11 +3823,13 @@ public sealed class ScriptEngine
     // expensive when matchwait registers 10+ patterns on a single line and
     // they survive across many incoming lines.
     private static readonly Dictionary<string, Regex> _regexCache = new(StringComparer.Ordinal);
+    // A dedicated gate (#285) rather than locking the Dictionary instance itself.
+    private static readonly System.Threading.Lock _regexCacheGate = new();
     private const int RegexCacheLimit = 256;
 
     private static Regex? GetCompiledRegex(string pattern)
     {
-        lock (_regexCache)
+        lock (_regexCacheGate)
         {
             if (_regexCache.TryGetValue(pattern, out var cached)) return cached;
             try

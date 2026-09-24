@@ -420,12 +420,15 @@ public sealed class MapsUpdater : IUpdater
         return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     }
 
+    // Built once (#285): a fresh JsonSerializerOptions per call rebuilds its metadata cache.
+    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+
     private void SaveShaManifest(Dictionary<string, string> shas)
     {
         try
         {
             File.WriteAllText(ShaManifestPath,
-                JsonSerializer.Serialize(shas, new JsonSerializerOptions { WriteIndented = true }));
+                JsonSerializer.Serialize(shas, IndentedJson));
         }
         catch { /* best-effort — a failed write just means a re-check re-flags files */ }
     }

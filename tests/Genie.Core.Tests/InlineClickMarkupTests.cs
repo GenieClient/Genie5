@@ -111,7 +111,7 @@ public class InlineClickMarkupTests
 
         Assert.Equal("a north b", r.Text);
         Assert.Equal(new[] { "x", "go north", "y" }, r.Links!.Select(l => l.Command));
-        Assert.Equal("north", Linked(r, r.Links[1]));
+        Assert.Equal("north", Linked(r, r.Links![1]));
         Assert.DoesNotContain(r.Links, l => l.Command == "overlap");
     }
 }

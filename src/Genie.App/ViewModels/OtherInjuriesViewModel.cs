@@ -27,15 +27,17 @@ namespace Genie.App.ViewModels;
 /// the player's body, and this window describes someone else's (see the
 /// exact-id note on <c>ServerDialogEngine</c>'s exclusions).</para>
 /// </summary>
-public sealed class OtherInjuriesViewModel : ReactiveObject, IServerDialogBespoke
+public sealed partial class OtherInjuriesViewModel : ReactiveObject, IServerDialogBespoke
 {
-    private static readonly Regex IdRe = new(@"^injuries-\d+$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex IdRe = IdRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^injuries-\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex IdRegex();
 
     public static bool Handles(string dialogId) => IdRe.IsMatch(dialogId ?? "");
 
     /// <summary>One body region: the shared sprite cell plus the transfer
     /// command DR attached to it, if any.</summary>
-    public sealed class Part : ReactiveObject
+    public sealed partial class Part : ReactiveObject
     {
         public Part(InjuriesViewModel.InjuryCell cell, string regionId)
         {

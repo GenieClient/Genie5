@@ -27,7 +27,7 @@ namespace Genie.App.ViewModels;
 /// <see cref="SelectedZoneFile"/>), and <see cref="GotoNodeCommand"/> which
 /// walks the player to the clicked room using the engine's BFS pathfinder.
 /// </summary>
-public class MapperViewModel : ReactiveObject
+public partial class MapperViewModel : ReactiveObject
 {
     [Reactive] public string ZoneName        { get; private set; } = "(disconnected)";
     [Reactive] public string CurrentTitle    { get; private set; } = "(unknown)";
@@ -1823,9 +1823,9 @@ public class MapperViewModel : ReactiveObject
 
     /// <summary>Matches the standard zone naming scheme: <c>Map</c> + number +
     /// optional letter suffix (Map10, Map107a, Map118e). Case-insensitive.</summary>
-    private static readonly System.Text.RegularExpressions.Regex MapNumberRx =
-        new(@"^map(\d+)([a-z]*)", System.Text.RegularExpressions.RegexOptions.IgnoreCase |
-                                  System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex MapNumberRx = MapNumberRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^map(\d+)([a-z]*)", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex MapNumberRegex();
 
     /// <summary>
     /// Order the zone file paths per the user's sort mode and return bare
@@ -2318,7 +2318,7 @@ public class MapperViewModel : ReactiveObject
 /// that), so the "special map" distinction is derived per-item at render time
 /// instead of being baked into a wrapper object.
 /// </summary>
-public static class ZoneNameConverters
+public static partial class ZoneNameConverters
 {
     /// <summary>String zone filename → true when it's a special (non-MapNN)
     /// map, e.g. Hollow_Eve. Shows the SPECIAL badge in the dropdown.</summary>

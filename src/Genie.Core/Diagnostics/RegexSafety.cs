@@ -46,6 +46,11 @@ public static class RegexSafety
     /// <summary>Report a caught regex timeout for <paramref name="stage"/>.</summary>
     public static void ReportTimeout(PipelineStage stage) => TimeoutSink?.Invoke(stage);
 
+    /// <summary>Alternation / optionality metacharacters: a pattern with any of them
+    /// has no literal run guaranteed in every match. Built once (public #285).</summary>
+    private static readonly System.Buffers.SearchValues<char> OptionalityChars =
+        System.Buffers.SearchValues.Create("|?*{");
+
     /// <summary>
     /// Longest run of literal characters in <paramref name="pattern"/> that is
     /// guaranteed to appear in <i>every</i> string the pattern matches, usable as
@@ -60,7 +65,7 @@ public static class RegexSafety
 
         // Optionality / alternation ⇒ no literal run is guaranteed in every
         // match. Bail conservatively rather than risk a false-negative filter.
-        if (pattern.IndexOfAny(new[] { '|', '?', '*', '{' }) >= 0) return null;
+        if (pattern.AsSpan().IndexOfAny(OptionalityChars) >= 0) return null;
 
         var best = string.Empty;
         var cur  = new StringBuilder();

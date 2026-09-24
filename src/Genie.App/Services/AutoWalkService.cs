@@ -48,7 +48,7 @@ namespace Genie.App.Services;
 ///   always-available user controls.
 /// </para>
 /// </summary>
-public sealed class AutoWalkService : ReactiveObject
+public sealed partial class AutoWalkService : ReactiveObject
 {
     private readonly GenieCore _core;
     private readonly AutoMapperEngine _mapEngine;
@@ -221,9 +221,9 @@ public sealed class AutoWalkService : ReactiveObject
     /// hidden-exit go/climb gets before a successful search reveals the path.
     /// Mirrors the relevant members of Genie 4 automapper.cmd's %move_FAIL.
     /// </summary>
-    private static readonly Regex HiddenExitBlock = new(
-        @"^(?:I could not find what you were referring to\.|What were you referring to\?|You can't go there\.)",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex HiddenExitBlock = HiddenExitBlockRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(?:I could not find what you were referring to\.|What were you referring to\?|You can't go there\.)", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex HiddenExitBlockRegex();
 
     /// <summary>
     /// Server responses that mean "you can't move — you're engaged in combat".
@@ -234,9 +234,9 @@ public sealed class AutoWalkService : ReactiveObject
     /// disarm.cmd) all key off these same lines to drive retreat-then-move, so a
     /// text match here is the parity-correct mechanism, not a fallback.
     /// </summary>
-    private static readonly Regex EngagementBlock = new(
-        @"^(?:You are engaged to .+!|You try to move, but you're engaged\.|While in combat\?\s+You'll have better luck if you first retreat\.|You can't do that while engaged!)",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex EngagementBlock = EngagementBlockRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(?:You are engaged to .+!|You try to move, but you're engaged\.|While in combat\?\s+You'll have better luck if you first retreat\.|You can't do that while engaged!)", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex EngagementBlockRegex();
 
     /// <summary>
     /// Id of the room we were standing in when the most recent move was

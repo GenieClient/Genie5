@@ -202,6 +202,13 @@ public sealed class AnalystCapture : IDisposable
         }
     }
 
+    // Built once (#285): a fresh JsonSerializerOptions per call rebuilds its metadata cache.
+    private static readonly JsonSerializerOptions MetaJsonOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,   // keep names/UTF-8 readable
+    };
+
     private void WriteMeta()
     {
         if (_basePath is null) return;
@@ -229,11 +236,7 @@ public sealed class AnalystCapture : IDisposable
         try
         {
             File.WriteAllText(_basePath + ".meta.json",
-                JsonSerializer.Serialize(meta, new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping   // keep names/UTF-8 readable
-                }));
+                JsonSerializer.Serialize(meta, MetaJsonOptions));
         }
         catch (Exception ex) { _diag?.Invoke($"[analyst] meta write failed: {ex.Message}"); }
     }

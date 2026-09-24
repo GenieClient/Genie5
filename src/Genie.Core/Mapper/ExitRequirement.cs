@@ -21,7 +21,7 @@ namespace Genie.Core.Mapper;
 /// information; they pass as "non-blocking" requirements (best-effort).
 /// </para>
 /// </summary>
-public sealed record ExitRequirement
+public sealed partial record ExitRequirement
 {
     /// <summary>Skill-name → minimum rank. AND-ed against the character.</summary>
     public Dictionary<string, int> MinRanks { get; init; } = new(StringComparer.OrdinalIgnoreCase);
@@ -111,17 +111,17 @@ public sealed record ExitRequirement
 
     // ── Parser ─────────────────────────────────────────────────────────────
 
-    private static readonly Regex SkillOpRegex = new(
-        @"^\s*(?<skill>[a-zA-Z][a-zA-Z ]*?)\s*(?<op>>=|>|=)?\s*(?<value>\d+)\s*$",
-        RegexOptions.Compiled);
+    private static readonly Regex SkillOpRegex = SkillOpPattern();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*(?<skill>[a-zA-Z][a-zA-Z ]*?)\s*(?<op>>=|>|=)?\s*(?<value>\d+)\s*$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex SkillOpPattern();
 
-    private static readonly Regex ClassRegex = new(
-        @"^\s*class\s*=\s*(?<class>\w+)\s*$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex ClassRegex = ClassPattern();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*class\s*=\s*(?<class>\w+)\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex ClassPattern();
 
-    private static readonly Regex LevelRegex = new(
-        @"^\s*level\s*(?:>=|>)?\s*(?<value>\d+)\s*$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex LevelRegex = LevelPattern();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*level\s*(?:>=|>)?\s*(?<value>\d+)\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex LevelPattern();
 
     /// <summary>
     /// Parse the free-form Requires string into structured fields.

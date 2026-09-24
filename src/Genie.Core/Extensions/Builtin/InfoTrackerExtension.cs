@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace Genie.Core.Extensions.Builtin;
 
-public sealed class InfoTrackerExtension : IGameExtension
+public sealed partial class InfoTrackerExtension : IGameExtension
 {
     public string Name        => "InfoTracker";
     public string Version     => "1.0";
@@ -11,9 +11,9 @@ public sealed class InfoTrackerExtension : IGameExtension
 
     private IExtensionHost _host = null!;
 
-    private static readonly Regex Field = new(
-        @"(?<key>Name|Guild|Race|Gender|Age|Circle)\s*:\s*(?<val>[^:]*?)(?=\s{2,}\w+\s*:|$)",
-        RegexOptions.Compiled);
+    private static readonly Regex Field = FieldRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?<key>Name|Guild|Race|Gender|Age|Circle)\s*:\s*(?<val>[^:]*?)(?=\s{2,}\w+\s*:|$)", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex FieldRegex();
 
     public void Initialize(IExtensionHost host) { _host = host; }
     public void OnCommandSent(string command) { }

@@ -11,7 +11,7 @@ internal enum Visibility { Unknown, Clear, Cloudy, BelowHorizon }
 /// <see cref="Feed"/> is fed one game-text line at a time and keeps just enough
 /// state to assemble the multi-line <c>obs sky</c> block.
 /// </summary>
-internal sealed class SkyState
+internal sealed partial class SkyState
 {
     public static readonly string[] Moons = { "Katamba", "Xibar", "Yavash" };
 
@@ -40,9 +40,9 @@ internal sealed class SkyState
     // both normalise to the same key the clear wording produces.
     private const string Body = @"(?:[Tt]he planet |[Tt]he )?(.+?)";
 
-    private static readonly Regex BodyRe = new(
-        @"^(?:The planet |The )?(.+?) is (unobscured by clouds|obscured by clouds|below the horizon)\.$",
-        RegexOptions.Compiled);
+    private static readonly Regex BodyRe = BodyRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(?:The planet |The )?(.+?) is (unobscured by clouds|obscured by clouds|below the horizon)\.$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex BodyRegex();
 
     /// <summary>Partial/total cloud wordings, all of which mean "up, but
     /// clouded". Tried in order after <see cref="BodyRe"/> misses. The
@@ -53,22 +53,39 @@ internal sealed class SkyState
     {
         // "Two-thirds of the planet Szeldia is blocked by cloud cover above."
         // "Two-thirds of the early afternoon sun is blocked by cloud cover above."
-        new($@"^.+? of {Body} is blocked by cloud cover above\.$", RegexOptions.Compiled),
+        Cloudy1Regex(),
         // "One half of the Raven has been obscured by clouds above."
-        new($@"^.+? of {Body} has been obscured by clouds above\.$", RegexOptions.Compiled),
+        Cloudy2Regex(),
         // "A rather large cloud has covered nearly a third of the Wolf."
-        new($@"^A .*?cloud has covered .+? of {Body}\.$", RegexOptions.Compiled),
+        Cloudy3Regex(),
         // "A cloud has obscured parts of the Magpie."
-        new($@"^A .*?cloud has obscured parts of {Body}\.$", RegexOptions.Compiled),
+        Cloudy4Regex(),
         // "Most of the Cat is obscured from view."
-        new($@"^.+? of {Body} is obscured from view\.$", RegexOptions.Compiled),
+        Cloudy5Regex(),
         // "Clouds obscure the sky where the Heart should appear."
-        new($@"^Clouds obscure the sky where {Body} should appear\.$", RegexOptions.Compiled),
+        Cloudy6Regex(),
         // "You focus your enhanced sight, through some of the cloud cover, upon the planet Yoakena."
-        new($@"^You focus your enhanced sight,.*? upon {Body}\.$", RegexOptions.Compiled),
+        Cloudy7Regex(),
         // "The clouds covering the planet Dawgolesh melt away under your gaze."
-        new($@"^The clouds covering {Body} melt away under your gaze\.$", RegexOptions.Compiled),
+        Cloudy8Regex(),
     };
+    // Source-generated (#285): Body is const, so these interpolations are compile-time constants.
+    [System.Text.RegularExpressions.GeneratedRegex($@"^.+? of {Body} is blocked by cloud cover above\.$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex Cloudy1Regex();
+    [System.Text.RegularExpressions.GeneratedRegex($@"^.+? of {Body} has been obscured by clouds above\.$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex Cloudy2Regex();
+    [System.Text.RegularExpressions.GeneratedRegex($@"^A .*?cloud has covered .+? of {Body}\.$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex Cloudy3Regex();
+    [System.Text.RegularExpressions.GeneratedRegex($@"^A .*?cloud has obscured parts of {Body}\.$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex Cloudy4Regex();
+    [System.Text.RegularExpressions.GeneratedRegex($@"^.+? of {Body} is obscured from view\.$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex Cloudy5Regex();
+    [System.Text.RegularExpressions.GeneratedRegex($@"^Clouds obscure the sky where {Body} should appear\.$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex Cloudy6Regex();
+    [System.Text.RegularExpressions.GeneratedRegex($@"^You focus your enhanced sight,.*? upon {Body}\.$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex Cloudy7Regex();
+    [System.Text.RegularExpressions.GeneratedRegex($@"^The clouds covering {Body} melt away under your gaze\.$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex Cloudy8Regex();
 
     /// <summary>Safety valve: how many consecutive lines the scan tolerates
     /// without recognising a body before it gives up. The real terminators are
@@ -77,10 +94,12 @@ internal sealed class SkyState
     /// rest of the session. A real block's body lines are contiguous, so no
     /// genuine reading comes close to the limit.</summary>
     private const int MaxUnrecognisedInScan = 12;
-    private static readonly Regex FavoredRe = new(
-        @"^(.+?) spells are favou?red\.$", RegexOptions.Compiled);
-    private static readonly Regex DominantRe = new(
-        @"\bis dominant\b", RegexOptions.Compiled);
+    private static readonly Regex FavoredRe = FavoredRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(.+?) spells are favou?red\.$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex FavoredRegex();
+    private static readonly Regex DominantRe = DominantRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\bis dominant\b", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex DominantRegex();
 
     /// <summary>Feed one game-text line. Returns true if it was a sky/weather/
     /// perceive line the tracker consumed.</summary>

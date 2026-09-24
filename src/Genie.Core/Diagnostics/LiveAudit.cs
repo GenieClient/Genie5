@@ -43,7 +43,7 @@ public enum AuditMode
 /// <c>&lt;LogDir&gt;/live_audit.log</c> (truncated on each enable for a clean
 /// read). Local-only — never leaves the machine.
 /// </summary>
-public sealed class LiveAudit : IDisposable
+public sealed partial class LiveAudit : IDisposable
 {
     private readonly object                  _lock = new();
     private readonly string                  _path;
@@ -65,7 +65,9 @@ public sealed class LiveAudit : IDisposable
 
     // Tag-coverage state (only used while Hunting). First-sighting drives the
     // live HUNT lines; the running tally drives the stop-time summary.
-    private static readonly Regex _tagRx = new(@"<([A-Za-z][A-Za-z0-9]*)", RegexOptions.Compiled);
+    private static readonly Regex _tagRx = TagRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"<([A-Za-z][A-Za-z0-9]*)", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex TagRegex();
     private readonly Dictionary<string, int> _huntCounts = new(StringComparer.OrdinalIgnoreCase);
 
     /// <param name="path">Full path to the audit log file.</param>

@@ -18,7 +18,7 @@ namespace Genie.Core.Extensions.Builtin.SimuCoins;
 /// <para>These patterns are matched against markup this client does not control, so
 /// they are expected to rot. They are not a stable contract.</para>
 /// </summary>
-internal static class SimuCoinsPage
+internal static partial class SimuCoinsPage
 {
     internal const string LoginUrl   = "https://store.play.net/Account/SignIn?returnURL=%2FAccount%2FSignIn";
     internal const string StoreUrl   = "https://store.play.net/";
@@ -26,34 +26,34 @@ internal static class SimuCoinsPage
     internal const string ClaimUrl   = "https://store.play.net/Store/ClaimReward";
     internal const string SignOutUrl = "https://store.play.net/Account/SignOut";
 
-    private static readonly Regex TokenRx = new(
-        "<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"(.*?)\" />",
-        RegexOptions.Compiled);
+    private static readonly Regex TokenRx = TokenRegex();
+    [System.Text.RegularExpressions.GeneratedRegex("<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"(.*?)\" />", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex TokenRegex();
 
-    private static readonly Regex AccountRx = new(
-        "<div\\s+class=\"login\\s+sans_serif\">\\s*(\\S+)\\s+",
-        RegexOptions.Compiled);
+    private static readonly Regex AccountRx = AccountRegex();
+    [System.Text.RegularExpressions.GeneratedRegex("<div\\s+class=\"login\\s+sans_serif\">\\s*(\\S+)\\s+", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex AccountRegex();
 
-    private static readonly Regex BalanceRx = new(
-        "<h1 class=\"balance centered sans_serif\">You Have <span class=\"blue\">(\\d+)</span>",
-        RegexOptions.Compiled);
+    private static readonly Regex BalanceRx = BalanceRegex();
+    [System.Text.RegularExpressions.GeneratedRegex("<h1 class=\"balance centered sans_serif\">You Have <span class=\"blue\">(\\d+)</span>", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex BalanceRegex();
 
     /// <summary>The store reuses one <c>RewardMessage</c> heading for two different
     /// states: "Subscription Reward: N Free SimuCoins" when a claim is waiting, and
     /// a human-readable countdown ("Next reward in ...") when it is not. They are
     /// matched separately rather than by one loose pattern, because confusing the
     /// two is the difference between claiming and not.</summary>
-    private static readonly Regex ClaimableRx = new(
-        "<h1 class=\"RewardMessage centered sans_serif\">Subscription Reward: (\\d+) Free SimuCoins</h1>",
-        RegexOptions.Compiled);
+    private static readonly Regex ClaimableRx = ClaimableRegex();
+    [System.Text.RegularExpressions.GeneratedRegex("<h1 class=\"RewardMessage centered sans_serif\">Subscription Reward: (\\d+) Free SimuCoins</h1>", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex ClaimableRegex();
 
-    private static readonly Regex TimeRx = new(
-        "<h1 class=\"RewardMessage centered sans_serif\">(.*?)</h1>",
-        RegexOptions.Compiled);
+    private static readonly Regex TimeRx = TimeRegex();
+    [System.Text.RegularExpressions.GeneratedRegex("<h1 class=\"RewardMessage centered sans_serif\">(.*?)</h1>", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex TimeRegex();
 
-    private static readonly Regex ClaimedRx = new(
-        "<h1 class=\"RewardMessage centered sans_serif\">Claimed (\\d+) SimuCoin reward!</h1>",
-        RegexOptions.Compiled);
+    private static readonly Regex ClaimedRx = ClaimedRegex();
+    [System.Text.RegularExpressions.GeneratedRegex("<h1 class=\"RewardMessage centered sans_serif\">Claimed (\\d+) SimuCoin reward!</h1>", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex ClaimedRegex();
 
     /// <summary>The ASP.NET antiforgery form token. Scraped per login attempt from
     /// the very response whose cookies will carry the POST — see the note in

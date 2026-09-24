@@ -15,7 +15,7 @@ namespace Genie.Core.Combat;
 /// reused by any consumer of the stream (public #318's analyze window is meant
 /// to follow this same shape).
 /// </summary>
-public static class AssessLineParser
+public static partial class AssessLineParser
 {
     /// <summary>The header that opens an assess block. Treated as a reset
     /// signal alongside <c>&lt;clearStream id="assess"/&gt;</c>, so a block
@@ -26,35 +26,35 @@ public static class AssessLineParser
     //  |- name --|  |n|  |-- balance --|  |--------- tail ------------------|
     // Name is lazy so it stops at the FIRST "(n: ...)" group — a creature whose
     // own name contains parentheses would otherwise swallow it.
-    private static readonly Regex CreatureRegex = new(
-        @"^(?<name>.+?)\s+\((?<num>\d+):\s*(?<bal>[^)]*)\)\s*(?<tail>.*)$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex CreatureRegex = CreaturePattern();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(?<name>.+?)\s+\((?<num>\d+):\s*(?<bal>[^)]*)\)\s*(?<tail>.*)$", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex CreaturePattern();
 
     // "You (solidly balanced) are facing a sleazy lout (1) at pole weapon range."
-    private static readonly Regex SelfRegex = new(
-        @"^You\s+\((?<bal>[^)]*)\)\s*(?<tail>.*)$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex SelfRegex = SelfPattern();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^You\s+\((?<bal>[^)]*)\)\s*(?<tail>.*)$", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex SelfPattern();
 
     // The target inside the self line, when it carried no link:
     // "... facing a sleazy lout (1) at ...".
-    private static readonly Regex SelfTargetRegex = new(
-        @"(?<name>.+?)\s+\((?<num>\d+)\)",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex SelfTargetRegex = SelfTargetPattern();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?<name>.+?)\s+\((?<num>\d+)\)", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex SelfTargetPattern();
 
     // The target's number when the NAME came from a link: the link ends right
     // before it, so what follows is " (1) at ..." with no name text to anchor
     // on — SelfTargetRegex's "(?<name>.+?)\s+" would never match here.
-    private static readonly Regex TargetNumberRegex = new(
-        @"^\s*\((?<num>\d+)\)",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex TargetNumberRegex = TargetNumberPattern();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*\((?<num>\d+)\)", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex TargetNumberPattern();
 
     // "is behind you at pole weapon range."  ->  pos="behind you", range="pole
     // weapon range". Both the range clause and the full stop are optional: only
     // one capture of this stream exists, so an unknown tail shape must degrade
     // to empty fields, never to a dropped row.
-    private static readonly Regex TailRegex = new(
-        @"^is\s+(?<pos>.*?)(?:\s+at\s+(?<range>.+?))?\.?\s*$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex TailRegex = TailPattern();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^is\s+(?<pos>.*?)(?:\s+at\s+(?<range>.+?))?\.?\s*$", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex TailPattern();
 
     /// <summary>True when <paramref name="text"/> is the block header.</summary>
     public static bool IsHeader(string? text) =>

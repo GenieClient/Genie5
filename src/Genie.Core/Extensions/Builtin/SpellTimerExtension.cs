@@ -23,7 +23,7 @@ namespace Genie.Core.Extensions.Builtin;
 /// configurable parts are the special-parse rules and variable-name overrides in
 /// <see cref="SpellTimerConfig"/> (<c>spelltimer.cfg</c>).</para>
 /// </summary>
-public sealed class SpellTimerExtension : IGameExtension
+public sealed partial class SpellTimerExtension : IGameExtension
 {
     public string Name        => "SpellTimer";
     public string Version     => "2.0";
@@ -50,7 +50,7 @@ public sealed class SpellTimerExtension : IGameExtension
     private bool _dirty;
     private bool _configLoaded;
 
-    private sealed class Spell
+    private sealed partial class Spell
     {
         public required string Name;
         public bool Active;
@@ -71,10 +71,16 @@ public sealed class SpellTimerExtension : IGameExtension
     // enough and don't need the lock; only the dictionary structure does.
     private readonly System.Threading.Lock _gate = new();
 
-    private static readonly Regex SpellLineRe = new(@"^(.+?)\s+\((.+)\)\s*$", RegexOptions.Compiled);
+    private static readonly Regex SpellLineRe = SpellLineRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(.+?)\s+\((.+)\)\s*$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex SpellLineRegex();
     // DR uses singular "roisan" for a 1-roisaen duration; "roisae?n" matches both.
-    private static readonly Regex RoisaenRe   = new(@"(\d+)\s+roisae?n", RegexOptions.Compiled);
-    private static readonly Regex PercentRe   = new(@"(\d+)%", RegexOptions.Compiled);
+    private static readonly Regex RoisaenRe = RoisaenRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(\d+)\s+roisae?n", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex RoisaenRegex();
+    private static readonly Regex PercentRe = PercentRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(\d+)%", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex PercentRegex();
 
     public void Initialize(IExtensionHost host) => _host = host;
 

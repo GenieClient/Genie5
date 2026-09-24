@@ -40,7 +40,7 @@ namespace Genie.Core.Capture;
 /// third-person-speech patterns — verified to 0 leaks by <c>TestHarness CAPTUREVERIFY</c>.
 /// </para>
 /// </summary>
-public sealed class CaptureRedactor
+public sealed partial class CaptureRedactor
 {
     /// <summary>
     /// Default "social" stream set — other players' speech and presence. These
@@ -105,9 +105,9 @@ public sealed class CaptureRedactor
     // third-person speech. These content patterns catch it on both artifacts.
 
     // Any line DR prefixes with "DEAD>" — departed-soul speech AND emotes.
-    private static readonly Regex DeadLine = new(
-        @"(?m)^[ \t]*DEAD>.*$",
-        RegexOptions.Compiled);
+    private static readonly Regex DeadLine = DeadLineRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?m)^[ \t]*DEAD>.*$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex DeadLineRegex();
 
     // Bare third-person speech: "Name [adverb] says/asks/whispers/…, "…"".
     // The third-person verb (says, not "You say") excludes self; the required
@@ -118,9 +118,9 @@ public sealed class CaptureRedactor
         "says|asks|whispers|exclaims|shouts|mutters|murmurs|growls|hisses|states|" +
         "remarks|replies|answers|responds|sneers|snaps|recites|sings|chants|" +
         "yells|cries|calls|drawls|stammers|sobs";
-    private static readonly Regex OtherPlayerSpeechLine = new(
-        @"(?m)^[ \t]*(?!You\b)[A-Z][\w'’.\-]*\b[^""\r\n]*?\b(?:" + SpeechVerbs + @")\b[^""\r\n]*""[^\r\n]*$",
-        RegexOptions.Compiled);
+    private static readonly Regex OtherPlayerSpeechLine = OtherPlayerSpeechLineRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?m)^[ \t]*(?!You\b)[A-Z][\w'’.\-]*\b[^""\r\n]*?\b(?:" + SpeechVerbs + @")\b[^""\r\n]*""[^\r\n]*$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex OtherPlayerSpeechLineRegex();
 
     /// <summary>
     /// True if a parsed line's <b>content</b> is other-player speech/emote that
@@ -139,14 +139,14 @@ public sealed class CaptureRedactor
     }
 
     // <pushStream id='talk'/> … <popStream/>  (push is usually self-closing)
-    private static readonly Regex PushStreamBlock = new(
-        @"<pushStream\s+id=['""](?<id>[^'""]+)['""][^>]*>.*?<popStream\s*/?>",
-        RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex PushStreamBlock = PushStreamBlockRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"<pushStream\s+id=['""](?<id>[^'""]+)['""][^>]*>.*?<popStream\s*/?>", System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex PushStreamBlockRegex();
 
     // <preset id='whisper'>…</preset>  /  <preset id='speech'>…</preset>
-    private static readonly Regex SpeechPresetSpan = new(
-        @"<preset\s+id=['""](?<id>whisper|speech)['""][^>]*>.*?</preset>",
-        RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex SpeechPresetSpan = SpeechPresetSpanRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"<preset\s+id=['""](?<id>whisper|speech)['""][^>]*>.*?</preset>", System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex SpeechPresetSpanRegex();
 
     /// <summary>
     /// Best-effort removal of complete social <c>pushStream</c> blocks and
@@ -200,19 +200,19 @@ public sealed class CaptureRedactor
     // which is the whole point of the log; only the tail is blanked.
 
     /// <summary>Commands whose entire argument tail is credentials.</summary>
-    private static readonly Regex CredentialCommand = new(
-        @"^\s*(?<verb>#(?:lich)?connect|#reconnect|#account|#password)\b.*$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex CredentialCommand = CredentialCommandRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*(?<verb>#(?:lich)?connect|#reconnect|#account|#password)\b.*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex CredentialCommandRegex();
 
     /// <summary>
     /// Player-initiated social sends. The message body is the redacted part;
     /// a leading target (whisper/tell/send take one) goes with it, since a
     /// recipient name is itself other-player information.
     /// </summary>
-    private static readonly Regex SocialCommand = new(
-        @"^\s*(?<verb>whisper|whis|tell|say|'|says|send|reply|gweth|amulet|esp|think|" +
-        @"thinkto|ooc|group|gtell|answer|hug|kiss|beckon|pray)\b.*$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex SocialCommand = SocialCommandRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*(?<verb>whisper|whis|tell|say|'|says|send|reply|gweth|amulet|esp|think|" +
+        @"thinkto|ooc|group|gtell|answer|hug|kiss|beckon|pray)\b.*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex SocialCommandRegex();
 
     /// <summary>
     /// Redact one outbound command for the capture's sent-command log. Returns

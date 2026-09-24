@@ -13,7 +13,7 @@ namespace Genie.Core.GameState;
 /// This is the single source of truth for "what is the character doing right now."
 /// The AI context buffer reads from here; scripts read from here; the UI binds to here.
 /// </summary>
-public sealed class GameStateEngine : IDisposable
+public sealed partial class GameStateEngine : IDisposable
 {
     private readonly Models.GameState        _state;
     private readonly ILogger<GameStateEngine> _log;
@@ -390,8 +390,9 @@ public sealed class GameStateEngine : IDisposable
         }
     }
 
-    private static readonly System.Text.RegularExpressions.Regex SkillRankRegex =
-        new(@"\b(?<rank>\d+)\s+\d+%", System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex SkillRankRegex = SkillRankPattern();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\b(?<rank>\d+)\s+\d+%", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex SkillRankPattern();
 
     /// <summary>
     /// Extract the integer rank from a skill-component content string and
@@ -432,9 +433,9 @@ public sealed class GameStateEngine : IDisposable
     // contain spaces ("Shield Usage", "Twohanded Edged"); a row carries two columns,
     // so Matches() is run globally over the line. The rank is the first integer, the
     // percent (toward next rank) is discarded.
-    private static readonly System.Text.RegularExpressions.Regex ExpTableRowRegex =
-        new(@"(?<name>[A-Z][A-Za-z]*(?: [A-Z][A-Za-z]*)*):\s+(?<rank>\d+)\s+\d+%",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex ExpTableRowRegex = ExpTableRowPattern();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?<name>[A-Z][A-Za-z]*(?: [A-Z][A-Za-z]*)*):\s+(?<rank>\d+)\s+\d+%", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex ExpTableRowPattern();
 
     private void ApplyText(TextEvent te)
     {

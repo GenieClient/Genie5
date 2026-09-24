@@ -40,7 +40,7 @@ namespace Genie.Core.Extensions.Builtin.CircleCalc;
 /// <c>Parse 1</c> to consume the output from a script without cluttering the window
 /// (public #207).</para>
 /// </summary>
-public sealed class CircleCalcExtension : IGameExtension
+public sealed partial class CircleCalcExtension : IGameExtension
 {
     public string Name        => "Circle Calculator";
     public string Version     => "2.0";
@@ -63,9 +63,9 @@ public sealed class CircleCalcExtension : IGameExtension
     private readonly Dictionary<string, double> _ranks = new(StringComparer.Ordinal);
 
     // "Small Edged:  142 71% examining" — name, ranks, learning %. Two skills per line.
-    private static readonly Regex SkillRe = new(
-        @"(?<name>[A-Z][A-Za-z '\-]+?):\s+(?<rank>\d+)\s+(?<pct>\d+)%",
-        RegexOptions.Compiled);
+    private static readonly Regex SkillRe = SkillRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?<name>[A-Z][A-Za-z '\-]+?):\s+(?<rank>\d+)\s+(?<pct>\d+)%", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex SkillRegex();
 
     public void Initialize(IExtensionHost host)
     {

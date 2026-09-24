@@ -21,18 +21,18 @@ namespace Genie.Core.Update;
 /// Future kinds (HTTP manifest, GitLab releases, etc.) plug in here as
 /// additional <see cref="TryParse"/> branches.
 /// </summary>
-public static class PluginSourceParser
+public static partial class PluginSourceParser
 {
     // Matches the (owner, repo) pair out of any of the accepted GitHub
     // forms above. Owner and repo follow GitHub's naming rules:
     // alphanumeric + dash/underscore/dot, no leading dash.
-    private static readonly Regex GithubPattern = new(
-        @"^(?:https?://)?(?:www\.)?github\.com/(?<owner>[A-Za-z0-9][A-Za-z0-9\-_.]*)/(?<repo>[A-Za-z0-9][A-Za-z0-9\-_.]*?)(?:\.git)?/?$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex GithubPattern = GithubPatternRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(?:https?://)?(?:www\.)?github\.com/(?<owner>[A-Za-z0-9][A-Za-z0-9\-_.]*)/(?<repo>[A-Za-z0-9][A-Za-z0-9\-_.]*?)(?:\.git)?/?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex GithubPatternRegex();
 
-    private static readonly Regex ShorthandPattern = new(
-        @"^(?<owner>[A-Za-z0-9][A-Za-z0-9\-_.]*)/(?<repo>[A-Za-z0-9][A-Za-z0-9\-_.]*)$",
-        RegexOptions.Compiled);
+    private static readonly Regex ShorthandPattern = ShorthandPatternRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(?<owner>[A-Za-z0-9][A-Za-z0-9\-_.]*)/(?<repo>[A-Za-z0-9][A-Za-z0-9\-_.]*)$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex ShorthandPatternRegex();
 
     /// <summary>
     /// Attempt to parse <paramref name="input"/> into a new plugin

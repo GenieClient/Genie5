@@ -3,7 +3,7 @@ using Genie.Core.Commanding;
 
 namespace Genie.Core.Aliases;
 
-public sealed class AliasEngine
+public sealed partial class AliasEngine
 {
     private readonly List<AliasRule>  _aliases = new();
     private readonly CommandEngine?   _commandEngine;
@@ -111,6 +111,7 @@ public sealed class AliasEngine
         });
     }
 
-    private static readonly System.Text.RegularExpressions.Regex ArgPattern =
-        new(@"\$(\d+)", System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex ArgPattern = ArgPatternRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\$(\d+)", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex ArgPatternRegex();
 }
