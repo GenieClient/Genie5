@@ -66,6 +66,8 @@ public partial class ServerDialogPromptDialog : Window
             Genie.Core.Events.DialogControlType.UpDownEditBox => "number field",
             Genie.Core.Events.DialogControlType.ProgressBar  => "bar",
             Genie.Core.Events.DialogControlType.Link         => "link",
+            Genie.Core.Events.DialogControlType.MenuLink     => "name",
+            Genie.Core.Events.DialogControlType.MenuImage    => "icon",
             _                                                => "item",
         };
         return count == 1 ? word : word + "s";

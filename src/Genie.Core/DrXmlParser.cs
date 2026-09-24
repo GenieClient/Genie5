@@ -195,6 +195,12 @@ public sealed partial class DrXmlParser : IDisposable
             ["skin"]           = DialogControlType.Skin,
             ["image"]          = DialogControlType.Image,
             ["link"]           = DialogControlType.Link,
+            // befriend (Friends & Enemies): each row is a menuLink name, a
+            // menuImage demeanor face and an image remove button. Without these
+            // two entries only the remove images were captured, and the window
+            // read "crossFace" seven times with no names (public #345).
+            ["menulink"]       = DialogControlType.MenuLink,
+            ["menuimage"]      = DialogControlType.MenuImage,
         };
 
     // ── Silent `health` window (injuries auto-refresh) ───────────────────────

@@ -117,11 +117,13 @@ public sealed class DialogLinkViewModel(DialogGridCell cell) : DialogControlView
 /// image controls and nothing else, and it arrives in the login block — so the
 /// dialog most users meet first opened as an essentially empty window.</para>
 ///
-/// <para>This is the legible-placeholder half: the sprite name is rendered as
-/// text, and the control activates if it carries a cmd (the empath-facing
-/// <c>injuries-&lt;charnum&gt;</c> images carry <c>transfer …</c> commands and
-/// tooltips that were being dropped with the image). Real sprite rendering,
-/// reusing the injuries panel's mapping, is tracked separately as #345.</para>
+/// <para>No DR artwork ships with Genie, so an image renders as words: a known
+/// icon gets a glyph (<c>crossFace</c> → ✕), otherwise DR's own
+/// <c>tooltip</c> is the caption ("Friendly", "Warm" on befriend's demeanor
+/// faces — #345), and only an image with neither falls back to its sprite name,
+/// which reads as "unhandled" rather than blank. It activates if it carries a
+/// cmd. Also backs <c>&lt;menuImage&gt;</c>. The empath injuries window has a
+/// real sprite view of its own (<see cref="OtherInjuriesViewModel"/>).</para>
 /// </summary>
 public sealed class DialogImageViewModel(DialogGridCell cell) : DialogControlViewModel(cell)
 {
@@ -137,13 +139,28 @@ public sealed class DialogImageViewModel(DialogGridCell cell) : DialogControlVie
     public override void Update(DialogGridCell c)
     {
         base.Update(c);
-        var name = Attr(c, "name");
-        Label = !string.IsNullOrWhiteSpace(name) ? name!
-              : !string.IsNullOrWhiteSpace(c.Control.Id) ? c.Control.Id
-              : "(image)";
+        var name    = Attr(c, "name");
+        var tooltip = Attr(c, "tooltip");
+        Glyph = GlyphFor(name);
+        Label = Glyph
+              ?? (!string.IsNullOrWhiteSpace(tooltip) ? tooltip!
+              :   !string.IsNullOrWhiteSpace(name) ? name!
+              :   !string.IsNullOrWhiteSpace(c.Control.Id) ? c.Control.Id
+              :   "(image)");
         IsActivatable = !string.IsNullOrWhiteSpace(c.Control.Cmd);
-        Tooltip       = Attr(c, "tooltip") ?? c.Control.Cmd;
+        Tooltip       = tooltip ?? c.Control.Cmd;
     }
+
+    /// <summary>A text glyph for a sprite name, when its meaning is plain from
+    /// the dialogs it appears in. Only names seen in real captures belong here
+    /// — befriend's remove button, <c>crossFace</c> with tooltip "Remove".</summary>
+    [Reactive] public string? Glyph { get; private set; }
+
+    private static string? GlyphFor(string? name) => name?.ToLowerInvariant() switch
+    {
+        "crossface" => "✕",
+        _           => null,
+    };
 }
 
 public sealed class DialogTextBoxViewModel(DialogGridCell cell) : DialogControlViewModel(cell)
@@ -509,7 +526,7 @@ public sealed class ServerDialogViewModel : ReactiveObject
         DialogControlType.StreamBox   => typeof(DialogStreamViewModel),
         DialogControlType.ProgressBar => typeof(DialogProgressViewModel),
         DialogControlType.Link        => typeof(DialogLinkViewModel),
-        DialogControlType.Image or DialogControlType.Skin
+        DialogControlType.Image or DialogControlType.Skin or DialogControlType.MenuImage
                                       => typeof(DialogImageViewModel),
         _                             => typeof(DialogLabelViewModel),
     };
@@ -526,7 +543,7 @@ public sealed class ServerDialogViewModel : ReactiveObject
         DialogControlType.StreamBox   => new DialogStreamViewModel(cell),
         DialogControlType.ProgressBar => new DialogProgressViewModel(cell),
         DialogControlType.Link        => new DialogLinkViewModel(cell),
-        DialogControlType.Image or DialogControlType.Skin
+        DialogControlType.Image or DialogControlType.Skin or DialogControlType.MenuImage
                                       => new DialogImageViewModel(cell),
         _                             => new DialogLabelViewModel(cell),
     };

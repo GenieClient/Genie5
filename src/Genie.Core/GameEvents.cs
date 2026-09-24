@@ -436,6 +436,12 @@ public enum DialogControlType
 {
     Label, CmdButton, CloseButton, CheckBox, Radio, StreamBox, DropDownBox,
     EditBox, UpDownEditBox, ProgressBar, ClearContainer, Skin, Image, Link,
+    /// <summary><c>&lt;menuLink&gt;</c> — a name that opens a context menu in
+    /// Wrayth (befriend's player names, carrying <c>exist</c>/<c>noun</c>).</summary>
+    MenuLink,
+    /// <summary><c>&lt;menuImage&gt;</c> — an image that opens a context menu
+    /// in Wrayth (befriend's demeanor faces).</summary>
+    MenuImage,
     Unknown,
 }
 
