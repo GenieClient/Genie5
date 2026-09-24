@@ -295,10 +295,18 @@ public sealed class AutoScrollState : ReactiveObject
 
     private void OnScrollChanged(object? sender, ScrollChangedEventArgs e)
     {
-        var max = _sv.Extent.Height - _sv.Viewport.Height;
-        _atBottom    = max <= 0 || _sv.Offset.Y >= max - 10;
+        var max   = _sv.Extent.Height - _sv.Viewport.Height;
+        var atEnd = max <= 0 || _sv.Offset.Y >= max - 10;
+        // Only an UPWARD offset move takes a following view off the tail. A
+        // viewport shrink or extent growth under an unchanged offset (the Script
+        // Bar appearing on script start, a window resize) is layout, not the
+        // reader scrolling away — keep following and re-pin to the end.
+        var keepFollowing = !atEnd && !_paused && _atBottom && e.OffsetDelta.Y >= 0;
+        _atBottom    = atEnd || keepFollowing;
         IsScrolledUp = !_atBottom;
         SyncHold();
+        if (keepFollowing)
+            Dispatcher.UIThread.Post(ScrollToBottom, DispatcherPriority.Loaded);
     }
 
     // ── Scroll helpers ─────────────────────────────────────────────────────

@@ -265,6 +265,10 @@ public sealed class GameTextEditor : UserControl
         PageScroll.SetIsTarget(sv, true);
         PageScroll.SetIsDefaultTarget(sv, true);
         _editor.TextArea.TextView.ScrollOffsetChanged += (_, _) => UpdateAtBottom();
+        // Viewport/extent changes (a strip appearing above or below the dock —
+        // the Script Bar on script start — or a re-wrap) move the geometric
+        // bottom without the offset changing; re-evaluate so the tail stays pinned.
+        sv.ScrollChanged += (_, _) => UpdateAtBottom();
         UpdateAtBottom();
     }
 
@@ -414,13 +418,29 @@ public sealed class GameTextEditor : UserControl
 
     // ── Auto-follow / Pause Scrolling ─────────────────────────────────────────
 
+    /// <summary>
+    /// Re-derive "following the tail". Only an UPWARD offset move can take a
+    /// following view off the tail: a viewport shrink or extent growth under an
+    /// unchanged offset (the Script Bar appearing when a script starts, a window
+    /// resize, a re-wrap) is layout, not the reader scrolling away — without this
+    /// the view silently stopped following and needed a ↓ Bottom click to catch up.
+    /// </summary>
     private void UpdateAtBottom()
     {
         var scroll = (IScrollable)_editor.TextArea.TextView;
         var max    = scroll.Extent.Height - scroll.Viewport.Height;
-        _atBottom  = max <= 0 || scroll.Offset.Y >= max - AtBottomBand;
+        var y      = scroll.Offset.Y;
+        var atEnd  = max <= 0 || y >= max - AtBottomBand;
+        var keepFollowing = !atEnd && !_paused && _atBottom && y >= _lastOffsetY - 0.5;
+        _lastOffsetY = y;
+
+        _atBottom    = atEnd || keepFollowing;
         IsScrolledUp = !_atBottom;
+        if (keepFollowing)
+            Dispatcher.UIThread.Post(_editor.ScrollToEnd, DispatcherPriority.Loaded);
     }
+
+    private double _lastOffsetY;
 
     /// <summary>"Pause Scrolling": stop following the tail but keep appending.
     /// Unlike the legacy path this needs no scrollback-cap suspension — a trim
