@@ -1508,7 +1508,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             if (_core is null) return;   // EnsureCoreBuilt always assigns; guards the nullable field
             var profileDir   = ConnectedProfile is not null ? GetProfileConfigDir(ConnectedProfile) : null;
             var profileChar  = ConnectedProfile?.CharacterName;
-            var importVm = new Genie4ImportViewModel(_core, _configDir, profileDir, profileChar);
+            var importVm = new Genie4ImportViewModel(_core, _configDir, profileDir, profileChar,
+                globalLayouts:  _globalLayouts,
+                profileLayouts: profileDir is not null ? new Settings.LayoutStore(Path.Combine(profileDir, "Layouts")) : null);
             await ShowGenie4ImportDialog.Handle(importVm);
         });
 

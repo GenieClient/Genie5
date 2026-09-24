@@ -50,6 +50,8 @@ public sealed class Genie4ImportViewModel : ReactiveObject
     private readonly string    _globalConfigDir;
     private readonly string?   _profileConfigDir;
     private readonly string?   _connectedCharacterName;
+    private readonly Settings.LayoutStore? _globalLayouts;
+    private readonly Settings.LayoutStore? _profileLayouts;
 
     // ── Source ─────────────────────────────────────────────────────────────
 
@@ -88,6 +90,11 @@ public sealed class Genie4ImportViewModel : ReactiveObject
     /// </summary>
     [Reactive] public bool ImportSettings    { get; set; }
 
+    /// <summary>Genie 4 saved window layouts (<c>*.layout</c>, public #319),
+    /// converted to windowed-mode Genie 5 layouts named "G4 …". Written to the
+    /// same Global / per-character target as the rules.</summary>
+    [Reactive] public bool ImportLayouts     { get; set; } = true;
+
     // Per-type counts populated by Probe. Shown next to each checkbox in
     // the dialog ("Highlights — 47 rules found"). -1 means "not yet probed
     // / no file present"; 0 means "file exists but no rules" — both render
@@ -104,6 +111,7 @@ public sealed class Genie4ImportViewModel : ReactiveObject
     [Reactive] public int CountNames        { get; private set; } = -1;
     [Reactive] public int CountPresets      { get; private set; } = -1;
     [Reactive] public int CountSettings     { get; private set; } = -1;
+    [Reactive] public int CountLayouts      { get; private set; } = -1;
 
     // ── Target (Global vs Profile-Specific) ────────────────────────────────
 
@@ -172,12 +180,16 @@ public sealed class Genie4ImportViewModel : ReactiveObject
     public event Action? BrowseRequested;
 
     public Genie4ImportViewModel(GenieCore core, string globalConfigDir,
-                                 string? profileConfigDir, string? connectedCharacterName)
+                                 string? profileConfigDir, string? connectedCharacterName,
+                                 Settings.LayoutStore? globalLayouts = null,
+                                 Settings.LayoutStore? profileLayouts = null)
     {
         _core                   = core;
         _globalConfigDir        = globalConfigDir;
         _profileConfigDir       = profileConfigDir;
         _connectedCharacterName = connectedCharacterName;
+        _globalLayouts          = globalLayouts;
+        _profileLayouts         = profileLayouts;
 
         // Default the target: per-character if a profile is connected
         // (safer — doesn't bleed into other characters), global otherwise
@@ -263,6 +275,7 @@ public sealed class Genie4ImportViewModel : ReactiveObject
         CountMacros       = -1;
         CountVariables    = -1;
         CountClasses      = -1;
+        CountLayouts      = -1;
 
         if (string.IsNullOrWhiteSpace(SourcePath) || !Directory.Exists(SourcePath))
         {
@@ -282,6 +295,8 @@ public sealed class Genie4ImportViewModel : ReactiveObject
         if (counts.TryGetValue(Genie4ImportTypes.Names,       out n))      CountNames        = n;
         if (counts.TryGetValue(Genie4ImportTypes.Presets,     out n))      CountPresets      = n;
         if (counts.TryGetValue(Genie4ImportTypes.Settings,    out n))      CountSettings     = n;
+        var layoutFiles = Settings.Genie4LayoutConverter.FindLayoutFiles(SourcePath).Count;
+        if (layoutFiles > 0) CountLayouts = layoutFiles;
 
         var totalRules = counts.Values.Sum();
         SourceStatus = totalRules > 0
@@ -315,7 +330,8 @@ public sealed class Genie4ImportViewModel : ReactiveObject
             if (ImportPresets)     types |= Genie4ImportTypes.Presets;
             if (ImportSettings)    types |= Genie4ImportTypes.Settings;
 
-            if (types == Genie4ImportTypes.None)
+            bool layouts = ImportLayouts && LayoutTarget is not null;
+            if (types == Genie4ImportTypes.None && !layouts)
             {
                 ResultMessage = "Nothing selected to import.";
                 return false;
@@ -338,8 +354,9 @@ public sealed class Genie4ImportViewModel : ReactiveObject
                 Settings    = _core.Config,
             };
 
-            var result = await Task.Run(() =>
-                Genie4Importer.ImportDirectory(SourcePath, ctx, Mode, types));
+            var result = types == Genie4ImportTypes.None
+                ? null
+                : await Task.Run(() => Genie4Importer.ImportDirectory(SourcePath, ctx, Mode, types));
 
             // ── Persist the merged engine state to the target dir ───────
             // so the imported rules survive a restart. The choice between
@@ -377,13 +394,62 @@ public sealed class Genie4ImportViewModel : ReactiveObject
             // target dir here - ImportSettings applied them to the live config
             // and the normal config save persists them.
 
-            ResultMessage = BuildResultSummary(result, targetDir);
+            var layoutSummary = layouts ? ImportLayoutFiles(LayoutTarget!) : "";
+            ResultMessage = result is null
+                ? layoutSummary.TrimEnd()
+                : (BuildResultSummary(result, targetDir)
+                   + (layoutSummary.Length > 0 ? Environment.NewLine + Environment.NewLine + layoutSummary : "")).TrimEnd();
             return true;
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>The layout store the chosen target maps to — the connected
+    /// character's when per-character, else the global one.</summary>
+    private Settings.LayoutStore? LayoutTarget =>
+        TargetIsGlobal ? _globalLayouts : (_profileLayouts ?? _globalLayouts);
+
+    /// <summary>Convert and save every Genie 4 <c>.layout</c> file (#319). Add
+    /// Only keeps an existing "G4 …" layout; Merge and Replace overwrite it.
+    /// Returns the summary block for the dialog footer.</summary>
+    public string ImportLayoutFiles(Settings.LayoutStore store)
+    {
+        var files = Settings.Genie4LayoutConverter.FindLayoutFiles(SourcePath);
+        if (files.Count == 0) return "Layouts: no .layout files found.";
+
+        var sb = new System.Text.StringBuilder();
+        int saved = 0, kept = 0, unreadable = 0;
+        var skippedWindows = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var names = new List<string>();
+        foreach (var file in files)
+        {
+            var name = Settings.Genie4LayoutConverter.ImportedName(file);
+            string xml;
+            try { xml = File.ReadAllText(file); }
+            catch { unreadable++; continue; }
+
+            var (layout, report) = Settings.Genie4LayoutConverter.Convert(xml, name);
+            if (layout is null) { unreadable++; continue; }
+            foreach (var s in report.Skipped) skippedWindows.Add(s);
+
+            if (Mode == ImportMode.AddOnly && store.HasUserCopy(name)) { kept++; continue; }
+            store.Save(layout);
+            saved++;
+            names.Add($"{name} ({report.Converted} windows)");
+        }
+
+        sb.AppendLine($"Layouts: {saved} imported"
+                      + (kept > 0 ? $", {kept} kept (already there)" : "")
+                      + (unreadable > 0 ? $", {unreadable} unreadable" : "") + ".");
+        foreach (var n in names) sb.AppendLine($"  {n}");
+        if (skippedWindows.Count > 0)
+            sb.AppendLine($"  Windows with no Genie 5 panel (skipped): {string.Join(", ", skippedWindows)}");
+        if (saved > 0)
+            sb.AppendLine("  They open in windowed (MDI) mode — Layout ▸ Load. Fonts, colours and IfClosed are not part of a layout and were not converted.");
+        return sb.ToString();
     }
 
     /// <summary>

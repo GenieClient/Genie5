@@ -91,7 +91,7 @@ Everything V1 tagged 🔧 FIX BEFORE ALPHA is done, verified against beta.3 sour
 | Update Maps from Official Repo... | n/a | 🆕 | 🆕 | Pulls from github.com/GenieClient/Maps |
 | Open Maps Folder | ✅ via Open Directory | ✅ direct | 🆕 | Direct menu in Genie 5 |
 | Change Maps Directory... | n/a | 🆕 | 🆕 | Genie 5 addition for git-clone workflow |
-| Import from Genie 4... | n/a | 🆕 | 🆕 | Migrates 8 settings types with Global/per-character routing |
+| Import from Genie 4... | n/a | 🆕 | 🆕 | Migrates the rule files, settings and saved `.layout` files (as windowed-mode layouts) with Global/per-character routing |
 | Record Session (raw XML, toggle) | n/a | 🆕 | 🆕 | Captures raw XML to `Logs/raw_session_*.xml` |
 | Open Recordings Folder | n/a | 🆕 | 🆕 | Pair with Record Session |
 | Performance Test Parse (dev) | ✅ | partial via Console | ✅ | Genie 5's TestHarness REPLAY mode covers this |

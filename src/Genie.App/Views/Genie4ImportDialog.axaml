@@ -128,6 +128,15 @@
                              IsVisible="{Binding CountPresets, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
                 </StackPanel>
               </CheckBox>
+              <CheckBox IsChecked="{Binding ImportLayouts}" AutomationProperties.Name="Layouts"
+                        ToolTip.Tip="Saved window layouts (.layout files), converted to windowed-mode Genie 5 layouts named 'G4 …'. Positions, sizes and open windows carry over; fonts and colours don't.">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="Layouts" FontSize="12"/>
+                  <TextBlock Text="{Binding CountLayouts, StringFormat='— {0} files'}"
+                             Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11"
+                             IsVisible="{Binding CountLayouts, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
+                </StackPanel>
+              </CheckBox>
               <CheckBox IsChecked="{Binding ImportSettings}" AutomationProperties.Name="Settings"
                         ToolTip.Tip="App-wide, not per-character. Genie 4 folder paths and keys with no Genie 5 equivalent are reported rather than applied.">
                 <StackPanel Orientation="Horizontal" Spacing="6">
