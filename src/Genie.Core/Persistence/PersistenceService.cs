@@ -1,5 +1,4 @@
-﻿using System.Text.Encodings.Web;
-using System.Text.Json;
+﻿using System.Text.Json;
 using Genie.Core.Aliases;
 using Genie.Core.Classes;
 using Genie.Core.Gags;
@@ -15,17 +14,9 @@ namespace Genie.Core.Persistence;
 
 public sealed class PersistenceService
 {
-    private readonly JsonSerializerOptions _options = new()
-    {
-        WriteIndented = true,
-        // Keep regex metacharacters (+ < > & ') and UTF-8 text literal instead
-        // of escaping them to \uXXXX. The default encoder is HTML-safe, which
-        // turns a pattern like "\s+" into "\\s+" — functional but unreadable,
-        // and these config files are shared and hand-edited by the community.
-        // "Unsafe" only refers to embedding JSON in HTML/JS; for local files this
-        // is the correct, recommended setting.
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-    };
+    // Writes: indented, regex metacharacters left literal (see
+    // PersistenceJsonContext.Write). Source-generated metadata, #287.
+    private readonly JsonSerializerOptions _options = PersistenceJsonContext.Write;
 
     public void SaveAliases(string path, IEnumerable<AliasRule> aliases)
     {
@@ -42,7 +33,7 @@ public sealed class PersistenceService
     public List<AliasPersistenceModel> LoadAliases(string path)
     {
         if (!File.Exists(path)) return new();
-        return JsonSerializer.Deserialize<List<AliasPersistenceModel>>(File.ReadAllText(path)) ?? new();
+        return JsonSerializer.Deserialize<List<AliasPersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new();
     }
 
     public void SaveTriggers(string path, IEnumerable<TriggerRule> triggers)
@@ -66,7 +57,7 @@ public sealed class PersistenceService
     public List<TriggerPersistenceModel> LoadTriggers(string path)
     {
         if (!File.Exists(path)) return new();
-        return JsonSerializer.Deserialize<List<TriggerPersistenceModel>>(File.ReadAllText(path)) ?? new();
+        return JsonSerializer.Deserialize<List<TriggerPersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new();
     }
 
     public void SaveVariables(string path, VariableStore store)
@@ -84,7 +75,7 @@ public sealed class PersistenceService
     public List<VariablePersistenceModel> LoadVariables(string path)
     {
         if (!File.Exists(path)) return new();
-        return JsonSerializer.Deserialize<List<VariablePersistenceModel>>(File.ReadAllText(path)) ?? new();
+        return JsonSerializer.Deserialize<List<VariablePersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new();
     }
 
     public void SaveHighlights(string path, IEnumerable<HighlightRule> rules)
@@ -116,14 +107,14 @@ public sealed class PersistenceService
     public List<ClassPersistenceModel> LoadClasses(string path)
     {
         if (!File.Exists(path)) return new();
-        try { return JsonSerializer.Deserialize<List<ClassPersistenceModel>>(File.ReadAllText(path)) ?? new(); }
+        try { return JsonSerializer.Deserialize<List<ClassPersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new(); }
         catch { return new(); }
     }
 
     public List<HighlightPersistenceModel> LoadHighlights(string path)
     {
         if (!File.Exists(path)) return new();
-        return JsonSerializer.Deserialize<List<HighlightPersistenceModel>>(File.ReadAllText(path)) ?? new();
+        return JsonSerializer.Deserialize<List<HighlightPersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new();
     }
 
     public void SaveNames(string path, IEnumerable<NameRule> rules)
@@ -140,7 +131,7 @@ public sealed class PersistenceService
     public List<NamePersistenceModel> LoadNames(string path)
     {
         if (!File.Exists(path)) return new();
-        try { return JsonSerializer.Deserialize<List<NamePersistenceModel>>(File.ReadAllText(path)) ?? new(); }
+        try { return JsonSerializer.Deserialize<List<NamePersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new(); }
         catch { return new(); }
     }
 
@@ -161,7 +152,7 @@ public sealed class PersistenceService
     public List<SubstitutePersistenceModel> LoadSubstitutes(string path)
     {
         if (!File.Exists(path)) return new();
-        try { return JsonSerializer.Deserialize<List<SubstitutePersistenceModel>>(File.ReadAllText(path)) ?? new(); }
+        try { return JsonSerializer.Deserialize<List<SubstitutePersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new(); }
         catch { return new(); }
     }
 
@@ -180,7 +171,7 @@ public sealed class PersistenceService
     public List<GagPersistenceModel> LoadGags(string path)
     {
         if (!File.Exists(path)) return new();
-        try { return JsonSerializer.Deserialize<List<GagPersistenceModel>>(File.ReadAllText(path)) ?? new(); }
+        try { return JsonSerializer.Deserialize<List<GagPersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new(); }
         catch { return new(); }
     }
 
@@ -197,7 +188,7 @@ public sealed class PersistenceService
     public List<MacroPersistenceModel> LoadMacros(string path)
     {
         if (!File.Exists(path)) return new();
-        try { return JsonSerializer.Deserialize<List<MacroPersistenceModel>>(File.ReadAllText(path)) ?? new(); }
+        try { return JsonSerializer.Deserialize<List<MacroPersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new(); }
         catch { return new(); }
     }
 
@@ -221,7 +212,7 @@ public sealed class PersistenceService
     public List<PresetPersistenceModel> LoadPresets(string path)
     {
         if (!File.Exists(path)) return new();
-        try { return JsonSerializer.Deserialize<List<PresetPersistenceModel>>(File.ReadAllText(path)) ?? new(); }
+        try { return JsonSerializer.Deserialize<List<PresetPersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new(); }
         catch { return new(); }
     }
 
@@ -231,7 +222,7 @@ public sealed class PersistenceService
     public LayoutState? LoadLayout(string path)
     {
         if (!File.Exists(path)) return null;
-        try { return JsonSerializer.Deserialize<LayoutState>(File.ReadAllText(path)); }
+        try { return JsonSerializer.Deserialize<LayoutState>(File.ReadAllText(path), PersistenceJsonContext.Read); }
         catch { return null; }
     }
 
@@ -259,7 +250,7 @@ public sealed class PersistenceService
     public List<WindowSettingsPersistenceModel> LoadWindowSettings(string path)
     {
         if (!File.Exists(path)) return new();
-        try { return JsonSerializer.Deserialize<List<WindowSettingsPersistenceModel>>(File.ReadAllText(path)) ?? new(); }
+        try { return JsonSerializer.Deserialize<List<WindowSettingsPersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new(); }
         catch { return new(); }
     }
 
@@ -271,7 +262,7 @@ public sealed class PersistenceService
     public ClientState LoadClientState(string path)
     {
         if (!File.Exists(path)) return new();
-        try { return JsonSerializer.Deserialize<ClientState>(File.ReadAllText(path)) ?? new(); }
+        try { return JsonSerializer.Deserialize<ClientState>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new(); }
         catch { return new(); }
     }
 }

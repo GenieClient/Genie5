@@ -167,7 +167,7 @@ public static class RuleFileLiveReload
     private static List<T> Parse<T>(string path) =>
         !File.Exists(path)
             ? new List<T>()
-            : JsonSerializer.Deserialize<List<T>>(File.ReadAllText(path)) ?? new List<T>();
+            : JsonSerializer.Deserialize<List<T>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new List<T>();
 
     /// <summary>Rewrite each dir's coexisting Genie 4-style .cfg from its own
     /// scope's subset (null scope = single-layer, whole set). Only rewrites a
