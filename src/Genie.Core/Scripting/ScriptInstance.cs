@@ -119,6 +119,8 @@ public sealed class ScriptInstance
     public bool     InMatchWait;
     public DateTime MatchWaitDeadline = DateTime.MaxValue;
     public List<(string Label, string Pattern, bool IsRegex)> PendingMatches = new();
+    /// <summary>The PendingMatches cap warning has been shown for this run.</summary>
+    public bool MatchCapWarned;
 
     // waitfor / waitforre state
     public string?  WaitForPattern;

@@ -1087,6 +1087,31 @@ public sealed class ScriptEngine
     /// at the next arm anyway.</summary>
     private const int GateReplayCap = 400;
 
+    /// <summary>Upper bound on match / matchre registrations awaiting a matchwait
+    /// (2026-08-31 stability review). The list is cleared only when a match fires,
+    /// a matchwait times out, or an action goto abandons it, so a loop that keeps
+    /// registering without ever reaching matchwait (e.g. a pause-yielding retry
+    /// loop, which the runaway detector never trips) grew it for the script's
+    /// lifetime — memory plus an O(n) scan per game line once a matchwait arms.
+    /// Real scripts register a handful; Genie 4 has no cap at all.</summary>
+    internal const int PendingMatchCap = 500;
+
+    private void AddPendingMatch(ScriptInstance inst, (string Label, string Pattern, bool IsRegex) match, int lineNo)
+    {
+        if (inst.PendingMatches.Count >= PendingMatchCap)
+        {
+            // Once per run: a looping script would otherwise repeat it every pass.
+            if (!inst.MatchCapWarned)
+            {
+                inst.MatchCapWarned = true;
+                _echo($"[script] {inst.Name}:{lineNo} more than {PendingMatchCap} match patterns " +
+                      "registered without a matchwait — dropping the oldest.");
+            }
+            inst.PendingMatches.RemoveAt(0);
+        }
+        inst.PendingMatches.Add(match);
+    }
+
     /// <summary>Test one game line against the armed <c>match</c>/<c>matchre</c>
     /// list and jump to the winning label. Shared by the live matchwait path
     /// (line just arrived) and the send-gate replay (line arrived while the
@@ -2202,7 +2227,7 @@ public sealed class ScriptEngine
                 if (!string.IsNullOrEmpty(label))
                 {
                     WarnUnknownMatchLabel(inst, label.Trim(), lineNo);
-                    inst.PendingMatches.Add((label.Trim(), pat, false));
+                    AddPendingMatch(inst, (label.Trim(), pat, false), lineNo);
                     DbgEcho(inst, 2, $"match {label.Trim()} \"{pat}\"");
                 }
                 return true;
@@ -2214,7 +2239,7 @@ public sealed class ScriptEngine
                 if (!string.IsNullOrEmpty(label))
                 {
                     WarnUnknownMatchLabel(inst, label.Trim(), lineNo);
-                    inst.PendingMatches.Add((label.Trim(), pat, true));
+                    AddPendingMatch(inst, (label.Trim(), pat, true), lineNo);
                     DbgEcho(inst, 2, $"matchre {label.Trim()} \"{pat}\"");
                 }
                 return true;
