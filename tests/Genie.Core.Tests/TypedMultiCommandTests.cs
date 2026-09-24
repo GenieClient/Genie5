@@ -19,6 +19,10 @@ namespace Genie.Core.Tests;
 /// actually SENT once its delay elapses outside roundtime — the full chain
 /// behind the community report "put health;-0.8 encumbrance just puts out
 /// health and that's it".
+/// <para>Both tests drive the queue with a manual clock. They used to assert
+/// "not fired yet" against a real 100 ms deadline, which failed whenever the
+/// machine took longer than that to get from the enqueue to the next tick
+/// (first-time JIT, a GC pause, parallel test assemblies) — about 1 run in 8.</para>
 /// </summary>
 public class TypedMultiCommandTests : IDisposable
 {
@@ -84,7 +88,8 @@ public class TypedMultiCommandTests : IDisposable
     public void Typed_bare_put_chain_fires_both_segments()
     {
         var host = new RecordingHost();
-        var queue = new CommandQueue();
+        var now = DateTime.UtcNow;   // manual clock — see the class note on flakiness
+        var queue = new CommandQueue(() => now);
         var engine = new CommandEngine(_config, queue, new EventQueue(), host);
 
         engine.ProcessInput("put health;-0.1 encumbrance");
@@ -103,7 +108,7 @@ public class TypedMultiCommandTests : IDisposable
         Assert.Equal(new[] { "put health" }, host.Sent);
 
         // After the delay elapses, a tick outside roundtime must fire it.
-        System.Threading.Thread.Sleep(250);
+        now = now.AddSeconds(0.25);
         engine.Tick(inRoundtime: false);
         Assert.Equal(new[] { "put health", "encumbrance" }, host.Sent);
     }
@@ -119,7 +124,8 @@ public class TypedMultiCommandTests : IDisposable
         // BOTH engines on one heartbeat (OnScriptHeartbeat: Scripts.Tick then
         // Commands.Tick) — mirrored here by the pump loop.
         var host = new RecordingHost();
-        var queue = new CommandQueue();
+        var now = DateTime.UtcNow;
+        var queue = new CommandQueue(() => now);
         var commandEngine = new CommandEngine(_config, queue, new EventQueue(), host);
 
         var dir = Path.Combine(_root, "scripts");
@@ -145,7 +151,7 @@ public class TypedMultiCommandTests : IDisposable
         Assert.Equal(new[] { "health" }, host.Sent);
 
         // Roundtime holds it even after the delay …
-        System.Threading.Thread.Sleep(250);
+        now = now.AddSeconds(0.25);
         commandEngine.Tick(inRoundtime: true);
         Assert.Equal(new[] { "health" }, host.Sent);
 

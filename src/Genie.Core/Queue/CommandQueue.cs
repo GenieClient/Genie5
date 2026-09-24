@@ -5,6 +5,12 @@ public sealed class CommandQueue
     public readonly List<CommandQueueItem> EventList = new();
     private readonly object _threadLock = new();
     private DateTime? _nextTime;
+    private readonly Func<DateTime> _utcNow;
+
+    /// <param name="utcNow">Clock for the per-item delays; defaults to the wall
+    /// clock. Tests pass a manual clock so "has the delay elapsed yet" does not
+    /// depend on how fast the machine gets from one line to the next.</param>
+    public CommandQueue(Func<DateTime>? utcNow = null) => _utcNow = utcNow ?? (() => DateTime.UtcNow);
 
     public void AddToQueue(double delaySeconds, string action, bool waitForRoundtime, bool waitForWebbed, bool waitForStunned)
     {
@@ -28,7 +34,7 @@ public sealed class CommandQueue
         lock (_threadLock)
         {
             if (EventList.Count == 0 || _nextTime is null) return string.Empty;
-            if (DateTime.UtcNow < _nextTime.Value) return string.Empty;
+            if (_utcNow() < _nextTime.Value) return string.Empty;
             var item = EventList[0];
             if (item.IsRestricted(inRoundtime, isWebbed, isStunned)) return string.Empty;
             EventList.RemoveAt(0);
@@ -38,7 +44,7 @@ public sealed class CommandQueue
         }
     }
 
-    private void SetNextTime(double delaySeconds) => _nextTime = DateTime.UtcNow.AddSeconds(delaySeconds);
+    private void SetNextTime(double delaySeconds) => _nextTime = _utcNow().AddSeconds(delaySeconds);
 }
 
 public sealed class CommandQueueItem
