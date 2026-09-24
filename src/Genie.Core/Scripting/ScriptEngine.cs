@@ -277,19 +277,9 @@ public sealed class ScriptEngine
 
         _js = new JsScriptRuntime(
             scriptsDir:         _scriptsDir,
-            // `genie.put()` from a standalone .js array script gets the same
-            // extension-then-plugin offer and mycommandchar hold-back as a .cmd
-            // `put` and as the per-script JS library (EnsureJsLib). This sink was
-            // the last one still wired straight to the raw send delegate, so a
-            // .js `genie.put("/restart …")` leaked to the game while the same
-            // line from a .cmd script did not. The JS bridge has never
-            // participated in the type-ahead budget, so there is no _inFlight
-            // bookkeeping to skip when the line is claimed or held.
-            send:               c =>
-                                {
-                                    if (ResolveOutboundCommand(c) is { } outbound)
-                                        _sendCommand(outbound);
-                                },
+            // `genie.put()` from a standalone .js array script routes like a .cmd
+            // `put` — the same sink as the per-script JS library (see JsPut).
+            send:               JsPut,
             echo:               _echo,
             globals:            Globals,
             roundtimeRemaining: () => RoundTimeRemainingSeconds?.Invoke() ?? 0,
@@ -1560,7 +1550,7 @@ public sealed class ScriptEngine
         {
             if (next[0] == '#')
             {
-                HandleMetaCommand(next, inst);
+                HandleMetaCommand(next);
             }
             else if (ResolveOutboundCommand(next) is not { } outbound)
             {
@@ -1831,7 +1821,7 @@ public sealed class ScriptEngine
                     if (rest[0] == '.')
                         _handleHashCmd?.Invoke(rest);
                     else
-                        HandleMetaCommand(rest, inst);
+                        HandleMetaCommand(rest);
                     return true;
                 }
 
@@ -1924,7 +1914,7 @@ public sealed class ScriptEngine
 
                 if (first.Length > 0 && first[0] == '#')
                 {
-                    HandleMetaCommand(first, inst);
+                    HandleMetaCommand(first);
                 }
                 else if (first.Length > 0 && first[0] == '.')
                 {
@@ -2847,7 +2837,7 @@ public sealed class ScriptEngine
     /// <c>#echo &gt;Log #DAF7A6 ...</c>, <c>#mapper reset</c>. These arrive via
     /// <c>put #...</c> in scripts and never reach the game.
     /// </summary>
-    private void HandleMetaCommand(string text, ScriptInstance inst)
+    private void HandleMetaCommand(string text)
     {
         var (cmd, rest) = SplitCmd(text); // cmd starts with '#'
         switch (cmd.ToLowerInvariant())
@@ -3332,12 +3322,32 @@ public sealed class ScriptEngine
             // same extension-then-plugin offer as a .cmd `put` (public #325).
             // The JS bridge has never participated in the type-ahead budget, so
             // there is no _inFlight bookkeeping to skip on a claim here.
-            put:       c =>
-            {
-                if (ResolveOutboundCommand(c) is not { } outbound) return;
-                Extensions.DispatchCommand(outbound);
-                _sendCommand(outbound);
-            });
+            put:       JsPut);
+
+    /// <summary>
+    /// The one sink behind <c>genie.put()</c> — standalone <c>.js</c> array
+    /// scripts and inline <c>&lt;% %&gt;</c> blocks alike. It routes exactly like a
+    /// <c>.cmd</c> <c>put</c> (2026-08-30 Lich gap analysis): <c>#</c> meta-commands
+    /// run client-side (<c>genie.put("#var x 1")</c>, <c>#goto</c>, <c>#class</c>), a
+    /// leading <c>.</c> starts a script, and everything else gets the
+    /// extension-then-plugin offer and mycommandchar hold-back (public #325)
+    /// before reaching the game. Before this, a <c>#</c> line was sent to the game
+    /// server literally. The JS bridge has never participated in the type-ahead
+    /// budget, so there is no <c>_inFlight</c> bookkeeping on any branch.
+    /// </summary>
+    private void JsPut(string command)
+    {
+        if (command.Length == 0) return;
+        // A standalone .js calls in from its own thread; serialize the meta
+        // command with the tick (re-entrant for inline blocks, which already
+        // hold it). Nothing under _exec waits on a JS thread, so this can't
+        // deadlock; host-bound commands marshal onward via RunOnLoop.
+        if (command[0] == '#') { lock (_exec) HandleMetaCommand(command); return; }
+        if (command[0] == '.') { _handleHashCmd?.Invoke(command); return; }
+        if (ResolveOutboundCommand(command) is not { } outbound) return;
+        Extensions.DispatchCommand(outbound);
+        _sendCommand(outbound);
+    }
 
     private string SubstituteVars(string text, ScriptInstance inst)
     {

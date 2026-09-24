@@ -45,7 +45,7 @@ Every script gets a global `genie` object (also aliased `game`):
 
 | Call | Description |
 |---|---|
-| `genie.put(cmd)` / `genie.send(cmd)` | Send a command to the game. |
+| `genie.put(cmd)` / `genie.send(cmd)` | Send a command, routed like a `.cmd` `put`: `#` commands run in Genie (`genie.put("#var x 1")`), a leading `.` starts a script, anything else goes to the game. |
 | `genie.echo(text)` / `genie.log(text)` | Echo text to the game window. |
 | `genie.echoTo(window [, text [, color]])` | Directed echo — route `text` to a named window/stream (and optional `#RRGGBB`/colour name). Same seam as `.cmd`'s `#echo >Window #Color`. |
 | `genie.waitFor(text [, secs])` | Block until a game line contains `text` (case-insensitive). Returns the matched line, or `""` on timeout. `secs` ≤ 0 (default) waits forever. |
