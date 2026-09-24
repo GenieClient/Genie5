@@ -74,10 +74,22 @@ public sealed partial class SpellTimerExtension : IGameExtension
     private static readonly Regex SpellLineRe = SpellLineRegex();
     [System.Text.RegularExpressions.GeneratedRegex(@"^(.+?)\s+\((.+)\)\s*$", System.Text.RegularExpressions.RegexOptions.None)]
     private static partial System.Text.RegularExpressions.Regex SpellLineRegex();
-    // DR uses singular "roisan" for a 1-roisaen duration; "roisae?n" matches both.
-    private static readonly Regex RoisaenRe = RoisaenRegex();
-    [System.Text.RegularExpressions.GeneratedRegex(@"(\d+)\s+roisae?n", System.Text.RegularExpressions.RegexOptions.None)]
-    private static partial System.Text.RegularExpressions.Regex RoisaenRegex();
+    // A remaining duration: "N roisaen" (DR's singular is "roisan"), or for long
+    // spells "N anlaen" — 30 roisaen each (public #301; Lich converts the same way).
+    // "Stellar Collector  (0%, 4 anlaen)" is the shape that surfaced it.
+    private static readonly Regex DurationRe = DurationRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(\d+)\s*(roisae?n|anla(?:en|s))", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex DurationRegex();
+    private const int RoisaenPerAnlas = 30;
+
+    /// <summary>The duration in <paramref name="inside"/>, in roisaen, or null.</summary>
+    private static int? ParseDuration(string inside)
+    {
+        var m = DurationRe.Match(inside);
+        if (!m.Success) return null;
+        var n = int.Parse(m.Groups[1].Value);
+        return m.Groups[2].Value.StartsWith("anla", StringComparison.OrdinalIgnoreCase) ? n * RoisaenPerAnlas : n;
+    }
     private static readonly Regex PercentRe = PercentRegex();
     [System.Text.RegularExpressions.GeneratedRegex(@"(\d+)%", System.Text.RegularExpressions.RegexOptions.None)]
     private static partial System.Text.RegularExpressions.Regex PercentRegex();
@@ -182,17 +194,21 @@ public sealed partial class SpellTimerExtension : IGameExtension
             switch (_config.RuleFor(name))
             {
                 case SpellParseRule.Charge:
+                    // DR sends the charge AND the time left: "Stellar Collector  (5%,
+                    // 12 roisaen)", "(0%, 4 anlaen)", "(0%, fading)" (public #301 —
+                    // the duration used to be discarded, so the window had no time).
                     var pcCharge = PercentRe.Match(inside);
                     if (pcCharge.Success) charge = int.Parse(pcCharge.Groups[1].Value);
+                    if (ParseDuration(inside) is int chargeTime) duration = chargeTime;
+                    else if (inside.Contains("fading", StringComparison.OrdinalIgnoreCase)) fading = true;
                     break;
                 case SpellParseRule.Percent:
                     var pcDur = PercentRe.Match(inside);
                     if (pcDur.Success) duration = int.Parse(pcDur.Groups[1].Value);
                     break;
                 default:   // Roisaen (and Slivers, which normally has no parens)
-                    var rs = RoisaenRe.Match(inside);
-                    if (rs.Success)
-                        duration = int.Parse(rs.Groups[1].Value);
+                    if (ParseDuration(inside) is int time)
+                        duration = time;
                     else if (inside.Equals("OM", StringComparison.OrdinalIgnoreCase)
                           || inside.Equals("Indefinite", StringComparison.OrdinalIgnoreCase))
                         duration = Indefinite;
@@ -275,8 +291,10 @@ public sealed partial class SpellTimerExtension : IGameExtension
         var when = s.Fading                 ? "fading"
                  : s.Duration == Indefinite ? "indefinite"
                  : $"{s.Duration} roisaen";
-        if (_config.RuleFor(s.Name) == SpellParseRule.Charge && s.Charge > 0)
-            when = $"{s.Charge}% charged";
+        // A charged spell shows both (#301): "5% charged, 12 roisaen". Only the
+        // charge when no time came with it.
+        if (_config.RuleFor(s.Name) == SpellParseRule.Charge)
+            when = s.Duration > 0 || s.Fading ? $"{s.Charge}% charged, {when}" : $"{s.Charge}% charged";
         return $"{s.Name,-22} {when}";
     }
 
