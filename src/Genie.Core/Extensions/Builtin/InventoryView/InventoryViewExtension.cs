@@ -102,6 +102,10 @@ public sealed class InventoryViewExtension : IGameExtension
 
     private WikiItemInfoCache? _itemInfo;
     private PlazaShopService? _plaza;
+    /// <summary>Taps still waiting on the wiki. A request that lands while a run
+    /// is active adds to this rather than being dropped — the run drains it.
+    /// Guarded by <see cref="_sync"/>.</summary>
+    private readonly HashSet<string> _infoQueue = new(StringComparer.OrdinalIgnoreCase);
     private bool _infoResolveRunning;
 
     /// <summary>Elanthipedia weight/size per tap (persistent-cached).</summary>
@@ -111,15 +115,17 @@ public sealed class InventoryViewExtension : IGameExtension
 
     /// <summary>Kick off background wiki resolution for any of these taps that
     /// have no cached answer. Batched + throttled; <see cref="ItemInfoUpdated"/>
-    /// fires after each batch. Re-entrant calls while a run is active are
-    /// no-ops (the active run picks the taps up via the cache check).</summary>
+    /// fires after each batch. A call that lands while a run is active queues its
+    /// taps for that run to pick up — the run's batch list is not fixed at start,
+    /// so taps added by a later scan are not stranded until the next request.</summary>
     public void RequestItemInfo(IEnumerable<string> taps)
     {
         var pending = ItemInfo.Unresolved(taps);
         if (pending.Count == 0) return;
         lock (_sync)
         {
-            if (_infoResolveRunning) return;
+            _infoQueue.UnionWith(pending);
+            if (_infoResolveRunning) return;   // the live run will drain them
             _infoResolveRunning = true;
         }
 
@@ -128,10 +134,25 @@ public sealed class InventoryViewExtension : IGameExtension
         {
             try
             {
-                for (int i = 0; i < pending.Count && !token.IsCancellationRequested;
-                     i += WikiItemInfoCache.BatchSize)
+                while (true)
                 {
-                    var batch = pending.Skip(i).Take(WikiItemInfoCache.BatchSize).ToList();
+                    List<string> batch;
+                    lock (_sync)
+                    {
+                        if (token.IsCancellationRequested || _infoQueue.Count == 0)
+                        {
+                            // Cleared under the same lock that sees the queue empty,
+                            // so a request arriving now either lands in the queue
+                            // before we look (and we take it) or starts a new run.
+                            _infoResolveRunning = false;
+                            return;
+                        }
+                        batch = _infoQueue.Take(WikiItemInfoCache.BatchSize).ToList();
+                        _infoQueue.ExceptWith(batch);
+                    }
+
+                    batch = ItemInfo.Unresolved(batch);   // another path may have cached them
+                    if (batch.Count == 0) continue;
                     await ItemInfo.ResolveBatchAsync(batch).ConfigureAwait(false);
                     ItemInfoUpdated?.Invoke();
                     await Task.Delay(300, token).ConfigureAwait(false);   // politeness gap
@@ -167,8 +188,12 @@ public sealed class InventoryViewExtension : IGameExtension
 
     public void Shutdown()
     {
+        // Cancel but do NOT dispose: RequestItemInfo, ShopSearchCommand and the
+        // scan watchdog read _cts.Token from other threads, and Token throws
+        // ObjectDisposedException on a disposed source — which on the UI path
+        // (the window's RequestItemInfo call) is unhandled. Cancellation is what
+        // those callers need; the source itself holds nothing worth reclaiming.
         _cts.Cancel();
-        _cts.Dispose();
     }
 
     public void OnGameLine(string line)     { }   // stream-agnostic — the FSM feeds from OnGameEvent

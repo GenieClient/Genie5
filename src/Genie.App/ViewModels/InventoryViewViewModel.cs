@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using Avalonia.Threading;
 using Genie.Core;
 using Genie.Core.Extensions.Builtin.InventoryView;
@@ -26,6 +27,14 @@ public class InventoryViewViewModel : ReactiveObject
 {
     private InventoryViewExtension? _ext;
     private List<CharacterData> _snapshot = new();
+    /// <summary>Every tap in <see cref="_snapshot"/>, cached because the resolve
+    /// progress line asks for it on every wiki batch and it only changes when the
+    /// snapshot does.</summary>
+    private List<string> _snapshotTaps = new();
+    /// <summary>Wiki batches land every ~300ms and each one costs a full tree walk
+    /// plus a re-sort on the UI thread; sampled so a catalog-sized resolve is a
+    /// handful of passes rather than hundreds.</summary>
+    private readonly Subject<Unit> _itemInfoArrived = new();
 
     public ObservableCollection<InventoryNode> Roots { get; } = new();
 
@@ -107,6 +116,14 @@ public class InventoryViewViewModel : ReactiveObject
             ShopStatus = "";
         });
 
+        // One UI pass per second while the wiki resolves, instead of one per batch.
+        // Sample (not Throttle) so a long run still shows progress as it goes, and
+        // the last batch is picked up at the next tick rather than dropped.
+        _itemInfoArrived
+            .Sample(TimeSpan.FromSeconds(1))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => ApplyItemInfo());
+
         // Live filter: rebuild the tree as the search text settles.
         this.WhenAnyValue(vm => vm.SearchText)
             .Throttle(TimeSpan.FromMilliseconds(200))
@@ -129,7 +146,7 @@ public class InventoryViewViewModel : ReactiveObject
             if (!string.IsNullOrEmpty(term)) SearchText = term;
             OpenRequested?.Invoke();
         });
-        _ext.ItemInfoUpdated += () => Dispatcher.UIThread.Post(ApplyItemInfo);
+        _ext.ItemInfoUpdated += () => _itemInfoArrived.OnNext(Unit.Default);
         _ext.ScanStateChanged += () => Dispatcher.UIThread.Post(
             () => IsScanning = _ext?.ScanInProgress ?? false);
         IsScanning = _ext.ScanInProgress;
@@ -227,9 +244,7 @@ public class InventoryViewViewModel : ReactiveObject
     private void UpdateResolveProgress()
     {
         if (_ext is null) return;
-        var taps = new List<string>();
-        foreach (var c in _snapshot) CollectTaps(c.Items, taps);
-        int remaining = _ext.ItemInfo.Unresolved(taps).Count;
+        int remaining = _ext.ItemInfo.Unresolved(_snapshotTaps).Count;
         if (remaining > 0)
             StatusText = $"Looking up item weight/size on Elanthipedia… {remaining} item(s) remaining.";
         else if (StatusText.StartsWith("Looking up item weight/size", StringComparison.Ordinal))
@@ -285,15 +300,15 @@ public class InventoryViewViewModel : ReactiveObject
     private void RefreshSnapshot()
     {
         _snapshot = _ext?.SnapshotCatalog() ?? new List<CharacterData>();
+        _snapshotTaps = new List<string>();
+        foreach (var c in _snapshot) CollectTaps(c.Items, _snapshotTaps);
         Rebuild();
 
         // Kick background weight/size resolution for anything not yet cached
         // (batched + throttled in the extension; no-op when all cached).
         if (_ext is not null)
         {
-            var taps = new List<string>();
-            foreach (var c in _snapshot) CollectTaps(c.Items, taps);
-            _ext.RequestItemInfo(taps);
+            _ext.RequestItemInfo(_snapshotTaps);
             UpdateResolveProgress();
         }
     }

@@ -492,6 +492,47 @@ public class InventoryViewExtensionTests
         Assert.Equal("a backpack", Assert.Single(inv.Items).Tap);
     }
 
+    // ── Background wiki resolution ────────────────────────────────────
+
+    [Fact]
+    public async Task Taps_requested_while_a_wiki_run_is_active_are_still_resolved()
+    {
+        var host = NewHost();
+        var ext  = new InventoryViewExtension();
+        ext.Initialize(host);
+
+        var asked = new List<string>();
+        ext.ItemInfo.QueryApi = titles =>
+        {
+            lock (asked) asked.AddRange(titles);
+            return Task.FromResult<string?>(null);   // API down: nothing gets cached
+        };
+
+        ext.RequestItemInfo(new[] { "a first item" });
+        // Lands while the run is still going (a second scan finishing, say). The
+        // run's work list is built as it goes, so this is picked up rather than
+        // stranded until some later request happens to find the run idle.
+        await Task.Delay(50);
+        ext.RequestItemInfo(new[] { "a second item" });
+
+        await WaitUntil(() => { lock (asked) return asked.Contains("Item:second item"); });
+        lock (asked) Assert.Contains("Item:first item", asked);
+    }
+
+    [Fact]
+    public void Requests_after_shutdown_do_not_throw()
+    {
+        var host = NewHost();
+        var ext  = new InventoryViewExtension();
+        ext.Initialize(host);
+        ext.ItemInfo.QueryApi = _ => Task.FromResult<string?>(null);
+
+        ext.Shutdown();
+        // Reads _cts.Token on the caller's thread — the window's own refresh path,
+        // which is not inside the extension manager's try/catch.
+        ext.RequestItemInfo(new[] { "a steel ingot" });
+    }
+
     [Fact]
     public void Search_and_open_route_through_the_ui_seams()
     {
