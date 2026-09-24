@@ -3218,8 +3218,16 @@ public sealed class ScriptEngine
     /// </summary>
     private void DbgEcho(ScriptInstance inst, int minLevel, string msg)
     {
-        if (inst.DebugLevel >= minLevel)
-            _echo($"[dbg:{inst.DebugLevel}] {msg}");
+        if (inst.DebugLevel < minLevel) return;
+        var line = $"[dbg:{inst.DebugLevel}] {msg}";
+        // #config scriptdebugwindow (public #366): at a high debuglevel a busy
+        // script interleaves a lot of trace with game output. Route it to a named
+        // window through the #echo >window seam; unset (or no UI wired) keeps the
+        // Game window.
+        if (Config?.ScriptDebugWindow is { Length: > 0 } window && EchoTo is not null)
+            EchoTo(line, window, null);
+        else
+            _echo(line);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

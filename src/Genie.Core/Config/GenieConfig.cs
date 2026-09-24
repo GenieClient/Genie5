@@ -148,6 +148,11 @@ public sealed class GenieConfig
     public bool AutoLog { get; set; } = true;
     public bool ClassicConnect { get; set; } = true;
     public string Editor { get; set; } = "notepad.exe";
+    /// <summary>Named window that script <c>[dbg:N]</c> trace lines go to instead
+    /// of the Game window (public #366) — any name <c>#echo &gt;window</c> accepts,
+    /// created on first use. Empty (the default) keeps them in the Game window;
+    /// <c>#config scriptdebugwindow none</c> (or main / game / off) clears it.</summary>
+    public string ScriptDebugWindow { get; set; } = "";
     public string Prompt { get; set; } = "> ";
     public bool PromptBreak { get; set; } = true;
     public bool PromptForce { get; set; } = true;
@@ -758,6 +763,7 @@ public sealed class GenieConfig
         ("activitytimeout", ActivityTimeout.ToString()),
         ("gamethread", GameThread.ToString()),
         ("editor", Editor),
+        ("scriptdebugwindow", ScriptDebugWindow),
         ("prompt", Prompt),
         ("promptbreak", PromptBreak.ToString()),
         ("promptforce", PromptForce.ToString()),
@@ -882,7 +888,7 @@ public sealed class GenieConfig
         ("Window / Input",   new[] { "alwaysontop", "alwaysshowscrollbars", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout", "objectscreatures", "objectsconfigbar" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
-        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "tracesends", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "gamethread" }),
+        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "tracesends", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "scriptdebugwindow", "gamethread" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
         ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsstreampriority", "ttsrate", "ttsvolume" }),
@@ -943,6 +949,7 @@ public sealed class GenieConfig
                 case "autolog": AutoLog = ToBool(value); Notify(ConfigFieldUpdated.Autolog); break;
                 case "classicconnect": ClassicConnect = ToBool(value); Notify(ConfigFieldUpdated.ClassicConnect); break;
                 case "editor": Editor = value; break;
+                case "scriptdebugwindow": ScriptDebugWindow = NormalizeWindowName(value); break;
                 case "prompt": Prompt = NormalizePrompt(value); break;
                 case "promptbreak": PromptBreak = ToBool(value); break;
                 case "promptforce": PromptForce = ToBool(value); break;
@@ -1064,6 +1071,15 @@ public sealed class GenieConfig
             return messages;
         }
         catch { if (showException) throw; return messages; }
+    }
+
+    /// <summary>A window-name setting: a leading <c>&gt;</c> is accepted (the
+    /// <c>#echo &gt;window</c> spelling), and none / off / main / game mean the Game
+    /// window, stored as empty.</summary>
+    private static string NormalizeWindowName(string value)
+    {
+        var name = (value ?? "").Trim().TrimStart('>').Trim();
+        return name.ToLowerInvariant() is "" or "none" or "off" or "main" or "game" ? "" : name;
     }
 
     private string SetDir(string value)

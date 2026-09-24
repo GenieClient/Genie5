@@ -95,6 +95,7 @@ setting; only `frontend` appears in `settings.cfg` and `#config list`).
 | `ignorescriptwarnings` | `False` | Suppress non-fatal script-engine warnings (hard errors are always shown). |
 | `scriptextension` | `cmd` | Default file extension for scripts. |
 | `editor` | `notepad.exe` | External editor used to open scripts/logs. |
+| `scriptdebugwindow` | *(empty)* | Named window for script `[dbg:N]` trace lines instead of the Game window (created on first use, like `#echo >name`). `none` / `main` clears it. |
 | `gamethread` | `True` | Run the game pipeline (parser, scripts, triggers, plugins) on a dedicated background thread so a busy script can never freeze the app. Takes effect at the next launch. `off` restores the previous single-threaded behavior — an escape hatch if anything misbehaves. |
 
 ## Mapper
