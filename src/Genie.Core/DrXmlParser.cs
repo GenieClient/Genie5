@@ -998,11 +998,14 @@ public sealed class DrXmlParser : IDisposable
         if (_newsEnterRe.IsMatch(t)) { _inNewsList = true; _newsCategory = 0; return null; }
 
         // Category header sets the active category (and implies listing mode).
+        // TryParse (2026-08-31 stability review): the pattern runs against every emitted line, so
+        // an 11+ digit "Category" in any display text overflowed int.Parse and the
+        // throw dropped the connection. An unparseable number is not a header.
         var cat = _newsCategoryRe.Match(t);
-        if (cat.Success)
+        if (cat.Success && int.TryParse(cat.Groups[1].Value, out var catNum))
         {
             _inNewsList   = true;
-            _newsCategory = int.Parse(cat.Groups[1].Value);
+            _newsCategory = catNum;
             return null;
         }
 

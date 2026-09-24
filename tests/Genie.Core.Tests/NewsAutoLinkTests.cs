@@ -154,4 +154,23 @@ public class NewsAutoLinkTests
         var body = events.Last(e => e.Text.Contains("body text that merely looks numbered"));
         Assert.Null(body.Links);
     }
+
+    [Fact]
+    public void OverflowingCategoryNumber_DoesNotThrow_AndIsNotAHeader()
+    {
+        // 2026-08-31 stability review: the category regex runs against every emitted line, and
+        // int.Parse on an 11+ digit run threw OverflowException up through Feed
+        // (→ the read loop → a dropped connection). It must parse as plain text.
+        var raw =
+            "** Category 99999999999 - X **\n" +
+            "     1 - numbered text after it\n" +
+            "still flowing\n";
+
+        var events = Feed(raw);
+
+        Assert.NotNull(Line(events, "** Category 99999999999 - X **"));
+        // Not a header, so it opened no listing: the next numbered line stays plain.
+        Assert.Null(Line(events, "1 - numbered text after it")!.Links);
+        Assert.NotNull(Line(events, "still flowing"));
+    }
 }
