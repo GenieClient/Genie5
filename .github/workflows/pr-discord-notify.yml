@@ -74,6 +74,13 @@ jobs:
 
           # Discord embed limits: title 256, description 4096. Keep the card
           # phone-sized — a short excerpt, the rest is one tap away.
+          #
+          # No `username` / `avatar_url` override in the payload: the poster
+          # name and avatar are whatever the webhook was given in the Discord
+          # channel settings, so they can be changed without a commit.
+          #
+          # The jq program below is a single-quoted shell string: it must never
+          # contain an apostrophe, not even inside a jq comment.
           jq -n \
             --arg repo      "${REPO}" \
             --arg verb      "${verb}" \
@@ -93,9 +100,6 @@ jobs:
             --arg when      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '
               def clip($n): if length > $n then .[:($n - 1)] + "…" else . end;
-              # No `username`/`avatar_url` override: the poster's name and
-              # avatar are whatever the webhook was given in Discord's
-              # channel settings, so they can be changed without a commit.
               {
                 embeds: [{
                   title: (("#" + $number + " " + $title) | clip(256)),
