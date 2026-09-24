@@ -7,8 +7,13 @@ public static class ScriptParser
     /// text in once (Genie 4 puts the running file in <c>m_oScriptFiles</c> too).
     /// Omitting it costs nothing but that one case — a self-include still
     /// terminates, because the path is recorded before the recursive call.</param>
+    /// <param name="includeRoots">Directories besides <paramref name="scriptsDir"/>
+    /// that an <c>include</c> may resolve into — the engine passes its script
+    /// search dirs, so a script in a subfolder can still include a shared file
+    /// from the scripts root.</param>
     public static ScriptInstance Parse(string name, string scriptsDir, string source,
-                                       string? sourcePath = null)
+                                       string? sourcePath = null,
+                                       IReadOnlyList<string>? includeRoots = null)
     {
         var inst = new ScriptInstance { Name = name };
 
@@ -17,7 +22,8 @@ public static class ScriptParser
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (!string.IsNullOrEmpty(sourcePath) && CanonicalPath(sourcePath) is { } rootPath)
             visited.Add(rootPath);
-        ExpandIncludes(name, source, scriptsDir, raw, visited);
+        var roots = IncludeRoots(scriptsDir, includeRoots);
+        ExpandIncludes(name, source, scriptsDir, roots, raw, visited);
 
         // 2. Normalise inline-body conditionals to block form. Matches
         //    Genie4's parse-time behavior: `if X then stmt` becomes
@@ -249,7 +255,7 @@ public static class ScriptParser
     /// stops when B's include of A finds A's path already in the set.</para>
     /// </summary>
     private static void ExpandIncludes(
-        string origin, string source, string scriptsDir,
+        string origin, string source, string scriptsDir, IReadOnlyList<string> roots,
         List<(string, int, string)> output, HashSet<string> visited)
     {
         var lines = source.Replace("\r\n", "\n").Split('\n');
@@ -270,23 +276,30 @@ public static class ScriptParser
                 // compatibility rewrite). The path resolves against the scripts dir.
                 if (incName.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
                 {
-                    var jsPath = (Path.IsPathRooted(incName) || incName.IndexOfAny(new[] { '\\', '/' }) >= 0)
-                        ? incName
-                        : Path.Combine(scriptsDir, incName);
-                    output.Add((origin, i + 1, File.Exists(jsPath)
-                        ? $"__jsinclude {jsPath}"
-                        : $"echo [script] include not found: {incName}"));
+                    // Relative names — including sub-paths like lib\x.js, which used
+                    // to resolve against the process working directory — resolve
+                    // against the scripts dir, as .cmd/.inc includes always have.
+                    // Path.Combine keeps a rooted name as-is.
+                    var jsPath = Path.Combine(scriptsDir, incName);
+                    output.Add((origin, i + 1,
+                        !File.Exists(jsPath)          ? $"echo [script] include not found: {incName}"
+                        : !IsUnderAnyRoot(jsPath, roots) ? RefusedInclude(incName)
+                        :                                  $"__jsinclude {jsPath}"));
                     continue;
                 }
 
                 var path = ResolveIncludePath(scriptsDir, incName);
-                if (path != null)
+                if (path != null && !IsUnderAnyRoot(path, roots))
+                {
+                    output.Add((origin, i + 1, RefusedInclude(incName)));
+                }
+                else if (path != null)
                 {
                     // Already pulled in (by any spelling that resolves here) —
                     // skip silently, exactly as Genie 4 does for a repeat include.
                     if (!visited.Add(CanonicalPath(path) ?? path)) continue;
                     var subOrigin = Path.GetFileNameWithoutExtension(path);
-                    ExpandIncludes(subOrigin, File.ReadAllText(path), scriptsDir, output, visited);
+                    ExpandIncludes(subOrigin, File.ReadAllText(path), scriptsDir, roots, output, visited);
                 }
                 else
                 {
@@ -316,6 +329,35 @@ public static class ScriptParser
         try { return Path.GetFullPath(path); }
         catch { return null; }
     }
+
+    // ── Include containment (2026-08-31 security review) ─────────────────────
+    // An include name comes straight from script text, and a downloaded script
+    // could name `..\..\..\somewhere\secret.txt` or an absolute path: the file
+    // was read and its unrecognised lines sent verbatim to the game socket. An
+    // include must now resolve inside the script's own folder or one of the
+    // engine's script dirs. This is stricter than Genie 4, which used any path
+    // containing a backslash verbatim; no script in the reference corpora
+    // includes from outside its scripts folder.
+
+    private static string[] IncludeRoots(string scriptsDir, IReadOnlyList<string>? extra)
+    {
+        var roots = new List<string>();
+        foreach (var d in extra is null ? new[] { scriptsDir } : extra.Prepend(scriptsDir))
+            if (!string.IsNullOrWhiteSpace(d) && CanonicalPath(d) is { } full)
+                roots.Add(Path.EndsInDirectorySeparator(full) ? full : full + Path.DirectorySeparatorChar);
+        return roots.ToArray();
+    }
+
+    private static bool IsUnderAnyRoot(string path, IReadOnlyList<string> roots)
+    {
+        if (CanonicalPath(path) is not { } full) return false;
+        foreach (var root in roots)
+            if (full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    private static string RefusedInclude(string name) =>
+        $"echo [script] include refused — outside the scripts folder: {name}";
 
     private static string? ResolveIncludePath(string dir, string name)
     {

@@ -496,7 +496,8 @@ public sealed class ScriptEngine
         ScriptInstance inst;
         try
         {
-            inst = ScriptParser.Parse(name, baseDir, File.ReadAllText(path), path);
+            inst = ScriptParser.Parse(name, baseDir, File.ReadAllText(path), path,
+                                      includeRoots: SearchDirs().ToList());
         }
         catch (Exception ex)
         {
@@ -908,7 +909,7 @@ public sealed class ScriptEngine
         try
         {
             fresh = ScriptParser.Parse(inst.Name, inst.BaseDir, File.ReadAllText(inst.SourcePath),
-                                       inst.SourcePath);
+                                       inst.SourcePath, includeRoots: SearchDirs().ToList());
         }
         catch (Exception ex)
         {

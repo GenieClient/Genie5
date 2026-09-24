@@ -44,7 +44,7 @@ Scripts do **not** run on their own thread. They are advanced synchronously off 
 
 [ScriptParser.Parse](../src/Genie.Core/Scripting/ScriptParser.cs) turns a file into a `ScriptInstance` in four stages:
 
-1. **Include expansion** — `include foo` is recursively replaced with `foo.cmd` from the scripts directory. Cycles are detected; a missing include becomes an `echo` line rather than a crash.
+1. **Include expansion** — `include foo` is recursively replaced with `foo.cmd` from the scripts directory. Cycles are detected; a missing include becomes an `echo` line rather than a crash. An include must resolve inside the script's own folder or a scripts folder (the scripts dir, or the repo scripts dir when set); one that reaches outside — via `..` or an absolute path — is refused with an `include refused` echo. Genie 4 accepted any path, but no known community script includes from outside its scripts folder.
 2. **Inline-conditional normalisation** — `if X then put Y` is rewritten to block form (`if X then { put Y }`) so the jump-table code handles every conditional uniformly. `begin`/`end` are translated to `{`/`}`.
 3. **Line list + label table** — every line becomes a `ScriptLine`; `label:` lines populate the label table for O(1) `goto`/`gosub`.
 4. **If/else/while jump tables** — pre-computed at parse time so each conditional executes in O(1) at runtime with no forward scanning for the matching brace.
