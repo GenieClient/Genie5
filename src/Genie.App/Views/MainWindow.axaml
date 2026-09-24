@@ -501,6 +501,23 @@
           </MenuItem.Styles>
         </MenuItem>
 
+        <!-- ── Script-created windows (dynamic, #367) ───────────────────── -->
+        <!-- Same registry as Plugin Windows, split by origin: named windows -->
+        <!-- a script made with #echo >name, #link >name or #window.         -->
+        <MenuItem Header="_Script Windows"
+                  Classes="plugin-windows-host"
+                  ItemsSource="{Binding ScriptWindowMenuItems}"
+                  ToolTip.Tip="Windows created by scripts (#echo >name, #link >name, #window add). Toggle to show/hide. Empty until a script opens a window.">
+          <MenuItem.Styles>
+            <Style Selector="MenuItem:not(.plugin-windows-host)">
+              <Setter Property="Header"     Value="{Binding Title}"/>
+              <Setter Property="ToggleType" Value="CheckBox"/>
+              <Setter Property="IsChecked"  Value="{Binding IsVisible, Mode=OneWay}"/>
+              <Setter Property="Command"    Value="{Binding ToggleCommand}"/>
+            </Style>
+          </MenuItem.Styles>
+        </MenuItem>
+
       </MenuItem>
 
       <!-- ── Plugins ─────────────────────────────────────────────────────── -->

@@ -401,6 +401,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// EchoToWindow seam; this list lets the user show/hide each. Rebuilt when
     /// the Window menu opens.</summary>
     public System.Collections.ObjectModel.ObservableCollection<PluginWindowMenuItem> PluginWindowMenuItems { get; } = new();
+    /// <summary>Window ▸ Script Windows (#367): the named windows scripts made
+    /// (#echo &gt;name, #link, #window) — split out of Plugin Windows, which
+    /// used to list both.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<PluginWindowMenuItem> ScriptWindowMenuItems { get; } = new();
     public ReactiveCommand<Unit, Unit> OpenPluginsFolderCommand { get; }
     public ReactiveCommand<Unit, Unit> ReloadPluginsCommand     { get; }
     public ReactiveCommand<Unit, Unit> RefreshPluginListCommand { get; }
@@ -3444,13 +3448,26 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     {
         // SetWindow(name, content) → replace the panel's contents (snapshot
         // style — how the Experience/Inventory plugins re-render).
+        // #367: record which named windows are a plugin's, so the Window menu
+        // can list them apart from script windows. Posted ahead of the write
+        // that creates the panel (same UI-thread queue, same order).
+        core.PluginWindowWritten += window =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (DockFactory is GenieDockFactory f && !string.IsNullOrWhiteSpace(window))
+                    f.MarkPluginOwned(window);
+            });
+
         core.SetPluginWindow += (window, content) =>
         {
             if (IsReservedWindow(window)) return;
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 if (DockFactory is GenieDockFactory f)
+                {
+                    f.MarkPluginOwned(window);   // SetWindow is plugin/extension-only (#367)
                     f.GetOrCreatePluginWindow(window).SetContent(content);
+                }
             });
         };
 
@@ -3619,13 +3636,21 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// live set of plugin panels. Called when the Window menu opens.</summary>
     private void RefreshPluginWindowList()
     {
-        PluginWindowMenuItems.Clear();
+        FillWindowToggleList(PluginWindowMenuItems, f => f.PluginWindows(pluginOwned: true));
+        FillWindowToggleList(ScriptWindowMenuItems, f => f.PluginWindows(pluginOwned: false));
+    }
+
+    private void FillWindowToggleList(
+        System.Collections.ObjectModel.ObservableCollection<PluginWindowMenuItem> items,
+        Func<GenieDockFactory, IReadOnlyList<(string Id, string Title, bool Visible)>> source)
+    {
+        items.Clear();
         if (DockFactory is not GenieDockFactory factory) return;
 
-        foreach (var (id, title, visible) in factory.PluginWindows())
+        foreach (var (id, title, visible) in source(factory))
         {
             var wid = id;   // capture per-iteration for the toggle closure
-            PluginWindowMenuItems.Add(new PluginWindowMenuItem(title, visible, () =>
+            items.Add(new PluginWindowMenuItem(title, visible, () =>
             {
                 if (DockFactory is GenieDockFactory f)
                     f.SetToolVisibility(wid, !f.IsToolVisible(wid));

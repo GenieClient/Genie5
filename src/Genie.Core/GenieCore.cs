@@ -2211,7 +2211,19 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     void Genie.Plugins.IPluginHost.Echo(string text) => RaiseEchoLine(text);
 
     void Genie.Plugins.IPluginHost.EchoToWindow(string window, string text)
-        => RaiseEchoToWindow(text, window, null);
+    {
+        // Raised BEFORE the echo so the host has recorded the origin by the time
+        // the echo creates the panel (#367) — both are marshaled in this order.
+        PluginWindowWritten?.Invoke(window);
+        RaiseEchoToWindow(text, window, null);
+    }
+
+    /// <summary>A plugin wrote to a named window through
+    /// <see cref="Genie.Plugins.IPluginHost.EchoToWindow"/> (public #367). Script
+    /// <c>#echo &gt;name</c> reaches the same <see cref="EchoToWindow"/> event, so
+    /// this is what lets the host tell a plugin's window from a script's.
+    /// <see cref="SetPluginWindow"/> is plugin/extension-only and needs no twin.</summary>
+    public event Action<string>? PluginWindowWritten;
 
     void Genie.Plugins.IPluginHost.SetWindow(string window, string content)
         => SetPluginWindow?.Invoke(window, content);

@@ -2506,6 +2506,25 @@ public class GenieDockFactory : Factory
         return list;
     }
 
+    // ── Window origin (public #367) ─────────────────────────────────────────
+    // Script windows (#echo >name, #link, #window) and plugin windows are the
+    // same PluginWindowTool objects in one registry, so the origin is recorded
+    // beside it. A window counts as a plugin's once a plugin (or built-in
+    // extension) has written to it this session; anything else is a script's.
+    // A window restored from a saved layout is unclaimed until someone writes
+    // to it, so it lists under Script Windows until its plugin next draws it.
+    private readonly HashSet<string> _pluginOwnedWindowIds = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Record that a plugin writes to the window named <paramref name="name"/>.</summary>
+    public void MarkPluginOwned(string name) => _pluginOwnedWindowIds.Add(PluginWindowId(name));
+
+    public bool IsPluginOwned(string id) => _pluginOwnedWindowIds.Contains(id);
+
+    /// <summary>The plugin-window registry split by origin, for the two Window
+    /// menu groups.</summary>
+    public IReadOnlyList<(string Id, string Title, bool Visible)> PluginWindows(bool pluginOwned) =>
+        PluginWindows().Where(w => IsPluginOwned(w.Id) == pluginOwned).ToList();
+
     // FactoryBase already exposes DockableClosed / DockableAdded events; the
     // VM subscribes to those directly in its constructor so the Window-menu
     // check marks stay aligned with the dock's actual state.
