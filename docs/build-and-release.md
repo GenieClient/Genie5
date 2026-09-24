@@ -113,10 +113,12 @@ Windows releases are EV code-signed (GlobalSign certificate issued to Shadow Rea
 
 ## CI & releases
 
-Two workflows are checked in under [.github/workflows](../.github/workflows):
+Four workflows are checked in under [.github/workflows](../.github/workflows):
 
 - **`build.yml`** — continuous build with an event-tiered OS matrix: PRs build on Linux only; pushes to `main` add Windows; version tags add macOS. A publish-smoke job verifies the self-contained single-file output on pushes.
 - **`release.yml`** — the tag-triggered release pipeline: extracts the tag's section from `RELEASE_NOTES.md` (and **fails if the `# Genie 5 — <tag>` heading is missing**), publishes win-x64, signs `Genie5.exe` via SignPath (maintainer email approval), Velopack-packages all four targets, signs `Setup.exe` (second approval), and attaches the numbered artifacts plus updater feeds to the GitHub Release.
+- **`priority-tally.yml`** — daily rebuild of the community priority board from 👍 reactions on open issues (see [Voting on priorities](../CONTRIBUTING.md#voting-on-priorities)).
+- **`pr-discord-notify.yml`** — posts a card to a Discord channel when a pull request is opened, reopened, or marked ready for review. Needs a `DISCORD_WEBHOOK_URL` repository secret; without it the job logs a notice and exits green. It runs on `pull_request_target` so fork PRs are announced too, and for that reason it deliberately never checks out or runs PR code — keep it that way.
 
 ## Code references
 

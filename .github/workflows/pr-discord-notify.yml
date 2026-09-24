@@ -1,0 +1,128 @@
+name: PR Discord notify
+
+# Posts a Discord message when a pull request opens (public #32).
+#
+# The maintainer's mobile routine opens PRs from phone sessions and needs a
+# push notification when one lands — Discord is the channel already on the
+# phone. GitHub's own PR emails are easy to miss and can't be filtered to a
+# per-repo channel; a webhook can.
+#
+# Event choice: `pull_request_target`, not `pull_request`. On a `pull_request`
+# run for a PR from a fork, repository secrets are withheld and the step below
+# would silently no-op — which drops exactly the contributor PRs a maintainer
+# most wants to hear about. `pull_request_target` runs in the BASE repo's
+# context, so the secret is available. That is safe here ONLY because this job
+# never checks out or executes anything from the PR: it reads event metadata
+# and makes one HTTPS call. Do not add `actions/checkout` or any build step to
+# this file — see the GitHub security guidance on `pull_request_target`.
+#
+# Untrusted fields (title, body, branch names, author login) are passed to the
+# shell through `env:` and JSON-encoded by `jq`, never interpolated into the
+# script body, so a hostile PR title can't break out of the payload.
+#
+# Setup: add a repository secret named DISCORD_WEBHOOK_URL holding a Discord
+# channel webhook (Channel settings → Integrations → Webhooks → Copy URL).
+# Without the secret the job logs a notice and exits green, so this file is
+# safe to share between the private dev repo and the public mirror — each
+# points its own secret at its own channel, or leaves it unset.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+
+permissions: {}
+
+jobs:
+  notify:
+    name: Post to Discord
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post the PR card
+        shell: bash
+        env:
+          WEBHOOK_URL:   ${{ secrets.DISCORD_WEBHOOK_URL }}
+          REPO:          ${{ github.repository }}
+          ACTION:        ${{ github.event.action }}
+          PR_NUMBER:     ${{ github.event.pull_request.number }}
+          PR_TITLE:      ${{ github.event.pull_request.title }}
+          PR_BODY:       ${{ github.event.pull_request.body }}
+          PR_URL:        ${{ github.event.pull_request.html_url }}
+          PR_DRAFT:      ${{ github.event.pull_request.draft }}
+          PR_BASE:       ${{ github.event.pull_request.base.ref }}
+          PR_HEAD:       ${{ github.event.pull_request.head.label }}
+          PR_AUTHOR:     ${{ github.event.pull_request.user.login }}
+          PR_AUTHOR_URL: ${{ github.event.pull_request.user.html_url }}
+          PR_AVATAR:     ${{ github.event.pull_request.user.avatar_url }}
+          PR_ADDITIONS:  ${{ github.event.pull_request.additions }}
+          PR_DELETIONS:  ${{ github.event.pull_request.deletions }}
+          PR_FILES:      ${{ github.event.pull_request.changed_files }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${WEBHOOK_URL}" ]; then
+            echo "::notice::DISCORD_WEBHOOK_URL is not set on ${REPO} — skipping the Discord post. Add the repository secret to enable it."
+            exit 0
+          fi
+
+          # Human-readable verb for the footer.
+          case "${ACTION}" in
+            opened)           verb="opened" ;;
+            reopened)         verb="reopened" ;;
+            ready_for_review) verb="marked ready for review" ;;
+            *)                verb="${ACTION}" ;;
+          esac
+
+          # Discord embed limits: title 256, description 4096. Keep the card
+          # phone-sized — a short excerpt, the rest is one tap away.
+          jq -n \
+            --arg repo      "${REPO}" \
+            --arg verb      "${verb}" \
+            --arg number    "${PR_NUMBER}" \
+            --arg title     "${PR_TITLE}" \
+            --arg body      "${PR_BODY}" \
+            --arg url       "${PR_URL}" \
+            --arg draft     "${PR_DRAFT}" \
+            --arg base      "${PR_BASE}" \
+            --arg head      "${PR_HEAD}" \
+            --arg author    "${PR_AUTHOR}" \
+            --arg authorUrl "${PR_AUTHOR_URL}" \
+            --arg avatar    "${PR_AVATAR}" \
+            --arg adds      "${PR_ADDITIONS}" \
+            --arg dels      "${PR_DELETIONS}" \
+            --arg files     "${PR_FILES}" \
+            --arg when      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '
+              def clip($n): if length > $n then .[:($n - 1)] + "…" else . end;
+              # No `username`/`avatar_url` override: the poster's name and
+              # avatar are whatever the webhook was given in Discord's
+              # channel settings, so they can be changed without a commit.
+              {
+                embeds: [{
+                  title: (("#" + $number + " " + $title) | clip(256)),
+                  url: $url,
+                  description: (
+                    ($body | gsub("\r"; "") | gsub("\n{3,}"; "\n\n") | clip(350))
+                    | if . == "" then "_No description._" else . end
+                  ),
+                  color: (if $draft == "true" then 9807270 else 5763719 end),
+                  author: { name: $author, url: $authorUrl, icon_url: $avatar },
+                  fields: [
+                    { name: "Branch",  value: ("`" + $head + "` → `" + $base + "`"), inline: true },
+                    { name: "Changes", value: ("+" + $adds + " −" + $dels + " · " + $files + " file" + (if $files == "1" then "" else "s" end)), inline: true }
+                  ],
+                  footer: { text: ($repo + " · pull request " + $verb + (if $draft == "true" then " (draft)" else "" end)) },
+                  timestamp: $when
+                }]
+              }
+            ' > payload.json
+
+          # `?wait=true` makes Discord return the created message (HTTP 200)
+          # instead of a fire-and-forget 204, so a rejected payload fails the
+          # step visibly. --retry covers transient 429/5xx.
+          curl -sS --fail-with-body \
+            --retry 3 --retry-delay 2 --retry-all-errors \
+            -H 'Content-Type: application/json' \
+            --data @payload.json \
+            "${WEBHOOK_URL}?wait=true" > response.json
+
+          echo "Posted: $(jq -r '.id // "ok"' response.json) for PR #${PR_NUMBER}"
