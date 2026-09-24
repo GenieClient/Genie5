@@ -1247,6 +1247,20 @@ public sealed class ScriptEngine
                 if (!inst.Running) { NotifyFinished(inst); _instances.RemoveAt(i); continue; }
                 if (inst.UserPaused) continue;
 
+                // 2026-08-31 stability review: a gated action's sends are queued rather than
+                // rewound, and they must not wait out the script's own block —
+                // `action put stand when …` has to fire while the script sits at
+                // waitfor/matchwait/pause. A script's own put tails never hit
+                // this: its Pc can't reach a blocking line until they drain.
+                // Still roundtime-gated, like every other script send.
+                if (inst.PendingSends.Count > 0 && inst.IsBlocked)
+                {
+                    if (!inst.RtBypass && (InRoundtime?.Invoke() ?? false))
+                        ScheduleRoundTimeWakeup();
+                    else if (DrainPendingSend(inst, markGate: false))
+                        progress = true;
+                }
+
                 if (inst.Paused)
                 {
                     bool unblock = inst.PauseMode switch
@@ -1503,6 +1517,80 @@ public sealed class ScriptEngine
 
     // ── Statement dispatch ──────────────────────────────────────────────────
 
+    /// <summary>Dispatch the head of <see cref="ScriptInstance.PendingSends"/> if its
+    /// delay and the send gate allow; true when a segment went out.
+    /// <paramref name="markGate"/> flags a gated attempt as
+    /// <see cref="ScriptInstance.SendGateBlocked"/> (public #309) — only right when the
+    /// drain is what the script itself is waiting on. The parked-script drain of
+    /// action sends (2026-08-31 stability review) passes false: that script is waiting on its own
+    /// matchwait/waitfor, and flagging it would feed lines into the gate-replay buffer.</summary>
+    private bool DrainPendingSend(ScriptInstance inst, bool markGate)
+    {
+        // Honor a `send` segment's leading delay before it may be sent.
+        // This is independent of (and stacks with) the engine-level
+        // roundtime gate, which already skips StepOne entirely during RT
+        // — so a delayed send fires at max(RT-end, delay-end). Schedule a
+        // self-wakeup so we drain even if no server traffic arrives.
+        if (DateTime.UtcNow < inst.NextSendAt)
+        {
+            if (markGate) inst.SendGateBlocked = true;
+            ScheduleTick?.Invoke(inst.NextSendAt - DateTime.UtcNow + TimeSpan.FromSeconds(0.05));
+            return false;
+        }
+
+        // Game-bound continuation of a `put a;b;c` / `send a;b;c` series.
+        // Match the tighter script-side cap used by the put/send case so
+        // the semicolon-split tail can't bypass the per-prompt throttle.
+        var peek = inst.PendingSends.Peek().Command;
+        bool nextSendsToGame = peek.Length > 0 && peek[0] != '#' && peek[0] != '.';
+        int effectiveLimit = nextSendsToGame ? 1 : _typeAhead.Limit;
+        if (_inFlight >= effectiveLimit) { if (markGate) inst.SendGateBlocked = true; return false; }
+        var next = inst.PendingSends.Dequeue().Command;
+
+        // Arm the gate for the new head from ITS leading delay, measured
+        // from now (i.e. from when this segment was dispatched — Genie4
+        // CommandQueue.SetNextTime parity). Zero-delay heads clear the
+        // gate so `put` tails and quick-send segments (whose wait lives
+        // inside their `#send N …` form) dispatch on the next drain.
+        inst.NextSendAt = inst.PendingSends.Count > 0 && inst.PendingSends.Peek().Delay > 0
+            ? DateTime.UtcNow.AddSeconds(inst.PendingSends.Peek().Delay)
+            : DateTime.MinValue;
+
+        if (next.Length > 0)
+        {
+            if (next[0] == '#')
+            {
+                HandleMetaCommand(next, inst);
+            }
+            else if (ResolveOutboundCommand(next) is not { } outbound)
+            {
+                // Claimed by an extension or swallowed by a plugin —
+                // client-side, so no _inFlight bump.
+            }
+            else
+            {
+                _inFlight++;
+                EchoCommand?.Invoke(inst.Name, outbound);
+                Extensions.DispatchCommand(outbound);
+                _sendCommand(outbound);
+            }
+        }
+        return true;
+    }
+
+    /// <summary>Queue a gated action body's sends (2026-08-31 stability review) behind anything
+    /// already pending. Drained by StepOne while the script runs, or by the tick
+    /// loop's parked-script drain while it waits.</summary>
+    private static void EnqueueActionSends(ScriptInstance inst, IReadOnlyList<(double Delay, string Cmd)> segs)
+    {
+        bool wasEmpty = inst.PendingSends.Count == 0;
+        foreach (var s in segs) inst.PendingSends.Enqueue(new PendingSend(s.Cmd, s.Delay));
+        // A fresh head arms its own delay; behind an existing queue the current
+        // head's timer already governs and the drain re-arms per segment.
+        if (wasEmpty)
+            inst.NextSendAt = segs[0].Delay > 0 ? DateTime.UtcNow.AddSeconds(segs[0].Delay) : DateTime.MinValue;
+    }
+
     private bool StepOne(ScriptInstance inst)
     {
         // Assume this attempt makes progress; the send-gate defer points below
@@ -1510,59 +1598,7 @@ public sealed class ScriptEngine
         inst.SendGateBlocked = false;
 
         // Drain any pending semicolon-split sends before advancing the PC.
-        if (inst.PendingSends.Count > 0)
-        {
-            // Honor a `send` segment's leading delay before it may be sent.
-            // This is independent of (and stacks with) the engine-level
-            // roundtime gate, which already skips StepOne entirely during RT
-            // — so a delayed send fires at max(RT-end, delay-end). Schedule a
-            // self-wakeup so we drain even if no server traffic arrives.
-            if (DateTime.UtcNow < inst.NextSendAt)
-            {
-                inst.SendGateBlocked = true;
-                ScheduleTick?.Invoke(inst.NextSendAt - DateTime.UtcNow + TimeSpan.FromSeconds(0.05));
-                return false;
-            }
-
-            // Game-bound continuation of a `put a;b;c` / `send a;b;c` series.
-            // Match the tighter script-side cap used by the put/send case so
-            // the semicolon-split tail can't bypass the per-prompt throttle.
-            var peek = inst.PendingSends.Peek().Command;
-            bool nextSendsToGame = peek.Length > 0 && peek[0] != '#' && peek[0] != '.';
-            int effectiveLimit = nextSendsToGame ? 1 : _typeAhead.Limit;
-            if (_inFlight >= effectiveLimit) { inst.SendGateBlocked = true; return false; }
-            var next = inst.PendingSends.Dequeue().Command;
-
-            // Arm the gate for the new head from ITS leading delay, measured
-            // from now (i.e. from when this segment was dispatched — Genie4
-            // CommandQueue.SetNextTime parity). Zero-delay heads clear the
-            // gate so `put` tails and quick-send segments (whose wait lives
-            // inside their `#send N …` form) dispatch on the next drain.
-            inst.NextSendAt = inst.PendingSends.Count > 0 && inst.PendingSends.Peek().Delay > 0
-                ? DateTime.UtcNow.AddSeconds(inst.PendingSends.Peek().Delay)
-                : DateTime.MinValue;
-
-            if (next.Length > 0)
-            {
-                if (next[0] == '#')
-                {
-                    HandleMetaCommand(next, inst);
-                }
-                else if (ResolveOutboundCommand(next) is not { } outbound)
-                {
-                    // Claimed by an extension or swallowed by a plugin —
-                    // client-side, so no _inFlight bump.
-                }
-                else
-                {
-                    _inFlight++;
-                    EchoCommand?.Invoke(inst.Name, outbound);
-                    Extensions.DispatchCommand(outbound);
-                    _sendCommand(outbound);
-                }
-            }
-            return true;
-        }
+        if (inst.PendingSends.Count > 0) return DrainPendingSend(inst, markGate: true);
 
         if (inst.Pc >= inst.Lines.Count)
         {
@@ -1862,6 +1898,15 @@ public sealed class ScriptEngine
                 int effectiveLimit = sendsToGame ? 1 : _typeAhead.Limit;
                 if (_inFlight >= effectiveLimit)
                 {
+                    // 2026-08-31 stability review: an action body never advanced Pc for this
+                    // statement, so rewinding re-ran the script's PREVIOUS line
+                    // (a double send, or a re-armed empty matchwait that hung
+                    // forever) and the action's put was lost. Queue it instead.
+                    if (fromAction)
+                    {
+                        EnqueueActionSends(inst, segs);
+                        return true;
+                    }
                     inst.SendGateBlocked = true;
                     inst.Pc--; // re-execute next tick when budget frees up
                     return false;
@@ -1978,6 +2023,15 @@ public sealed class ScriptEngine
                 {
                     if (_inFlight >= _typeAhead.Limit)
                     {
+                        // An action body owns no Pc slot to re-run (2026-08-31 stability review):
+                        // queue the command instead. The room-change wait is not
+                        // armed — a client-side claim at drain time would leave it
+                        // waiting forever (public #325), and actions don't park.
+                        if (fromAction)
+                        {
+                            EnqueueActionSends(inst, new[] { (0.0, rest) });
+                            return true;
+                        }
                         inst.SendGateBlocked = true;
                         inst.Pc--; // re-run next tick when budget frees up
                         return false;
@@ -2535,6 +2589,11 @@ public sealed class ScriptEngine
                 // post-substitution so $/% vars are resolved.
                 if (_inFlight >= 1)
                 {
+                    if (fromAction)   // no Pc slot to re-run (2026-08-31 stability review)
+                    {
+                        EnqueueActionSends(inst, new[] { (0.0, text) });
+                        return true;
+                    }
                     inst.SendGateBlocked = true;
                     inst.Pc--; // re-execute next tick when the budget frees up
                     return false;
