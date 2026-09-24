@@ -28,7 +28,7 @@ public sealed class TimeTrackerExtension : IGameExtension
     private const int HeartbeatMs = 30_000;      // Genie 4 parity: refresh every 30 s
     private const long SoonSeconds = 360;        // Genie 4's red-warning threshold
 
-    private readonly object _sync = new();
+    private readonly System.Threading.Lock _sync = new();
     private IExtensionHost _host = null!;
     private TimeTrackerOptions _opts = new();
     private TimeCalc _calc = new(0, 0, 0);

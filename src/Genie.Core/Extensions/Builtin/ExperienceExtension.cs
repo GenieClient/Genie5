@@ -63,7 +63,7 @@ public sealed class ExperienceExtension : IGameExtension
     // OnReset read/clear it on the UI thread. Without this, a /exp typed while a
     // skill is pulsing experience can enumerate _skills mid-mutation →
     // "collection was modified".
-    private readonly object _gate = new();
+    private readonly System.Threading.Lock _gate = new();
 
     /// <summary>First-seen (rank, percent) per skill this session — the baseline the
     /// optional rank-gain display subtracts from (#144). Guarded by <see cref="_gate"/>;

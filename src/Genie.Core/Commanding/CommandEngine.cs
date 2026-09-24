@@ -47,7 +47,7 @@ public sealed class CommandEngine
     private const int MaxProcessInputDepth = 100;
 
     // Serializes #log file writes (multiple scripts can #log concurrently).
-    private readonly object _logLock = new();
+    private readonly System.Threading.Lock _logLock = new();
 
     // ── Engines wired after construction ─────────────────────────────────────
     // GenieCore creates the command engine first (so other engines can route

@@ -18,7 +18,7 @@ namespace Genie.App.Services;
 /// </summary>
 public sealed class TtsPlayer : IDisposable
 {
-    private readonly object _lock = new();
+    private readonly System.Threading.Lock _lock = new();
     private bool _paInitialized;
     private PortAudioSharp.Stream? _stream;
     private int _streamRate = -1;

@@ -63,7 +63,7 @@ public sealed class ScriptEngine
     /// thread) may later replace it with a single-threaded game loop, at which
     /// point the lock becomes uncontended rather than unnecessary — leave it.</para>
     /// </summary>
-    private readonly object _exec = new();
+    private readonly System.Threading.Lock _exec = new();
     private readonly TypeAheadSession     _typeAhead;
     private readonly Action<string>       _sendCommand;
     private readonly Action<string>       _echo;

@@ -41,7 +41,7 @@ public sealed class GameLoop : IDisposable
     // Timer service: a min-heap of (due, seq) → action, guarded by _timerGate.
     // Serviced by the loop's own TryTake timeout — NOT System.Threading.Timer —
     // so timer callbacks are inherently serialized with posted work.
-    private readonly object _timerGate = new();
+    private readonly System.Threading.Lock _timerGate = new();
     private readonly PriorityQueue<TimerEntry, (long DueTicks, long Seq)> _timers = new();
     private long _timerSeq;
 

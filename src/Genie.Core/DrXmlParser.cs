@@ -28,7 +28,7 @@ namespace Genie.Core.Parser;
 ///   &lt;output class='…'/&gt;     — text styling class
 ///   bare text lines            — room descriptions, combat text, dialogue
 /// </summary>
-public sealed class DrXmlParser : IDisposable
+public sealed partial class DrXmlParser : IDisposable
 {
     private readonly ILogger<DrXmlParser> _log;
 
@@ -251,10 +251,9 @@ public sealed class DrXmlParser : IDisposable
             "LootKills", "ShowRoomID",
         };
 
-    private static readonly System.Text.RegularExpressions.Regex _flagRowRe =
-        new(@"^\s*(?<name>[A-Za-z]{3,20})\s+(?<state>ON|OFF)\b",
-            System.Text.RegularExpressions.RegexOptions.Compiled
-          | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    private static readonly System.Text.RegularExpressions.Regex _flagRowRe = FlagRowRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*(?<name>[A-Za-z]{3,20})\s+(?<state>ON|OFF)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex FlagRowRegex();
 
     /// <summary>Arm silent capture for the next <c>flags</c> response (the
     /// connect-time probe). Call immediately before sending <c>flags</c>.</summary>
@@ -366,9 +365,9 @@ public sealed class DrXmlParser : IDisposable
     // marker line; while the window is armed we consume it (never displayed)
     // and emit CharacterNameEvent. One-shot: disarms on match or deadline.
     private DateTimeOffset _identDeadline = DateTimeOffset.MinValue;
-    private static readonly System.Text.RegularExpressions.Regex _lichIdentRe =
-        new(@"^GENIE5-IDENT\s+(\S+)\s*$",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex _lichIdentRe = LichIdentRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^GENIE5-IDENT\s+(\S+)\s*$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex LichIdentRegex();
 
     /// <summary>Arm capture of the Lich ident reply (Lich attach). Call
     /// immediately before sending the ident query.</summary>
@@ -426,10 +425,9 @@ public sealed class DrXmlParser : IDisposable
     // nsys damage ("complete paralysis of the entire body", "open and bleeding
     // sores all over the skin"). nsys is left alone whenever one of these shows
     // up, so the always-on nerve scan below owns the reading.
-    private static readonly System.Text.RegularExpressions.Regex _healthNsysRe = new(
-        @"\b(nerve\w*|nervous|skin|entire body|paralysis|numb\w*|muscle|convulsion\w*|spasm\w*|twitch\w*|slurred speech)\b",
-        System.Text.RegularExpressions.RegexOptions.Compiled
-        | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    private static readonly System.Text.RegularExpressions.Regex _healthNsysRe = HealthNsysRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\b(nerve\w*|nervous|skin|entire body|paralysis|numb\w*|muscle|convulsion\w*|spasm\w*|twitch\w*|slurred speech)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex HealthNsysRegex();
 
     /// <summary>
     /// Apply the `health` verb's injuries summary: every region the line does
@@ -539,44 +537,46 @@ public sealed class DrXmlParser : IDisposable
     }
 
     // The game sends plain-text prompts like ">", "H>", "HR>" (stance + round-time).
-    private static readonly System.Text.RegularExpressions.Regex _promptRe =
-        new(@"^[A-Z]*>$", System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex _promptRe = PromptRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^[A-Z]*>$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex PromptRegex();
 
     // The server room id DR appends to the room streamWindow subtitle:
     // " - [The Crossing, Hodierna Way] (10015)". Captures the digits inside the
     // trailing parens; "(**)" (unknown room) has no digits and won't match.
-    private static readonly System.Text.RegularExpressions.Regex _roomUidRe =
-        new(@"\((\d+)\)", System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex _roomUidRe = RoomUidRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\((\d+)\)", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex RoomUidRegex();
 
     // The `info` verb's first line: "Name: <name>   Race: <race>   Guild: <guild>".
     // Anchored to start at "Name:" and capture the trailing "Guild: X" so we
     // don't false-match on arbitrary game text mentioning a guild. Race can be
     // multi-word (e.g. "S'Kra Mur"), hence the lazy ".+?" between fields.
-    private static readonly System.Text.RegularExpressions.Regex _guildRe =
-        new(@"^\s*Name:\s.+?\bGuild:\s+([A-Za-z][A-Za-z' ]*?)\s*$",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex _guildRe = GuildRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*Name:\s.+?\bGuild:\s+([A-Za-z][A-Za-z' ]*?)\s*$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex GuildRegex();
 
     // ── News-listing markers (public issue #30) ──────────────────────────────
     // Enter the listing context on either the "Listing all news items." preamble
     // or the "ITEM # - HEADLINE" column header; leave it on the "Type NEWS HELP"
     // footer or "END NEWS ITEM" (which precedes the body of a read article — we
     // must NOT synthesize links inside article text).
-    private static readonly System.Text.RegularExpressions.Regex _newsEnterRe =
-        new(@"^(Listing all news items\.|ITEM # - HEADLINE)",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
-    private static readonly System.Text.RegularExpressions.Regex _newsExitRe =
-        new(@"^(Type NEWS HELP|END NEWS ITEM)",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex _newsEnterRe = NewsEnterRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(Listing all news items\.|ITEM # - HEADLINE)", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex NewsEnterRegex();
+    private static readonly System.Text.RegularExpressions.Regex _newsExitRe = NewsExitRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(Type NEWS HELP|END NEWS ITEM)", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex NewsExitRegex();
     // "** Category 1 - GENERAL ANNOUNCEMENTS **" → captures the category number.
-    private static readonly System.Text.RegularExpressions.Regex _newsCategoryRe =
-        new(@"^\*\* Category (\d+) - .* \*\*$",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex _newsCategoryRe = NewsCategoryRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\*\* Category (\d+) - .* \*\*$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex NewsCategoryRegex();
     // "     2 - COMMUNICATION WITH STAFF" → captures the item number (group 1).
     // Matched against the un-trimmed line so the capture index gives the real
     // offset of the digit within the display text.
-    private static readonly System.Text.RegularExpressions.Regex _newsItemRe =
-        new(@"^\s*(\d+) - .+$",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex _newsItemRe = NewsItemRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"^\s*(\d+) - .+$", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex NewsItemRegex();
 
     // Buffers raw text fragments across inline tag splits (e.g. <pushBold/>, <d>).
     // Flushed on '\n' or explicit FlushTextLine() call.
@@ -1092,9 +1092,9 @@ public sealed class DrXmlParser : IDisposable
     /// element tag string. Used by the fallback path when XmlReader refuses
     /// to parse a tag (e.g. bare <c>&lt;d&gt;</c>).
     /// </summary>
-    private static readonly System.Text.RegularExpressions.Regex _attrRe =
-        new(@"(\w+)\s*=\s*(?:""([^""]*)""|'([^']*)')",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex _attrRe = AttrRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(\w+)\s*=\s*(?:""([^""]*)""|'([^']*)')", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex AttrRegex();
 
     private static Dictionary<string, string> ParseAttributesFallback(string tag)
     {
@@ -2298,8 +2298,9 @@ public sealed class DrXmlParser : IDisposable
     // ── Utility ──────────────────────────────────────────────────────────────
 
     // Matches ANSI escape sequences like ESC[1m, ESC[0m, ESC[31m, etc.
-    private static readonly System.Text.RegularExpressions.Regex _ansiRe =
-        new(@"\x1B\[[0-9;]*[A-Za-z]", System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex _ansiRe = AnsiRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\x1B\[[0-9;]*[A-Za-z]", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex AnsiRegex();
 
     /// <summary>
     /// Strips XML formatting tags and ANSI escape codes from text,

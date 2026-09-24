@@ -51,7 +51,7 @@ public sealed class RuleFileWatcher : IDisposable
         catch { /* invalid path — nothing to suppress */ }
     }
 
-    private readonly object _gate = new();
+    private readonly System.Threading.Lock _gate = new();
     private readonly List<FileSystemWatcher> _watchers = [];
     private readonly ConcurrentDictionary<string, Timer> _debounce =
         new(StringComparer.OrdinalIgnoreCase);

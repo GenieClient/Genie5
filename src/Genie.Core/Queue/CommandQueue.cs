@@ -3,7 +3,7 @@ namespace Genie.Core.Queue;
 public sealed class CommandQueue
 {
     public readonly List<CommandQueueItem> EventList = new();
-    private readonly object _threadLock = new();
+    private readonly System.Threading.Lock _threadLock = new();
     private DateTime? _nextTime;
     private readonly Func<DateTime> _utcNow;
 

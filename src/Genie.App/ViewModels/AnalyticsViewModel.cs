@@ -36,7 +36,7 @@ public class AnalyticsViewModel : ReactiveObject
     private SkillHistoryRecorder? _recorder;
     private IDisposable? _connSub;
     private readonly List<SnapshotRecord> _liveSnaps = new();
-    private readonly object _liveLock = new();
+    private readonly System.Threading.Lock _liveLock = new();
 
     private const int MaxBarSkills = 12;
 

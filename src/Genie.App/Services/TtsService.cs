@@ -40,14 +40,14 @@ public sealed class TtsService : IDisposable
     private readonly TtsPlayer _player = new();
 
     // ── Engine (lazy, rebuilt on dir/voice change) ───────────────────────────
-    private readonly object _engineGate = new();
+    private readonly System.Threading.Lock _engineGate = new();
     private OfflineTts? _engine;
     private string? _attemptedKey;   // dir|selected the engine / failure latch is for
     private bool _initFailed;
 
     // ── Queue + worker ───────────────────────────────────────────────────────
     private const int MaxQueue = 24;
-    private readonly object _qlock = new();
+    private readonly System.Threading.Lock _qlock = new();
     private readonly List<Request> _queue = new();
     private readonly SemaphoreSlim _signal = new(0);
     private readonly Thread _worker;

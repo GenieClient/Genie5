@@ -69,7 +69,7 @@ public sealed class SpellTimerExtension : IGameExtension
     // every prompt) can enumerate _spells while a new spell is being inserted →
     // "collection was modified". Field mutations on existing Spell objects are atomic
     // enough and don't need the lock; only the dictionary structure does.
-    private readonly object _gate = new();
+    private readonly System.Threading.Lock _gate = new();
 
     private static readonly Regex SpellLineRe = new(@"^(.+?)\s+\((.+)\)\s*$", RegexOptions.Compiled);
     // DR uses singular "roisan" for a 1-roisaen duration; "roisae?n" matches both.

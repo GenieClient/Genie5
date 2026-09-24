@@ -22,7 +22,7 @@ public sealed class LichDebugLogTailer : IDisposable
 
     private CancellationTokenSource? _cts;
     private Task? _loop;
-    private readonly object _gate = new();
+    private readonly System.Threading.Lock _gate = new();
 
     /// <summary>
     /// Resolve Lich's temp directory the way <c>lich.rbw</c> itself does:

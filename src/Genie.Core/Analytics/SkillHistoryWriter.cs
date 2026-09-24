@@ -14,7 +14,7 @@ public sealed class SkillHistoryWriter
     public const string SessionsFile = "sessions.jsonl";
     public const string DailyFile    = "daily.jsonl";
 
-    private readonly object _io = new();
+    private readonly System.Threading.Lock _io = new();
     private readonly Action<string>? _log;
     private bool _failed;
 

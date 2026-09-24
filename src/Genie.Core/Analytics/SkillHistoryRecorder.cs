@@ -36,7 +36,7 @@ public sealed class SkillHistoryRecorder : IDisposable
     private readonly Action<string>? _log;
     private readonly System.Threading.Timer _timer;
 
-    private readonly object _lock = new();
+    private readonly System.Threading.Lock _lock = new();
     private string? _sid;
     private DateTime _startUtc;
     private long _startTick;

@@ -41,7 +41,7 @@ internal sealed class JsScriptInstance
     private readonly ManualResetEventSlim _resume = new(true);
 
     // line waiter
-    private readonly object _gate = new();
+    private readonly System.Threading.Lock _gate = new();
     private Func<string, bool>? _linePredicate;
     private string? _matchedLine;
     private readonly ManualResetEventSlim _lineWake = new(false);

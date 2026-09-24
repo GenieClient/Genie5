@@ -16,7 +16,7 @@ namespace Genie.App.Highlighting;
 /// Future work: merge with user-defined rules from <c>HighlightEngine</c> /
 /// <c>NameHighlightEngine</c> in <c>Genie.Core</c>.
 /// </summary>
-public static class DefaultHighlights
+public static partial class DefaultHighlights
 {
     // ── Brushes (sharable, immutable) ─────────────────────────────────────────
 
@@ -94,31 +94,46 @@ public static class DefaultHighlights
     private static readonly (Regex Pattern, IBrush Brush)[] Rules =
     [
         // Bracketed room titles on their own line — e.g. [Garden Rooftop, Medical Pavilion]
-        (new Regex(@"^\s*\[[^\]]+\]\s*$", Opts), RoomTitleBrush),
+        (RoomTitleRegex(), RoomTitleBrush),
 
         // "Roundtime: 3 sec." / "Roundtime: 3 seconds." — combat readiness signal
-        (new Regex(@"\bRoundtime:\s*\d+\s*sec(?:ond)?s?\.?", Opts), RoundTimeBrush),
+        (RoundTimeRegex(), RoundTimeBrush),
 
         // Compass directions when listed as exits or in movement messages
-        (new Regex(@"\b(?:north|south|east|west|northeast|northwest|southeast|southwest|up|down|out)\b",
-                   Opts), DirectionBrush),
+        (DirectionRegex(), DirectionBrush),
 
         // Currency metals + DR currency names
-        (new Regex(@"\b(?:platinum|gold|silver|bronze|copper)\b(?=\s+(?:Kronars|Lirums|Dokoras|coins?)|\s+to|,|\s*$|\s*\.)",
-                   Opts), CurrencyBrush),
-        (new Regex(@"\b(?:Kronars|Lirums|Dokoras)\b", Opts), CurrencyBrush),
+        (CurrencyMetalRegex(), CurrencyBrush),
+        (CurrencyNameRegex(), CurrencyBrush),
 
         // "Your X" — common in health, vitals, status checks
-        (new Regex(@"\bYour\b", Opts), PossessiveBrush),
+        (PossessiveRegex(), PossessiveBrush),
 
         // All-caps tags like BANK DEBT, GO HOLD, RUMOR — 2+ caps words in a row
-        (new Regex(@"\b[A-Z]{2,}(?:\s+[A-Z]{2,})+\b", Opts), AllCapsBrush),
+        (AllCapsRegex(), AllCapsBrush),
 
         // Numbers >= 2 digits (skips small inline numbers like "1 sec")
-        (new Regex(@"\b\d{2,}\b", Opts), NumberBrush),
+        (NumberRegex(), NumberBrush),
     ];
 
-    private const RegexOptions Opts = RegexOptions.Compiled | RegexOptions.CultureInvariant;
+    // Source-generated (public #285): matcher code is built at compile time
+    // instead of JIT-compiled on first match.
+    [GeneratedRegex(@"^\s*\[[^\]]+\]\s*$", RegexOptions.CultureInvariant)]
+    private static partial Regex RoomTitleRegex();
+    [GeneratedRegex(@"\bRoundtime:\s*\d+\s*sec(?:ond)?s?\.?", RegexOptions.CultureInvariant)]
+    private static partial Regex RoundTimeRegex();
+    [GeneratedRegex(@"\b(?:north|south|east|west|northeast|northwest|southeast|southwest|up|down|out)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex DirectionRegex();
+    [GeneratedRegex(@"\b(?:platinum|gold|silver|bronze|copper)\b(?=\s+(?:Kronars|Lirums|Dokoras|coins?)|\s+to|,|\s*$|\s*\.)", RegexOptions.CultureInvariant)]
+    private static partial Regex CurrencyMetalRegex();
+    [GeneratedRegex(@"\b(?:Kronars|Lirums|Dokoras)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex CurrencyNameRegex();
+    [GeneratedRegex(@"\bYour\b", RegexOptions.CultureInvariant)]
+    private static partial Regex PossessiveRegex();
+    [GeneratedRegex(@"\b[A-Z]{2,}(?:\s+[A-Z]{2,})+\b", RegexOptions.CultureInvariant)]
+    private static partial Regex AllCapsRegex();
+    [GeneratedRegex(@"\b\d{2,}\b", RegexOptions.CultureInvariant)]
+    private static partial Regex NumberRegex();
 
     private static IBrush MakeBrush(byte r, byte g, byte b)
         => new SolidColorBrush(Color.FromRgb(r, g, b));

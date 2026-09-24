@@ -3,7 +3,7 @@ namespace Genie.Core.Queue;
 public sealed class EventQueue
 {
     private readonly List<EventItem> _events = new();
-    private readonly object _lock = new();
+    private readonly System.Threading.Lock _lock = new();
 
     public void Add(double delaySeconds, string action)
     {
