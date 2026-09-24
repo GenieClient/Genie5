@@ -47,5 +47,9 @@ public enum ConfigFieldUpdated
     ServerDialogs,
     /// <summary>"Always show scrollbars" changed (<c>#config alwaysshowscrollbars</c>,
     /// public #365) — the host mirrors it into display.json, which applies it.</summary>
-    AlwaysShowScrollbars
+    AlwaysShowScrollbars,
+    /// <summary>A map-spoiler setting changed (<c>#config showmapspoilers</c> /
+    /// <c>avoidmapspoilers</c>, public #254) — the mapper re-filters its canvas,
+    /// Less Obvious Paths and routing.</summary>
+    MapSpoilers
 }

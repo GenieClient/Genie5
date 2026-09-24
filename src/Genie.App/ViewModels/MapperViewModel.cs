@@ -967,6 +967,20 @@ public partial class MapperViewModel : ReactiveObject
         AutoCreateEnabled = _core.Config.AutoMapper;
     }
 
+    /// <summary>Map spoilers (public #254): whether search / objsearch / quick-send
+    /// arcs are drawn and listed. Mirrors <c>#config showmapspoilers</c>.</summary>
+    [Reactive] public bool ShowMapSpoilers { get; private set; } = true;
+
+    /// <summary>Apply <c>#config showmapspoilers</c> / <c>avoidmapspoilers</c> — the
+    /// canvas and Less Obvious Paths re-filter, and routing picks up the avoid flag.</summary>
+    private void SyncSpoilersFromConfig()
+    {
+        if (_core is null) return;
+        ShowMapSpoilers = _core.Config.ShowMapSpoilers;
+        if (_engine is not null) _engine.AvoidSpoilerMoves = _core.Config.AvoidMapSpoilers;
+        Refresh();
+    }
+
     /// <summary>Route a walk/probe verb into the command pipeline on the game
     /// thread (#251). Falls back to the direct engine for a test harness that
     /// attached a CommandEngine without a core.</summary>
@@ -1130,6 +1144,15 @@ public partial class MapperViewModel : ReactiveObject
             .Where(f => f == Genie.Core.Config.ConfigFieldUpdated.AutoMapper)
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(_ => SyncAutoMapperFromConfig());
+
+        // #254: map-spoiler settings, from any source, applied live.
+        Observable.FromEvent<Action<Genie.Core.Config.ConfigFieldUpdated>, Genie.Core.Config.ConfigFieldUpdated>(
+                h => core.Config.ConfigChanged += h,
+                h => core.Config.ConfigChanged -= h)
+            .Where(f => f == Genie.Core.Config.ConfigFieldUpdated.MapSpoilers)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => SyncSpoilersFromConfig());
+        SyncSpoilersFromConfig();
 
         RefreshAvailableZones();
 
@@ -1599,7 +1622,8 @@ public partial class MapperViewModel : ReactiveObject
             // graph the player can't see.
             foreach (var exit in node.Exits)
             {
-                if (exit.Direction == Direction.None && !string.IsNullOrEmpty(exit.MoveCommand))
+                if (exit.Direction == Direction.None && !string.IsNullOrEmpty(exit.MoveCommand)
+                    && (ShowMapSpoilers || !MoveVerb.IsSpoilerMove(exit.MoveCommand)))   // #254
                     CurrentLessObviousPaths.Add(new LessObviousPath(exit.MoveCommand, exit.Requires));
             }
 
@@ -2176,7 +2200,10 @@ public partial class MapperViewModel : ReactiveObject
 
         var pathfinder = new MultiZonePathfinder(
             _zoneRepo, MapsDirectory, Connections(),
-            _skillStore, _engine.CharacterClass, _engine.CharacterLevel);
+            _skillStore, _engine.CharacterClass, _engine.CharacterLevel)
+        {
+            AvoidSpoilerMoves = _engine.AvoidSpoilerMoves,   // #254
+        };
 
         var plan = pathfinder.FindPath(
             origin.Zone, origin.NodeId.ToString(), destZone, destNodeId.ToString());

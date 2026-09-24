@@ -153,6 +153,13 @@ public sealed class GenieConfig
     /// created on first use. Empty (the default) keeps them in the Game window;
     /// <c>#config scriptdebugwindow none</c> (or main / game / off) clears it.</summary>
     public string ScriptDebugWindow { get; set; } = "";
+    /// <summary>Show map spoilers (public #254): search / objsearch / quick-send arcs
+    /// on the canvas and in Less Obvious Paths. Default on — today's behaviour; off
+    /// lets a new player use the mapper without secrets pre-revealed.</summary>
+    public bool ShowMapSpoilers { get; set; } = true;
+    /// <summary>Keep <c>#goto</c> from routing through those arcs (public #254), so a
+    /// walk can't lead a new player through a secret either. Default off.</summary>
+    public bool AvoidMapSpoilers { get; set; }
     public string Prompt { get; set; } = "> ";
     public bool PromptBreak { get; set; } = true;
     public bool PromptForce { get; set; } = true;
@@ -764,6 +771,8 @@ public sealed class GenieConfig
         ("autolog", AutoLog.ToString()),
         ("automapper", AutoMapper.ToString()),
         ("automapperalpha", AutoMapperAlpha.ToString()),
+        ("showmapspoilers", ShowMapSpoilers.ToString()),
+        ("avoidmapspoilers", AvoidMapSpoilers.ToString()),
         ("automapperscript", AutoMapperScript.ToString()),
         ("conndebug", ConnDebug.ToString()),
         ("activitytimeout", ActivityTimeout.ToString()),
@@ -896,7 +905,7 @@ public sealed class GenieConfig
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout", "objectscreatures", "objectsconfigbar" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases", "serverdialogs" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "tracesends", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "scriptdebugwindow", "gamethread" }),
-        ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug" }),
+        ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug", "showmapspoilers", "avoidmapspoilers" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
         ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsstreampriority", "ttsrate", "ttsvolume" }),
         ("Logging",          new[] { "autolog" }),
@@ -1031,6 +1040,8 @@ public sealed class GenieConfig
                 case "flagscheck": FlagsCheck = ToBool(value); break;
                 case "automapper": AutoMapper = ToBool(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "automapperalpha": AutoMapperAlpha = ClampAlpha(value); Notify(ConfigFieldUpdated.AutoMapper); break;
+                case "showmapspoilers": ShowMapSpoilers = ToBool(value); Notify(ConfigFieldUpdated.MapSpoilers); break;
+                case "avoidmapspoilers": AvoidMapSpoilers = ToBool(value); Notify(ConfigFieldUpdated.MapSpoilers); break;
                 case "automapperscript": AutoMapperScript = ToBool(value); break;
                 case "conndebug": ConnDebug = ToBool(value); break;
                 case "gamethread": GameThread = ToBool(value); break;

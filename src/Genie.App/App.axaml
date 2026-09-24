@@ -1147,6 +1147,7 @@
                                     CurrentNode="{Binding ViewModel.ActiveNode}"
                                     Level="{Binding ViewModel.Level}"
                                     RenderTick="{Binding ViewModel.RenderTick}"
+                                    ShowSpoilers="{Binding ViewModel.ShowMapSpoilers}"
                                     Zoom="{Binding ViewModel.ZoomLevel}"
                                     MapBackgroundBrush="{Binding ViewModel.MapBackgroundBrush}"
                                     LabelTextBrush="{Binding ViewModel.MapTextBrush}"

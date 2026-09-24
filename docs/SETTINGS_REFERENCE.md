@@ -106,6 +106,8 @@ setting; only `frontend` appears in `settings.cfg` and `#config list`).
 | `automapper` | `False` | Record mode ("auto-map as you walk"): the mapper creates new rooms as you explore. Off = lookup-only, where the loaded map is read-only. Same toggle as the ⏺ Record button and `#mapper record on\|off`. |
 | `automapperalpha` | `255` | Opacity (0–255) of the ghost rooms drawn for the floors directly above and below the current level. 0 = off-level rooms hidden (single-level view). |
 | `automapperscript` | `True` | Let `#goto` hand the walk to a community `automapper.cmd` when one is present, so the map's special-move directives and the script's pacing are honored. Off forces the built-in walker. Cross-zone gotos always use the built-in walker. |
+| `showmapspoilers` | `True` | Draw hidden exits (search / objsearch arcs) and quick-send secret sequences on the map canvas and in Less Obvious Paths. Off lets a new player use the mapper without secrets pre-revealed. |
+| `avoidmapspoilers` | `False` | Keep `#goto` from routing through those arcs, so a walk can't lead through a secret either. |
 | `updatemapperscripts` | `False` | Let mapper updates also update mapper support scripts. (Not yet wired — the in-app updater doesn't read this key.) |
 
 ## Auto-Walk

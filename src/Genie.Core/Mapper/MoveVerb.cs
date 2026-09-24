@@ -36,6 +36,34 @@ public static class MoveVerb
     /// <c>automapper.cmd</c>, which runs the named script; the built-in walker can't,
     /// and would send the text to the game as a command. Pacing prefixes
     /// (<c>rt</c> / <c>slow</c> / <c>room</c>) are looked through.</summary>
+    /// <summary>
+    /// An arc that encodes a discovery (public #254): a <c>search</c> /
+    /// <c>objsearch</c> directive (a hidden exit you have to find) or a quick-send
+    /// chain (<c>room sear;-3knock concealed door;…</c> — a secret sequence). These
+    /// are what the map-spoiler settings hide from a new player. Genie 4's
+    /// <c>hidden="…"</c> attribute is a different thing — a layout hint telling the
+    /// canvas not to draw an arc — and is not consulted.
+    /// </summary>
+    public static bool IsSpoilerMove(string? verb)
+    {
+        if (string.IsNullOrWhiteSpace(verb)) return false;
+        var v = Normalize(verb);
+        if (TryParseSearchDirective(v, out _) || TryParseObjSearchDirective(v, out _, out _)) return true;
+        if (v.IndexOf(';') < 0) return false;
+        foreach (var raw in v.Split(';'))
+        {
+            var seg = Normalize(raw.Trim());
+            if (TryStripQuickSend(seg, out _)) return true;
+            // A search step in a chain — "room sear;go tiny hatch", "search;#send 4 go …"
+            // ("sear" is DR's own abbreviation).
+            var first = seg.Split(' ', 2)[0];
+            if (first.Equals("search", StringComparison.OrdinalIgnoreCase) ||
+                first.Equals("sear", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
     public static bool IsScriptMove(string? verb)
     {
         var v = Normalize(verb);

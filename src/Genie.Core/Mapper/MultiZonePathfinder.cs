@@ -55,6 +55,10 @@ public sealed class MultiZonePathfinder
     private readonly int                  _characterLevel;
     private readonly int                  _athleticsRank;   // cached for swim/climb cost scaling
 
+    /// <summary>Map-spoiler routing (public #254): skip search / objsearch /
+    /// quick-send arcs, as <see cref="AutoMapperEngine.AvoidSpoilerMoves"/> does.</summary>
+    public bool AvoidSpoilerMoves { get; init; }
+
     public MultiZonePathfinder(
         MapZoneRepository zoneRepo,
         string mapsDirectory,
@@ -127,6 +131,7 @@ public sealed class MultiZonePathfinder
                 // Cross-zone walks always run on the built-in walker, which can't
                 // execute a `script <name>` arc (#253) — never route through one.
                 if (MoveVerb.IsScriptMove(exit.MoveCommand)) continue;
+                if (AvoidSpoilerMoves && MoveVerb.IsSpoilerMove(exit.MoveCommand)) continue;   // #254
 
                 var req = ExitRequirement.Parse(exit.Requires);
                 if (!req.IsMet(_skills, _characterClass, _characterLevel)) continue;

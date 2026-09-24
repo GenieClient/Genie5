@@ -1097,6 +1097,13 @@ public sealed class AutoMapperEngine
     /// Self-arcs never win: they can't improve on the room's own distance.
     /// </para>
     /// </summary>
+    /// <summary>Map-spoiler routing (public #254, <c>#config avoidmapspoilers</c>):
+    /// when true, <see cref="FindPath"/> and <see cref="FindNearestByTag"/> never
+    /// route through a search / objsearch / quick-send arc
+    /// (<see cref="MoveVerb.IsSpoilerMove"/>), so <c>#goto</c> can't walk a new player
+    /// through a secret. Set by the mapper from config.</summary>
+    public bool AvoidSpoilerMoves { get; set; }
+
     public IReadOnlyList<string>? FindPath(MapNode start, MapNode destination, bool allowScriptMoves = true)
     {
         if (start.Id == destination.Id) return Array.Empty<string>();
@@ -1124,6 +1131,7 @@ public sealed class AutoMapperEngine
                 var destId = exit.DestinationId.Value;
                 if (!_zone.Nodes.TryGetValue(destId, out _)) continue;
                 if (!allowScriptMoves && MoveVerb.IsScriptMove(exit.MoveCommand)) continue;
+                if (AvoidSpoilerMoves && MoveVerb.IsSpoilerMove(exit.MoveCommand)) continue;
 
                 // Check the exit's requirement against the character.
                 // ExitRequirement.Empty (or no Requires text) always passes.
@@ -1211,6 +1219,7 @@ public sealed class AutoMapperEngine
                 if (!exit.DestinationId.HasValue) continue;
                 var destId = exit.DestinationId.Value;
                 if (!_zone.Nodes.ContainsKey(destId)) continue;
+                if (AvoidSpoilerMoves && MoveVerb.IsSpoilerMove(exit.MoveCommand)) continue;   // #254
                 if (!ExitRequirement.Parse(exit.Requires).IsMet(Skills, CharacterClass, CharacterLevel))
                     continue;                                            // skill-gated, skip
 

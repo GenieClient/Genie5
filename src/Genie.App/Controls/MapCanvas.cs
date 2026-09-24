@@ -102,6 +102,11 @@ public class MapCanvas : Control
     /// equality is reference-based — re-assigning the same zone reference
     /// would not fire <c>OnPropertyChanged</c>.
     /// </summary>
+    /// <summary>Draw spoiler arcs (search / objsearch / quick-send — public #254).
+    /// Off hides them so a new player's map doesn't pre-reveal secrets.</summary>
+    public static readonly StyledProperty<bool> ShowSpoilersProperty =
+        AvaloniaProperty.Register<MapCanvas, bool>(nameof(ShowSpoilers), defaultValue: true);
+
     public static readonly StyledProperty<int> RenderTickProperty =
         AvaloniaProperty.Register<MapCanvas, int>(nameof(RenderTick));
 
@@ -240,6 +245,7 @@ public class MapCanvas : Control
     public MapNode?  CurrentNode        { get => GetValue(CurrentNodeProperty);        set => SetValue(CurrentNodeProperty, value); }
     public int       Level              { get => GetValue(LevelProperty);              set => SetValue(LevelProperty, value); }
     public int       RenderTick         { get => GetValue(RenderTickProperty);         set => SetValue(RenderTickProperty, value); }
+    public bool      ShowSpoilers       { get => GetValue(ShowSpoilersProperty);       set => SetValue(ShowSpoilersProperty, value); }
     public ICommand? NodeClickedCommand { get => GetValue(NodeClickedCommandProperty); set => SetValue(NodeClickedCommandProperty, value); }
     public ICommand? CrossZoneClickedCommand { get => GetValue(CrossZoneClickedCommandProperty); set => SetValue(CrossZoneClickedCommandProperty, value); }
     public double    Zoom               { get => GetValue(ZoomProperty);               set => SetValue(ZoomProperty, value); }
@@ -289,6 +295,7 @@ public class MapCanvas : Control
     static MapCanvas()
     {
         // Any of these changing means we need to repaint AND recompute size.
+        AffectsRender<MapCanvas>(ShowSpoilersProperty);
         AffectsRender<MapCanvas>(ZoneProperty, CurrentNodeProperty, LevelProperty, RenderTickProperty,
                                  ZoomProperty, CurrentRoomBrushProperty, MapBackgroundBrushProperty,
                                  LabelTextBrushProperty, AutoMapperAlphaProperty, ShowLegendProperty,
@@ -450,6 +457,9 @@ public class MapCanvas : Control
 
             foreach (var exit in node.Exits)
             {
+                // #254: with spoilers off, a hidden exit leaves no trace — no
+                // edge and no stub pointing at it.
+                if (!ShowSpoilers && Genie.Core.Mapper.MoveVerb.IsSpoilerMove(exit.MoveCommand)) continue;
                 if (exit.DestinationId is int destId
                     && Zone.Nodes.TryGetValue(destId, out var dest)
                     && dest.Z == Level)
