@@ -1991,6 +1991,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     string ICommandHost.ExpandVariables(string text)
         => Scripts.ExpandGlobalVars(text);
 
+    void ICommandHost.CheckScript(string name)
+    {
+        foreach (var line in Scripts.CheckScript(name))
+            RaiseEchoLine(line);
+    }
+
     void ICommandHost.EditScript(string name)
     {
         // The actual editor launch lives in the App layer (cross-platform

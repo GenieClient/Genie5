@@ -441,6 +441,47 @@ public sealed class ScriptEngine
 
     public bool TryStart(string name, IReadOnlyList<string> args) { lock (_exec) return TryStartCore(name, args); }
 
+    /// <summary>
+    /// <c>#scriptcheck</c> (public #239): parse <paramref name="name"/> exactly as a
+    /// start would — same path resolution, include folders and inline-if
+    /// normalisation — and report every <see cref="ScriptChecker"/> finding, without
+    /// running a line of it. Returns the report as echo lines.
+    /// </summary>
+    public IReadOnlyList<string> CheckScript(string name)
+    {
+        var path = ResolveScriptPath(name);
+        if (path is null)
+            return [$"[scriptcheck] not found: {name}  (searched in: {string.Join("; ", SearchDirs())})"];
+        if (path.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+            return [$"[scriptcheck] {Path.GetFileName(path)}: JavaScript scripts aren't checked — only .cmd scripts."];
+
+        ScriptInstance inst;
+        try
+        {
+            inst = ScriptParser.Parse(Path.GetFileNameWithoutExtension(path), Path.GetDirectoryName(path) ?? _scriptsDir,
+                                      File.ReadAllText(path), path, includeRoots: SearchDirs().ToList());
+        }
+        catch (Exception ex)
+        {
+            return [$"[scriptcheck] {Path.GetFileName(path)}: could not be parsed — {ex.Message}"];
+        }
+
+        var issues = ScriptChecker.Check(inst);
+        var file   = Path.GetFileName(path);
+        var includes = inst.Lines.Select(l => l.Origin).Distinct(StringComparer.OrdinalIgnoreCase).Count() - 1;
+        var count  = inst.Lines.Count(l => l.Trimmed.Length > 0);
+        var scope  = $"{count} line{(count == 1 ? "" : "s")}{(includes > 0 ? $", {includes} include{(includes == 1 ? "" : "s")}" : "")}";
+        if (issues.Count == 0)
+            return [$"[scriptcheck] {file}: no problems found ({scope})."];
+
+        var lines = new List<string>(issues.Count + 1)
+        {
+            $"[scriptcheck] {file}: {issues.Count} problem{(issues.Count == 1 ? "" : "s")} ({scope}):"
+        };
+        lines.AddRange(issues.Select(i => "  " + i));
+        return lines;
+    }
+
     private bool TryStartCore(string name, IReadOnlyList<string> args)
     {
         var path = ResolveScriptPath(name);
@@ -3192,7 +3233,7 @@ public sealed class ScriptEngine
         return NamedColors.Contains(tok);
     }
 
-    private static int FindKeywordOutsideQuotes(string s, string keyword)
+    internal static int FindKeywordOutsideQuotes(string s, string keyword)
     {
         bool inStr = false;
         for (int i = 0; i + keyword.Length <= s.Length; i++)

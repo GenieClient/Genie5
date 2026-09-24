@@ -257,6 +257,11 @@ public interface ICommandHost
     /// </summary>
     void EditScript(string name);
 
+    /// <summary><c>#scriptcheck &lt;name&gt;</c> (public #239): report every problem in a
+    /// script at once, without running it. Default no-op so test hosts needn't
+    /// implement it; <see cref="GenieCore"/> does.</summary>
+    void CheckScript(string name) { }
+
     /// <summary>
     /// Run a <c>#layout</c> command — the raw argument string after
     /// <c>#layout </c> (e.g. <c>save global My Layout</c>, <c>load Base</c>,

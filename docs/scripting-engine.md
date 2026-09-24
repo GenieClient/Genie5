@@ -199,6 +199,7 @@ The rows marked *computed live on every read* are the exception: they resolve in
 
 ## Diagnostics
 
+- **Whole-script check** — `#scriptcheck <name>` vets a script without running it and reports every problem at once, with file and line. It covers goto/gosub/match to a missing label, `if`/`elseif`/`while` without `then`, unbalanced parentheses in a condition, `action` without `when`, a missing or refused `include`, unbalanced `{`/`}` blocks, and duplicate labels. Findings inside an included file are marked `[in an include]`, since shared libraries often jump to labels each including script defines. Variable targets (`goto %next`) and the built-in `gosub clear` are not flagged.
 - **Per-script** — `debug 5+` in a script traces its reactions (actions at 5, every line at 10), through the echo channel.
 - **Scripts panel** — script-originated output (`[script]`, `[dbg:N]`, in-script `#echo`) is forked to the Scripts panel via `ScriptOutputLine` so it has its own scrollback ([GenieCore.cs:252](../src/Genie.Core/GenieCore.cs#L252)).
 

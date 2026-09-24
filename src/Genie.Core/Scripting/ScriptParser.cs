@@ -684,7 +684,7 @@ public static class ScriptParser
     /// a nested `if … then {` block's '}' with the OUTER opener, so the outer
     /// if's false-jump lands inside its own body (#228).
     /// </summary>
-    private static bool OpensInlineBrace(string t)
+    internal static bool OpensInlineBrace(string t)
     {
         if (t.Length < 2 || t[^1] != '{') return false;
         if (IsElseLine(t) && !IsElseIfLine(t))

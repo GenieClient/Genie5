@@ -642,6 +642,17 @@ public sealed class CommandEngine
                 _host.EditScript(parts[1]);
                 break;
             }
+            case "scriptcheck":
+            case "checkscript":
+                // #scriptcheck <name> (public #239) — vet a whole script without
+                // running it: missing labels, if-without-then, bad includes, …
+                if (parts.Count < 2)
+                {
+                    _host.Echo("Usage: #scriptcheck <script-name>");
+                    break;
+                }
+                _host.CheckScript(parts[1]);
+                break;
             case "layout":
             case "layouts":
                 // #layout <sub> [args] — forwarded whole (minus the verb) to
