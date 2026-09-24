@@ -56,7 +56,7 @@ public sealed class RuleFileWatcher : IDisposable
     private readonly ConcurrentDictionary<string, Timer> _debounce =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly int _debounceMs;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>An external edit settled for the named rule file. Argument is
     /// the bare lower-case file name (e.g. <c>"triggers.json"</c>) — the host
@@ -110,9 +110,12 @@ public sealed class RuleFileWatcher : IDisposable
         }
     }
 
-    private void OnFsEvent(string? name, string fullPath)
+    internal void OnFsEvent(string? name, string fullPath)
     {
-        if (name is null) return;
+        // _disposed checks (2026-08-31 stability review): FileSystemWatcher.Dispose
+        // does not wait for in-flight callbacks, so an event racing Dispose could
+        // GetOrAdd a fresh timer after _debounce.Clear() ran — armed, never disposed.
+        if (_disposed || name is null) return;
         var fileName = Path.GetFileName(name);
         if (!WatchedFiles.Contains(fileName)) return;
 
@@ -130,6 +133,13 @@ public sealed class RuleFileWatcher : IDisposable
         var key = fileName.ToLowerInvariant();
         var timer = _debounce.GetOrAdd(key, k => new Timer(_ => Fire(k), null,
             Timeout.Infinite, Timeout.Infinite));
+        // Dispose may have run between the check above and GetOrAdd: its sweep
+        // could have missed this timer, so dispose it here instead of arming it.
+        if (_disposed)
+        {
+            if (_debounce.TryRemove(key, out var stray)) stray.Dispose();
+            return;
+        }
         try { timer.Change(_debounceMs, Timeout.Infinite); }
         catch (ObjectDisposedException) { /* disposed mid-event */ }
     }
@@ -140,6 +150,9 @@ public sealed class RuleFileWatcher : IDisposable
         try { RuleFileChanged?.Invoke(fileName); }
         catch { /* a handler failure must not kill the timer thread */ }
     }
+
+    /// <summary>Live debounce timers (tests).</summary>
+    internal int DebounceTimerCount => _debounce.Count;
 
     public void Dispose()
     {

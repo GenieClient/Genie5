@@ -105,4 +105,32 @@ public class RuleFileWatcherTests : IDisposable
 
         Assert.True(hit.Wait(TimeSpan.FromSeconds(10)), "expected RuleFileChanged from the created dir");
     }
+
+    /// <summary>2026-08-31 stability review: FileSystemWatcher.Dispose does not
+    /// wait for in-flight callbacks, so an event landing after Dispose used to
+    /// GetOrAdd a fresh debounce timer that nothing would ever dispose.</summary>
+    [Fact]
+    public void EventAfterDisposeCreatesNoTimer()
+    {
+        var watcher = new RuleFileWatcher(debounceMs: 100);
+        watcher.Rescope(_dir);
+        watcher.Dispose();
+
+        watcher.OnFsEvent("triggers.json", Path.Combine(_dir, "triggers.json"));
+
+        Assert.Equal(0, watcher.DebounceTimerCount);
+    }
+
+    [Fact]
+    public void EventBeforeDisposeArmsATimerThatDisposeSweeps()
+    {
+        var watcher = new RuleFileWatcher(debounceMs: 60_000);
+        watcher.Rescope(_dir);
+
+        watcher.OnFsEvent("triggers.json", Path.Combine(_dir, "triggers.json"));
+        Assert.Equal(1, watcher.DebounceTimerCount);
+
+        watcher.Dispose();
+        Assert.Equal(0, watcher.DebounceTimerCount);
+    }
 }
