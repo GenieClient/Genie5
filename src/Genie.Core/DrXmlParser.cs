@@ -1230,7 +1230,8 @@ public sealed partial class DrXmlParser : IDisposable
         // UI can build a `#NNNN → "My Backpack"` map (used by BuildLinkEcho to
         // render container-IDs as human names in click-echoes). DR's <container>
         // tags are self-closing in practice, so the close path is never hit.
-        "exposecontainer", "clearcontainer",
+        // exposeContainer / clearContainer are NOT here any more — they emit
+        // ContainerExposeEvent / ContainerClearEvent (public #336).
         // ── Experience panel slot definitions ───────────────────────────────
         "compdef",
         // NOTE: "d" was previously in this skip set, which destroyed click
@@ -1325,7 +1326,7 @@ public sealed partial class DrXmlParser : IDisposable
     private static readonly HashSet<string> _handledTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "a", "app", "b", "casttime", "cleardynastream", "clearstream", "dynastream",
-        "closedialog", "compass", "component", "container",
+        "clearcontainer", "closedialog", "compass", "component", "container", "exposecontainer",
         "crtrstatus", "d", "dialogdata", "dir", "endsetup", "exposedialog",
         "exposestream", "image", "indicator", "inv", "opendialog",
         "left", "nav", "openwindow", "output", "popbold", "popstream",
@@ -1340,7 +1341,7 @@ public sealed partial class DrXmlParser : IDisposable
     private static readonly HashSet<string> _droppedDataTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "skin", "compdef",
-        "radio", "detach", "playerid", "exposecontainer", "clearcontainer",
+        "radio", "detach", "playerid",
         // Wrayth dialog-control vocabulary — DroppedData ONLY outside a
         // <dialogData> block (inside one they're captured as DialogControls,
         // #156); pre-seeding keeps `#audit xmlhunting` from drafting a
@@ -1730,10 +1731,25 @@ public sealed partial class DrXmlParser : IDisposable
             // pending main-stream text first, then switch to "inv" so the
             // body lines emit on the inventory stream. Close in HandleEndElement
             // flushes the buffered line and pops back.
+            // Public #336: an id names the container the item is in — <inv id='stow'>
+            // is the backpack's contents, not the worn-items list — so the body
+            // goes on that container's own stream. No id keeps the "inv" stream.
             case "inv":
                 FlushTextLine();
                 _streamStack.Push(_activeStream);
-                _activeStream = "inv";
+                _activeStream = ContainerStreams.For(r["id"]);
+                break;
+
+            // Container lifecycle (#336). Inside a <dialogData> block these are
+            // dialog controls, captured above; outside one they drive the
+            // container's window.
+            case "exposecontainer" when _dialogId is null:
+                if (r["id"] is { Length: > 0 } containerExposeId)
+                    _events.OnNext(new ContainerExposeEvent(containerExposeId));
+                break;
+            case "clearcontainer" when _dialogId is null:
+                if (r["id"] is { Length: > 0 } containerClearId)
+                    _events.OnNext(new ContainerClearEvent(containerClearId));
                 break;
 
             // ── Text styling spans ───────────────────────────────────────────

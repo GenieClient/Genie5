@@ -2409,14 +2409,17 @@ public class GenieDockFactory : Factory
     /// <c>EchoToWindow</c> passes <c>show: false</c> — a passive appended line
     /// must not yank a closed log panel back open on every line.</para>
     /// </summary>
-    public PluginWindowViewModel GetOrCreatePluginWindow(string name, bool show = true)
+    /// <param name="revealOnCreate">False creates a brand-new window without showing
+    /// it — DR's container windows (#336) fill in the background and are opened from
+    /// the Window menu.</param>
+    public PluginWindowViewModel GetOrCreatePluginWindow(string name, bool show = true, bool revealOnCreate = true)
     {
         var id = PluginWindowId(name);
         if (!_pluginWindowVms.TryGetValue(id, out var vm))
         {
             var tool = CreatePluginWindowTool(id, name);
             vm = _pluginWindowVms[tool.Id];
-            show = true;   // first sight: always open so it's actually visible
+            show = revealOnCreate;   // first sight: open so it's actually visible
         }
 
         // SetToolVisibility resolves the parent dock live by id and no-ops if
@@ -2737,6 +2740,26 @@ public class GenieDockFactory : Factory
     // to it, so it lists under Script Windows until its plugin next draws it.
     private readonly HashSet<string> _pluginOwnedWindowIds = new(StringComparer.OrdinalIgnoreCase);
 
+    // ── DR container windows (#336) ─────────────────────────────────────────
+    // Same registry again, but these are windows DragonRealms describes itself,
+    // so the Window menu lists them with the server dialogs, not as script windows.
+    private readonly HashSet<string> _containerWindowIds = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The existing window for a name, or null — never creates one.</summary>
+    public PluginWindowViewModel? TryGetPluginWindow(string name) =>
+        _pluginWindowVms.TryGetValue(PluginWindowId(name), out var vm) ? vm : null;
+
+    /// <summary>The window for a DR container, created hidden on first sight.</summary>
+    public PluginWindowViewModel GetOrCreateContainerWindow(string name)
+    {
+        _containerWindowIds.Add(PluginWindowId(name));
+        return GetOrCreatePluginWindow(name, show: false, revealOnCreate: false);
+    }
+
+    /// <summary>DR container windows created this session.</summary>
+    public IReadOnlyList<(string Id, string Title, bool Visible)> ContainerWindows() =>
+        PluginWindows().Where(w => _containerWindowIds.Contains(w.Id)).ToList();
+
     /// <summary>Record that a plugin writes to the window named <paramref name="name"/>.</summary>
     public void MarkPluginOwned(string name) => _pluginOwnedWindowIds.Add(PluginWindowId(name));
 
@@ -2745,7 +2768,7 @@ public class GenieDockFactory : Factory
     /// <summary>The plugin-window registry split by origin, for the two Window
     /// menu groups.</summary>
     public IReadOnlyList<(string Id, string Title, bool Visible)> PluginWindows(bool pluginOwned) =>
-        PluginWindows().Where(w => IsPluginOwned(w.Id) == pluginOwned).ToList();
+        PluginWindows().Where(w => !_containerWindowIds.Contains(w.Id) && IsPluginOwned(w.Id) == pluginOwned).ToList();
 
     // FactoryBase already exposes DockableClosed / DockableAdded events; the
     // VM subscribes to those directly in its constructor so the Window-menu

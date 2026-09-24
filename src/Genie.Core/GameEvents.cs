@@ -427,6 +427,40 @@ public sealed record FlagsReportEvent(IReadOnlyDictionary<string, bool> Flags) :
 /// </summary>
 public sealed record ContainerEvent(string LogicalId, string Title, string TargetId) : GameEvent;
 
+/// <summary>
+/// <c>&lt;exposeContainer id='stow'/&gt;</c> — DR asking for a container's window to be
+/// shown (public #336). Outside a <c>&lt;dialogData&gt;</c> block only; inside one the
+/// same tag is a dialog control.
+/// </summary>
+public sealed record ContainerExposeEvent(string LogicalId) : GameEvent;
+
+/// <summary>
+/// <c>&lt;clearContainer id="stow"/&gt;</c> — the container's contents are about to be
+/// re-sent; empty its window first so a re-<c>look</c> replaces rather than appends
+/// (public #336).
+/// </summary>
+public sealed record ContainerClearEvent(string LogicalId) : GameEvent;
+
+/// <summary>Stream naming for container contents (public #336).</summary>
+public static class ContainerStreams
+{
+    /// <summary>Stream prefix for a container's <c>&lt;inv id='X'&gt;</c> lines.</summary>
+    public const string Prefix = "container:";
+
+    /// <summary>The stream an <c>&lt;inv id='X'&gt;</c> body is emitted on — the plain
+    /// <c>inv</c> stream (My Inventory) when there is no id.</summary>
+    public static string For(string? logicalId) =>
+        string.IsNullOrWhiteSpace(logicalId) || logicalId.Equals("inv", StringComparison.OrdinalIgnoreCase)
+            ? "inv"
+            : Prefix + logicalId.Trim();
+
+    /// <summary>The container id a stream belongs to, or null for any other stream.</summary>
+    public static string? IdOf(string? stream) =>
+        stream is not null && stream.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)
+            ? stream[Prefix.Length..]
+            : null;
+}
+
 // ── Server-driven dialogs (public #156) ──────────────────────────────────────
 
 /// <summary>The Wrayth dialog-control vocabulary (see

@@ -3746,7 +3746,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     {
         FillWindowToggleList(PluginWindowMenuItems, f => f.PluginWindows(pluginOwned: true));
         FillWindowToggleList(ScriptWindowMenuItems, f => f.PluginWindows(pluginOwned: false));
-        FillWindowToggleList(ServerDialogMenuItems, f => f.ServerDialogWindows());
+        // DR's container windows (#336) are server-described windows too.
+        FillWindowToggleList(ServerDialogMenuItems, f => f.ServerDialogWindows().Concat(f.ContainerWindows()).ToList());
     }
 
     private void FillWindowToggleList(
@@ -5640,6 +5641,27 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // rather than "get a cutlass in #37666728"). Subscription doesn't
         // need to marshal to the UI thread — the dict is concurrent-safe
         // and only read inside OnLinkClicked (which can run on any thread).
+        // ── DR container windows (#336): <inv id='stow'> items arrive on the
+        // container's own stream; route them to a window titled by DR, created
+        // hidden, emptied on <clearContainer>. UI-thread bound (dock mutation).
+        var containers = new ContainerWindowRouter(
+            name => ((GenieDockFactory)DockFactory!).GetOrCreateContainerWindow(name),
+            name => (DockFactory as GenieDockFactory)?.TryGetPluginWindow(name));
+        _core.GameEvents
+            .Where(e => e is ContainerEvent or ContainerClearEvent
+                        || e is TextEvent t && ContainerStreams.IdOf(t.Stream) is not null)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(e =>
+            {
+                if (DockFactory is not GenieDockFactory) return;
+                switch (e)
+                {
+                    case ContainerEvent c:      containers.OnContainer(c); break;
+                    case ContainerClearEvent x: containers.OnClear(x);     break;
+                    case TextEvent t:           containers.OnText(t);      break;
+                }
+            });
+
         _core.GameEvents
             .OfType<ContainerEvent>()
             .Subscribe(e =>
