@@ -1543,6 +1543,27 @@ public sealed class DrXmlParser : IDisposable
                 if (_activeStream != "main") _activeStream = "main";
                 _streamStack.Clear();
 
+                // Unclosed-element valve (2026-08-31 stability review), the same boundary logic:
+                // _inHand / _inSpell / _inComponent / _inDynaStream / _inCompass
+                // route ALL text into a side buffer and only their close tag clears
+                // them, so one lost </right> (a TCP-boundary drop — see the
+                // dialogData defense) silently ate every later line until the next
+                // hand change. None of these ever legitimately spans a prompt
+                // (0 of ~120k element opens across 72 recorded sessions), so the
+                // stranded body is discarded and loss is bounded to one message.
+                if (_inHand || _inSpell || _inComponent || _inDynaStream || _inCompass)
+                {
+                    _log.LogDebug(
+                        "Unclosed element at prompt boundary (hand={Hand} spell={Spell} component={Component} dynaStream={Dyna} compass={Compass}) — resetting.",
+                        _inHand, _inSpell, _inComponent, _inDynaStream, _inCompass);
+                    _inHand = _inSpell = _inComponent = _inDynaStream = _inCompass = false;
+                    _componentBuffer.Clear();
+                    _componentBoldStack.Clear();
+                    _compassBuffer.Clear();
+                    _pendingComponentId = null;
+                    _dynaStreamId = null;
+                }
+
                 var ts = long.TryParse(r["time"], out var t) ? t : 0L;
                 _pendingPromptTime = DateTimeOffset.FromUnixTimeSeconds(ts);
                 _promptBuffer.Clear();
