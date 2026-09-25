@@ -71,8 +71,9 @@ one-click **Repair Maps** (#352); Genie 4 `.layout` files import (#319);
 every panel reopens floating where you left it (#359) and the Icon, Health
 and Script bars dock top or bottom (#349, #357); plus the script-engine
 parity and durability batch — `%list.length`, bare sigil assignment,
-`genie.put("#…")`, container contents in their own window (#336), and
-charged spells keeping their time left (#301).
+`genie.put("#…")`, container contents in their own window (#336), charged
+spells keeping their time left (#301), and the mapper drawing a floor you are
+not on as a faint map rather than a grey grid.
 
 Highlights of what works today:
 

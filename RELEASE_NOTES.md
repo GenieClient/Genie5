@@ -175,6 +175,14 @@ finally remembering where you left every panel.
 - **The status bar keeps showing where your character is while you browse
   the map** — two subscribers disagreed about the browse-hold (#273).
 
+- **A floor you are not on is drawn as a map, not a grey grid** — standing in
+  a room the community map places on another floor (Crossing's Tatting Street
+  and Riverlace Lane sit on a one-floor inset) switched the canvas to that
+  floor and painted every room on the main floor as an opaque grey box with no
+  paths, stubs or labels. Off-floor rooms and their paths now draw in Genie 4's
+  white ghost colour, so the main floor stays readable under the one you are
+  on; `automapperalpha` still fades it and 0 still hides it.
+
 - **`obs sky` no longer stops at the first cloudy line** — the Time Tracker
   treated any unparsed line as the end of the block, so only about half the
   bodies were ever captured (#355).
