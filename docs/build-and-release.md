@@ -125,3 +125,4 @@ Four workflows are checked in under [.github/workflows](../.github/workflows):
 - **[Genie.App.csproj](../src/Genie.App/Genie.App.csproj)** — assembly name (`Genie5`), framework, publish + version properties, package refs.
 - **[Genie.Core.csproj](../src/Genie.Core/Genie.Core.csproj)** — engine library, `SelfContained`, embedded `ZoneConnections.baseline.xml` resource.
 - **[Genie.slnx](../Genie.slnx)** — solution layout.
+
