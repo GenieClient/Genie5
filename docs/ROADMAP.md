@@ -60,6 +60,20 @@ layout, and brings SimuCoins in-house (#328).
 Self-update is now **verified end-to-end on all three platforms** (#27 —
 thanks @dylb0t for the macOS validation).
 
+**On `main`, not yet released (staged for beta.9.6):** server dialogs get a
+settings page, honour DragonRealms' placement hints, and can open beside
+any window you name, while Friends & Enemies and another character's
+injuries render as content rather than sprite names (#156, #341, #342,
+#345); Genie 4's `{display:command}` inline click links (#362) and its `@`
+/ `\x` command-bar directives (#348); `#scriptcheck` reports every problem
+in a script without running it (#239); map spoiler settings (#254) and a
+one-click **Repair Maps** (#352); Genie 4 `.layout` files import (#319);
+every panel reopens floating where you left it (#359) and the Icon, Health
+and Script bars dock top or bottom (#349, #357); plus the script-engine
+parity and durability batch — `%list.length`, bare sigil assignment,
+`genie.put("#…")`, container contents in their own window (#336), and
+charged spells keeping their time left (#301).
+
 Highlights of what works today:
 
 - **Connection** — SGE direct auth (TLS on 7910 by default, plaintext 7900

@@ -1,3 +1,241 @@
+# Genie 5 — v5.0.0-beta.9.6
+
+**"Well Placed"** — the release where the windows DragonRealms sends you
+learn where they belong. Server dialogs get a settings page, honour the
+placement the game suggests, can sit beside any window you name, and the
+ones that rendered as bare sprite names — Friends & Enemies, another
+character's injuries — now read as what they are. Around that: a large
+batch of script-engine parity and durability fixes from the community
+issue sweep, map spoiler settings, a one-click map repair, and the dock
+finally remembering where you left every panel.
+
+## ✨ New
+- **Server dialogs: a settings page, placement hints and "Beside another
+  window"** — **Configuration ▸ Layout ▸ Server Dialogs** lists every answer
+  you have given a dialog for the selected profile: change where it goes,
+  toggle auto-open, or Forget it. Edits apply to the live window at once.
+  "Where DR suggests" now actually reads the hint DragonRealms sends —
+  `right` docks right, `left` docks beside Room, `center` and `detach` float
+  centred at the game's declared size, and the bank's `force-center`
+  re-centres on every open — and a new "Beside another window" mode opens a
+  dialog as a tab right after any window you pick, docked or floating. Once
+  you move a dialog, your placement wins. `#config serverdialogs on|off` is
+  the master switch, and **Window ▸ Server Dialogs** reopens any dialog seen
+  this session (#156).
+
+- **Dialogs that used to show sprite names now show their content** — Friends
+  & Enemies opened as the word "crossFace" once per friend with no names;
+  the name and demeanor rows were controls the renderer did not know. Another
+  character's injuries (the empath view) listed fifteen body-part image names
+  with "Injury1" links; it now draws the same sprite grid as the Injuries
+  panel, with an injured part's transfer command as a button. `<image>`,
+  `<skin>` and `<link>` controls render instead of producing blank rows, and
+  spell-choose stream boxes take the game's declared height with their links
+  clickable (#341, #342, #345).
+
+- **`{display:command}` inline click links** — Genie 4 turns any output text
+  containing `{display:command}` into a clickable link, anywhere on the line
+  and as often as it appears, so `echo Go {north:north} or {south:go south}`
+  shows two links on one line. Genie 5 had only the whole-line `#link`.
+  Both `#echo` and script output now honour the markup (#362).
+
+- **`#scriptcheck <name>`** — parses a script exactly as a start would (same
+  path resolution, include folders and inline-if normalisation) and reports
+  every problem with file and line, without running a line of it. Vetting a
+  large old script no longer means walking every branch in game (#239).
+
+- **Map spoiler settings** — `#config showmapspoilers off` hides secret exits
+  from the map canvas and the exit lists, and `#config avoidmapspoilers on`
+  keeps `#goto` from routing through them, so a new character can use the
+  community maps without being handed every discovery. Display and pathfinder
+  only; the map files are untouched (#254).
+
+- **Repair Maps** — a full re-download that undoes the damage earlier builds
+  did through the lossy map round-trip. An ordinary Update Maps skips any
+  zone whose upstream copy is unchanged, so it could never revisit a damaged
+  file that was already current. **Mapper ▸ Repair Maps** re-fetches every
+  zone and keeps your own edits — exits, notes, colours, server ids (#352).
+
+- **Genie 4 saved `.layout` files import** — the importer handled the rule
+  files and settings but walked past Config/Layout, so a long-time user's
+  saved arrangements were lost. They come across as windowed-mode layouts,
+  the same shape as the Heirloom built-in (#319).
+
+- **Every panel reopens floating if that is where you left it** — a panel
+  dragged out to its own window, sized and positioned, came back at the
+  dock's default placement on every reopen. Float geometry is now remembered
+  per panel, server dialog windows included, and the Script Manager can open
+  as a window (#359).
+
+- **Dock Top / Dock Bottom for the Icon, Health and Script bars** — Genie 4's
+  Layout menu let all three bars sit at either end of the window; Genie 5
+  pinned them. The Script Bar's parent item is also a show/hide toggle
+  (#349, #357).
+
+- **"Always show scrollbars"** — Avalonia's scrollbars shrink to a thin line
+  when idle and expand on hover, a small target acquired twice, unreliable
+  with a trackball or a tremor. A global toggle keeps them at full width:
+  Display Settings ▸ General, or `#config alwaysshowscrollbars on` (#365).
+
+- **The Window menu lists script windows apart from plugin windows** —
+  windows a script made with `#echo >name`, `#link >name` or `#window` were
+  indistinguishable from a plugin's in one Plugin Windows list (#367).
+
+- **`#config scriptdebugwindow <name>`** routes `[dbg:N]` script trace lines
+  to a window of your choosing instead of interleaving them with game text
+  (#366).
+
+- **`$scriptlistactive` / `$scriptlistpaused`, and `#script` over a list** —
+  the running scripts split by state, and `#script pause|resume|abort` over a
+  space-separated list, so a bulk-control script no longer has to loop
+  (#247).
+
+- **Substitutes: per-rule whole-words-only, and `$globals` in the
+  replacement** — a substitute for `take` no longer rewrites the inside of
+  `mistake` without you writing `\b` into the pattern, and a replacement can
+  carry `$charactername` or `$roomid` resolved at match time (#245, #246).
+
+- **The Genie 4 `@` caret and `\x` command-bar directives** — `@` in sent
+  text places it in the command input with the caret at the marker, `\x`
+  clears the input first, `\@` is a literal. Genie 5 sent all three to the
+  game verbatim (#348).
+
+- **`perceive health` is parsed** — the `<patient>'s injuries include` block
+  now feeds the Injuries panel, which is a richer source than the injuries
+  dialog on every axis: any patient, full severity, every reading (#277).
+
+- **`#config tracesends`** names every outgoing command and where it came
+  from — typed, script, alias, trigger, plugin — so a phantom "Please
+  rephrase that command" finally has something above it to explain it (part
+  of #306).
+
+- **The Objects window can hide its top bar** — the same **Show Config Bar**
+  item the Experience window has, now on the Objects window's right-click
+  menu. Unticking it hides the `OBJECTS (n)` header row and its Creatures
+  checkbox and gives the row to the list, which is the difference between
+  seeing three items and four in a short panel. Pure display: the creatures
+  setting behind the hidden checkbox keeps applying, and it stays reachable
+  as `#config objectscreatures on|off`. The bar's own state persists as
+  `#config objectsconfigbar`.
+
+- **The Updates dialog says what changed** — hover a Scripts or Maps row's
+  status to see which remote files are new or changed before you pull them.
+
+- **The Text-to-Speech tab has a voice folder picker, an Install button and
+  a visible offline banner** — it pointed at commands for both setup steps
+  while offering a control for neither (#369).
+
+## 🐛 Fixes
+- **`%list.length` and bare `%var = value` lines work as they do in
+  Genie 4** — `.length` resolved a variable of that literal name instead of
+  counting the list, so `cyclic.cmd`'s loop silently skipped its last
+  element; and a line starting with a sigil was sent to the game as a
+  command instead of being treated as an assignment — ten of them in
+  `lumberjacking.cmd`. Both failed quietly, which is why neither had ever
+  been reported.
+
+- **A `.cmd` script no longer dies at its first `<% %>` block on a cold
+  start** — the JavaScript bridge's own setup ran under the 250 ms
+  wall-clock budget meant for user code, so a slow first start threw before
+  the script had produced any output.
+
+- **`genie.put("#…")` from JavaScript runs the meta-command** instead of
+  sending `#var x 1` to the game server literally. A `.js` script can now set
+  a `#var`, start a script, `#goto`, or toggle a class.
+
+- **An action's `put` no longer rewinds the script** — a send from an action
+  body while the script's own command was still in flight was silently
+  dropped and the script stepped back a line.
+
+- **Container contents get their own window** — DragonRealms sends a
+  container's contents as bare `<inv>` elements, and the parser folded every
+  one into My Inventory: in a recorded session, 1,091 backpack lines mixed
+  into the worn-items list (#336).
+
+- **Charged spells keep their time left in Active Spells** — "Stellar
+  Collector 5% charged" showed no duration because the charge rule kept only
+  the percentage (#301).
+
+- **A lost `</left>`, `</right>` or `</spell>` no longer swallows all game
+  text** — one close tag dropped at a TCP boundary hid everything until the
+  next hand change. The loss is now bounded to one message.
+
+- **Curly quotes, dashes and accented names survive a socket read boundary**
+  — each 8 KB chunk was decoded on its own, so a multi-byte character split
+  across two reads became replacement characters (#280).
+
+- **A news category number too large to parse no longer drops the
+  connection.**
+
+- **The built-in walker never routes through a `script <name>` arc** — the
+  Astral Plane map moves between pillars with `script apmove` arcs, and a
+  planned route through one sent the literal text to the game and stalled
+  (#253).
+
+- **The status bar keeps showing where your character is while you browse
+  the map** — two subscribers disagreed about the browse-hold (#273).
+
+- **`obs sky` no longer stops at the first cloudy line** — the Time Tracker
+  treated any unparsed line as the end of the block, so only about half the
+  bodies were ever captured (#355).
+
+- **Structured panels no longer render blank in the Game group** — Mobs,
+  Injuries, Inventory View and Experience dropped into the group that holds
+  Game drew nothing at all (#346).
+
+- **Starting a script no longer pauses the game window** — the Script Bar
+  appearing shrank the window and the auto-follow read that as you scrolling
+  up. Only an upward scroll now leaves the tail.
+
+- **A bare `#echo` prints a blank line**, as Genie 4 does; banner scripts
+  depend on it for vertical spacing (#360).
+
+- **Settings says when it is editing a draft rather than the live rules** —
+  macros and triggers set up before connecting looked as though they did
+  nothing (#350).
+
+- **The importer no longer reports Genie 4's implicit default class as a
+  drop** — every clean import printed one false loss (#354).
+
+- **`<exposeStream>` is consumed** instead of prompting you to file a parser
+  gap for a tag whose meaning is understood (#310).
+
+- **An `/iv` scan that stalls can end** — a stun, full hands or a reworded
+  server message parked the scan forever and every later scan echoed "a scan
+  is already in progress." `/iv cancel` plus a watchdog, and a cancelled
+  scan restores the catalog it started with.
+
+- **Includes that resolve outside the scripts folders are refused** — an
+  include name could name an absolute path or `..\` its way out, and the
+  file's unrecognised lines went to the game socket.
+
+- **A retry loop that registers `match` without reaching `matchwait` no
+  longer grows without bound.**
+
+- **A failed browser launch no longer leaks the URL or the machine name into
+  the bug report** (#307).
+
+- **A fresh install no longer seeds the retired EXP Tracker plugin feed**
+  (#281).
+
+## 🔧 Under the hood
+- **Regexes and JSON are source-generated** — the parser's, the default
+  highlights', and 62 more fixed patterns across the trackers are compiled at
+  build time instead of on first match, and the persistence layer's 27
+  serializer call sites use generated metadata. Less JIT work on the launch
+  and connect path (#285, #287).
+- **The SDK is pinned** with a `global.json` and shared build properties are
+  centralised, ahead of the .NET 11 SDK (#282).
+- **Supported OS floors are stated** in the README: Windows 10 1809+ / 11
+  x64, macOS 14+, Linux x64 with glibc 2.27+ (#284).
+- **Three CI timing flakes are deterministic** — decided by an injected clock
+  rather than the scheduler.
+- **A Discord post on every pull request** (#32).
+- **Timestamps never reach trigger matching** — validated and pinned by a
+  test, closing a Genie 4 fault that does not reproduce here (#244).
+
+---
+
 # Genie 5 — v5.0.0-beta.9.5
 
 **"Carried Over"** — the release where a Genie 4 config folder finally arrives
@@ -56,15 +294,6 @@ classic Genie 4 workspace is a layout you can pick from a menu.
   out of sight instead of folding them. It now reads the same per-window Word
   Wrap setting every other text panel uses, and the right-click menu grows the
   toggle.
-
-- **The Objects window can hide its top bar** — the same **Show Config Bar**
-  item the Experience window has, now on the Objects window's right-click menu.
-  Unticking it hides the `OBJECTS (n)` header row and its Creatures checkbox and
-  gives the row to the list, which is the difference between seeing three items
-  and four in a short panel. Pure display: the creatures setting behind the
-  hidden checkbox keeps applying, and it stays reachable as
-  `#config objectscreatures on|off`. The bar's own state persists as
-  `#config objectsconfigbar`.
 
 ## 🐛 Fixes
 - **Update Maps no longer rewrites your maps through a lossy exporter** — the

@@ -4,11 +4,30 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.9.5 — Carried Over
+## Latest: v5.0.0-beta.9.6 — Well Placed
+
+The windows DragonRealms sends you learn where they belong, and a large community-issue sweep lands on the script engine, the mapper and the dock.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.6** as a delta from beta.9.5.
+
+- **Server dialogs: a settings page, placement hints and "Beside another window"** — **Configuration ▸ Layout ▸ Server Dialogs** lists every answer you have given a dialog: change where it goes, toggle auto-open, or Forget it. "Where DR suggests" now reads the hint the game sends (`right`, `left`, `center`, `force-center`), a new mode opens a dialog as a tab beside any window you pick, and once you move a dialog your placement wins. `#config serverdialogs on|off` is the master switch; **Window ▸ Server Dialogs** reopens any dialog seen this session (#156).
+- **Dialogs that showed sprite names now show their content** — Friends & Enemies lists names and demeanors instead of the word "crossFace"; another character's injuries draws the Injuries sprite grid with transfer buttons; `<image>`, `<skin>` and `<link>` controls render instead of blank rows (#341, #342, #345).
+- **`{display:command}` inline click links** — Genie 4's markup for several clickable links on one line, in `#echo` and script output alike (#362).
+- **`#scriptcheck <name>`** parses a script exactly as a start would and reports every problem with file and line, without running it (#239).
+- **Map spoiler settings** — `#config showmapspoilers off` hides secret exits; `#config avoidmapspoilers on` keeps `#goto` from routing through them. Display and pathfinder only; the map files are untouched (#254).
+- **Repair Maps** — **Mapper ▸ Repair Maps** re-downloads every zone to undo the damage earlier builds did through the lossy round-trip, keeping your own edits. This replaces the manual `.map-shas.json` procedure from the beta.9.5 notes (#352).
+- **Genie 4 saved `.layout` files import** as windowed-mode layouts (#319).
+- **Every panel reopens floating if that is where you left it**, server dialog windows included, and the **Icon, Health and Script bars dock top or bottom** (#359, #349, #357).
+- **Script engine parity** — `%list.length` counts the list, a bare `%var = value` line is an assignment rather than a game command, `genie.put("#…")` from JavaScript runs the meta-command, an action's `put` no longer rewinds the script, and `$scriptlistactive` / `$scriptlistpaused` with `#script` over a list (#247).
+- **Substitutes** get a per-rule whole-words-only toggle and `$globals` in the replacement text (#245, #246); the Genie 4 **`@` caret and `\x`** command-bar directives work (#348).
+- **Durability** — container contents get their own window instead of joining My Inventory (#336), a lost `</left>`/`</right>`/`</spell>` no longer swallows all game text, multi-byte characters survive a socket read boundary (#280), a `.cmd` script no longer dies at its first `<% %>` block on a cold start, and a stalled `/iv` scan can be cancelled.
+- Also: **charged spells keep their time left** in Active Spells (#301), the walker never routes through a `script <name>` arc (#253), `obs sky` captures every body (#355), structured panels render in the Game group (#346), starting a script no longer pauses the game window, **"Always show scrollbars"** (#365), `#config scriptdebugwindow` (#366), script windows listed apart from plugin windows (#367), `perceive health` is parsed (#277), and the TTS tab gets its setup controls (#369).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.6)
+
+## v5.0.0-beta.9.5 — Carried Over
 
 A Genie 4 config folder finally arrives intact, and Update Maps stops damaging the maps it was meant to update.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.5** as a delta from beta.9.
 
 > ### ⚠️ If you have ever run an earlier release, repair your maps once
 > Every build before this one rewrote downloaded map zones through an exporter that could not represent what it had just read, so `go` and `climb` exits came back as `none` and room descriptions were thinned — a little more on every update. This release stops the damage, but a normal **Update Maps** only rewrites zones whose upstream copy changed, so it will **not** repair what is already there.
