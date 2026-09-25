@@ -39,7 +39,7 @@ public class RepoScriptDirTests : IDisposable
         _config = new GenieConfig(lds);
 
         _engine = new ScriptEngine(_primary, new TypeAheadSession(),
-                                   sendCommand: _ => { }, echo: l => _echoed.Add(l))
+                                   sendCommand: _ => { }, echo: l => { lock (_echoed) _echoed.Add(l); })
         {
             Config = _config,
         };
@@ -122,7 +122,11 @@ public class RepoScriptDirTests : IDisposable
         // The .js runtime's start echo is "[script] hunt started (js)" — its
         // presence proves the LOCAL hunt.js won; the repo's hunt.cmd would
         // have produced a path-bearing .cmd start line instead.
-        Assert.Contains(_echoed, l => l.Contains("started (js)"));
+        // The .js runtime echoes from its own thread; snapshot under the same
+        // lock the sink takes, or the enumeration races the script's exit echo.
+        string[] echoed;
+        lock (_echoed) echoed = _echoed.ToArray();
+        Assert.Contains(echoed, l => l.Contains("started (js)"));
         Assert.Empty(_engine.Instances);
     }
 
@@ -142,7 +146,9 @@ public class RepoScriptDirTests : IDisposable
         File.WriteAllText(Path.Combine(_repo, "pulled.cmd"), "echo hi");
 
         Assert.False(_engine.TryStart("pulled", Array.Empty<string>()));
-        Assert.DoesNotContain(_echoed, l => l.Contains(_repo));
+        string[] echoed;
+        lock (_echoed) echoed = _echoed.ToArray();
+        Assert.DoesNotContain(echoed, l => l.Contains(_repo));
     }
 
     [Fact]
@@ -158,7 +164,8 @@ public class RepoScriptDirTests : IDisposable
         _config.SetSetting("reposcriptdir", _repo);
 
         Assert.False(_engine.TryStart("nosuch", Array.Empty<string>()));
-        var line = _echoed.Single(l => l.Contains("not found"));
+        string line;
+        lock (_echoed) line = _echoed.Single(l => l.Contains("not found"));
         Assert.Contains(_primary, line);
         Assert.Contains(_repo, line);
     }
