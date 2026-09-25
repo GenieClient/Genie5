@@ -44,6 +44,9 @@
     <!-- The renderer's per-line entry (GameLineEntry) is internal; the headless
          tests pin how it exposes inline links (#362). -->
     <InternalsVisibleTo Include="Genie.App.HeadlessTests" />
+    <!-- MapCanvas's ghost-floor geometry helpers are internal; the App tests
+         count the off-floor arcs without a render surface. -->
+    <InternalsVisibleTo Include="Genie.App.Tests" />
   </ItemGroup>
 
   <ItemGroup>

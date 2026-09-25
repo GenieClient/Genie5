@@ -171,11 +171,11 @@ public class MapCanvas : Control
         AvaloniaProperty.Register<MapCanvas, IBrush?>(nameof(LabelTextBrush));
 
     /// <summary>
-    /// Opacity (0–255) of the "ghost" rooms drawn for the floors directly above
-    /// and below the current level — Genie 4's <c>AutoMapperAlpha</c>. Bound from
-    /// <see cref="ViewModels.MapperViewModel.AutoMapperAlpha"/> ←
+    /// Opacity (0–255) of the "ghost" rooms and arcs drawn for the floors directly
+    /// above and below the current level — Genie 4's <c>AutoMapperAlpha</c>. Bound
+    /// from <see cref="ViewModels.MapperViewModel.AutoMapperAlpha"/> ←
     /// <c>GenieConfig.AutoMapperAlpha</c>. 0 = off-level rooms hidden (pure
-    /// single-level view); 255 = fully opaque grey ghosts.
+    /// single-level view); 255 = Genie 4's solid white off-floor look.
     /// </summary>
     public static readonly StyledProperty<int> AutoMapperAlphaProperty =
         AvaloniaProperty.Register<MapCanvas, int>(nameof(AutoMapperAlpha), defaultValue: 255,
@@ -427,24 +427,36 @@ public class MapCanvas : Control
             return;
         }
 
-        // ── Pass 0: off-level "ghost" rooms (floors directly above/below) ──────
-        // Drawn first (under everything current) as faded grey squares so a
-        // multi-floor zone shows where the adjacent levels extend. Grey so they
-        // always read as "another floor" regardless of alpha; AutoMapperAlpha
-        // (Genie 4) tunes how visible they are. 0 = hidden (pure single level).
-        // Rooms share the X/Y grid across Z, so they align under the current
-        // floor and only peek out where this floor has no room. Edges/labels
-        // are intentionally omitted — ghosts are context, not detail.
+        // ── Pass 0: off-level "ghost" floors (directly above/below) ────────────
+        // Drawn first (under everything current) so a multi-floor zone shows
+        // where the adjacent levels extend. Genie 4 parity (MapForm.cs, "Mark
+        // all other levels gray"): an off-floor room AND its arcs are painted in
+        // the automapper presets' BACKGROUND colour — white by default
+        // ("automapper.node" / "automapper.line" = "…, White") — so the floor
+        // below stays a readable map under the current floor. The earlier cut
+        // painted opaque grey boxes and skipped the arcs; on a map whose new
+        // rooms sit on a one-floor inset (Crossing's Tatting Street / Riverlace
+        // Lane, z=1), that turned all 1,148 floor-0 rooms into a line-less grid
+        // that read as a broken mapper. AutoMapperAlpha fades the ghosts; 0 =
+        // hidden (pure single level). Rooms share the X/Y grid across Z, so
+        // ghosts align under the current floor. Labels stay current-floor only,
+        // as in Genie 4.
         if (AutoMapperAlpha > 0)
         {
-            var a         = (byte)AutoMapperAlpha;
-            var ghostFill = new SolidColorBrush(Color.FromArgb(a, 0x88, 0x88, 0x88));
-            var ghostPen  = new Pen(new SolidColorBrush(Color.FromArgb(a, 0x55, 0x55, 0x55)), 1.0);
+            var a          = (byte)AutoMapperAlpha;
+            var ghostBrush = new SolidColorBrush(Color.FromArgb(a, 0xff, 0xff, 0xff));
+            var ghostPen   = new Pen(ghostBrush, EdgeWidth);
+
+            // Ghost arcs first, under the ghost boxes, exactly like Pass 1 → 2.
+            ForEachGhostEdge(Zone, Level, ShowSpoilers,
+                (from, to)  => context.DrawLine(ghostPen, NodeCenter(from, minX, minY), NodeCenter(to, minX, minY)),
+                (from, dir) => DrawExitStub(context, NodeCenter(from, minX, minY), dir, ghostPen));
+
             foreach (var node in Zone.Nodes.Values)
             {
-                if (Math.Abs(node.Z - Level) != 1) continue;   // adjacent floors only
+                if (!IsGhostFloor(node.Z, Level)) continue;
                 var rect = NodeRect(node, minX, minY);
-                context.FillRectangle(ghostFill, rect);
+                context.FillRectangle(ghostBrush, rect);
                 context.DrawRectangle(ghostPen, rect);
             }
         }
@@ -1208,10 +1220,9 @@ public class MapCanvas : Control
     /// direction (#157). Only the eight 2-D cardinals get a stub — up/down/out/in
     /// have no on-map direction. The grid Δ maps straight to screen space (grid Y
     /// and screen Y both grow downward), normalised so diagonals aren't longer.</summary>
-    private void DrawExitStub(DrawingContext ctx, Point center, Direction dir)
+    private void DrawExitStub(DrawingContext ctx, Point center, Direction dir, Pen? pen = null)
     {
-        if (!DirectionHelper.Delta.TryGetValue(dir, out var d)) return;
-        if (d.dz != 0 || (d.dx == 0 && d.dy == 0)) return;
+        if (!IsStubDirection(dir, out var d)) return;
 
         var len  = Math.Sqrt(d.dx * (double)d.dx + d.dy * (double)d.dy);
         var ux   = d.dx / len;
@@ -1220,7 +1231,55 @@ public class MapCanvas : Control
         var stub = NodeSize * 0.7;
         var start = new Point(center.X + ux * half,          center.Y + uy * half);
         var end   = new Point(center.X + ux * (half + stub), center.Y + uy * (half + stub));
-        ctx.DrawLine(StubPen, start, end);
+        ctx.DrawLine(pen ?? StubPen, start, end);
+    }
+
+    /// <summary>The eight 2-D cardinals get an exit stub; up/down/out/in/none have
+    /// no on-map direction. Returns the grid Δ for the caller's geometry.</summary>
+    internal static bool IsStubDirection(Direction dir, out (int dx, int dy, int dz) d)
+    {
+        if (!DirectionHelper.Delta.TryGetValue(dir, out d)) return false;
+        return d.dz == 0 && (d.dx != 0 || d.dy != 0);
+    }
+
+    /// <summary>A floor drawn as ghosts under <paramref name="level"/>: the one
+    /// directly above or below it.</summary>
+    internal static bool IsGhostFloor(int z, int level) => Math.Abs(z - level) == 1;
+
+    /// <summary>
+    /// Enumerate the arcs Pass 0 paints for the ghost floors of
+    /// <paramref name="level"/>, in the same shape Pass 1 uses for the current
+    /// floor: <paramref name="edge"/> once per arc joining two rooms on the SAME
+    /// ghost floor (from the lower id, so a two-way arc draws once), and
+    /// <paramref name="stub"/> for a cardinal arc whose neighbour isn't on that
+    /// floor (no destination, another floor, or unrecorded). Non-cardinal stubs
+    /// are filtered here, and spoiler arcs obey <paramref name="showSpoilers"/>
+    /// exactly as on the current floor (#254). Static and callback-shaped so the
+    /// test project can count the geometry without a render surface.
+    /// </summary>
+    internal static void ForEachGhostEdge(MapZone zone, int level, bool showSpoilers,
+                                          Action<MapNode, MapNode> edge,
+                                          Action<MapNode, Direction> stub)
+    {
+        foreach (var node in zone.Nodes.Values)
+        {
+            if (!IsGhostFloor(node.Z, level)) continue;
+            foreach (var exit in node.Exits)
+            {
+                if (!showSpoilers && MoveVerb.IsSpoilerMove(exit.MoveCommand)) continue;
+                if (exit.DestinationId is int destId
+                    && zone.Nodes.TryGetValue(destId, out var dest)
+                    && dest.Z == node.Z)
+                {
+                    if (node.Id > dest.Id) continue;
+                    edge(node, dest);
+                }
+                else if (IsStubDirection(exit.Direction, out _))
+                {
+                    stub(node, exit.Direction);
+                }
+            }
+        }
     }
 
     private Point NodeCenter(MapNode node, int minX, int minY)
