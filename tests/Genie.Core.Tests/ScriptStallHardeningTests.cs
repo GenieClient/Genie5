@@ -84,4 +84,41 @@ public class ScriptStallHardeningTests
         Assert.Equal("6", ctx.Evaluate("2 * 3"));
         Assert.Empty(echoes);
     }
+
+    /// <summary>The prelude that defines getVar/setVar/getGlobal/setGlobal runs in
+    /// the constructor with the wall-clock guard DISARMED. It used to inherit the
+    /// guard's armed default (Jint re-baselines the 250 ms budget on every
+    /// Execute), so a cold Jint on a loaded CI runner threw JsWallClockException
+    /// out of the constructor and the .cmd script died at its first &lt;% %&gt;
+    /// block with no output (ScriptInlineJsBlockTests.GlobalsBridgeWorksFromBlock,
+    /// 2026-09-23). A clock that jumps ten seconds on every read makes every
+    /// ARMED call time out at its first check, so a context that comes up with a
+    /// working bridge proves the prelude ran unarmed — no slow machine needed.</summary>
+    [Fact]
+    public void Prelude_is_not_bounded_by_the_js_wall_clock_budget()
+    {
+        long clock = 0;
+        var echoes = new List<string>();
+        string? stored = null;
+        var ctx = new JsLibraryContext(
+            getVar:    n => n == "y" ? "seen" : null,
+            setVar:    (n, v) => stored = n + "=" + v,
+            getGlobal: _ => "",
+            setGlobal: (_, _) => { },
+            echo:      echoes.Add,
+            put:       _ => { },
+            clock:     () => clock += 10_000);
+
+        // The guard is live on this clock: an armed js one-liner is cut off at
+        // its very first constraint check…
+        Assert.Equal("", ctx.Evaluate("(function(){ while(true){} })()"));
+        Assert.Contains(echoes, e => e.Contains("wall-clock"));
+        echoes.Clear();
+
+        // …while an unarmed block, like the prelude before it, runs to the end
+        // and still finds the bridge the prelude defined.
+        Assert.True(ctx.ExecuteBlock("setVar('x', getVar('y'));"));
+        Assert.Equal("x=seen", stored);
+        Assert.Empty(echoes);
+    }
 }

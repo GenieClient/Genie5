@@ -128,17 +128,41 @@ public class GameLoopTests
     [Fact]
     public void Watchdog_reports_a_wedged_item_and_the_loop_recovers()
     {
+        // The watchdog is driven by a hand-advanced clock and checked directly:
+        // waiting for the real 1 s thread-pool timer to notice a 5 s stall took
+        // more than the 8 s budget on a loaded ubuntu runner (2026-09-22 CI),
+        // and a thread-pool timer starved by the rest of the suite is exactly
+        // the thing a test cannot promise about. The verdict is now arithmetic.
         using var loop = new GameLoop();
+        long ticks = 1_000;
+        loop.TickSource = () => Interlocked.Read(ref ticks);
+        int stalls = 0;
         using var stallSeen = new ManualResetEventSlim(false);
+        using var started   = new ManualResetEventSlim(false);
         using var release   = new ManualResetEventSlim(false);
-        loop.Stalled += _ => stallSeen.Set();
+        loop.Stalled += _ => { Interlocked.Increment(ref stalls); stallSeen.Set(); };
 
-        // Wedge the loop: the item blocks until we release it.
-        loop.Post(() => release.Wait(TimeSpan.FromSeconds(15)));
+        // Wedge the loop: the item blocks until we release it. Wait for it to
+        // actually START (its start stamp is taken from the fake clock) before
+        // moving the clock, or the stamp would land after the jump.
+        loop.Post(() => { started.Set(); release.Wait(TimeSpan.FromSeconds(15)); });
+        Assert.True(started.Wait(TimeSpan.FromSeconds(5)), "the wedged item never started");
 
-        // StallThreshold is 5s, polled at 1s — allow up to 8s.
-        Assert.True(stallSeen.Wait(TimeSpan.FromSeconds(8)),
-            "watchdog never reported the wedged item");
+        long threshold = (long)GameLoop.StallThreshold.TotalMilliseconds;
+
+        // One tick short of StallThreshold: no report — not from this check, and
+        // not from the real timer either, since it reads the same clock.
+        Interlocked.Exchange(ref ticks, 1_000 + threshold - 1);
+        loop.RunWatchdogCheck();
+        Assert.False(stallSeen.IsSet, "watchdog reported a stall before the threshold");
+
+        // At the threshold: reported, and only once per item however many
+        // checks (ours or the timer's) run against it.
+        Interlocked.Exchange(ref ticks, 1_000 + threshold);
+        loop.RunWatchdogCheck();
+        loop.RunWatchdogCheck();
+        Assert.True(stallSeen.IsSet, "watchdog never reported the wedged item");
+        Assert.Equal(1, Volatile.Read(ref stalls));
 
         // Un-wedge; queued work must then run (the loop survived).
         release.Set();

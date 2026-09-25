@@ -48,7 +48,8 @@ internal sealed class JsLibraryContext
         Func<string, string>   getGlobal,
         Action<string, string> setGlobal,
         Action<string>         echo,
-        Action<string>         put)
+        Action<string>         put,
+        Func<long>?            clock = null)
     {
         _echo      = echo;
         // Statement trigger only. Unlike the threaded .js runtime, this engine's
@@ -57,7 +58,7 @@ internal sealed class JsLibraryContext
         // so LimitMemory below is a per-call cap here, not the one-way lifetime
         // allowance it silently became on a .js script (#330).
         _guard     = new RunawayLoopGuard(MaxStatementsPerCall, maxBytesBetweenYields: long.MaxValue);
-        _wallClock = new WallClockGuard();
+        _wallClock = new WallClockGuard(clock);
 
         _engine = new Engine(opts =>
         {
@@ -69,6 +70,14 @@ internal sealed class JsLibraryContext
 
         _bridge = new Bridge(getVar, setVar, getGlobal, setGlobal, echo, put);
         _engine.SetValue("__h", _bridge);
+        // The prelude is our own fixed code, not user script: it must never be
+        // cut off by the js/jscall wall-clock budget. A fresh guard is ARMED by
+        // default (Jint calls Constraint.Reset at the top of every Execute, which
+        // re-baselines the 250 ms budget), so without this a cold Jint on a slow
+        // or loaded machine threw JsWallClockException out of the constructor —
+        // the script died at its first <% %> block with no bridge and no output
+        // (CI flake, ScriptInlineJsBlockTests.GlobalsBridgeWorksFromBlock).
+        _wallClock.Disarm();
         _engine.Execute(Prelude);
     }
 
@@ -306,15 +315,21 @@ var game = genie;
 /// so nested Jint entry points can't extend the deadline.</summary>
 internal sealed class WallClockGuard : Jint.Constraint
 {
+    private readonly Func<long> _clock;
     private TimeSpan _budget = TimeSpan.FromMilliseconds(250);
     private long     _deadline = long.MaxValue;
     private bool     _disabled;
+
+    /// <param name="clock">Millisecond tick source; tests inject one that jumps
+    /// so every armed call times out deterministically.</param>
+    public WallClockGuard(Func<long>? clock = null)
+        => _clock = clock ?? (static () => Environment.TickCount64);
 
     public void Arm(TimeSpan budget)
     {
         _disabled = false;
         _budget   = budget;
-        _deadline = Environment.TickCount64 + (long)budget.TotalMilliseconds;
+        _deadline = _clock() + (long)budget.TotalMilliseconds;
     }
 
     /// <summary>Run with no wall-clock cap (inline &lt;% %&gt; blocks, public #322).
@@ -328,13 +343,13 @@ internal sealed class WallClockGuard : Jint.Constraint
 
     public override void Check()
     {
-        if (!_disabled && Environment.TickCount64 > _deadline) throw new JsWallClockException();
+        if (!_disabled && _clock() > _deadline) throw new JsWallClockException();
     }
 
     public override void Reset()
         => _deadline = _disabled
             ? long.MaxValue
-            : Environment.TickCount64 + (long)_budget.TotalMilliseconds;
+            : _clock() + (long)_budget.TotalMilliseconds;
 }
 
 /// <summary>Thrown by <see cref="WallClockGuard"/> when a synchronous js/jscall

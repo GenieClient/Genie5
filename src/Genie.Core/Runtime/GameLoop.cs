@@ -50,6 +50,13 @@ public sealed class GameLoop : IDisposable
     private long _itemStartedTicks;
     private int _stallReported;
 
+    /// <summary>Millisecond tick source behind the watchdog (the item start stamp
+    /// and the stall check). Tests substitute a hand-advanced clock and drive
+    /// <see cref="RunWatchdogCheck"/> themselves, so the stall report is decided
+    /// by arithmetic rather than by a thread-pool timer keeping its schedule on a
+    /// loaded runner.</summary>
+    internal Func<long> TickSource { get; set; } = static () => Environment.TickCount64;
+
     private volatile bool _shuttingDown;
 
     /// <summary>Raised (on a thread-pool thread) when one work item has been
@@ -210,7 +217,7 @@ public sealed class GameLoop : IDisposable
 
     private void Execute(Action item)
     {
-        Volatile.Write(ref _itemStartedTicks, Environment.TickCount64);
+        Volatile.Write(ref _itemStartedTicks, TickSource());
         Volatile.Write(ref _stallReported, 0);
         try
         {
@@ -227,11 +234,15 @@ public sealed class GameLoop : IDisposable
         }
     }
 
+    /// <summary>One watchdog pass, on the caller's thread — what the timer does
+    /// once a second. Test seam (paired with <see cref="TickSource"/>).</summary>
+    internal void RunWatchdogCheck() => WatchdogCheck(null);
+
     private void WatchdogCheck(object? _)
     {
         var started = Volatile.Read(ref _itemStartedTicks);
         if (started == 0) return;   // idle
-        var elapsed = TimeSpan.FromMilliseconds(Environment.TickCount64 - started);
+        var elapsed = TimeSpan.FromMilliseconds(TickSource() - started);
         if (elapsed < StallThreshold) return;
         if (Interlocked.Exchange(ref _stallReported, 1) == 1) return;   // once per item
         try { Stalled?.Invoke(elapsed); } catch { /* observer must not kill the timer */ }

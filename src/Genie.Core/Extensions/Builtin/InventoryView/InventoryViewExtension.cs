@@ -79,6 +79,12 @@ public sealed class InventoryViewExtension : IGameExtension
     /// <c>/iv scan</c>. Settable for tests.</summary>
     internal TimeSpan ScanIdleTimeout { get; set; } = TimeSpan.FromSeconds(45);
 
+    /// <summary>The clock the scan deadline is stamped and checked against. Tests
+    /// substitute a hand-advanced clock so the idle timeout is exercised by
+    /// arithmetic instead of by racing a real <c>Task.Delay</c> against the
+    /// watchdog — a loaded CI runner overshoots a delay by hundreds of ms.</summary>
+    internal Func<DateTime> UtcNow { get; set; } = static () => DateTime.UtcNow;
+
     // ── UI-facing surface ──────────────────────────────────────────────────────
     /// <summary>The catalog changed (scan complete, reload, repair, or character
     /// removed). Raised on the game/parser thread — UI subscribers marshal.</summary>
@@ -751,7 +757,7 @@ public sealed class InventoryViewExtension : IGameExtension
     /// long vault list keeps the scan alive while pure chatter does not.</summary>
     private void TouchScan(int extraSeconds = 0) =>
         Interlocked.Exchange(ref _scanDeadlineTicks,
-            (DateTime.UtcNow + ScanIdleTimeout + TimeSpan.FromSeconds(extraSeconds)).Ticks);
+            (UtcNow() + ScanIdleTimeout + TimeSpan.FromSeconds(extraSeconds)).Ticks);
 
     /// <summary>One task per scan: sleep until the deadline, and if nothing has
     /// pushed it out by then, abandon the scan. Re-sleeps whenever
@@ -768,7 +774,7 @@ public sealed class InventoryViewExtension : IGameExtension
                 {
                     var remaining =
                         new DateTime(Interlocked.Read(ref _scanDeadlineTicks), DateTimeKind.Utc)
-                        - DateTime.UtcNow;
+                        - UtcNow();
                     if (remaining <= TimeSpan.Zero)
                     {
                         AbandonScan(

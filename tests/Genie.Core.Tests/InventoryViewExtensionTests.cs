@@ -274,6 +274,16 @@ public class InventoryViewExtensionTests
     }
 
     // ── Scan lifecycle: nothing may wedge the FSM permanently ────────────────
+    //
+    // The idle timeout is driven by a hand-advanced clock (ext.UtcNow), never by
+    // sleeping: these tests used to race Task.Delay against the watchdog's real
+    // deadline and failed on a loaded ubuntu runner when one 150 ms delay
+    // stretched past the 400 ms window (2026-09-22 / 2026-09-24 CI). The
+    // watchdog task still sleeps for real between checks, but whether it gives up
+    // is decided purely by the fake clock, so scheduling can only change WHEN a
+    // verdict lands, never WHICH verdict.
+
+    private static DateTime FakeClockStart => new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     [Fact]
     public async Task A_scan_the_game_never_advances_times_out_and_unblocks()
@@ -281,6 +291,8 @@ public class InventoryViewExtensionTests
         var host = NewHost();
         var ext  = new InventoryViewExtension();
         ext.Initialize(host);
+        var now = FakeClockStart;
+        ext.UtcNow = () => now;
         ext.ScanIdleTimeout = TimeSpan.FromMilliseconds(150);
 
         ext.OnSlashCommand("/iv scan");
@@ -288,7 +300,9 @@ public class InventoryViewExtensionTests
         Feed(ext, "  a backpack");
         Feed(ext, "Roundtime: 0 secs.");   // → VaultStart, waiting on the vault book
         Assert.True(ext.ScanInProgress);
-        // …and the game never answers (stunned, hands full, reworded message).
+        // …and the game never answers (stunned, hands full, reworded message):
+        // the clock runs well past the idle window (plus the RT grace) untouched.
+        now += TimeSpan.FromSeconds(10);
 
         await WaitUntil(() => !ext.ScanInProgress);
 
@@ -308,21 +322,29 @@ public class InventoryViewExtensionTests
         var host = NewHost();
         var ext  = new InventoryViewExtension();
         ext.Initialize(host);
+        var now = FakeClockStart;
+        ext.UtcNow = () => now;
         ext.ScanIdleTimeout = TimeSpan.FromMilliseconds(400);
 
         ext.OnSlashCommand("/iv scan");
         Feed(ext, "You have:");
         // A long list trickling in over more than one timeout window must survive:
-        // every catalogued line pushes the deadline out.
+        // every catalogued line pushes the deadline out. 900 ms of game time pass
+        // across six lines, none more than 150 ms apart — on the fake clock, so
+        // no gap can be stretched by a slow runner.
         for (int i = 0; i < 6; i++)
         {
-            await Task.Delay(150);
+            now += TimeSpan.FromMilliseconds(150);
             Feed(ext, $"  item {i}");
         }
         Assert.True(ext.ScanInProgress);
         Assert.Equal(6, ext.SnapshotCatalog().Single(c => c.Source == "Inventory").Items.Count);
 
-        ext.OnSlashCommand("/iv cancel");
+        // And the deadline really did ride along with the LAST line: one full
+        // idle window after it, the watchdog gives up.
+        now += TimeSpan.FromMilliseconds(401);
+        await WaitUntil(() => !ext.ScanInProgress);
+        Assert.Contains(host.Echoed, e => e.Contains("gave up waiting"));
     }
 
     [Fact]
