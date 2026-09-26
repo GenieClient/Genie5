@@ -137,11 +137,15 @@ public class MapperDetailsFlyoutHeadlessTests
 
             // The float's content must sit clear of the Win32 resize grip, or
             // the edge third of this strip is non-client (see GenieHostWindow).
-            Assert.True(host.ExtendClientAreaToDecorationsHint,
-                "Dock's theme extends the client area for a lone floated tool; the inset keys off that");
+            // Windows-only: Dock's Linux branch never sets the chrome's floating
+            // pseudo-classes (see GenieHostWindow's IsFloating note), so the
+            // theme leaves ExtendClientAreaToDecorationsHint false there and the
+            // inset is correctly zero.
             var presenter = host.GetVisualDescendants().OfType<Control>().First(c => c.Name == "PART_ContentPresenter");
             if (OperatingSystem.IsWindows())
             {
+                Assert.True(host.ExtendClientAreaToDecorationsHint,
+                    "Dock's theme extends the client area for a lone floated tool; the inset keys off that");
                 var band = Math.Ceiling(GenieHostWindow.ResizeGripBandPx / Math.Max(host.RenderScaling, 0.5));
                 Assert.Equal(new Thickness(band, 0, band, band), host.ResizeGripInset);
                 Assert.Equal(host.ResizeGripInset, presenter.Margin);
