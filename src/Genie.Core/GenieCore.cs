@@ -705,6 +705,17 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
                                RaiseScriptOutput(cmd);
                                _typeAhead.NotifySent();
+                               // The mapper must see script sends exactly as it sees
+                               // SendToGame's (below, :1508). It keeps the LAST sent
+                               // move pending until the next room block, and a refused
+                               // move ("You can't go there.") emits no room block, so
+                               // only a later send can clear it. Live 2026-09-26: a typed
+                               // `up` the game refused stayed pending while
+                               // automapper.cmd's `climb massive stairway` (this sink)
+                               // moved the player; the arrival was attributed to `up`
+                               // and auto-create wrote a phantom up/down arc pair
+                               // between the two rooms.
+                               AutoMapper.OnCommandSent(cmd);
                                // Offline (no live connection) the game-bound send is
                                // dropped — a script can still run, set variables,
                                // toggle trigger classes and #connect (issue #88).

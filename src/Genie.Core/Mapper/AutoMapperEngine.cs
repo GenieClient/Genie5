@@ -534,6 +534,19 @@ public sealed class AutoMapperEngine
             ? _pendingDirection.ToString().ToLowerInvariant()
             : _pendingMoveCommand.Length > 0 ? _pendingMoveCommand : "-";
 
+    /// <summary>
+    /// The command the next room block will be attributed to: a compass
+    /// primitive ("up", "northeast") or the raw non-compass send ("climb massive
+    /// stairway"); empty when nothing is pending. Read-only — what
+    /// <see cref="OnCommandSent"/> last recorded, as the <c>#config mapperdebug</c>
+    /// trace prints it. Every send sink must feed <see cref="OnCommandSent"/>, or
+    /// a refused move stays here and the next arrival authors a phantom arc.
+    /// </summary>
+    public string PendingMove =>
+        _pendingDirection != Direction.None
+            ? _pendingDirection.ToString().ToLowerInvariant()
+            : _pendingMoveCommand;
+
     private string DescribeCurrent() =>
         CurrentNode is { } n ? $"#{n.Id}" : "(unplaced)";
 
