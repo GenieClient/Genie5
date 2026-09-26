@@ -1163,16 +1163,33 @@
           <!-- the hover host: its IsPointerOver, OR ViewModel.DetailsPinned, -->
           <!-- decides which child shows. Both the strip and the open panel  -->
           <!-- are children of this one host, so moving between them never   -->
-          <!-- drops the hover — no open/close flicker. -->
+          <!-- drops the hover — no open/close flicker. The strip is also a  -->
+          <!-- click-to-pin button (see its note on the Windows float edge). -->
           <Border x:Name="DetailsFlyout"
                   HorizontalAlignment="Right" VerticalAlignment="Stretch">
             <Grid>
 
-              <!-- Collapsed strip — shown whenever the panel is hidden. -->
-              <Border x:Name="DetailsStrip" Width="24"
-                      Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1,0,0,0"
-                      IsVisible="{Binding !#DetailsPanel.IsVisible}"
-                      ToolTip.Tip="Hover to open the Details panel; use the pin inside to keep it open.">
+              <!-- Collapsed strip — shown whenever the panel is hidden. A
+                   ToggleButton bound to DetailsPinned, not a plain Border: a
+                   CLICK pins the panel open. Hover alone proved unreliable in
+                   the (default) floated Mapper — Dock's tool float extends the
+                   client area for its custom chrome, and on Windows Avalonia
+                   answers WM_NCHITTEST with HTRIGHT for the outer 8 px of such
+                   a window (WindowImpl.HitTestNCA, AdjustWindowRectEx band), so
+                   the third of this strip that sits flush against the window
+                   edge never receives pointer events and crossing into it
+                   raises LeaveWindow, which clears IsPointerOver and snaps the
+                   panel shut. The click gives a path that no edge geometry can
+                   swallow; the pin inside the panel releases it again. -->
+              <ToggleButton x:Name="DetailsStrip" Width="24"
+                            IsChecked="{Binding ViewModel.DetailsPinned}"
+                            Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1,0,0,0"
+                            CornerRadius="0" Padding="0" MinHeight="0" MinWidth="0"
+                            VerticalAlignment="Stretch"
+                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                            IsVisible="{Binding !#DetailsPanel.IsVisible}"
+                            AutomationProperties.Name="Open details panel"
+                            ToolTip.Tip="Hover to slide the Details panel out, or click to pin it open; the pin inside releases it.">
                 <!-- LayoutTransformControl, not RenderTransform: a render
                      transform doesn't affect layout, so the text was measured
                      against the strip's 24px WIDTH and clipped to "DETA"
@@ -1185,7 +1202,7 @@
                   <TextBlock Text="DETAILS" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
                              FontWeight="SemiBold"/>
                 </LayoutTransformControl>
-              </Border>
+              </ToggleButton>
 
               <!-- Expanded panel — visible while hovered or pinned. Wrapped  -->
               <!-- in a ScrollViewer so the content scrolls if the panel is   -->

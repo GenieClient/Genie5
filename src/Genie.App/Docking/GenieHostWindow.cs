@@ -59,6 +59,14 @@ public sealed class GenieHostWindow : HostWindow
         // dismissal stays what it was: Close, then reopen from the Window menu.
         DoubleTapped += OnWindowDoubleTapped;
 
+        // The Windows resize-grip inset (see ApplyResizeGripInset). The hint is
+        // set by Dock's theme through a pseudo-class, so it can flip after the
+        // template is applied; the band is in physical pixels, so it changes
+        // in DIPs when the window crosses to a monitor with another scale.
+        this.GetObservable(ExtendClientAreaToDecorationsHintProperty)
+            .Subscribe(new AnonymousObserver<bool>(_ => ApplyResizeGripInset()));
+        ScalingChanged += (_, _) => ApplyResizeGripInset();
+
         // Issue #3: a floated panel that was maximized then closed can reopen
         // off-screen (saved restore-bounds land beyond the visible desktop on a
         // multi-monitor setup — seen as a sliver at a monitor's far edge). On open,
@@ -338,9 +346,58 @@ public sealed class GenieHostWindow : HostWindow
             Position = new PixelPoint(x, y);
     }
 
+    /// <summary>Physical pixels Avalonia's Win32 backend claims as a resize grip
+    /// along the left / right / bottom edges of a window whose client area is
+    /// extended into the frame: <c>WindowImpl.HitTestNCA</c> answers
+    /// <c>WM_NCHITTEST</c> with HTLEFT / HTRIGHT / HTBOTTOM inside the
+    /// <c>AdjustWindowRectEx</c> border, which is SM_CXFRAME + SM_CXPADDEDBORDER
+    /// = 8 px and is NOT DPI-scaled (the plain, not the ForDpi, call).</summary>
+    internal const int ResizeGripBandPx = 8;
+
+    private Control? _contentPresenter;
+
+    /// <summary>The inset currently applied to the window's content presenter
+    /// (zero off Windows or while the client area is not extended).</summary>
+    public Thickness ResizeGripInset { get; private set; }
+
+    /// <summary>Keep the content clear of the OS resize grip.
+    /// <para>Dock floats a lone tool with its chrome controlling the whole window
+    /// (<c>:toolchromecontrolswindow</c>), and the theme extends the client area
+    /// for that custom chrome. On Windows that makes the outer
+    /// <see cref="ResizeGripBandPx"/> of the CONTENT non-client: those pixels
+    /// never receive pointer events, and moving into them raises LeaveWindow,
+    /// which clears IsPointerOver on the whole tree. Anything sitting flush
+    /// against a float's edge is bitten — the Mapper's hover-to-open Details
+    /// strip (24 px wide, a third of it dead and the rest snapping shut as the
+    /// pointer reaches the edge; field report: "does not pop out"), and the
+    /// right-hand third of any float's vertical scrollbar.</para>
+    /// <para>Insetting the content presenter by the band gives the content the
+    /// whole client area it can actually see and leaves the grip where a window
+    /// border is expected. The band is physical, so it is converted at the
+    /// current scale; off Windows the other backends put the grip outside the
+    /// client area and no inset is needed.</para></summary>
+    private void ApplyResizeGripInset()
+    {
+        if (_contentPresenter is null) return;
+        double inset = 0;
+        if (OperatingSystem.IsWindows() && ExtendClientAreaToDecorationsHint)
+        {
+            var scale = RenderScaling <= 0 ? 1.0 : RenderScaling;
+            inset = Math.Ceiling(ResizeGripBandPx / scale);
+        }
+        ResizeGripInset = new Thickness(inset, 0, inset, inset);
+        if (_contentPresenter.Margin != ResizeGripInset)
+            _contentPresenter.Margin = ResizeGripInset;
+    }
+
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);
+
+        // Dock's HostWindow template hosts the whole float (chrome + tool) in
+        // PART_ContentPresenter; the resize-grip inset goes on it.
+        _contentPresenter = e.NameScope.Find<Control>("PART_ContentPresenter");
+        ApplyResizeGripInset();
 
         if (_titleBar is not null)
             _titleBar.DoubleTapped -= OnTitleBarDoubleTapped;
