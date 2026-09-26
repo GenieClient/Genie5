@@ -241,6 +241,11 @@ finally remembering where you left every panel.
 - **A Discord post on every pull request** (#32).
 - **Timestamps never reach trigger matching** — validated and pinned by a
   test, closing a Genie 4 fault that does not reproduce here (#244).
+- **The Injuries panel's Auto-refresh is gone** — with the server's injuries
+  dialog feeding the panel, the opt-in silent `health` poll no longer earns
+  its keep. The picker and `#config injuriespoll` are removed; a stale value
+  in `settings.cfg` is ignored. Typing `health` still refines the
+  nervous-system reading and clears any region the report no longer names.
 
 ---
 
