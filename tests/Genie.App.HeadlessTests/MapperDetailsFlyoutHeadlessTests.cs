@@ -84,6 +84,9 @@ public class MapperDetailsFlyoutHeadlessTests
             var panel = Named<Border>(window, "DetailsPanel");
             Assert.True(strip.IsVisible, "strip should show while the panel is hidden");
             Assert.False(panel.IsVisible, "panel should start hidden");
+            Assert.True(panel.GetVisualParent()!.GetVisualChildren().ToList().IndexOf(panel) >
+                        strip.GetVisualParent()!.GetVisualChildren().ToList().IndexOf(strip),
+                "the panel must be declared after the strip so it draws over it");
 
             var centre = strip.TranslatePoint(new Point(strip.Bounds.Width / 2, strip.Bounds.Height / 2), window);
             Assert.NotNull(centre);
@@ -91,12 +94,15 @@ public class MapperDetailsFlyoutHeadlessTests
             Pump(window);
 
             Assert.True(panel.IsVisible, $"hovering the strip at {centre} did not open the panel (strip.IsPointerOver={strip.IsPointerOver}, flyout.IsPointerOver={Named<Border>(window, "DetailsFlyout").IsPointerOver})");
+            // The strip must stay in the tree under the open panel: it is the
+            // element the pointer is over, and hiding it makes the renderer's
+            // re-hit-test drop the hover — the open/close flicker of 9/26.
+            Assert.True(strip.IsVisible, "the strip must not collapse when the panel opens");
 
             // Move well away → auto-hide.
             window.MouseMove(new Point(50, 300));
             Pump(window);
             Assert.False(panel.IsVisible, "panel should auto-hide once the pointer leaves");
-            Assert.True(strip.IsVisible);
         }
         finally { window.Close(); }
     }
@@ -191,7 +197,7 @@ public class MapperDetailsFlyoutHeadlessTests
 
             Assert.True(vm.DetailsPinned, "checking the strip should pin the panel");
             Assert.True(panel.IsVisible);
-            Assert.False(strip.IsVisible, "the strip yields to the open panel");
+            Assert.True(strip.IsVisible, "the strip stays under the open panel");
 
             // Pinned: the pointer being elsewhere does not hide it.
             window.MouseMove(new Point(50, 300));
@@ -202,7 +208,6 @@ public class MapperDetailsFlyoutHeadlessTests
             vm.DetailsPinned = false;
             Pump(window);
             Assert.False(panel.IsVisible);
-            Assert.True(strip.IsVisible);
             Assert.False(strip.IsChecked ?? false, "the strip mirrors the pin state");
         }
         finally { window.Close(); }

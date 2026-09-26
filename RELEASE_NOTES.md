@@ -126,14 +126,16 @@ finally remembering where you left every panel.
   while offering a control for neither (#369).
 
 ## 🐛 Fixes
-- **The Mapper's DETAILS strip opens on hover in a floated Mapper** — a
+- **The Mapper's DETAILS panel opens on hover and stays open** — hovering the
+  collapsed strip flickered the panel open and shut about ten times a second
+  instead of sliding it out: opening the panel removed the strip from under
+  the pointer, the hover dropped, the panel closed, and the strip's return
+  started it over. The strip now stays put beneath the open panel. Also, a
   floated panel draws its own title bar, and on Windows the outer 8 px of
-  such a window are the invisible resize grip: the mouse never reached the
-  edge third of the strip, and reaching for the edge snapped an open panel
-  shut. Floats now keep their content clear of the grip (the same band was
-  eating the outer third of every float's vertical scrollbar), and the strip
-  can be tapped to pin the panel open — the way in for touch and pen, which
-  never hover.
+  such a window are the invisible resize grip; floats now keep their content
+  clear of it (the same band was eating the outer third of every float's
+  vertical scrollbar), and the strip can be tapped to pin the panel open —
+  the way in for touch and pen, which never hover.
 
 - **`%list.length` and bare `%var = value` lines work as they do in
   Genie 4** — `.length` resolved a variable of that literal name instead of

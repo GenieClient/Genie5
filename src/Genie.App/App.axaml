@@ -1169,25 +1169,29 @@
                   HorizontalAlignment="Right" VerticalAlignment="Stretch">
             <Grid>
 
-              <!-- Collapsed strip — shown whenever the panel is hidden. A
-                   ToggleButton bound to DetailsPinned, not a plain Border: a
-                   CLICK pins the panel open. Hover alone proved unreliable in
-                   the (default) floated Mapper — Dock's tool float extends the
-                   client area for its custom chrome, and on Windows Avalonia
-                   answers WM_NCHITTEST with HTRIGHT for the outer 8 px of such
-                   a window (WindowImpl.HitTestNCA, AdjustWindowRectEx band), so
-                   the third of this strip that sits flush against the window
-                   edge never receives pointer events and crossing into it
-                   raises LeaveWindow, which clears IsPointerOver and snaps the
-                   panel shut. The click gives a path that no edge geometry can
-                   swallow; the pin inside the panel releases it again. -->
+              <!-- Collapsed strip — ALWAYS present; the open panel (declared
+                   after it, so drawn on top) simply covers it. It must NOT be
+                   hidden while the panel shows: the strip is the element the
+                   pointer is over when the panel opens, and Avalonia re-hit-
+                   tests the pointer after every scene invalidation
+                   (TopLevel.SceneInvalidated → PointerOverPreProcessor). With
+                   the strip collapsing on open, that re-hit-test landed on the
+                   map beneath before the panel was in the scene, IsPointerOver
+                   dropped off the flyout, the panel hid, the strip came back,
+                   the next re-hit-test found it again — a ~10 Hz open/close
+                   flicker the user read as "does not pop out" (recorded 9/26).
+                   The headless renderer never raises SceneInvalidated, so a
+                   test cannot catch this; the invariant it guards is that the
+                   element under the pointer never disappears on open.
+                   A ToggleButton bound to DetailsPinned, not a plain Border,
+                   so a TAP pins the panel open — the way in for touch and pen,
+                   which never set IsPointerOver. -->
               <ToggleButton x:Name="DetailsStrip" Width="24"
                             IsChecked="{Binding ViewModel.DetailsPinned}"
                             Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1,0,0,0"
                             CornerRadius="0" Padding="0" MinHeight="0" MinWidth="0"
-                            VerticalAlignment="Stretch"
+                            VerticalAlignment="Stretch" HorizontalAlignment="Right"
                             HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                            IsVisible="{Binding !#DetailsPanel.IsVisible}"
                             AutomationProperties.Name="Open details panel"
                             ToolTip.Tip="Hover to slide the Details panel out, or click to pin it open; the pin inside releases it.">
                 <!-- LayoutTransformControl, not RenderTransform: a render
@@ -1204,7 +1208,8 @@
                 </LayoutTransformControl>
               </ToggleButton>
 
-              <!-- Expanded panel — visible while hovered or pinned. Wrapped  -->
+              <!-- Expanded panel — visible while hovered or pinned; covers  -->
+              <!-- the strip (see above). Wrapped                              -->
               <!-- in a ScrollViewer so the content scrolls if the panel is   -->
               <!-- short / the user adds long Notes text. -->
               <Border x:Name="DetailsPanel" Width="260"
