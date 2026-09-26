@@ -222,58 +222,25 @@ public class InjuriesParsingTests
         Assert.Empty(events.OfType<InjuryEvent>());
     }
 
-    private const string SilentHealthResponse =
+    private const string MonoHealthResponse =
         "<output class=\"mono\"/>" +
         "You have a few nicks and scratches.\n" +
         "You have a strange case of muscle twitching.\n" +
         "<output class=\"\"/>";
 
     [Fact]
-    public void SilentWindow_SuppressesHealthResponse_ButStillRefinesNsys()
+    public void MonoHealthBlock_DisplaysAndRefinesNsys()
     {
-        var parser = new DrXmlParser(NullLogger<DrXmlParser>.Instance);
-        var events = new List<GameEvent>();
-        using var _ = parser.GameEvents.Subscribe(new Collector(events));
-
-        parser.BeginSilentHealthWindow();
-        parser.Feed(SilentHealthResponse);
-        parser.Feed("A sleazy lout swings a cudgel at you!\n");
-
-        // The polled response is invisible: no text, no output-class brackets.
-        Assert.Empty(events.OfType<TextEvent>().Where(t => t.Text.StartsWith("You have")));
-        Assert.Empty(events.OfType<OutputClassEvent>());
-
-        // …but its nerve line still refined the nsys reading.
-        var nsys = Assert.Single(events.OfType<InjuryEvent>());
-        Assert.Equal(InjuryKind.Wound, nsys.Kind);
-        Assert.Equal(1, nsys.Severity);
-
-        // The window closed with the response — later text flows normally.
-        Assert.Contains(events.OfType<TextEvent>(), t => t.Text.StartsWith("A sleazy lout"));
-    }
-
-    [Fact]
-    public void UnarmedMonoBlock_FlowsNormally()
-    {
-        var events = Feed(SilentHealthResponse);
+        // A typed `health` response (mono-bracketed) displays in full AND its
+        // nerve line refines the nsys reading — nothing is ever swallowed.
+        var events = Feed(MonoHealthResponse);
 
         Assert.Contains(events.OfType<TextEvent>(), t => t.Text == "You have a few nicks and scratches.");
         Assert.Equal(2, events.OfType<OutputClassEvent>().Count());
-    }
 
-    [Fact]
-    public void SilentWindow_ExpiresWithoutResponse()
-    {
-        var parser = new DrXmlParser(NullLogger<DrXmlParser>.Instance);
-        var events = new List<GameEvent>();
-        using var _ = parser.GameEvents.Subscribe(new Collector(events));
-
-        // Arm with an already-expired window: the mono bracket must NOT open
-        // suppression, so the block displays like normal output.
-        parser.BeginSilentHealthWindow(TimeSpan.FromSeconds(-1));
-        parser.Feed(SilentHealthResponse);
-
-        Assert.Contains(events.OfType<TextEvent>(), t => t.Text == "You have a few nicks and scratches.");
+        var nsys = Assert.Single(events.OfType<InjuryEvent>());
+        Assert.Equal(InjuryKind.Wound, nsys.Kind);
+        Assert.Equal(1, nsys.Severity);
     }
 
     // ── `health` summary clears a stale panel (post-death staleness) ─────────

@@ -881,85 +881,6 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             name => Scripts.Globals.TryGetValue(name, out var v) ? v : "");
         // Log every top-level command (incl. script-fired #goto) to the audit.
         Commands.CommandObserved = cmd => _liveAudit.Note("CMD", cmd);
-
-        // ── Injuries auto-refresh (#18) ───────────────────────────────────────
-        // Opt-in silent `health` poll that refines the nervous-system reading
-        // (wound vs scar — the dialog image can't say). A coarse 5 s ticker
-        // reads Config.InjuriesPollSeconds live each tick, so `#config
-        // injuriespoll N` (or the panel picker) applies without a restart and
-        // 0 keeps it fully idle. The tick itself gates on connection + prior
-        // injuries-dialog data, so Wizard/plain-text sessions never poll.
-        _injuriesPollTimer = new System.Threading.Timer(
-            _ => InjuriesPollTick(), null,
-            dueTime: TimeSpan.FromSeconds(5), period: TimeSpan.FromSeconds(5));
-    }
-
-    private System.Threading.Timer? _injuriesPollTimer;
-    private DateTimeOffset _lastInjuriesPoll = DateTimeOffset.MinValue;
-    private int _injuriesPollBusy;
-
-    /// <summary>
-    /// Live gate the host wires once: returns true while the Injuries panel is
-    /// actually open. The poll exists solely to feed that panel, so when the
-    /// window is closed there is no reason to send anything — the tick skips
-    /// (and resumes on the configured cadence when the panel reopens). A
-    /// callback rather than a pushed flag so it can never go stale; null
-    /// (headless Core, TestHarness) means "no panel concept — allow".
-    /// Read a cheap thread-safe snapshot here — the timer fires off the UI
-    /// thread, so don't walk UI trees in this callback.
-    /// </summary>
-    public Func<bool>? InjuriesPanelVisible { get; set; }
-
-    private bool _wasDeadPrompt;
-
-    /// <summary>
-    /// Resurrection resync (#18). DR pushes the injuries dialog only while the
-    /// character is conscious — through a death and back it sends nothing but
-    /// health2 bars — so the wound wipe that comes with a resurrection is never
-    /// announced and the panel keeps showing the injuries the character died
-    /// with. The DEAD prompt is the only marker available (DR never sends an
-    /// IconDEAD indicator), so a DEAD-to-alive transition makes the auto-refresh
-    /// poll due immediately: its `health` summary clears the healed regions.
-    /// Every gate of the periodic poll still applies — with the cadence Off the
-    /// client sends nothing and the panel corrects on the next typed `health`.
-    /// </summary>
-    private void NoteDeathPrompt(string indicator)
-    {
-        var dead = indicator.Contains("DEAD", StringComparison.OrdinalIgnoreCase);
-        if (dead == _wasDeadPrompt) return;
-        _wasDeadPrompt = dead;
-        if (!dead) _lastInjuriesPoll = DateTimeOffset.MinValue;   // alive again → poll on the next tick
-    }
-
-    private void InjuriesPollTick()
-    {
-        var interval = Config.InjuriesPollSeconds;
-        if (interval <= 0) return;                       // feature off (default)
-        if (_connection is null || _parser is null) return;
-        if (InjuriesPanelVisible is { } panelOpen && !panelOpen()) return;
-
-        // Only poll sessions that have actually received the injuries dialog —
-        // this is what makes the poll meaningful AND excludes Wizard mode
-        // (plain text has no dialog, and no output-class brackets to gag).
-        if (_state.Injuries.IsEmpty) return;
-
-        if ((DateTimeOffset.UtcNow - _lastInjuriesPoll).TotalSeconds < interval) return;
-        if (System.Threading.Interlocked.Exchange(ref _injuriesPollBusy, 1) == 1) return;
-
-        _lastInjuriesPoll = DateTimeOffset.UtcNow;
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                // Arm the parser's suppression window FIRST so the response is
-                // consumed silently, then send raw (no echo, no triggers —
-                // this is not user input).
-                _parser?.BeginSilentHealthWindow();
-                await SendCommandAsync("health");
-            }
-            catch { /* disconnected mid-poll — next tick re-checks */ }
-            finally { System.Threading.Volatile.Write(ref _injuriesPollBusy, 0); }
-        });
     }
 
     /// <summary>
@@ -1094,7 +1015,6 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                     break;
 
                 case PromptEvent pe:
-                    NoteDeathPrompt(pe.Indicator);  // resurrection → resync injuries
                     _typeAhead.NotifyConsumed();   // server caught up → free a type-ahead slot
                     // Unblock `move` BEFORE resuming RT/pause scripts (OnPrompt).
                     // We coalesce the room-change to the prompt (turn boundary)
@@ -2570,8 +2490,6 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _heartbeat?.Dispose();
         _heartbeat = null;
         _loop?.Dispose();
-        _injuriesPollTimer?.Dispose();
-        _injuriesPollTimer = null;
         _liveAudit.Dispose();
         AutoMapper.CurrentNodeChanged -= SyncMapperGlobals;
         Plugins.Shutdown();

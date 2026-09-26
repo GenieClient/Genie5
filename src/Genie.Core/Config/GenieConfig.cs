@@ -299,18 +299,6 @@ public sealed class GenieConfig
     public int AutoWalkUnfocusSeconds { get; set; } = 60;
     public double RoundTimeOffset { get; set; }
 
-    /// <summary>
-    /// Injuries auto-refresh (#18): seconds between silent <c>health</c> polls
-    /// that refine the nervous-system reading (the injuries dialog's Nsys image
-    /// can't say wound vs scar — only the <c>health</c> text can). 0 = off (the
-    /// default; Genie never sends unprompted commands unless the user opts in).
-    /// Non-zero values are floored at 10 s so a typo can't spam the server.
-    /// Set from the Injuries panel's Auto-refresh picker or
-    /// <c>#config injuriespoll N</c>. Polls additionally require the Injuries
-    /// panel to be open (<c>GenieCore.InjuriesPanelVisible</c> gate) — a
-    /// closed window has no reason to refresh.
-    /// </summary>
-    public int InjuriesPollSeconds { get; set; }
     /// <summary>Injuries panel layout: true = assembled body figure, false =
     /// the 4×4 part grid (default). Set from the panel's Figure-layout toggle
     /// or <c>#config injurieslayout figure|grid</c>.</summary>
@@ -787,7 +775,6 @@ public sealed class GenieConfig
         ("scripttimeout", ScriptTimeout.ToString()),
         ("maxgosubdepth", MaxGoSubDepth.ToString()),
         ("roundtimeoffset", RoundTimeOffset.ToString()),
-        ("injuriespoll", InjuriesPollSeconds.ToString()),
         ("injurieslayout", InjuriesFigureLayout ? "figure" : "grid"),
         ("objectscreatures", ObjectsShowCreatures.ToString()),
         ("objectsconfigbar", ObjectsConfigBar.ToString()),
@@ -902,7 +889,7 @@ public sealed class GenieConfig
         ("Connection",       new[] { "activitytimeout", "classicconnect", "conndebug", "connectscript", "flagscheck", "frontend", "reconnect" }),
         ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause", "lichdebug" }),
         ("Window / Input",   new[] { "alwaysontop", "alwaysshowscrollbars", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines", "useeditorgamewindow", "useeditorrawxmlwindow", "useeditorstreamwindow" }),
-        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injuriespoll", "injurieslayout", "objectscreatures", "objectsconfigbar" }),
+        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injurieslayout", "objectscreatures", "objectsconfigbar" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases", "serverdialogs" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "tracesends", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "scriptdebugwindow", "gamethread" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug", "showmapspoilers", "avoidmapspoilers" }),
@@ -974,12 +961,6 @@ public sealed class GenieConfig
                 case "scripttimeout": ScriptTimeout = (int)UtilityCore.StringToDouble(value); break;
                 case "maxgosubdepth": MaxGoSubDepth = int.TryParse(value, out var mgd) ? mgd : MaxGoSubDepth; break;
                 case "roundtimeoffset": RoundTimeOffset = UtilityCore.StringToDouble(value); break;
-                case "injuriespoll":
-                    // 0 (off) or ≥10 s — floor non-zero values so a typo like
-                    // "1" can't hammer the server with health commands.
-                    var ips = (int)UtilityCore.StringToDouble(value);
-                    InjuriesPollSeconds = ips <= 0 ? 0 : Math.Max(10, ips);
-                    break;
                 case "injurieslayout":
                     // "figure" or "grid"; anything else falls back to grid.
                     InjuriesFigureLayout = value.Trim().Equals("figure", StringComparison.OrdinalIgnoreCase);

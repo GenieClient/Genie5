@@ -841,15 +841,6 @@
           <CheckBox Content="Figure layout" FontSize="10" MinHeight="0" Padding="4,0"
                     IsChecked="{Binding ViewModel.FigureLayout}"
                     ToolTip.Tip="Show the body parts assembled into a figure instead of the 4×4 grid. Same setting as #config injurieslayout figure|grid."/>
-          <!-- opt-in silent `health` poll cadence (#config injuriespoll) — the
-               only way to tell nerve wound from nerve scar. Off by default. -->
-          <StackPanel Orientation="Horizontal" Spacing="6"
-                      ToolTip.Tip="Silently sends 'health' on this cadence to refine the nerve reading (wound vs scar) — the injuries dialog alone can't tell. Off by default; the response never shows in the game window, and polling pauses whenever this panel is closed. Same setting as #config injuriespoll.">
-            <TextBlock Text="Auto-refresh" FontSize="10" Foreground="{DynamicResource Theme.TextSecondary}" VerticalAlignment="Center"/>
-            <ComboBox ItemsSource="{Binding ViewModel.RefreshOptions}"
-                      SelectedIndex="{Binding ViewModel.RefreshIndex}"
-                      FontSize="10" MinWidth="72" Padding="6,2"/>
-          </StackPanel>
           <TextBlock Text="No injuries." Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"
                      IsVisible="{Binding ViewModel.IsEmpty}"/>
           <ItemsControl ItemsSource="{Binding ViewModel.Injured}"

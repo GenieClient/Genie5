@@ -203,27 +203,6 @@ public sealed partial class DrXmlParser : IDisposable
             ["menuimage"]      = DialogControlType.MenuImage,
         };
 
-    // ── Silent `health` window (injuries auto-refresh) ───────────────────────
-    // The dialog's Nsys image can't say wound vs scar; only the `health` verb's
-    // text can. When the core issues an auto-refresh poll it arms this window
-    // first: the response — bracketed by <output class="mono"/> … <output
-    // class=""/> exactly like Lich's nerve tracker observes — is consumed for
-    // its nerve line but never emitted as TextEvents, so the poll stays
-    // invisible. The window disarms on the closing bracket, on the deadline
-    // (mono never arrived / response never closed), or on a runaway line count
-    // — the three valves guarantee suppression can't outlive one response.
-    // User-TYPED health output is untouched (window is only armed by the poll);
-    // its nerve line still refines nsys via the always-on scan in EmitLine.
-    private DateTimeOffset _silentHealthDeadline = DateTimeOffset.MinValue;
-    private bool _silentHealthActive;
-    private int  _silentHealthLines;
-    private const int SilentHealthMaxLines = 60;
-
-    /// <summary>Arm suppression for the next <c>health</c> response (injuries
-    /// auto-refresh poll). Call immediately before sending the command.</summary>
-    public void BeginSilentHealthWindow(TimeSpan? timeout = null) =>
-        _silentHealthDeadline = DateTimeOffset.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
-
     // ── Silent `flags` window (connect-time flag-state probe, issue #29) ──────
     // The `flags` verb prints a plain-text mono table (no dedicated XML element):
     //   Usage / FLAG {flag_name} {on|off} / Example …           ← preamble
@@ -842,9 +821,7 @@ public sealed partial class DrXmlParser : IDisposable
 
         // Nervous-system refinement (#18): the `health` verb's nerve line is the
         // only wound-vs-scar source for the nsys region (the dialog image can't
-        // say). Always on — a user-typed `health` refines the panel exactly
-        // like an auto-refresh poll. Runs BEFORE silent suppression below so a
-        // polled response still yields its reading.
+        // say). Always on — a user-typed `health` refines the panel.
         if (_activeStream == "main" && stripped.StartsWith("You", StringComparison.Ordinal))
         {
             foreach (var (phrase, kind, severity) in _nervePhrases)
@@ -853,18 +830,6 @@ public sealed partial class DrXmlParser : IDisposable
                 _events.OnNext(new InjuryEvent("nsys", kind, severity));
                 break;
             }
-        }
-
-        // Silent-health window: this line is part of a polled `health` response
-        // — consume it without emitting. Deadline + line-count valves stop the
-        // suppression from ever outliving one response.
-        if (_silentHealthActive)
-        {
-            if (DateTimeOffset.UtcNow < _silentHealthDeadline
-                && ++_silentHealthLines <= SilentHealthMaxLines)
-                return;
-            _silentHealthActive   = false;   // valve tripped — stop suppressing
-            _silentHealthDeadline = DateTimeOffset.MinValue;
         }
 
         // News-listing auto-link (public issue #30). Updates the listing-context
@@ -1926,25 +1891,6 @@ public sealed partial class DrXmlParser : IDisposable
             case "output":
             {
                 var cls = r["class"] ?? "";
-                // Silent-health window: swallow the mono/'' brackets around a
-                // polled `health` response (and everything between — see
-                // EmitLine). Only an armed window can open; an open window
-                // closes on the empty-class bracket.
-                if (!_silentHealthActive && cls == "mono"
-                    && DateTimeOffset.UtcNow < _silentHealthDeadline)
-                {
-                    FlushTextLine();   // anything buffered before the bracket is real text
-                    _silentHealthActive = true;
-                    _silentHealthLines  = 0;
-                    break;
-                }
-                if (_silentHealthActive && cls.Length == 0)
-                {
-                    _silentHealthActive   = false;
-                    _silentHealthDeadline = DateTimeOffset.MinValue;
-                    _textLineBuffer.Clear();   // drop any partial suppressed line
-                    break;
-                }
                 // #178: track the mono bracket so lines between mono and the
                 // empty-class close render in the monospace font. "mono" opens;
                 // "" (or any other class) closes.

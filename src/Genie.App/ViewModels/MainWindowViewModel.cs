@@ -5437,12 +5437,6 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         RawXml.Attach(_core);
         Injuries.Attach(_core);
         AttachServerDialogs(_core);
-        // Gate the injuries auto-refresh poll on the panel actually being open
-        // — no visible window, no silent `health` sends. InjuriesVisible is the
-        // canonical mirror of the dock tool's state (toggle commands + the
-        // X-close sync both maintain it), and a bare bool read is safe from the
-        // poll's timer thread.
-        _core.InjuriesPanelVisible = () => InjuriesVisible;
         AttachPluginWindows(_core);
 
         // Load external plugin DLLs from {AppData}/Genie5/Plugins (the builtin

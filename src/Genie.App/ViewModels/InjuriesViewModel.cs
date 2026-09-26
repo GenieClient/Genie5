@@ -154,29 +154,15 @@ public sealed class InjuriesViewModel : ReactiveObject
     /// placeholder.</summary>
     [Reactive] public bool IsEmpty { get; private set; } = true;
 
-    // ── Auto-refresh picker ─────────────────────────────────────────────────
-    // The nsys image can't say wound vs scar; only the `health` verb's text
-    // can. This cadence drives Core's opt-in silent poll (#config
-    // injuriespoll). Persisted quietly — straight to config, not through
-    // #config — so changing it doesn't spam the Game window (same pattern as
-    // the Experience density slider).
-
-    private static readonly int[] RefreshSeconds = { 0, 30, 60, 120, 300 };
-
-    /// <summary>Cadence stops shown by the picker, index-aligned with
-    /// <see cref="RefreshSeconds"/>.</summary>
-    public IReadOnlyList<string> RefreshOptions { get; } =
-        new[] { "Off", "30 s", "1 min", "2 min", "5 min" };
-
     private GenieCore? _core;
-    private int _refreshIndex;
-    private int _appliedSeconds = -1;
     private bool _figureLayout;
 
     /// <summary>Panel layout toggle: true = assembled body figure, false =
     /// the 4×4 part grid (default). Persisted quietly to config
-    /// (<c>injurieslayout</c>) — same pattern as <see cref="RefreshIndex"/>;
-    /// seeding from config in <see cref="Attach"/> is a no-op write.</summary>
+    /// (<c>injurieslayout</c>) — straight to config, not through #config, so
+    /// toggling it doesn't spam the Game window (same pattern as the
+    /// Experience density slider); seeding from config in
+    /// <see cref="Attach"/> is a no-op write.</summary>
     public bool FigureLayout
     {
         get => _figureLayout;
@@ -186,25 +172,6 @@ public sealed class InjuriesViewModel : ReactiveObject
             if (_core is not null && value != _core.Config.InjuriesFigureLayout)
             {
                 _core.Config.SetSetting("injurieslayout", value ? "figure" : "grid", showException: false);
-                _core.Config.Save();
-            }
-        }
-    }
-
-    /// <summary>Selected picker index. Setting it applies + saves the config
-    /// value; seeding from config in <see cref="Attach"/> is a no-op write.</summary>
-    public int RefreshIndex
-    {
-        get => _refreshIndex;
-        set
-        {
-            var index = Math.Clamp(value, 0, RefreshSeconds.Length - 1);
-            this.RaiseAndSetIfChanged(ref _refreshIndex, index);
-            var seconds = RefreshSeconds[index];
-            if (_core is not null && seconds != _appliedSeconds)
-            {
-                _appliedSeconds = seconds;
-                _core.Config.SetSetting("injuriespoll", seconds.ToString(), showException: false);
                 _core.Config.Save();
             }
         }
@@ -235,17 +202,6 @@ public sealed class InjuriesViewModel : ReactiveObject
     public void Attach(GenieCore core)
     {
         _core = core;
-
-        // Seed the picker from config: snap a hand-edited value to the nearest
-        // stop for display, but record the REAL value as applied so merely
-        // attaching never rewrites the user's setting.
-        _appliedSeconds = core.Config.InjuriesPollSeconds;
-        var nearest = 0;
-        for (var i = 0; i < RefreshSeconds.Length; i++)
-            if (Math.Abs(RefreshSeconds[i] - _appliedSeconds) < Math.Abs(RefreshSeconds[nearest] - _appliedSeconds))
-                nearest = i;
-        _refreshIndex = nearest;
-        this.RaisePropertyChanged(nameof(RefreshIndex));
 
         _figureLayout = core.Config.InjuriesFigureLayout;
         this.RaisePropertyChanged(nameof(FigureLayout));

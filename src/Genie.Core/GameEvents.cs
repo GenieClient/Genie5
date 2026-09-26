@@ -240,11 +240,9 @@ public enum InjuryKind
     /// region NEVER uses the Injury/Scar names, and the dialog image alone
     /// cannot say whether the damage is a wound or a scar. It surfaces as this
     /// indeterminate kind until a <c>health</c> response resolves it: the
-    /// parser always scans main-stream text for the six nerve lines (so a
-    /// user-typed <c>health</c> refines it for free), and the user can opt in
-    /// to a silent poll cadence (<c>#config injuriespoll N</c> / the Injuries
-    /// panel's Auto-refresh picker; off by default) that re-emits a
-    /// Wound/Scar-kinded event for the nsys region.</summary>
+    /// parser always scans main-stream text for the six nerve lines, so a
+    /// user-typed <c>health</c> re-emits a Wound/Scar-kinded event for the
+    /// nsys region.</summary>
     Damage,
 }
 
