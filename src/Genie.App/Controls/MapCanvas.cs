@@ -615,46 +615,172 @@ public class MapCanvas : Control
             DrawLegend(context, proj);
     }
 
-    // Legend entries — the swatch must match how the map ACTUALLY draws each
-    // thing (#157 follow-up). style: 0 = filled room box (white fill + thin black
-    // border); 1 = OUTLINED box (the colour is a border/ring, like cross-zone's
-    // blue border and the current-room red ring — NOT a fill); 2 = a coloured
-    // line (edges + exit stub). "*" marks a user-configurable colour.
-    private static readonly (int style, IBrush brush, string label)[] LegendItems =
+    // ── Legend (#157) — lists ONLY what the current level actually draws ──
+    // A fixed seven-row key was both incomplete (coloured rooms, ghost floors
+    // and the edit selection had no row) and noisy (a zone with no climb arc
+    // still showed "Climb"). BuildLegend walks the same nodes/arcs Pass 0–2
+    // paint and emits one row per thing that is on screen, so the panel is as
+    // small as the map allows — one room on a flat zone gives a one-row key.
+
+    internal enum LegendStyle
     {
-        (0, DefaultNodeFill,                                      "Room"),
-        (1, new SolidColorBrush(Colors.Blue),                    "Cross-zone room"),
-        (1, CurrentStroke,                                       "Current room *"),
-        (2, new SolidColorBrush(Colors.Black),                   "Path"),
-        (2, new SolidColorBrush(Colors.Blue),                    "Go / secret"),
-        (2, new SolidColorBrush(Color.FromRgb(0x00, 0x80, 0x00)), "Climb / requires skill"),
-        (2, StubBrush,                                           "Exit (neighbour not mapped)"),
+        /// <summary>A filled room box (the colour is the FILL, thin black border).</summary>
+        Room,
+        /// <summary>An outlined box: the colour is a 2px ring on a white box (cross-zone
+        /// border, current-room ring, edit selection).</summary>
+        Ring,
+        /// <summary>A coloured line (arcs + the exit stub).</summary>
+        Line,
+        /// <summary>The off-level ghost box: alpha-white fill and border over the map
+        /// background, exactly as Pass 0 paints it.</summary>
+        Ghost,
+    }
+
+    internal readonly record struct LegendEntry(LegendStyle Style, Color Color, string Label, bool Dashed = false);
+
+    /// <summary>
+    /// The community Maps-repo colour key (github.com/GenieClient/Maps README,
+    /// "Color order indicates priority"), in README order. A room whose fill
+    /// matches an entry gets that meaning in the legend. Any other fill is
+    /// listed by its hex: the map maintainers audited the off-key colours in
+    /// #automapper (May 2026) and consider them legacy mistakes with no agreed
+    /// meaning, so inventing a label for them would be wrong. The May 2026
+    /// re-org proposal (drop Navy/Sand, add GoldenRod, pink Nexus) never
+    /// reached the README or the map data, so it is deliberately NOT here.
+    /// </summary>
+    internal static readonly (Color color, string label)[] RoomColourKey =
+    {
+        (Color.FromRgb(0xFF, 0x00, 0xFF), "Portal / transport"),
+        (Color.FromRgb(0x00, 0xFF, 0x00), "Bank / services"),
+        (Color.FromRgb(0xFF, 0x80, 0x00), "Guildleader"),
+        (Color.FromRgb(0x00, 0xBF, 0x80), "Auto-healer"),
+        (Color.FromRgb(0xFF, 0x00, 0x00), "Shop"),
+        (Color.FromRgb(0xFF, 0xFF, 0x00), "Stat training"),
+        (Color.FromRgb(0x00, 0x00, 0xFF), "Water (swim)"),
+        (Color.FromRgb(0x00, 0x00, 0x80), "Underwater (drowning)"),
+        (Color.FromRgb(0xFF, 0xBF, 0x00), "Roundtime / maze"),
+        (Color.FromRgb(0x99, 0x33, 0x00), "Mining"),
+        (Color.FromRgb(0x00, 0x80, 0x00), "Lumber"),
+        (Color.FromRgb(0xC2, 0xB2, 0x80), "Ranger trailhead"),
+        (Color.FromRgb(0x00, 0xFF, 0xFF), "PC housing"),
+        (Color.FromRgb(0xA6, 0xA3, 0xD9), "Pilgrim shrine"),
+        (Color.FromRgb(0x40, 0x00, 0x40), "Depart room"),
+        (Color.FromRgb(0x80, 0x00, 0x80), "Favor altar"),
     };
 
-    /// <summary>Draw a compact colour key in the top-left of the canvas (#157).
-    /// Pinned to the bottom-left of the visible viewport (via the parent
-    /// ScrollViewer's offset + a scroll-repaint hook) so it stays out of the
-    /// busy top-left where the rooms are, and doesn't slide as the map scrolls.
-    /// A trailing "*" on a label marks colours the user can change (AutoMapper
-    /// Settings); the rest are fixed.</summary>
+    private static readonly Color SelectedColor = Color.FromRgb(0xff, 0xe0, 0x40);
+    private static readonly Color StubColor     = Color.FromRgb(0x00, 0xC8, 0xE8);
+    private static readonly Color ClimbColor    = Color.FromRgb(0x00, 0x80, 0x00);
+
+    /// <summary>
+    /// Build the legend rows for <paramref name="level"/> of <paramref name="zone"/>:
+    /// only the things the render passes will actually paint there. Mirrors
+    /// Pass 0 (ghost floors, when <paramref name="ghostsVisible"/>), Pass 1
+    /// (arcs classified exactly as <see cref="EdgeKindFor"/> draws them, once
+    /// per pair from the lower id; stubs only for the eight 2-D cardinals;
+    /// spoiler arcs obey <paramref name="showSpoilers"/>) and Pass 2 (fills,
+    /// cross-zone border, current ring, edit selection). Row order: rooms
+    /// (plain, then colours in README priority, then off-key fills by hex),
+    /// rings, ghost, then lines. Static + pure so the tests can pin it without
+    /// a render surface.
+    /// </summary>
+    internal static List<LegendEntry> BuildLegend(MapZone zone, int level, MapNode? current, MapNode? selected,
+                                                  bool showSpoilers, bool ghostsVisible, Color currentRing)
+    {
+        bool plain = false, crossZone = false, ghost = false;
+        bool cardinal = false, go = false, climb = false, stub = false;
+        var fills = new HashSet<Color>();
+
+        foreach (var node in zone.Nodes.Values)
+        {
+            if (ghostsVisible && IsGhostFloor(node.Z, level)) ghost = true;
+            if (node.Z != level) continue;
+
+            if (TryParseFill(node.Color, out var fill)) fills.Add(fill);
+            else plain = true;
+            if (node.IsCrossZone) crossZone = true;
+
+            foreach (var exit in node.Exits)
+            {
+                if (!showSpoilers && Genie.Core.Mapper.MoveVerb.IsSpoilerMove(exit.MoveCommand)) continue;
+                if (exit.DestinationId is int destId
+                    && zone.Nodes.TryGetValue(destId, out var dest)
+                    && dest.Z == level)
+                {
+                    if (node.Id > dest.Id) continue;
+                    switch (EdgeKindFor(exit))
+                    {
+                        case EdgeKind.Cardinal: cardinal = true; break;
+                        case EdgeKind.Climb:    climb    = true; break;
+                        default:                go       = true; break;
+                    }
+                }
+                else if (IsStubDirection(exit.Direction, out _))
+                {
+                    stub = true;
+                }
+            }
+        }
+
+        var rows = new List<LegendEntry>();
+        if (plain) rows.Add(new(LegendStyle.Room, Colors.White, "Room"));
+
+        // Known colours in README priority order, then anything off-key by hex.
+        foreach (var (color, label) in RoomColourKey)
+            if (fills.Remove(color)) rows.Add(new(LegendStyle.Room, color, label));
+        foreach (var other in fills.OrderBy(c => c.ToUInt32()))
+            rows.Add(new(LegendStyle.Room, other, $"Other (#{other.R:X2}{other.G:X2}{other.B:X2})"));
+
+        if (crossZone)                                   rows.Add(new(LegendStyle.Ring, Colors.Blue,   "Cross-zone room"));
+        if (current  is not null && current.Z  == level) rows.Add(new(LegendStyle.Ring, currentRing,   "Current room *"));
+        if (selected is not null && selected.Z == level) rows.Add(new(LegendStyle.Ring, SelectedColor, "Selected room", Dashed: true));
+        if (ghost)                                       rows.Add(new(LegendStyle.Ghost, Colors.White, "Floor above / below"));
+
+        if (cardinal) rows.Add(new(LegendStyle.Line, Colors.Black, "Path"));
+        if (go)       rows.Add(new(LegendStyle.Line, Colors.Blue,  "Go / up / down"));
+        if (climb)    rows.Add(new(LegendStyle.Line, ClimbColor,   "Climb"));
+        if (stub)     rows.Add(new(LegendStyle.Line, StubColor,    "Exit (neighbour not mapped)"));
+        return rows;
+    }
+
+    /// <summary>A node's fill as the canvas paints it, if it is anything other
+    /// than the default white box. Named colours ("Red", "Blue") parse like hex;
+    /// alpha is dropped so "#FFFF0000" and "#FF0000" are the same key.</summary>
+    internal static bool TryParseFill(string? hex, out Color fill)
+    {
+        fill = default;
+        if (string.IsNullOrWhiteSpace(hex) || !Color.TryParse(hex, out var c)) return false;
+        fill = Color.FromRgb(c.R, c.G, c.B);
+        return fill != Colors.White;
+    }
+
+    /// <summary>Draw the legend for the current level (see <see cref="BuildLegend"/>).
+    /// Pinned to a clear corner of the visible viewport (parent ScrollViewer
+    /// offset + a scroll-repaint hook) so it never covers a room and doesn't
+    /// slide as the map pans. A trailing "*" marks a user-configurable colour
+    /// (AutoMapper Settings). Nothing on the level → no panel at all.</summary>
     private void DrawLegend(DrawingContext context, MapProjection proj)
     {
+        var currentRing = CurrentRoomBrush is ISolidColorBrush scb ? scb.Color : Color.FromRgb(0xff, 0x40, 0x40);
+        var rows = BuildLegend(Zone!, Level, CurrentNode, SelectedNode, ShowSpoilers, AutoMapperAlpha > 0, currentRing);
+        if (rows.Count == 0) return;
+
         const double pad = 8, row = 16, sw = 12, gap = 8;
         var typeface = new Typeface("Segoe UI, Consolas, monospace");
         const double fontSize = 11;
 
         // Measure the widest label to size the panel.
         double maxText = 0;
-        var texts = new FormattedText[LegendItems.Length];
-        for (int i = 0; i < LegendItems.Length; i++)
+        var texts = new FormattedText[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
         {
-            texts[i] = new FormattedText(LegendItems[i].label, System.Globalization.CultureInfo.CurrentCulture,
+            texts[i] = new FormattedText(rows[i].Label, System.Globalization.CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight, typeface, fontSize, RoomLabelBrush);
             if (texts[i].Width > maxText) maxText = texts[i].Width;
         }
 
         double w = pad + sw + gap + maxText + pad;
-        double h = pad + LegendItems.Length * row + pad;
+        double h = pad + rows.Count * row + pad;
 
         // Place the key in whichever VIEWPORT corner is clear of the drawn rooms,
         // so it never covers a room (#157 follow-up). Anchored in canvas coords to
@@ -693,21 +819,38 @@ public class MapCanvas : Control
         context.FillRectangle(new SolidColorBrush(Color.FromArgb(0xCC, 0xff, 0xff, 0xff)), panel, 4);
         context.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), 1.0), panel, 4, 4);
 
-        for (int i = 0; i < LegendItems.Length; i++)
+        var bg = MapBackgroundBrush ?? BackgroundBrush;
+        for (int i = 0; i < rows.Count; i++)
         {
-            var (style, brush, _) = LegendItems[i];
+            var (style, color, _, dashed) = rows[i];
+            var brush = new SolidColorBrush(color);
             double cy = panel.Y + pad + i * row + row / 2;
             double x0 = panel.X + pad;
-            if (style == 2)
-                context.DrawLine(new Pen(brush, 2.0), new Point(x0, cy), new Point(x0 + sw, cy));
-            else
+            var swatch = new Rect(x0, cy - sw / 2, sw, sw);
+            switch (style)
             {
-                // Every room box is drawn white-filled; style 0 gets the plain
-                // thin black node border, style 1 gets the colour AS a 2px border
-                // (matching the map's cross-zone box / current-room ring).
-                var swatch = new Rect(x0, cy - sw / 2, sw, sw);
-                context.FillRectangle(DefaultNodeFill, swatch);
-                context.DrawRectangle(style == 0 ? NodePen : new Pen(brush, 2.0), swatch);
+                case LegendStyle.Line:
+                    context.DrawLine(new Pen(brush, 2.0), new Point(x0, cy), new Point(x0 + sw, cy));
+                    break;
+                case LegendStyle.Room:
+                    // The colour IS the fill, with the map's thin black node border.
+                    context.FillRectangle(brush, swatch);
+                    context.DrawRectangle(NodePen, swatch);
+                    break;
+                case LegendStyle.Ring:
+                    // White box, colour as a 2px border (cross-zone / current / selected).
+                    context.FillRectangle(DefaultNodeFill, swatch);
+                    var ring = new Pen(brush, 2.0);
+                    if (dashed) ring.DashStyle = new DashStyle(new double[] { 2, 2 }, 0);
+                    context.DrawRectangle(ring, swatch);
+                    break;
+                case LegendStyle.Ghost:
+                    // Alpha-white over the map background, exactly as Pass 0 paints a ghost.
+                    var ghostBrush = new SolidColorBrush(Color.FromArgb((byte)AutoMapperAlpha, 0xff, 0xff, 0xff));
+                    context.FillRectangle(bg, swatch);
+                    context.FillRectangle(ghostBrush, swatch);
+                    context.DrawRectangle(new Pen(ghostBrush, EdgeWidth), swatch);
+                    break;
             }
             var ft = texts[i];
             context.DrawText(ft, new Point(panel.X + pad + sw + gap, cy - ft.Height / 2));
@@ -1455,13 +1598,17 @@ public class MapCanvas : Control
         return null;
     }
 
+    internal enum EdgeKind { Cardinal, Go, Climb }
+
     /// <summary>
-    /// Pick the connector pen for an exit, following the Genie 4 line palette:
-    /// cardinal arcs are black, climb arcs green, and everything else (go-doors,
-    /// up/down/out, swim, etc.) blue. Genie 5 collapses all non-compass arcs into
+    /// Classify an exit the way the Genie 4 line palette draws it: cardinal
+    /// arcs black, climb arcs green, and everything else (go-doors, up/down/out,
+    /// swim, etc.) blue. Genie 5 collapses all non-compass arcs into
     /// <see cref="Direction.None"/>, so climb is recognised from the move verb.
+    /// Shared by the renderer (<see cref="EdgePenFor"/>) and the legend, so the
+    /// key can never disagree with the map.
     /// </summary>
-    private static Pen EdgePenFor(MapExit exit)
+    internal static EdgeKind EdgeKindFor(MapExit exit)
     {
         switch (exit.Direction)
         {
@@ -1469,17 +1616,24 @@ public class MapCanvas : Control
             case Direction.East:  case Direction.SouthEast:
             case Direction.South: case Direction.SouthWest:
             case Direction.West:  case Direction.NorthWest:
-                return EdgePenCardinal;   // black
+                return EdgeKind.Cardinal;
             case Direction.Up: case Direction.Down: case Direction.Out:
-                return EdgePenGo;         // blue
+                return EdgeKind.Go;
             default: // None / In — disambiguate climb from go via the verb
                 var mc = exit.MoveCommand;
                 return !string.IsNullOrEmpty(mc)
                        && mc.TrimStart().StartsWith("climb", StringComparison.OrdinalIgnoreCase)
-                    ? EdgePenClimb        // green
-                    : EdgePenGo;          // blue
+                    ? EdgeKind.Climb
+                    : EdgeKind.Go;
         }
     }
+
+    private static Pen EdgePenFor(MapExit exit) => EdgeKindFor(exit) switch
+    {
+        EdgeKind.Cardinal => EdgePenCardinal,   // black
+        EdgeKind.Climb    => EdgePenClimb,      // green
+        _                 => EdgePenGo,         // blue
+    };
 
     private void DrawCenteredMessage(DrawingContext context, string text)
     {
