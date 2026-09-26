@@ -13,8 +13,10 @@ namespace Genie.App.Settings;
 /// and re-save afterwards.</para>
 ///
 /// <para>Converted: main-window geometry (or maximized), each recognised window's
-/// position, size and open/closed state, the script bar's top/bottom placement and the
-/// status bar. Not converted: per-window fonts, colours, timestamps and <c>IfClosed</c>
+/// position, size and open/closed state, and every bar Genie 4 records — the script
+/// bar's visibility and top/bottom placement, the icon bar's visibility and placement,
+/// the health bar's visibility, placement and Magic Panels, and the status bar as a
+/// fallback for the vitals when there is no health bar element. Not converted: per-window fonts, colours, timestamps and <c>IfClosed</c>
 /// routing — those live in Genie 5's per-window settings, not in a layout. A window id
 /// Genie 5 has no panel for (a custom <c>#echo &gt;name</c> window, or one of the
 /// Genie 4 windows with no Genie 5 counterpart) is skipped and reported.</para>
@@ -116,10 +118,39 @@ public static class Genie4LayoutConverter
             converted++;
         }
 
-        // Bars sit beside <Windows> in the file.
-        if (root.Element("ScriptBar") is { } bar && (string?)bar.Attribute("Dock") is { } dock)
-            layout.ScriptBarAtBottom = !dock.Equals("Top", StringComparison.OrdinalIgnoreCase);
-        if (root.Element("StatusBar") is { } status && Bool(status, "Visible") is { } showStatus)
+        // Bars sit beside <Windows> in the file. Genie 4 writes all of them
+        // (FormMain.SaveXMLConfig): ScriptBar Visible/Dock, IconBar Visible/Dock,
+        // HealthBar Visible/Dock/Magic, StatusBar Visible.
+        if (root.Element("ScriptBar") is { } bar)
+        {
+            if ((string?)bar.Attribute("Dock") is { } dock)
+                layout.ScriptBarAtBottom = !IsTop(dock);
+            layout.ScriptBarVisible = Bool(bar, "Visible");
+        }
+        if (root.Element("IconBar") is { } icon)
+        {
+            layout.IconBarVisible = Bool(icon, "Visible");
+            if ((string?)icon.Attribute("Dock") is { } iconDock)
+                layout.IconBarAtBottom = !IsTop(iconDock);
+        }
+
+        // Genie 5's one Status Bar toggle is the vitals strip (plus the
+        // #statusbar slot row that rides with it). Genie 4 split that into
+        // HealthBar (the vitals, PanelBars) and StatusBar (the text strip,
+        // StatusStripMain), and a saved file always carries both — so the
+        // HealthBar's Visible is the faithful source. StatusBar Visible stays
+        // the fallback for a file that has no HealthBar element.
+        bool? showVitals = null;
+        if (root.Element("HealthBar") is { } health)
+        {
+            showVitals = Bool(health, "Visible");
+            if ((string?)health.Attribute("Dock") is { } hpDock)
+                layout.HealthBarAtBottom = !IsTop(hpDock);
+            layout.MagicPanels = Bool(health, "Magic");
+        }
+        if (showVitals is null && root.Element("StatusBar") is { } status)
+            showVitals = Bool(status, "Visible");
+        if (showVitals is { } showStatus)
             layout.ShowStatusBar = showStatus;
 
         return (layout, new Report(converted, closed, skipped));
@@ -153,4 +184,10 @@ public static class Genie4LayoutConverter
 
     private static bool? Bool(XElement el, string attr) =>
         bool.TryParse((string?)el.Attribute(attr), out var b) ? b : null;
+
+    /// <summary>A WinForms <c>DockStyle</c> as Genie 4 writes it. Only <c>Top</c>
+    /// means the top slot; <c>Bottom</c>, and anything Genie 5 has no slot for,
+    /// keeps the bottom (Genie 5's default).</summary>
+    private static bool IsTop(string dock) =>
+        dock.Trim().Equals("Top", StringComparison.OrdinalIgnoreCase);
 }

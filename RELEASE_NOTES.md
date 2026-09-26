@@ -78,7 +78,9 @@ finally remembering where you left every panel.
 - **Genie 4 saved `.layout` files import** — the importer handled the rule
   files and settings but walked past Config/Layout, so a long-time user's
   saved arrangements were lost. They come across as windowed-mode layouts,
-  the same shape as the Heirloom built-in (#319).
+  the same shape as the Heirloom built-in, with every bar Genie 4 recorded:
+  each bar's position and visibility and Magic Panels. Genie 5's vitals strip
+  follows Genie 4's health bar rather than its text status strip (#319).
 
 - **Every panel reopens floating if that is where you left it** — a panel
   dragged out to its own window, sized and positioned, came back at the
@@ -89,7 +91,11 @@ finally remembering where you left every panel.
 - **Dock Top / Dock Bottom for the Icon, Health and Script bars** — Genie 4's
   Layout menu let all three bars sit at either end of the window; Genie 5
   pinned them. The Script Bar's parent item is also a show/hide toggle
-  (#349, #357).
+  (#349, #357). **Every bar rides on a saved layout, as in Genie 4** — the
+  Icon, Health and Script bars' positions and visibility and Magic Panels are
+  saved with the layout and restored when you load it, so a character's
+  startup layout brings its bars with it. A layout saved before this release
+  leaves your current bars alone.
 
 - **"Always show scrollbars"** — Avalonia's scrollbars shrink to a thin line
   when idle and expand on hover, a small target acquired twice, unreliable

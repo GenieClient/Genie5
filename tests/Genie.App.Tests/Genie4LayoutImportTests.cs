@@ -179,4 +179,81 @@ public sealed class Genie4LayoutImportTests : IDisposable
             .Select(m => m.Groups["id"].Value)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
+
+    // ── Every bar Genie 4 records ─────────────────────────────────────────
+    // Genie 4's SaveXMLConfig writes ScriptBar Visible/Dock, IconBar
+    // Visible/Dock, HealthBar Visible/Dock/Magic and StatusBar Visible into the
+    // same file a saved layout is. Before this, only the script bar's Dock and
+    // StatusBar Visible came across.
+
+    private const string AllBars = """
+        <Genie>
+          <Windows WindowCount="1">
+            <Main Maximized="True" />
+            <Game ID="main" Name="Game" Height="600" Width="800" Left="0" Top="0" />
+          </Windows>
+          <ScriptBar Visible="False" Dock="Bottom" />
+          <IconBar Visible="False" Dock="Top" />
+          <HealthBar Visible="True" Dock="Top" Magic="False" />
+          <StatusBar Visible="False" />
+        </Genie>
+        """;
+
+    [Fact]
+    public void Every_bar_genie4_records_carries_over()
+    {
+        var (layout, _) = Genie4LayoutConverter.Convert(AllBars, "G4 bars");
+
+        Assert.False(layout!.ScriptBarVisible);
+        Assert.True(layout.ScriptBarAtBottom);     // Dock="Bottom"
+        Assert.False(layout.IconBarVisible);
+        Assert.False(layout.IconBarAtBottom);      // Dock="Top"
+        Assert.False(layout.HealthBarAtBottom);    // Dock="Top"
+        Assert.False(layout.MagicPanels);
+    }
+
+    [Fact]
+    public void The_health_bar_not_the_text_strip_decides_whether_the_vitals_show()
+    {
+        // Genie 5's Status Bar toggle is the vitals strip. Genie 4 writes BOTH
+        // elements, and a user who hid only the text strip (StatusBar
+        // Visible=False) still had their health bars — that must not hide
+        // Genie 5's vitals.
+        var (layout, _) = Genie4LayoutConverter.Convert(AllBars, "G4 bars");
+        Assert.True(layout!.ShowStatusBar);
+
+        // With no HealthBar element, StatusBar Visible is still the fallback
+        // (the Hunting fixture, and older hand-trimmed files).
+        var (fallback, _) = Genie4LayoutConverter.Convert(Hunting, "G4 Hunting");
+        Assert.False(fallback!.ShowStatusBar);
+    }
+
+    [Fact]
+    public void Bars_a_file_does_not_mention_stay_unset_so_loading_keeps_the_users_own()
+    {
+        // The Hunting fixture has only ScriptBar and StatusBar. Nothing it
+        // doesn't say may be invented: null means "leave the current bar".
+        var (layout, _) = Genie4LayoutConverter.Convert(Hunting, "G4 Hunting");
+
+        Assert.True(layout!.ScriptBarVisible);     // it DOES say Visible="True"
+        Assert.Null(layout.IconBarVisible);
+        Assert.Null(layout.IconBarAtBottom);
+        Assert.Null(layout.HealthBarAtBottom);
+        Assert.Null(layout.MagicPanels);
+    }
+
+    [Theory]
+    [InlineData("Top", false)]
+    [InlineData("top", false)]
+    [InlineData("Bottom", true)]
+    [InlineData("Fill", true)]     // a DockStyle Genie 5 has no slot for keeps the default
+    [InlineData("None", true)]
+    public void A_winforms_dock_style_maps_to_the_top_slot_only_when_it_says_top(string dock, bool atBottom)
+    {
+        var xml = AllBars.Replace("<IconBar Visible=\"False\" Dock=\"Top\" />",
+                                  $"<IconBar Visible=\"True\" Dock=\"{dock}\" />");
+        var (layout, _) = Genie4LayoutConverter.Convert(xml, "G4 dock");
+
+        Assert.Equal(atBottom, layout!.IconBarAtBottom);
+    }
 }

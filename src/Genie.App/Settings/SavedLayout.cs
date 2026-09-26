@@ -103,6 +103,35 @@ public sealed class SavedLayout
     /// Defaults to true so layouts saved before #357 keep the old position.</summary>
     public bool   ScriptBarAtBottom    { get; set; } = true;
 
+    // ── The rest of the bars (Genie 4 parity) ─────────────────────────
+    // Genie 4's "save layout" writes the same file as its main config, and that
+    // file records every bar: IconBar Visible/Dock, HealthBar Visible/Dock/Magic,
+    // ScriptBar Visible/Dock (FormMain.SaveXMLConfig). #349 added the Icon Bar
+    // and Health bar positions and the Script Bar toggle to display.json only,
+    // so switching layouts left them behind. They ride on the layout now.
+    //
+    // Nullable on purpose: a layout saved before these existed has no key, and
+    // loading it must leave the user's current bars alone rather than snap them
+    // to a default. null = "this layout doesn't say".
+
+    /// <summary>Icon Bar (posture + condition chips) shown — <c>DisplaySettings.ShowIconBar</c>.</summary>
+    public bool?  IconBarVisible       { get; set; }
+
+    /// <summary>Icon Bar docked at the bottom (true) or top — <c>DisplaySettings.IconBarAtBottom</c>.</summary>
+    public bool?  IconBarAtBottom      { get; set; }
+
+    /// <summary>Health (vitals) bar docked at the bottom (true) or top —
+    /// <c>DisplaySettings.StatusBarAtBottom</c>, Genie 4's <c>HealthBar Dock</c>.</summary>
+    public bool?  HealthBarAtBottom    { get; set; }
+
+    /// <summary>Script Bar allowed to show — <c>DisplaySettings.ShowScriptBar</c>,
+    /// Genie 4's <c>ScriptBar Visible</c>.</summary>
+    public bool?  ScriptBarVisible     { get; set; }
+
+    /// <summary>Magic Panels (mana bar, prepared-spell label, cast bar) —
+    /// <c>DisplaySettings.ShowMagicPanels</c>, Genie 4's <c>HealthBar Magic</c>.</summary>
+    public bool?  MagicPanels          { get; set; }
+
     /// <summary>Per-tag visibility filters (Window → Game Window).</summary>
     public bool   ShowGameText         { get; set; } = true;
     public bool   ShowEchoText         { get; set; } = true;

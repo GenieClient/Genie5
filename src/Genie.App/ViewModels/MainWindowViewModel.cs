@@ -6018,7 +6018,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <see cref="Settings.SavedLayout"/> ready to persist. Reads
     /// from the live VM + DisplaySettings + DockFactory.
     /// </summary>
-    private Settings.SavedLayout CaptureCurrentLayout()
+    internal Settings.SavedLayout CaptureCurrentLayout()
     {
         var layout = new Settings.SavedLayout
         {
@@ -6027,6 +6027,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             ShowStatusBar         = Display.ShowStatusBar,
             RoundTimeOnHandsStrip = Display.RoundTimeOnHandsStrip,
             ScriptBarAtBottom     = Display.ScriptBarAtBottom,
+            IconBarVisible        = Display.ShowIconBar,
+            IconBarAtBottom       = Display.IconBarAtBottom,
+            HealthBarAtBottom     = Display.StatusBarAtBottom,
+            ScriptBarVisible      = Display.ShowScriptBar,
+            MagicPanels           = Display.ShowMagicPanels,
             ShowGameText          = Display.ShowGameText,
             ShowEchoText          = Display.ShowEchoText,
             ShowScriptText        = Display.ShowScriptText,
@@ -6085,7 +6090,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// applied first (cheap, instant); tool-visibility toggles run
     /// last because Dock.Avalonia mutations need a UI-thread tick.
     /// </summary>
-    private void ApplyLayout(Settings.SavedLayout layout)
+    internal void ApplyLayout(Settings.SavedLayout layout)
     {
         // Display flags — these have property-changed observers that
         // push through to the Avalonia resources so changes show
@@ -6095,6 +6100,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.ShowStatusBar          = layout.ShowStatusBar;
         Display.RoundTimeOnHandsStrip  = layout.RoundTimeOnHandsStrip;
         Display.ScriptBarAtBottom      = layout.ScriptBarAtBottom;
+        // The rest of the bars (Genie 4 saves them all in a layout). Only when
+        // the layout records them — an older layout leaves the current bars.
+        if (layout.IconBarVisible    is { } iconShown)  Display.ShowIconBar       = iconShown;
+        if (layout.IconBarAtBottom   is { } iconBottom) Display.IconBarAtBottom   = iconBottom;
+        if (layout.HealthBarAtBottom is { } hpBottom)   Display.StatusBarAtBottom = hpBottom;
+        if (layout.ScriptBarVisible  is { } barShown)   Display.ShowScriptBar     = barShown;
+        if (layout.MagicPanels       is { } magic)      Display.ShowMagicPanels   = magic;
         Display.ShowGameText           = layout.ShowGameText;
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;

@@ -161,6 +161,7 @@ Rearrange the panels however you like, then keep the arrangement — the **Layou
 - The Layout menu also holds the rest of the window chrome: **Hands Strip** / **Enhanced Hands Strip** / **Hands Strip Position**, **Roundtime Position**, **Status Bar**, **Zone / Room ID** (with **Zone as Number**), **Guild in Title Bar**, **Disconnect Popup**, and **Reset Layout** (restores all windows to visible).
 - The **Connect dialog** has a per-profile **startup layout** picker, so a character can load its saved layout automatically on connect.
 - Floating the Mapper, hiding panels you don't use, and moving the hands strip are all remembered.
+- **A saved layout carries every bar**, as Genie 4's did: the hands strip, the Icon Bar, the Health bar and the Script Bar (each one's position and whether it shows) and **Magic Panels**. Loading a layout, or connecting with a character's startup layout, puts them all back. A layout saved before beta.9.6 leaves your current bars alone.
 
 ## Themes
 
