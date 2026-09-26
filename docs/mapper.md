@@ -105,6 +105,16 @@ For a cross-zone hop with a known wait window (boats, ferries), `AutoWalkService
 
 Zone XML stores room and label positions in **Genie 4 map pixels**, and the canvas draws them through [MapProjection](../src/Genie.Core/Mapper/MapProjection.cs) — one transform shared by paint, hit-testing, drag and layout. Genie 4 draws every room as a 9px box centred on its raw pixel and its snap-to-grid step is 10px, so the community maps are authored on a **10px grid** (the Crossing has 623 rooms on an odd ten). Genie 5 scales that space by 1.1 per zoom unit (a 20px pitch becomes 22px) and keeps Genie 4's ratios: boxes are 9 map-px, label text is Genie 4's default font size, label rectangles are 15 map-px tall, and labels are anchored top-left at their raw pixel in the *same* space as the rooms. The canvas is sized from the rooms **and** the visible labels' measured rectangles, so label text past the outermost room is never clipped. Dragging a room in edit mode writes `MapNode.PixelX/PixelY` back with the 10px snap ("Snap" toggle) or to the pixel; the derived 20px grid cell `MapNode.X/Y` is only what the automapper *places* new rooms on. `MapProjectionTests` pins the ratios and sweeps every installed zone for stacked rooms and clipped labels.
 
+### Legend
+
+`MapCanvas.BuildLegend` builds the key per render from what the current level
+actually draws — plain rooms, each room fill present (named from the community
+Maps repo README colour key in its priority order, or listed by hex when the
+README does not define it), cross-zone / current / selected rings, the ghost
+floor, and only the arc kinds present. `EdgeKindFor` is shared with the
+renderer so the key cannot disagree with the map. Pinned to a clear viewport
+corner; no rows means no panel. Tests: `MapCanvasLegendTests`.
+
 ### Labels, tags and notes
 
 Three different things carry text on a map, and only one is drawn:

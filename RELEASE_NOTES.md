@@ -232,6 +232,16 @@ finally remembering where you left every panel.
   white ghost colour, so the main floor stays readable under the one you are
   on; `automapperalpha` still fades it and 0 still hides it.
 
+- **The map legend lists only what is on the floor you are looking at** —
+  the fixed seven-row key showed "Climb" on zones with no climb arc and had
+  no row at all for coloured rooms, the ghost floor or the edit selection.
+  The key is now built from what the canvas actually draws: coloured rooms
+  get a filled swatch with their meaning from the community Maps repo's
+  colour key (shop, guildleader, water, mining, PC housing, and so on), a
+  colour the repo does not define is listed by its hex rather than given a
+  made-up meaning, and rings, ghost floor and line types appear only when
+  present. A flat zone with plain rooms gets a two-row key.
+
 - **A script's moves now inform the automapper** — the mapper credits each
   new room to the last command sent, but only typed, macro, trigger and alias
   sends reached it; a script's `put` did not. So a move the game refused
