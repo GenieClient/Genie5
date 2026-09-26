@@ -1005,7 +1005,7 @@
                       ToolTip.Tip="Renumber all room IDs to a dense 1..N sequence (fixes sparse ids after lots of add/remove)."/>
               <ToggleButton Content="Snap" IsChecked="{Binding ViewModel.SnapToGrid}"
                             Padding="6,1" FontSize="11"
-                            ToolTip.Tip="Snap dragged rooms to the grid. Genie 5 maps are grid-based, so positions always align."/>
+                            ToolTip.Tip="Snap dragged rooms to Genie 4's 10px map grid (the step the community maps are drawn on). Off: the room stays exactly where you drop it."/>
               <ToggleButton Content="Lock" IsChecked="{Binding ViewModel.LockPositions}"
                             Padding="6,1" FontSize="11"
                             ToolTip.Tip="Lock positions: rooms can be selected but not dragged."/>

@@ -16,10 +16,12 @@ namespace Genie.App.Controls;
 /// <see cref="CurrentNode"/> is outlined in a hot colour so the player can see
 /// where they are at a glance.
 ///
-/// This is the MVP renderer — no pan, no zoom, no hit-testing, no labels. It
-/// matches the Genie 4 AutoMapper's visual style in broad strokes (small
-/// coloured squares connected by white edges) and is a stepping stone toward
-/// the full UI in the screenshot the user referenced.
+/// Geometry is Genie 4's, via <see cref="MapProjection"/>: rooms are 9px
+/// boxes (scaled) centred on their RAW map pixels — not on a 20px grid, since
+/// the community maps are authored on Genie 4's 10px snap grid — and the
+/// zone's <c>&lt;label&gt;</c> text is anchored at its raw pixel in the same
+/// space. Pan, zoom, hit-testing, drag-to-move and the legend all read the
+/// same projection so they can't disagree with the paint.
 ///
 /// Re-renders when any of:
 ///  - <see cref="Zone"/> reference changes
@@ -30,18 +32,42 @@ namespace Genie.App.Controls;
 /// </summary>
 public class MapCanvas : Control
 {
-    // ── Visual constants (base — multiplied by Zoom at render time) ────────
-    private const double BaseGridSize = 22.0;   // px per grid unit at zoom=1
-    private const double BaseNodeSize = 14.0;   // node side length at zoom=1
-    private const double BasePadding  = 32.0;   // canvas padding at zoom=1
+    // ── Visual constants ───────────────────────────────────────────────────
+    // All geometry (room pitch, box size, label font, padding) comes from
+    // MapProjection — Genie 4's pixel-space rules scaled by Zoom. See that
+    // class for why rooms are drawn at their raw pixels, not on a 20px grid.
     private const double EdgeWidth    = 1.0;
     private const double MinZoom      = 0.4;
     private const double MaxZoom      = 4.0;
     private const double ZoomStep     = 1.20;   // multiplicative step per wheel notch
 
-    private double GridSize => BaseGridSize * Zoom;
-    private double NodeSize => BaseNodeSize * Zoom;
-    private double Padding  => BasePadding  * Zoom;
+    // Projection cache: building one measures every visible label, and the
+    // hover hit-test asks for it on every pointer move. Keyed on everything
+    // that changes the geometry; RenderTick covers in-place zone edits.
+    private MapProjection? _proj;
+    private (MapZone? zone, int level, double zoom, int tick, bool labels) _projKey;
+
+    /// <summary>The current floor's projection (cached until the zone, level,
+    /// zoom, render tick or label toggle changes).</summary>
+    private MapProjection GetProjection()
+    {
+        var key = (Zone, Level, Zoom, RenderTick, FullLabels);
+        if (_proj is null || key != _projKey)
+        {
+            _proj    = MapProjection.Create(Zone ?? new MapZone(), Level, Zoom, MeasureLabel, FullLabels);
+            _projKey = key;
+        }
+        return _proj;
+    }
+
+    /// <summary>Label text width in canvas px at the projection's font size —
+    /// the same FormattedText the label pass draws, so bounds and paint agree.</summary>
+    private static double MeasureLabel(string text, double fontSize) =>
+        new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight, Typeface.Default, fontSize, RoomLabelBrush).Width;
+
+    private static Rect  R(MapRect r)           => new(r.X, r.Y, r.Width, r.Height);
+    private static Point P((double X, double Y) p) => new(p.X, p.Y);
 
     // Palette mirrors the Genie 4 AutoMapper defaults (Globals.SetDefaultPresets):
     //   panel bg = PaleGoldenrod, node = White, node border / line = Black.
@@ -261,11 +287,10 @@ public class MapCanvas : Control
     private Point    _cursor;
 
     // ── Drag state (edit mode) ────────────────────────────────────────────
-    private bool _dragging;
-    private int  _dragMinX;   // bounds origin cached at drag start (stable while dragging)
-    private int  _dragMinY;
-    private int  _dragOrigX;  // selected node's grid position at drag start —
-    private int  _dragOrigY;  // used to skip the move/dirty when it didn't change
+    private bool           _dragging;
+    private MapProjection? _dragProj;   // projection cached at drag start (stable while dragging)
+    private int            _dragOrigX;  // selected node's map-pixel position at drag start —
+    private int            _dragOrigY;  // used to skip the move/dirty when it didn't change
 
     // ── Pan state (grab-scroll the view) ──────────────────────────────────
     private bool          _panning;
@@ -331,19 +356,10 @@ public class MapCanvas : Control
         {
             if (CurrentNode is null || Zone is null) return;
 
-            // Find the bounds for the current Z-level (matches Render).
-            int minX = int.MaxValue, minY = int.MaxValue;
-            bool any = false;
-            foreach (var n in Zone.Nodes.Values)
-            {
-                if (n.Z != Level) continue;
-                if (n.X < minX) minX = n.X;
-                if (n.Y < minY) minY = n.Y;
-                any = true;
-            }
-            if (!any) return;
+            var proj = GetProjection();
+            if (!proj.Any) return;
 
-            var center = NodeCenter(CurrentNode, minX, minY);
+            var center = P(proj.NodeCenter(CurrentNode));
 
             // Walk up the visual tree to find the ScrollViewer we live in
             // and scroll its Offset so the node center lands at the
@@ -370,25 +386,12 @@ public class MapCanvas : Control
         if (Zone is null || Zone.Nodes.Count == 0)
             return new Size(200, 200);
 
-        // Bounds of all nodes on the active Z-level. Avoid LINQ allocations
-        // in the hot path — this runs on every layout pass.
-        int minX = int.MaxValue, maxX = int.MinValue;
-        int minY = int.MaxValue, maxY = int.MinValue;
-        bool any = false;
-        foreach (var node in Zone.Nodes.Values)
-        {
-            if (node.Z != Level) continue;
-            any = true;
-            if (node.X < minX) minX = node.X;
-            if (node.X > maxX) maxX = node.X;
-            if (node.Y < minY) minY = node.Y;
-            if (node.Y > maxY) maxY = node.Y;
-        }
-        if (!any) return new Size(200, 200);
+        // Extents of the rooms AND labels on the active floor (MapProjection
+        // folds the measured label rectangles in, so no label text clips).
+        var proj = GetProjection();
+        if (!proj.Any) return new Size(200, 200);
 
-        var w = (maxX - minX + 1) * GridSize + Padding * 2;
-        var h = (maxY - minY + 1) * GridSize + Padding * 2;
-        return new Size(Math.Max(200, w), Math.Max(200, h));
+        return new Size(Math.Max(200, proj.CanvasWidth), Math.Max(200, proj.CanvasHeight));
     }
 
     // ── Render ────────────────────────────────────────────────────────────
@@ -408,24 +411,14 @@ public class MapCanvas : Control
             return;
         }
 
-        // Compute level-filtered bounds (matches MeasureOverride).
-        int minX = int.MaxValue, maxX = int.MinValue;
-        int minY = int.MaxValue, maxY = int.MinValue;
-        bool any = false;
-        foreach (var node in Zone.Nodes.Values)
-        {
-            if (node.Z != Level) continue;
-            any = true;
-            if (node.X < minX) minX = node.X;
-            if (node.X > maxX) maxX = node.X;
-            if (node.Y < minY) minY = node.Y;
-            if (node.Y > maxY) maxY = node.Y;
-        }
-        if (!any)
+        // The floor's projection (matches MeasureOverride and HitTest).
+        var proj = GetProjection();
+        if (!proj.Any)
         {
             DrawCenteredMessage(context, $"No rooms on level {Level}.");
             return;
         }
+        var nodeSide = proj.NodeSide;
 
         // ── Pass 0: off-level "ghost" floors (directly above/below) ────────────
         // Drawn first (under everything current) so a multi-floor zone shows
@@ -449,13 +442,13 @@ public class MapCanvas : Control
 
             // Ghost arcs first, under the ghost boxes, exactly like Pass 1 → 2.
             ForEachGhostEdge(Zone, Level, ShowSpoilers,
-                (from, to)  => context.DrawLine(ghostPen, NodeCenter(from, minX, minY), NodeCenter(to, minX, minY)),
-                (from, dir) => DrawExitStub(context, NodeCenter(from, minX, minY), dir, ghostPen));
+                (from, to)  => context.DrawLine(ghostPen, P(proj.NodeCenter(from)), P(proj.NodeCenter(to))),
+                (from, dir) => DrawExitStub(context, P(proj.NodeCenter(from)), dir, nodeSide, ghostPen));
 
             foreach (var node in Zone.Nodes.Values)
             {
                 if (!IsGhostFloor(node.Z, Level)) continue;
-                var rect = NodeRect(node, minX, minY);
+                var rect = R(proj.NodeRect(node));
                 context.FillRectangle(ghostBrush, rect);
                 context.DrawRectangle(ghostPen, rect);
             }
@@ -465,7 +458,7 @@ public class MapCanvas : Control
         foreach (var node in Zone.Nodes.Values)
         {
             if (node.Z != Level) continue;
-            var fromCenter = NodeCenter(node, minX, minY);
+            var fromCenter = P(proj.NodeCenter(node));
 
             foreach (var exit in node.Exits)
             {
@@ -479,18 +472,24 @@ public class MapCanvas : Control
                     // Neighbour is drawn on this level → full edge (once, from the
                     // lower id side). Pen by exit type, matching Genie 4's palette.
                     if (node.Id > dest.Id) continue;
-                    context.DrawLine(EdgePenFor(exit), fromCenter, NodeCenter(dest, minX, minY));
+                    context.DrawLine(EdgePenFor(exit), fromCenter, P(proj.NodeCenter(dest)));
                 }
                 else
                 {
                     // Neighbour isn't drawn (no dest, off-level, or unrecorded) →
                     // a short cyan stub in the exit's cardinal direction (#157).
-                    DrawExitStub(context, fromCenter, exit.Direction);
+                    DrawExitStub(context, fromCenter, exit.Direction, nodeSide);
                 }
             }
         }
 
         // ── Pass 2: nodes ──────────────────────────────────────────────────
+        // Rooms are drawn at their raw map pixels, Genie 4 style: a 9px box
+        // (scaled) centred on the position. On the community's 10px-grid maps
+        // neighbouring boxes sit ~1px apart, exactly as in Genie 4 — so the
+        // current-room ring and the selection outline are painted AFTER every
+        // box (below) rather than inline, or a neighbour would cover them.
+        Rect? currentRect = null, selectedRect = null;
         foreach (var node in Zone.Nodes.Values)
         {
             if (node.Z != Level) continue;
@@ -498,11 +497,11 @@ public class MapCanvas : Control
             var isSelected = SelectedNode is not null && node.Id == SelectedNode.Id;
 
             // While dragging the selected node, draw it under the cursor (a
-            // visual-only offset) — its stored X/Y don't change until release,
-            // so the bounds origin stays stable and nothing else jumps.
+            // visual-only offset) — its stored position doesn't change until
+            // release, so the bounds origin stays stable and nothing else jumps.
             var rect = (_dragging && isSelected)
-                ? new Rect(_cursor.X - NodeSize / 2, _cursor.Y - NodeSize / 2, NodeSize, NodeSize)
-                : NodeRect(node, minX, minY);
+                ? new Rect(_cursor.X - nodeSide / 2, _cursor.Y - nodeSide / 2, nodeSide, nodeSide)
+                : R(proj.NodeRect(node));
             var fill = ParseColor(node.Color) ?? DefaultNodeFill;
 
             context.FillRectangle(fill, rect);
@@ -510,33 +509,35 @@ public class MapCanvas : Control
             // map" boxes); ordinary rooms get the thin black border.
             context.DrawRectangle(node.IsCrossZone ? CrossZonePen : NodePen, rect);
 
-            if (CurrentNode is not null && node.Id == CurrentNode.Id)
-            {
-                // Slight outset so the highlight stroke doesn't overlap the fill.
-                var hi = rect.Inflate(2.0);
-                // User-chosen "here I am" colour wins over the default red.
-                var pen = CurrentRoomBrush is null
-                    ? CurrentPen
-                    : new Pen(CurrentRoomBrush, 2.5);
-                context.DrawRectangle(pen, hi);
-            }
-
-            // Edit-mode selection outline (drawn outset further than the
-            // current-room ring so both are visible on the active room).
-            if (isSelected)
-                context.DrawRectangle(SelectedPen, rect.Inflate(4.0));
+            if (CurrentNode is not null && node.Id == CurrentNode.Id) currentRect  = rect;
+            if (isSelected)                                           selectedRect = rect;
         }
+
+        if (currentRect is { } cur)
+        {
+            // Slight outset so the highlight stroke doesn't overlap the fill.
+            // User-chosen "here I am" colour wins over the default red.
+            var pen = CurrentRoomBrush is null ? CurrentPen : new Pen(CurrentRoomBrush, 2.5);
+            context.DrawRectangle(pen, cur.Inflate(1.5));
+        }
+
+        // Edit-mode selection outline (drawn outset further than the
+        // current-room ring so both are visible on the active room).
+        if (selectedRect is { } sel)
+            context.DrawRectangle(SelectedPen, sel.Inflate(3.5));
 
         // ── Pass 3: map labels (<label> elements) ──────────────────────────
         // Genie 4 paints the zone's free-floating <label> text (landmark names
         // like "East Gate", "Guard House", "Driftwood Designs") in black at the
         // positions the map author placed them — anchored top-left, no collision
-        // avoidance (the placements are hand-tuned). Node notes are NOT drawn
-        // here: they are #goto aliases, surfaced in the hover badge instead. This
-        // is why a cross-zone room no longer shows its raw "Map31_…xml|…" note.
-        var labelTypeface = Typeface.Default;
-        var labelSize     = Math.Max(9.0, 10.0 * Zoom);   // grows slightly with zoom
-        var labelBrush    = LabelTextBrush ?? RoomLabelBrush;   // user colour, default black
+        // avoidance (the placements are hand-tuned). The label goes through the
+        // SAME projection as the rooms, so it lands where it sits in Genie 4
+        // (the old cell-corner anchor put every label half a cell up-left).
+        // Node notes are NOT drawn here: they are #goto aliases, surfaced in the
+        // hover badge instead. This is why a cross-zone room no longer shows its
+        // raw "Map31_…xml|…" note.
+        var labelSize  = proj.LabelFontSize;                 // Genie 4: default font × scale
+        var labelBrush = LabelTextBrush ?? RoomLabelBrush;   // user colour, default black
 
         if (FullLabels)
         foreach (var label in Zone.Labels)
@@ -545,13 +546,9 @@ public class MapCanvas : Control
 
             var ft = new FormattedText(
                 label.Text, System.Globalization.CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight, labelTypeface, labelSize, labelBrush);
+                FlowDirection.LeftToRight, Typeface.Default, labelSize, labelBrush);
 
-            // Anchor the label's top-left at its stored grid position (same
-            // origin as the nodes), matching Genie 4's placement.
-            var px = Padding + (label.X - minX) * GridSize;
-            var py = Padding + (label.Y - minY) * GridSize;
-            context.DrawText(ft, new Point(px, py));
+            context.DrawText(ft, P(proj.LabelTextOrigin(label)));
         }
 
         // ── Pass 4: hover badge ───────────────────────────────────────────
@@ -560,7 +557,7 @@ public class MapCanvas : Control
 
         // ── Pass 5: colour legend (#157) ──────────────────────────────────
         if (ShowLegend)
-            DrawLegend(context, minX, minY);
+            DrawLegend(context, proj);
     }
 
     // Legend entries — the swatch must match how the map ACTUALLY draws each
@@ -585,7 +582,7 @@ public class MapCanvas : Control
     /// busy top-left where the rooms are, and doesn't slide as the map scrolls.
     /// A trailing "*" on a label marks colours the user can change (AutoMapper
     /// Settings); the rest are fixed.</summary>
-    private void DrawLegend(DrawingContext context, int minX, int minY)
+    private void DrawLegend(DrawingContext context, MapProjection proj)
     {
         const double pad = 8, row = 16, sw = 12, gap = 8;
         var typeface = new Typeface("Segoe UI, Consolas, monospace");
@@ -620,7 +617,7 @@ public class MapCanvas : Control
         bool CornerClear(Rect c)
         {
             foreach (var n in Zone!.Nodes.Values)
-                if (n.Z == Level && NodeRect(n, minX, minY).Intersects(c))
+                if (n.Z == Level && R(proj.NodeRect(n)).Intersects(c))
                     return false;
             return true;
         }
@@ -729,11 +726,11 @@ public class MapCanvas : Control
 
             if (node is not null && !LockPositions)
             {
-                // Cache the bounds origin now so the grid math stays stable
-                // for the whole drag even as the visual node tracks the cursor.
-                ComputeOrigin(out _dragMinX, out _dragMinY);
-                _dragOrigX = node.X;
-                _dragOrigY = node.Y;
+                // Cache the projection now so the pixel math stays stable for
+                // the whole drag even as the visual node tracks the cursor.
+                _dragProj  = GetProjection();
+                _dragOrigX = node.PixelX;
+                _dragOrigY = node.PixelY;
                 _dragging = true;
                 e.Pointer.Capture(this);
             }
@@ -847,26 +844,28 @@ public class MapCanvas : Control
 
         if (SelectedNode is { } node)
         {
-            // Convert the release point to a grid cell using the origin cached
-            // at drag start. SnapToGrid rounds to the nearest cell; with it off
-            // we floor — both produce integer coords (the only values the
-            // Genie 4 XML format can round-trip, since export writes X*20).
-            var rawX = (_cursor.X - Padding - GridSize / 2) / GridSize + _dragMinX;
-            var rawY = (_cursor.Y - Padding - GridSize / 2) / GridSize + _dragMinY;
-            var newX = SnapToGrid ? (int)Math.Round(rawX) : (int)Math.Floor(rawX);
-            var newY = SnapToGrid ? (int)Math.Round(rawY) : (int)Math.Floor(rawY);
+            // Convert the release point back to map pixels through the
+            // projection cached at drag start. SnapToGrid rounds to Genie 4's
+            // 10px grid (MapForm's `% 10`); off, to the nearest whole pixel.
+            // The room's raw PixelX/PixelY are written — NOT the 20px grid
+            // cell — so a room on a 10px-spaced street stays on that street
+            // instead of being re-quantised onto its neighbour.
+            var proj = _dragProj ?? GetProjection();
+            var newX = MapProjection.SnapMapPx(proj.ToMapX(_cursor.X), SnapToGrid);
+            var newY = MapProjection.SnapMapPx(proj.ToMapY(_cursor.Y), SnapToGrid);
 
-            // Only commit + mark dirty when the room actually moved to a new
-            // grid cell. A plain click (press+release with no drag) lands back
-            // on the same cell and must not dirty the zone.
+            // Only commit + mark dirty when the room actually moved. A plain
+            // click (press+release with no drag) lands back on the same pixel
+            // (or the same snap cell) and must not dirty the zone.
             if (newX != _dragOrigX || newY != _dragOrigY)
             {
-                node.X = newX;
-                node.Y = newY;
+                node.PixelX = newX;
+                node.PixelY = newY;
                 if (NodeMovedCommand?.CanExecute(node) == true)
                     NodeMovedCommand.Execute(node);
             }
         }
+        _dragProj = null;
 
         InvalidateVisual();
         e.Handled = true;
@@ -887,24 +886,6 @@ public class MapCanvas : Control
                 e.Handled = true;
             }
         }
-    }
-
-    /// <summary>Compute the current-level bounds origin (min X/Y across visible
-    /// nodes) — the same calculation Render/HitTest use to map grid → pixels.</summary>
-    private void ComputeOrigin(out int minX, out int minY)
-    {
-        minX = 0; minY = 0;
-        if (Zone is null) return;
-        int mx = int.MaxValue, my = int.MaxValue;
-        bool any = false;
-        foreach (var n in Zone.Nodes.Values)
-        {
-            if (n.Z != Level) continue;
-            if (n.X < mx) mx = n.X;
-            if (n.Y < my) my = n.Y;
-            any = true;
-        }
-        if (any) { minX = mx; minY = my; }
     }
 
     /// <summary>
@@ -1158,23 +1139,15 @@ public class MapCanvas : Control
     {
         if (Zone is null || Zone.Nodes.Count == 0) return null;
 
-        // Same bounds calculation as Render — required to map node X/Y to
-        // canvas pixels consistently.
-        int minX = int.MaxValue, minY = int.MaxValue;
-        bool any = false;
-        foreach (var node in Zone.Nodes.Values)
-        {
-            if (node.Z != Level) continue;
-            any = true;
-            if (node.X < minX) minX = node.X;
-            if (node.Y < minY) minY = node.Y;
-        }
-        if (!any) return null;
+        // The same projection Render draws with, so a click lands on the box
+        // the user sees.
+        var proj = GetProjection();
+        if (!proj.Any) return null;
 
         foreach (var node in Zone.Nodes.Values)
         {
             if (node.Z != Level) continue;
-            if (NodeRect(node, minX, minY).Contains(point))
+            if (proj.NodeRect(node).Contains(point.X, point.Y))
                 return node;
         }
         return null;
@@ -1220,15 +1193,15 @@ public class MapCanvas : Control
     /// direction (#157). Only the eight 2-D cardinals get a stub — up/down/out/in
     /// have no on-map direction. The grid Δ maps straight to screen space (grid Y
     /// and screen Y both grow downward), normalised so diagonals aren't longer.</summary>
-    private void DrawExitStub(DrawingContext ctx, Point center, Direction dir, Pen? pen = null)
+    private void DrawExitStub(DrawingContext ctx, Point center, Direction dir, double nodeSide, Pen? pen = null)
     {
         if (!IsStubDirection(dir, out var d)) return;
 
         var len  = Math.Sqrt(d.dx * (double)d.dx + d.dy * (double)d.dy);
         var ux   = d.dx / len;
         var uy   = d.dy / len;
-        var half = NodeSize / 2;
-        var stub = NodeSize * 0.7;
+        var half = nodeSide / 2;
+        var stub = nodeSide * 0.7;
         var start = new Point(center.X + ux * half,          center.Y + uy * half);
         var end   = new Point(center.X + ux * (half + stub), center.Y + uy * (half + stub));
         ctx.DrawLine(pen ?? StubPen, start, end);
@@ -1280,20 +1253,6 @@ public class MapCanvas : Control
                 }
             }
         }
-    }
-
-    private Point NodeCenter(MapNode node, int minX, int minY)
-    {
-        var x = Padding + (node.X - minX) * GridSize + GridSize / 2;
-        var y = Padding + (node.Y - minY) * GridSize + GridSize / 2;
-        return new Point(x, y);
-    }
-
-    private Rect NodeRect(MapNode node, int minX, int minY)
-    {
-        var cx = Padding + (node.X - minX) * GridSize + GridSize / 2;
-        var cy = Padding + (node.Y - minY) * GridSize + GridSize / 2;
-        return new Rect(cx - NodeSize / 2, cy - NodeSize / 2, NodeSize, NodeSize);
     }
 
     private static IBrush? ParseColor(string? hex)

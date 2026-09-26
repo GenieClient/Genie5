@@ -101,6 +101,10 @@ The walker is deliberately conservative, to stay within DR's allowed-software po
 
 For a cross-zone hop with a known wait window (boats, ferries), `AutoWalkService` surfaces a countdown ("~4:23 left") in the indicator strip. The countdown is only a UI hint — actual arrival is driven by the destination zone fingerprinting in, so a late boat just shows "any moment now…" until the room change fires.
 
+## Drawing geometry
+
+Zone XML stores room and label positions in **Genie 4 map pixels**, and the canvas draws them through [MapProjection](../src/Genie.Core/Mapper/MapProjection.cs) — one transform shared by paint, hit-testing, drag and layout. Genie 4 draws every room as a 9px box centred on its raw pixel and its snap-to-grid step is 10px, so the community maps are authored on a **10px grid** (the Crossing has 623 rooms on an odd ten). Genie 5 scales that space by 1.1 per zoom unit (a 20px pitch becomes 22px) and keeps Genie 4's ratios: boxes are 9 map-px, label text is Genie 4's default font size, label rectangles are 15 map-px tall, and labels are anchored top-left at their raw pixel in the *same* space as the rooms. The canvas is sized from the rooms **and** the visible labels' measured rectangles, so label text past the outermost room is never clipped. Dragging a room in edit mode writes `MapNode.PixelX/PixelY` back with the 10px snap ("Snap" toggle) or to the pixel; the derived 20px grid cell `MapNode.X/Y` is only what the automapper *places* new rooms on. `MapProjectionTests` pins the ratios and sweeps every installed zone for stacked rooms and clipped labels.
+
 ## Zone files, import, and updates
 
 - **Import from Genie 4** — **File → Import from Genie 4…** brings `.cfg` rules across; map XML is imported via the mapper. See the [Importing Genie4 Config](../wiki/Importing-Genie4-Config.md) wiki page.

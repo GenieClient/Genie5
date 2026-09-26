@@ -27,9 +27,16 @@ public sealed class MapNode
     /// <c>X = px / 20</c> with integer division, which moved every one of those
     /// rooms — and truncated negatives toward zero, so the shift wasn't even
     /// symmetric. Keeping the pixels verbatim and deriving the grid cell fixes
-    /// that without disturbing any consumer: the canvas, pathfinder and
-    /// automapper all still see the same integer <see cref="X"/>/<see cref="Y"/>
-    /// grid they always have.
+    /// that for the file; the pathfinder and automapper still see the same
+    /// integer <see cref="X"/>/<see cref="Y"/> grid they always have.
+    /// <para>
+    /// The map canvas, however, does NOT draw from <see cref="X"/>/<see cref="Y"/>:
+    /// those are not "off-grid" positions but Genie 4's 10px authoring grid
+    /// (its snap step is <c>% 10</c>), and rounding them to 20px cells stacked
+    /// 4,043 rooms across 64 shipped zones onto their neighbours. The canvas
+    /// projects <see cref="PixelX"/>/<see cref="PixelY"/> directly through
+    /// <see cref="MapProjection"/>, and a drag writes them back directly.
+    /// </para>
     /// </remarks>
     public int    PixelX       { get; set; }
 

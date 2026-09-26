@@ -137,6 +137,25 @@ finally remembering where you left every panel.
   vertical scrollbar), and the strip can be tapped to pin the panel open —
   the way in for touch and pen, which never hover.
 
+- **The map draws rooms where their authors put them** — Genie 5 rounded
+  every room to a 20px cell before drawing it, but the community maps are
+  drawn on Genie 4's 10px grid: 623 of the Crossing's 1,060 rooms sit on an
+  odd ten, and rounding stacked them onto their neighbours (the four
+  Goldstone Square / Arboretum rooms drew as one square; 4,043 rooms across
+  64 zones were affected). Rooms now project straight from their stored
+  pixels, as Genie 4's 9px boxes scaled to the zoom, so a 10px street is a
+  row of touching squares instead of a pile. Dragging a room in edit mode
+  writes the pixel back with Genie 4's 10px snap, so a moved room stays on
+  its street rather than jumping to the nearest 20px cell.
+
+- **Map labels sit where they were placed, and never clip** — the landmark
+  text ("Bakery", "Northeast Gate") was anchored half a cell up and left of
+  its true spot, because rooms were centred in their cell and labels were
+  not, and the canvas was sized from rooms alone so any label past the
+  outermost room lost its tail. Labels now share the rooms' origin exactly
+  and count toward the canvas size, and their font scales with the map like
+  Genie 4's instead of a fixed 10px.
+
 - **`%list.length` and bare `%var = value` lines work as they do in
   Genie 4** — `.length` resolved a variable of that literal name instead of
   counting the list, so `cyclic.cmd`'s loop silently skipped its last
