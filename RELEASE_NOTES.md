@@ -183,6 +183,13 @@ finally remembering where you left every panel.
   white ghost colour, so the main floor stays readable under the one you are
   on; `automapperalpha` still fades it and 0 still hides it.
 
+- **A script's moves now inform the automapper** — the mapper credits each
+  new room to the last command sent, but only typed, macro, trigger and alias
+  sends reached it; a script's `put` did not. So a move the game refused
+  stayed pending until a script moved you, the arrival was credited to the
+  refused move, and record mode drew a phantom exit pair between the two
+  rooms. Script-driven walks also get proper direction context now.
+
 - **`obs sky` no longer stops at the first cloudy line** — the Time Tracker
   treated any unparsed line as the end of the block, so only about half the
   bodies were ever captured (#355).
