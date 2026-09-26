@@ -33,6 +33,25 @@ finally remembering where you left every panel.
   spell-choose stream boxes take the game's declared height with their links
   clickable (#341, #342, #345).
 
+- **Map labels are editable, as in Genie 4** — in Edit mode, click a
+  landmark label to select it (white on blue, like Genie 4), drag it into
+  place with the same 10px snap as rooms, rename it or type an exact
+  "x, y, z" in the new **EDIT LABEL** panel, and remove it with Delete, the
+  panel's Remove, or the right-click menu. **+ Label** on the toolbar drops a
+  new label beside your room; **Add Label Here** on the right-click menu
+  drops one where you clicked. A plain click never moves a room or label —
+  only a real drag does — so selecting an off-grid room no longer re-snaps it.
+
+- **Room tags can finally be written** — `#goto @bank` has walked to the
+  nearest room tagged `bank` since the tags extension shipped, but nothing
+  in the app could tag a room. Now: a **Tags** field in EDIT ROOM
+  (`bank|moongate`), `#mapper tag add <tag>` / `remove <tag>` / `list` on the
+  room you stand in, `#mapper tags` for the whole zone, and tags show in the
+  hover badge as `@bank`. A tag added by command is routable at once and is
+  saved straight to the zone file. Genie 4's `#automapper note <text>` is
+  here too as `#mapper note <text>` (append a `#goto` note to the current
+  room) and bare `#mapper note` (list the zone's notes).
+
 - **`{display:command}` inline click links** — Genie 4 turns any output text
   containing `{display:command}` into a clickable link, anywhere on the line
   and as often as it appears, so `echo Go {north:north} or {south:go south}`

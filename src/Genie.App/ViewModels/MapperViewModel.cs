@@ -244,6 +244,21 @@ public partial class MapperViewModel : ReactiveObject
     [Reactive] public string SelNodeNotes    { get; set; } = "";
     [Reactive] public string SelNodeColor    { get; set; } = "";
     [Reactive] public string SelNodeServerId { get; set; } = "";
+    /// <summary>Editable mirror of the selected room's <see cref="MapNode.Tags"/>,
+    /// '|'-separated (commas accepted on Apply). Tags drive <c>#goto @tag</c>;
+    /// until this field existed nothing in the app could write one.</summary>
+    [Reactive] public string SelNodeTags     { get; set; } = "";
+
+    // ── Label editing (Genie 4 LabelDetails panel) ────────────────────────
+    /// <summary>The map label selected on the canvas in edit mode (two-way
+    /// with <c>MapCanvas.SelectedLabel</c>). Selecting a label clears the
+    /// room selection and vice versa — the canvas enforces that.</summary>
+    [Reactive] public MapLabel? SelectedLabel { get; set; }
+    /// <summary>Editable mirror of the selected label's text.</summary>
+    [Reactive] public string SelLabelText     { get; set; } = "";
+    /// <summary>Editable mirror of the selected label's position as Genie 4's
+    /// LabelDetails shows it: <c>x, y, z</c> in map pixels.</summary>
+    [Reactive] public string SelLabelPosition { get; set; } = "";
 
     // ── Editor commands ───────────────────────────────────────────────────
     /// <summary>Create a fresh empty zone in the engine (Genie 4 "New").</summary>
@@ -263,6 +278,17 @@ public partial class MapperViewModel : ReactiveObject
     /// <summary>Delete a specific node — invoked by the canvas (Remove Room
     /// context item / Delete key) with the target node.</summary>
     public ReactiveCommand<MapNode, Unit> RemoveNodeCommand  { get; }
+    /// <summary>Add a map label (Genie 4 "New Label"). The canvas passes a
+    /// label positioned at the right-click ("Add Label Here"); the toolbar
+    /// passes null and the label is placed beside the current room.</summary>
+    public ReactiveCommand<MapLabel?, Unit> AddLabelCommand   { get; }
+    /// <summary>Delete a specific label — canvas context item / Delete key.</summary>
+    public ReactiveCommand<MapLabel, Unit> RemoveLabelCommand { get; }
+    /// <summary>Invoked by the canvas after a label drag completes.</summary>
+    public ReactiveCommand<MapLabel, Unit> LabelMovedCommand  { get; }
+    /// <summary>Push the Edit-Label fields (text, "x, y, z") back into the
+    /// selected label.</summary>
+    public ReactiveCommand<Unit, Unit> ApplyLabelPropsCommand { get; }
 
     // ── Zone selection ────────────────────────────────────────────────────
     /// <summary>Zone filenames (no extension) found in <see cref="MapsDirectory"/>.</summary>
@@ -717,16 +743,26 @@ public partial class MapperViewModel : ReactiveObject
         ApplyNodePropsCommand = ReactiveCommand.Create(ApplyNodeProps);
         NodeMovedCommand      = ReactiveCommand.Create<MapNode>(_ => { IsZoneDirty = true; RenderTick++; });
         RemoveNodeCommand     = ReactiveCommand.Create<MapNode>(RemoveNodeById);
+        AddLabelCommand       = ReactiveCommand.Create<MapLabel?>(AddLabel);
+        RemoveLabelCommand    = ReactiveCommand.Create<MapLabel>(RemoveLabel);
+        LabelMovedCommand     = ReactiveCommand.Create<MapLabel>(l =>
+        {
+            IsZoneDirty = true; RenderTick++;
+            if (ReferenceEquals(l, SelectedLabel)) MirrorSelectedLabel();   // the position field follows the drag
+        });
+        ApplyLabelPropsCommand = ReactiveCommand.Create(ApplyLabelProps);
 
         foreach (var c in new IReactiveCommand[]
                  { NewZoneCommand, SaveMapCommand, RemoveSelectedCommand,
-                   ResetMapIdsCommand, ApplyNodePropsCommand, NodeMovedCommand, RemoveNodeCommand })
+                   ResetMapIdsCommand, ApplyNodePropsCommand, NodeMovedCommand, RemoveNodeCommand,
+                   AddLabelCommand, RemoveLabelCommand, LabelMovedCommand, ApplyLabelPropsCommand })
             c.ThrownExceptions.Subscribe(ex => LoadStatus = $"Editor error: {ex.Message}");
 
         // Mirror the selected node's fields into the editable Edit-Panel
         // properties whenever the selection changes (canvas sets SelectedNode
         // via its two-way binding).
         this.WhenAnyValue(x => x.SelectedNode).Subscribe(_ => MirrorSelectedNode());
+        this.WhenAnyValue(x => x.SelectedLabel).Subscribe(_ => MirrorSelectedLabel());
 
         RefreshZonesCommand = ReactiveCommand.Create(RefreshAvailableZones);
         RefreshZonesCommand.ThrownExceptions.Subscribe(ex =>
@@ -1760,8 +1796,213 @@ public partial class MapperViewModel : ReactiveObject
 
     private void RemoveSelected()
     {
-        if (SelectedNode is null) { LoadStatus = "No room selected."; return; }
-        RemoveNodeById(SelectedNode);
+        // Genie 4 "Remove Selected Nodes/Labels": whichever kind is selected.
+        if (SelectedNode is not null) { RemoveNodeById(SelectedNode); return; }
+        if (SelectedLabel is not null) { RemoveLabel(SelectedLabel); return; }
+        LoadStatus = "No room or label selected.";
+    }
+
+    // ── Label editing (Genie 4 LabelDetails: New / Apply / Remove) ────────
+    private void AddLabel(MapLabel? at)
+    {
+        if (_engine is null) { LoadStatus = "Mapper not ready."; return; }
+        var zone = _engine.ActiveZone;
+
+        MapLabel label;
+        if (at is not null)
+        {
+            label = at;
+            if (string.IsNullOrEmpty(label.Text)) label.Text = "New Label";
+        }
+        else
+        {
+            // Toolbar "+ Label": beside the current room when it is on the
+            // viewed floor, else beside the first room of that floor, else at
+            // the origin (Genie 4 EventAddLabel puts it at 0,0 on the current Z).
+            var anchor = _engine.CurrentNode is { } cur && cur.Z == Level ? cur
+                       : zone.Nodes.Values.FirstOrDefault(n => n.Z == Level);
+            label = new MapLabel
+            {
+                Text = "New Label",
+                X    = anchor is null ? 0 : (anchor.PixelX + MapProjection.SnapPx) / MapProjection.G4GridPx,
+                Y    = anchor is null ? 0 : (anchor.PixelY - MapProjection.SnapPx) / MapProjection.G4GridPx,
+                Z    = Level,
+            };
+        }
+
+        zone.Labels.Add(label);
+        SelectedNode  = null;
+        SelectedLabel = label;
+        IsZoneDirty   = true;
+        RenderTick++;
+        LoadStatus = $"Added label \"{label.Text}\" — edit it in Details, drag it into place, then Save.";
+    }
+
+    private void RemoveLabel(MapLabel label)
+    {
+        if (_engine is null || label is null) return;
+        if (!_engine.ActiveZone.Labels.Remove(label)) return;
+        if (ReferenceEquals(SelectedLabel, label)) SelectedLabel = null;
+        IsZoneDirty = true;
+        RenderTick++;
+        LoadStatus = $"Removed label \"{label.Text}\". Save to persist.";
+    }
+
+    private void ApplyLabelProps()
+    {
+        if (SelectedLabel is null) { LoadStatus = "No label selected."; return; }
+        var text = (SelLabelText ?? "").Trim();
+        if (text.Length == 0) { LoadStatus = "A label needs some text — use Remove to delete it."; return; }
+
+        if (!TryParseLabelPosition(SelLabelPosition, out var px, out var py, out var pz))
+        {
+            LoadStatus = "Position must be \"x, y, z\" in map pixels (e.g. 180, -36, 0).";
+            return;
+        }
+
+        SelectedLabel.Text = text;
+        SelectedLabel.X    = px / MapProjection.G4GridPx;
+        SelectedLabel.Y    = py / MapProjection.G4GridPx;
+        SelectedLabel.Z    = pz;
+        IsZoneDirty = true;
+        RenderTick++;
+        LoadStatus = $"Updated label \"{text}\". Save to persist.";
+    }
+
+    /// <summary>Genie 4 LabelDetails position syntax: "x, y, z" (z optional,
+    /// defaults to the viewed floor). Whitespace-tolerant.</summary>
+    internal bool TryParseLabelPosition(string? s, out int x, out int y, out int z)
+    {
+        x = y = 0; z = Level;
+        var parts = (s ?? "").Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length is < 2 or > 3) return false;
+        if (!int.TryParse(parts[0], out x) || !int.TryParse(parts[1], out y)) return false;
+        if (parts.Length == 3 && !int.TryParse(parts[2], out z)) return false;
+        return true;
+    }
+
+    private void MirrorSelectedLabel()
+    {
+        var l = SelectedLabel;
+        SelLabelText     = l?.Text ?? "";
+        SelLabelPosition = l is null
+            ? ""
+            : $"{(int)Math.Round(l.X * MapProjection.G4GridPx)}, {(int)Math.Round(l.Y * MapProjection.G4GridPx)}, {l.Z}";
+    }
+
+    // ── #mapper tag / note (write path for #goto @tag and note labels) ─────
+
+    /// <summary>
+    /// <c>#mapper tag add|remove &lt;tag&gt;</c> on the character's current room,
+    /// <c>#mapper tag list</c> for the room's tags, <c>#mapper tags</c> for every
+    /// tag in the zone. Tags are the Genie 5 <c>tags="…"</c> extension that
+    /// <c>#goto @tag</c> routes to; the engine's tag index is rebuilt so the
+    /// new tag is routable at once. Persists straight to the zone file when
+    /// there is one (like Save Notes), else marks the zone dirty.
+    /// </summary>
+    public string TagCommand(string sub, string arg)
+    {
+        if (_engine is null) return "[mapper] Mapper not ready.";
+        var zone = _engine.ActiveZone;
+        sub = (sub ?? "").Trim().ToLowerInvariant();
+        arg = (arg ?? "").Trim().Trim('@');
+
+        if (sub is "" or "list" or "zone" or "all")
+        {
+            if (sub is "zone" or "all" || _engine.CurrentNode is null)
+            {
+                var counts = zone.Nodes.Values.SelectMany(n => n.Tags.Select(t => t.ToLowerInvariant()))
+                                              .GroupBy(t => t).OrderBy(g => g.Key)
+                                              .Select(g => $"@{g.Key} ({g.Count()})").ToList();
+                return counts.Count == 0
+                    ? "[mapper] No tagged rooms in this zone. Tag one with #mapper tag add <tag>."
+                    : $"[mapper] Tags in {zone.Name}: {string.Join(", ", counts)}";
+            }
+            var cur = _engine.CurrentNode;
+            return cur.Tags.Count == 0
+                ? $"[mapper] Room {cur.Id} ({cur.Title}) has no tags."
+                : $"[mapper] Room {cur.Id} ({cur.Title}) tags: {string.Join(", ", cur.Tags.Select(t => "@" + t))}";
+        }
+
+        if (_engine.CurrentNode is not { } node)
+            return "[mapper] Current location unknown — walk one step so the mapper can place you, then try again.";
+        if (arg.Length == 0)
+            return "[mapper] Usage: #mapper tag add <tag> | remove <tag> | list";
+        if (arg.Contains('|'))
+            return "[mapper] A tag can't contain '|' (it separates tags in the map file).";
+
+        switch (sub)
+        {
+            case "add":
+                if (node.HasTag(arg)) return $"[mapper] Room {node.Id} already has @{arg}.";
+                node.Tags.Add(arg);
+                _engine.NotifyStructureChanged();          // rebuild the tag index → #goto @tag sees it
+                return $"[mapper] Tagged room {node.Id} ({node.Title}) @{arg}. {PersistZone()}";
+            case "remove":
+            case "del":
+            case "delete":
+                var removed = node.Tags.RemoveAll(t => t.Equals(arg, StringComparison.OrdinalIgnoreCase));
+                if (removed == 0) return $"[mapper] Room {node.Id} has no tag @{arg}.";
+                _engine.NotifyStructureChanged();
+                return $"[mapper] Removed @{arg} from room {node.Id}. {PersistZone()}";
+            default:
+                return "[mapper] Usage: #mapper tag add <tag> | remove <tag> | list";
+        }
+    }
+
+    /// <summary>
+    /// Genie 4's <c>#automapper note &lt;text&gt;</c> (aliases label/notes/labels):
+    /// with text, append a '|'-separated note (a <c>#goto</c> label) to the
+    /// current room; bare, list every noted room in the zone.
+    /// </summary>
+    public string NoteCommand(string arg)
+    {
+        if (_engine is null) return "[mapper] Mapper not ready.";
+        var zone = _engine.ActiveZone;
+        arg = (arg ?? "").Trim();
+
+        if (arg.Length == 0)
+        {
+            var lines = zone.Nodes.Values.Where(n => n.Notes.Length > 0).OrderBy(n => n.Id)
+                                         .Select(n => $"\t{n.Notes} ({n.Id})").ToList();
+            return lines.Count == 0
+                ? $"[mapper] No notes in {zone.Name}."
+                : $"[mapper] Notes in {zone.Name}:\n{string.Join("\n", lines)}";
+        }
+
+        if (_engine.CurrentNode is not { } node)
+            return "[mapper] Current location unknown, cannot add note.";
+
+        node.Notes = node.Notes.Length > 0 ? node.Notes + "|" + arg : arg;
+        if (ReferenceEquals(node, ActiveNode)) CurrentNotes = node.Notes;   // the Details field follows
+        RenderTick++;
+        return $"[mapper] Note added for room {node.Id}: {arg}. {PersistZone()}";
+    }
+
+    /// <summary>Write the active zone to its file when it has one (the
+    /// SaveNotes behaviour), else leave it dirty for Save. Returns the
+    /// trailing status fragment for a command echo.</summary>
+    private string PersistZone()
+    {
+        if (_engine is null || _zoneRepo is null) return "";
+        if (string.IsNullOrEmpty(SelectedZoneFile) || string.IsNullOrEmpty(MapsDirectory))
+        {
+            IsZoneDirty = true;
+            return "Save to persist.";
+        }
+        var path = Path.Combine(MapsDirectory, SelectedZoneFile + ".xml");
+        try
+        {
+            _zoneRepo.Save(path, _engine.ActiveZone);
+            ZoneLastWriteTime = File.GetLastWriteTime(path);
+            RefreshZoneAge();
+            return $"Saved {SelectedZoneFile}.xml.";
+        }
+        catch (Exception ex)
+        {
+            IsZoneDirty = true;
+            return $"Save failed: {ex.Message}";
+        }
     }
 
     private void RemoveNodeById(MapNode node)
@@ -1794,7 +2035,9 @@ public partial class MapperViewModel : ReactiveObject
         SelectedNode.Notes        = SelNodeNotes    ?? "";
         SelectedNode.Color        = SelNodeColor    ?? "";
         SelectedNode.ServerRoomId = SelNodeServerId ?? "";
-        // Title + ServerRoomId feed the lookup indexes — rebuild them.
+        // Tags: '|' or ',' separated, trimmed, de-duplicated case-insensitively.
+        SelectedNode.Tags = ParseTags(SelNodeTags);
+        // Title + ServerRoomId + Tags feed the lookup indexes — rebuild them.
         _engine.NotifyStructureChanged();
         IsZoneDirty = true;
         RenderTick++;
@@ -1808,6 +2051,21 @@ public partial class MapperViewModel : ReactiveObject
         SelNodeNotes    = n?.Notes        ?? "";
         SelNodeColor    = n?.Color        ?? "";
         SelNodeServerId = n?.ServerRoomId ?? "";
+        SelNodeTags     = n is null ? "" : string.Join("|", n.Tags);
+    }
+
+    /// <summary>Split a typed tag list ('|' or ',' separated) into clean,
+    /// case-insensitively de-duplicated tags.</summary>
+    internal static List<string> ParseTags(string? text)
+    {
+        var result = new List<string>();
+        foreach (var t in (text ?? "").Split(new[] { '|', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var tag = t.TrimStart('@');
+            if (tag.Length > 0 && !result.Any(r => r.Equals(tag, StringComparison.OrdinalIgnoreCase)))
+                result.Add(tag);
+        }
+        return result;
     }
 
     private static string SanitizeFileName(string name)

@@ -992,14 +992,17 @@
             </Button>
             <ToggleButton Content="Labels" IsChecked="{Binding ViewModel.FullLabels}"
                           Margin="8,0,0,0" Padding="6,1" FontSize="11"
-                          ToolTip.Tip="OFF: show only each room's primary name. ON: show the full |-separated label list. Labels auto-place around rooms and skip when crowded; the full set is always in the hover tooltip."/>
+                          ToolTip.Tip="Show the map's landmark labels (the zone's own label text, e.g. 'East Gate'). Off hides them for a cleaner view. Room notes are never drawn — hover a room to see them."/>
 
             <!-- Edit-only cluster -->
             <StackPanel Orientation="Horizontal" Spacing="4"
                         IsVisible="{Binding ViewModel.EditMode}">
               <Button Content="Remove" Command="{Binding ViewModel.RemoveSelectedCommand}"
                       Padding="6,1" FontSize="11" Background="{DynamicResource Theme.DangerBg}" Foreground="{DynamicResource Theme.Danger}"
-                      ToolTip.Tip="Delete the selected room (or press Delete on the map)."/>
+                      ToolTip.Tip="Delete the selected room or label (or press Delete on the map)."/>
+              <Button Content="+ Label" Command="{Binding ViewModel.AddLabelCommand}"
+                      Padding="6,1" FontSize="11"
+                      ToolTip.Tip="Add a landmark label beside the current room. Drag it into place and edit its text in Details. Right-click the map for 'Add Label Here'."/>
               <Button Content="Reset IDs" Command="{Binding ViewModel.ResetMapIdsCommand}"
                       Padding="6,1" FontSize="11"
                       ToolTip.Tip="Renumber all room IDs to a dense 1..N sequence (fixes sparse ids after lots of add/remove)."/>
@@ -1153,7 +1156,11 @@
                                     FullLabels="{Binding ViewModel.FullLabels}"
                                     SelectedNode="{Binding ViewModel.SelectedNode, Mode=TwoWay}"
                                     NodeMovedCommand="{Binding ViewModel.NodeMovedCommand}"
-                                    RemoveNodeCommand="{Binding ViewModel.RemoveNodeCommand}"/>
+                                    RemoveNodeCommand="{Binding ViewModel.RemoveNodeCommand}"
+                                    SelectedLabel="{Binding ViewModel.SelectedLabel, Mode=TwoWay}"
+                                    AddLabelCommand="{Binding ViewModel.AddLabelCommand}"
+                                    RemoveLabelCommand="{Binding ViewModel.RemoveLabelCommand}"
+                                    LabelMovedCommand="{Binding ViewModel.LabelMovedCommand}"/>
               </ScrollViewer>
             </Border>
           </Grid>
@@ -1282,10 +1289,41 @@
                     <TextBlock Text="Server id" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <TextBox Text="{Binding ViewModel.SelNodeServerId}" FontSize="11"
                              FontFamily="Consolas,monospace"/>
+                    <TextBlock Text="Tags" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
+                    <TextBox Text="{Binding ViewModel.SelNodeTags}" FontSize="11"
+                             Watermark="e.g. bank|moongate — #goto @tag walks to the nearest"
+                             ToolTip.Tip="Free-form room tags, | or , separated. #goto @bank walks to the nearest room tagged bank. Also: #mapper tag add bank."/>
                     <Button Content="Apply" Padding="8,2" FontSize="11"
                             HorizontalAlignment="Right"
                             Command="{Binding ViewModel.ApplyNodePropsCommand}"
                             ToolTip.Tip="Write these fields back into the room. Save the zone to persist to disk."/>
+                  </StackPanel>
+                </StackPanel>
+
+                <!-- ── Edit Label (edit mode only) ──────────────────── -->
+                <!-- Genie 4 AutoMapper "LabelDetails": the selected map      -->
+                <!-- label's text and "x, y, z" position in map pixels.       -->
+                <StackPanel Spacing="3" IsVisible="{Binding ViewModel.EditMode}">
+                  <StackPanel Spacing="3"
+                              IsVisible="{Binding ViewModel.SelectedLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <TextBlock Text="EDIT LABEL" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="9"
+                               FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBlock Text="Text" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
+                    <TextBox Text="{Binding ViewModel.SelLabelText}" FontSize="11"/>
+                    <TextBlock Text="Position (x, y, z)" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
+                    <TextBox Text="{Binding ViewModel.SelLabelPosition}" FontSize="11"
+                             FontFamily="Consolas,monospace" Watermark="180, -36, 0"
+                             ToolTip.Tip="Map pixels, as Genie 4 stores them. Dragging the label on the map updates this."/>
+                    <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
+                      <Button Content="Remove" Padding="8,2" FontSize="11"
+                              Background="{DynamicResource Theme.DangerBg}" Foreground="{DynamicResource Theme.Danger}"
+                              Command="{Binding ViewModel.RemoveLabelCommand}"
+                              CommandParameter="{Binding ViewModel.SelectedLabel}"
+                              ToolTip.Tip="Delete this label. Save the zone to persist."/>
+                      <Button Content="Apply" Padding="8,2" FontSize="11"
+                              Command="{Binding ViewModel.ApplyLabelPropsCommand}"
+                              ToolTip.Tip="Write the text and position back into the label. Save the zone to persist to disk."/>
+                    </StackPanel>
                   </StackPanel>
                 </StackPanel>
 

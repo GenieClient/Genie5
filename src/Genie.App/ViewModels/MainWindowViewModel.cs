@@ -6517,9 +6517,26 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 Echo($"[mapper] Record (auto-map as you walk): {(rec ? "on" : "off")}");
                 break;
 
+            // Room tags — the write path for #goto @tag. `#mapper tag add bank`
+            // tags the current room; `#mapper tags` lists the zone's tags.
+            case "tag":
+                Echo(Mapper.TagCommand(parts.Length > 1 ? parts[1] : "",
+                                       parts.Length > 2 ? string.Join(" ", parts.Skip(2)) : ""));
+                break;
+            case "tags":
+                Echo(Mapper.TagCommand("zone", ""));
+                break;
+
+            // Genie 4 `#automapper note <text>` (and its label/notes/labels
+            // aliases): append a #goto note to the current room; bare = list.
+            case "note": case "notes": case "label": case "labels":
+                Echo(Mapper.NoteCommand(RestAfterFirstToken(args)));
+                break;
+
             default:
                 Echo("[mapper] Usage: #mapper reset | save | load | clear | zone [<id|name>] | " +
-                     "color <bg|text> <colour> | allowdupes [on|off] | record [on|off]");
+                     "color <bg|text> <colour> | allowdupes [on|off] | record [on|off] | " +
+                     "tag add|remove <tag> | tag list | tags | note [<text>]");
                 break;
         }
     }
@@ -6534,6 +6551,16 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "text": case "fg": case "foreground": Mapper.MapTextColor = c; echo($"[mapper] Map text colour: {parts[2]}"); break;
             default: echo("[mapper] Usage: #mapper color <bg|text> <colour>"); break;
         }
+    }
+
+    /// <summary>Everything after the first whitespace-delimited token of
+    /// <paramref name="args"/>, original spacing and case intact — for
+    /// subcommands whose argument is free text (a room note).</summary>
+    private static string RestAfterFirstToken(string? args)
+    {
+        var s = (args ?? string.Empty).TrimStart();
+        var cut = s.IndexOfAny(new[] { ' ', '\t' });
+        return cut < 0 ? string.Empty : s[(cut + 1)..].Trim();
     }
 
     /// <summary>Parse an on/off/toggle flag argument; anything unrecognised toggles.</summary>

@@ -104,6 +104,10 @@ public class MapCanvas : Control
     // On-map label text — Genie 4 paints <label> elements in the panel's
     // foreground colour (black on the PaleGoldenrod canvas).
     private static readonly IBrush  RoomLabelBrush  = new SolidColorBrush(Colors.Black);
+    // A selected label (edit mode) — Genie 4 paints it white-on-blue with a
+    // black border (MapForm.cs, m_SelectedLabels).
+    private static readonly IBrush  SelectedLabelFillBrush = new SolidColorBrush(Colors.Blue);
+    private static readonly IBrush  SelectedLabelTextBrush = new SolidColorBrush(Colors.White);
 
     // Hover badge — translucent panel + bright text drawn near the cursor.
     private static readonly IBrush  HoverBackgroundBrush = new SolidColorBrush(Color.FromArgb(0xee, 0x22, 0x22, 0x22));
@@ -238,6 +242,32 @@ public class MapCanvas : Control
     public static readonly StyledProperty<bool> FullLabelsProperty =
         AvaloniaProperty.Register<MapCanvas, bool>(nameof(FullLabels), defaultValue: true);
 
+    /// <summary>The map label selected in edit mode (two-way with the Mapper
+    /// VM). Genie 4 paints a selected label as white text on a blue box.
+    /// Selecting a label clears <see cref="SelectedNode"/> and vice versa.</summary>
+    public static readonly StyledProperty<MapLabel?> SelectedLabelProperty =
+        AvaloniaProperty.Register<MapCanvas, MapLabel?>(nameof(SelectedLabel),
+            defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
+
+    /// <summary>Fired with a <see cref="MapLabel"/> positioned at the right-click
+    /// ("Add Label Here", edit mode). The VM adds it to the zone.</summary>
+    public static readonly StyledProperty<ICommand?> AddLabelCommandProperty =
+        AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(AddLabelCommand));
+
+    /// <summary>Fired with the label to delete (Remove Label context item /
+    /// Delete key with a label selected).</summary>
+    public static readonly StyledProperty<ICommand?> RemoveLabelCommandProperty =
+        AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(RemoveLabelCommand));
+
+    /// <summary>Fired with the label after a drag-to-move completes.</summary>
+    public static readonly StyledProperty<ICommand?> LabelMovedCommandProperty =
+        AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(LabelMovedCommand));
+
+    public MapLabel? SelectedLabel      { get => GetValue(SelectedLabelProperty);      set => SetValue(SelectedLabelProperty, value); }
+    public ICommand? AddLabelCommand    { get => GetValue(AddLabelCommandProperty);    set => SetValue(AddLabelCommandProperty, value); }
+    public ICommand? RemoveLabelCommand { get => GetValue(RemoveLabelCommandProperty); set => SetValue(RemoveLabelCommandProperty, value); }
+    public ICommand? LabelMovedCommand  { get => GetValue(LabelMovedCommandProperty);  set => SetValue(LabelMovedCommandProperty, value); }
+
     /// <summary>The currently selected node (edit mode). Outlined in yellow.</summary>
     public static readonly StyledProperty<MapNode?> SelectedNodeProperty =
         AvaloniaProperty.Register<MapCanvas, MapNode?>(nameof(SelectedNode),
@@ -291,6 +321,16 @@ public class MapCanvas : Control
     private MapProjection? _dragProj;   // projection cached at drag start (stable while dragging)
     private int            _dragOrigX;  // selected node's map-pixel position at drag start —
     private int            _dragOrigY;  // used to skip the move/dirty when it didn't change
+    private Point          _pressPoint; // where the button went down — a release within
+                                        // DragThreshold of it is a click, not a move
+    private const double   DragThreshold = 3.0;
+
+    // Label drag (edit mode). The grab offset keeps the label under the same
+    // spot of the pointer instead of snapping its corner to the cursor.
+    private bool           _draggingLabel;
+    private Point          _labelGrab;   // (Avalonia Point − Point is a Point)
+    private double         _labelOrigX;
+    private double         _labelOrigY;
 
     // ── Pan state (grab-scroll the view) ──────────────────────────────────
     private bool          _panning;
@@ -324,7 +364,8 @@ public class MapCanvas : Control
         AffectsRender<MapCanvas>(ZoneProperty, CurrentNodeProperty, LevelProperty, RenderTickProperty,
                                  ZoomProperty, CurrentRoomBrushProperty, MapBackgroundBrushProperty,
                                  LabelTextBrushProperty, AutoMapperAlphaProperty, ShowLegendProperty,
-                                 EditModeProperty, SelectedNodeProperty, FullLabelsProperty);
+                                 EditModeProperty, SelectedNodeProperty, FullLabelsProperty,
+                                 SelectedLabelProperty);
         AffectsMeasure<MapCanvas>(ZoneProperty, LevelProperty, RenderTickProperty, ZoomProperty);
 
         // Auto-center on the active room whenever it changes. Walking into a
@@ -544,11 +585,25 @@ public class MapCanvas : Control
         {
             if (label.Z != Level || string.IsNullOrEmpty(label.Text)) continue;
 
+            var isSel = EditMode && ReferenceEquals(label, SelectedLabel);
             var ft = new FormattedText(
                 label.Text, System.Globalization.CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight, Typeface.Default, labelSize, labelBrush);
+                FlowDirection.LeftToRight, Typeface.Default, labelSize,
+                isSel ? SelectedLabelTextBrush : labelBrush);
 
-            context.DrawText(ft, P(proj.LabelTextOrigin(label)));
+            // Genie 4: a selected label is white text on a blue box with a black
+            // border. While it is being dragged it follows the cursor (visual
+            // only — its stored position changes on release).
+            var origin = (_draggingLabel && isSel)
+                ? _cursor - _labelGrab
+                : P(proj.LabelOrigin(label));
+            if (isSel)
+            {
+                var box = new Rect(origin.X, origin.Y, ft.Width + 2, proj.LabelRowHeight);
+                context.FillRectangle(SelectedLabelFillBrush, box);
+                context.DrawRectangle(NodePen, box);
+            }
+            context.DrawText(ft, new Point(origin.X + 1, origin.Y + 1));
         }
 
         // ── Pass 4: hover badge ───────────────────────────────────────────
@@ -681,8 +736,8 @@ public class MapCanvas : Control
             // / Edit Exit) grey out when the click missed a room; the window
             // actions (Float / Close) are always live. The dock chrome's own
             // menu is suppressed in OnContextRequested so only this one shows.
-            var node = HitTest(e.GetPosition(this));
-            ShowContextMenu(node);
+            var at = e.GetPosition(this);
+            ShowContextMenu(HitTest(at), at);
             e.Handled = true;
             return;
         }
@@ -717,10 +772,15 @@ public class MapCanvas : Control
             // empty space) and, unless locked, begins a drag-to-move. Pressing
             // on empty space instead pans the view.
             Focus();   // so the Delete key reaches OnKeyDown
-            _cursor   = e.GetPosition(this);
-            var node  = HitTest(_cursor);
+            _cursor     = e.GetPosition(this);
+            _pressPoint = _cursor;
+            var node    = HitTest(_cursor);
+            // Rooms win over labels (a label's box can run under a room);
+            // otherwise the LAST label under the pointer wins, as in Genie 4.
+            var label   = node is null ? HitTestLabel(_cursor) : null;
 
-            SelectedNode = node;
+            SelectedNode  = node;
+            SelectedLabel = label;
             if (SelectNodeCommand?.CanExecute(node) == true)
                 SelectNodeCommand.Execute(node);
 
@@ -732,6 +792,16 @@ public class MapCanvas : Control
                 _dragOrigX = node.PixelX;
                 _dragOrigY = node.PixelY;
                 _dragging = true;
+                e.Pointer.Capture(this);
+            }
+            else if (label is not null && !LockPositions)
+            {
+                // Genie 4 "Move Nodes/Labels": labels drag like rooms.
+                _dragProj      = GetProjection();
+                _labelGrab     = _cursor - P(_dragProj.LabelOrigin(label));
+                _labelOrigX    = label.X;
+                _labelOrigY    = label.Y;
+                _draggingLabel = true;
                 e.Pointer.Capture(this);
             }
             else
@@ -837,12 +907,41 @@ public class MapCanvas : Control
             return;
         }
 
+        if (_draggingLabel)
+        {
+            _draggingLabel = false;
+            e.Pointer.Capture(null);
+            if (SelectedLabel is { } label && DragMoved())
+            {
+                // Drop the label's top-left (cursor minus the grab offset) back
+                // into map pixels, snapped like a room — Genie 4 moves labels
+                // and rooms with the same `% 10` snap.
+                var proj   = _dragProj ?? GetProjection();
+                var origin = _cursor - _labelGrab;
+                var mx = MapProjection.SnapMapPx(proj.ToMapX(origin.X), SnapToGrid);
+                var my = MapProjection.SnapMapPx(proj.ToMapY(origin.Y), SnapToGrid);
+                label.X = mx / MapProjection.G4GridPx;
+                label.Y = my / MapProjection.G4GridPx;
+                if ((label.X != _labelOrigX || label.Y != _labelOrigY)
+                    && LabelMovedCommand?.CanExecute(label) == true)
+                    LabelMovedCommand.Execute(label);
+            }
+            _dragProj = null;
+            InvalidateVisual();
+            e.Handled = true;
+            return;
+        }
+
         if (!_dragging) return;
 
         _dragging = false;
         e.Pointer.Capture(null);
 
-        if (SelectedNode is { } node)
+        // A press-and-release that never travelled is a click (select), not a
+        // move: without the threshold, clicking a room that sits off the snap
+        // grid (Crossing has 265 at odd pixels) would re-snap it and dirty the
+        // zone.
+        if (SelectedNode is { } node && DragMoved())
         {
             // Convert the release point back to map pixels through the
             // projection cached at drag start. SnapToGrid rounds to Genie 4's
@@ -886,6 +985,24 @@ public class MapCanvas : Control
                 e.Handled = true;
             }
         }
+        else if (EditMode && e.Key == Key.Delete && SelectedLabel is { } label)
+        {
+            if (RemoveLabelCommand?.CanExecute(label) == true)
+            {
+                RemoveLabelCommand.Execute(label);
+                SelectedLabel = null;
+                e.Handled = true;
+            }
+        }
+    }
+
+    /// <summary>True when the pointer travelled far enough since the press to
+    /// count as a drag rather than a click.</summary>
+    private bool DragMoved()
+    {
+        var dx = _cursor.X - _pressPoint.X;
+        var dy = _cursor.Y - _pressPoint.Y;
+        return Math.Sqrt(dx * dx + dy * dy) >= DragThreshold;
     }
 
     /// <summary>
@@ -898,15 +1015,19 @@ public class MapCanvas : Control
     /// (the click missed a room) rather than disappearing, so there's never a
     /// second menu and the user always sees every option.
     /// </summary>
-    private void ShowContextMenu(MapNode? node)
+    private void ShowContextMenu(MapNode? node, Point at)
     {
         var items = new List<Control>();
+
+        // A label under the click (only when no room is) gets its own Remove
+        // item in edit mode and names the header.
+        var hitLabel = node is null && EditMode ? HitTestLabel(at) : null;
 
         // Header: the room this menu acts on, or a placeholder when the click
         // missed every room. IsHitTestVisible=false makes it a non-selectable
         // label; FontWeight=Bold marks it as a header.
         var headerText = node is null
-            ? "(no room here)"
+            ? (hitLabel is null ? "(no room here)" : $"Label \"{hitLabel.Text}\"")
             : (string.IsNullOrWhiteSpace(node.Title) ? "(unnamed room)" : node.Title)
               + (!string.IsNullOrEmpty(node.ServerRoomId) ? $"  #{node.ServerRoomId}" : "");
         items.Add(new MenuItem { Header = headerText, IsHitTestVisible = false, FontWeight = FontWeight.Bold });
@@ -970,6 +1091,48 @@ public class MapCanvas : Control
                     }
                 };
             items.Add(remove);
+        }
+
+        // Edit-mode-only label actions (Genie 4 LabelDetails "New" / "Remove"):
+        // add a label at the click point, or remove the label under it.
+        if (EditMode)
+        {
+            var proj = GetProjection();
+            if (AddLabelCommand is not null && proj.Any)
+            {
+                var add = new MenuItem { Header = "Add Label Here" };
+                add.Click += (_, _) =>
+                {
+                    var l = new MapLabel
+                    {
+                        Text = "New Label",
+                        X    = MapProjection.SnapMapPx(proj.ToMapX(at.X), SnapToGrid) / MapProjection.G4GridPx,
+                        Y    = MapProjection.SnapMapPx(proj.ToMapY(at.Y), SnapToGrid) / MapProjection.G4GridPx,
+                        Z    = Level,
+                    };
+                    if (AddLabelCommand?.CanExecute(l) == true) AddLabelCommand.Execute(l);
+                };
+                items.Add(add);
+            }
+            if (RemoveLabelCommand is not null)
+            {
+                var removeLabel = new MenuItem
+                {
+                    Header     = hitLabel is null ? "Remove Label" : $"Remove Label \"{hitLabel.Text}\"",
+                    IsEnabled  = hitLabel is not null,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xff, 0x99, 0x99))
+                };
+                if (hitLabel is not null)
+                    removeLabel.Click += (_, _) =>
+                    {
+                        if (RemoveLabelCommand?.CanExecute(hitLabel) == true)
+                        {
+                            RemoveLabelCommand.Execute(hitLabel);
+                            if (ReferenceEquals(SelectedLabel, hitLabel)) SelectedLabel = null;
+                        }
+                    };
+                items.Add(removeLabel);
+            }
         }
 
         // --- Window actions — Float/Re-dock + Close Window, pulled from the same
@@ -1087,7 +1250,7 @@ public class MapCanvas : Control
 
         // While dragging a node, just track the cursor and repaint — the node
         // is drawn under the cursor and committed to a grid cell on release.
-        if (_dragging)
+        if (_dragging || _draggingLabel)
         {
             _hoveredNode = null;   // suppress the hover badge mid-drag
             InvalidateVisual();
@@ -1153,12 +1316,42 @@ public class MapCanvas : Control
         return null;
     }
 
+    /// <summary>The label under <paramref name="point"/> on the current floor,
+    /// or null — also null while labels are hidden (nothing to grab).</summary>
+    private MapLabel? HitTestLabel(Point point)
+    {
+        if (Zone is null || !FullLabels) return null;
+        var proj = GetProjection();
+        if (!proj.Any) return null;
+        return FindLabelAt(Zone, Level, proj, MeasureLabel, point.X, point.Y);
+    }
+
+    /// <summary>
+    /// Label hit-test against the rectangles the label pass paints: the LAST
+    /// label in file order under the point wins when two overlap (Genie 4
+    /// <c>FindLabel</c>: "so the highest label gets selected"). Static and
+    /// measure-injected so the test project can pin it without a render surface.
+    /// </summary>
+    internal static MapLabel? FindLabelAt(MapZone zone, int level, MapProjection proj,
+                                          LabelMeasure measure, double x, double y)
+    {
+        MapLabel? hit = null;
+        foreach (var label in zone.Labels)
+        {
+            if (label.Z != level || string.IsNullOrEmpty(label.Text)) continue;
+            var r = proj.LabelRect(label, measure(label.Text, proj.LabelFontSize));
+            if (r.Contains(x, y)) hit = label;
+        }
+        return hit;
+    }
+
     private void DrawHoverBadge(DrawingContext context, MapNode node)
     {
         var title = string.IsNullOrEmpty(node.Title) ? "(no title)" : node.Title;
         var line2Parts = new List<string> { $"id {node.Id}" };
         if (!string.IsNullOrEmpty(node.ServerRoomId)) line2Parts.Add($"server {node.ServerRoomId}");
         if (!string.IsNullOrEmpty(node.Notes))        line2Parts.Add(node.Notes);
+        if (node.Tags.Count > 0)                      line2Parts.Add(string.Join(" ", node.Tags.Select(t => "@" + t)));
         var subText = string.Join("  ·  ", line2Parts);
 
         var titleText = new FormattedText(title,   System.Globalization.CultureInfo.CurrentCulture,
