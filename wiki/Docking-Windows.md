@@ -38,7 +38,7 @@ To **resize** sections, drag the divider between them.
 
 A window doesn't have to live in the dock at all:
 
-- **Drag it out** — release the drag away from any dock target and the window floats in its own OS window (handy for a second monitor).
+- **Drag it out** — release the drag away from any dock target and the window floats in its own OS window (handy for a second monitor). (Not in [windowed mode](#windowed-mode-mdi), where windows stay inside the main window.)
 - **Right-click → Float** — every window's right-click menu has a **Float** entry; on a window that's already floating it reads **Re-dock** and sends it back into the layout.
 - **Hide Title Bar** — a floating window's right-click menu also offers **Hide Title Bar** for a chromeless, screen-space-saving float; bring it back with **Show Title Bar**.
 
@@ -54,7 +54,15 @@ Everything on this page is remembered automatically between sessions. Beyond tha
 
 - **Layout → Save Layout As… / Load Layout / Manage Layouts…** — keep several named arrangements and switch between them.
 - **Layout → Reset to Default Layout** — back to the out-of-the-box three-column arrangement.
-- **Layout → Windowed Mode (MDI)** — prefer free-floating child windows over docked panes entirely, Genie 4-style.
+- **Layout → Windowed Mode (MDI)** — prefer free-floating child windows over docked panes entirely, Genie 4-style. See below.
+
+## Windowed mode (MDI)
+
+**Layout → Windowed Mode (MDI)** turns every open panel into a child window inside the main window, the way Genie 4 worked. It is also what gives windows the Genie 4 title bars: the **Genie 4 Classic** theme changes colours only, so pick windowed mode (or the built-in **Heirloom** layout, which uses it) for the classic look.
+
+- **Switching keeps what you have open.** Windows that are open stay open and closed ones stay closed, in both directions. Going into windowed mode, the windows are tiled where their docked panes were, so a group of stream tabs becomes a row of stream windows. A window you had already placed in windowed mode earlier in the session goes back to that spot.
+- **Switching back restores your docked arrangement** from before you entered windowed mode, with any windows you opened or closed in the meantime added or removed. Loading a layout replaces that memory, so after a load you land on the default docked arrangement instead.
+- **Child windows stay inside the main window.** They can't be dragged or floated out of it. A panel you last had floating in docked mode opens as a child window while windowed mode is on.
 
 ## Related
 

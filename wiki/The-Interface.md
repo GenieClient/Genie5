@@ -170,7 +170,7 @@ Rearrange the panels however you like, then keep the arrangement — the **Layou
 - **Layout → Save Layout As… / Load Layout / Manage Layouts…** — keep several named layouts (a "Combat" layout vs. an "In-Character" layout) and switch between them; **Manage Layouts…** also picks the default.
 - Three layouts ship with Genie and appear in **Load Layout** marked *built-in*: **Strongbox** (the out-of-the-box three-column dock with a floating Mapper), **Shadowveil** (room and story columns around the game text, chatter and experience at right), and **Heirloom** (the Genie 4 arrangement in windowed mode — Game over Talk at the left, the Thoughts/Experience/Whispers/Familiar/Active Spells stack beside it, Arrivals floating over it, and the Mapper filling the right half). Saving over a built-in makes your own editable copy; deleting that copy brings the shipped one back.
 - **Layout → Reset to Default Layout** restores the three-column arrangement.
-- **Layout → Windowed Mode (MDI)** switches from docked panels to free-floating child windows, Genie 4-style.
+- **Layout → Windowed Mode (MDI)** switches from docked panels to child windows inside the main window, Genie 4-style, keeping the panels you have open. It is what gives windows the Genie 4 title bars; the Genie 4 Classic theme changes colours only. See [Docking Windows](Docking-Windows#windowed-mode-mdi).
 - **Layout → Always on Top** keeps Genie above other windows.
 - **Layout → Align Input to Game Window** makes the command bar track the Game window's width instead of spanning the full frame.
 - **Layout → Magic Panels** hides the mana bar, cast bar, and spell labels — tidy on a non-caster.
