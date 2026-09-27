@@ -46,7 +46,7 @@ Identity (`Id`, `Name`, `Version`, `Author`, `Description`, `MinHostVersion`), a
 
 What a plugin is allowed to do:
 
-- **Output** — `Echo(text)` to the main window, `EchoToWindow(window, text)` to a **named panel** (the app surfaces unknown window names as dock panels — this is how plugins stay UI-agnostic), and `SendCommand(command)` to the game (policy-gated).
+- **Output** — `Echo(text)` to the main window, `EchoToWindow(window, text)` to a **named panel** (the app surfaces unknown window names as dock panels — this is how plugins stay UI-agnostic; a new panel opens beside the Inventory panel, or floats on its own if that part of your layout is gone), and `SendCommand(command)` to the game (policy-gated).
 - **Variables** — read/write the same variable store scripts use.
 - **State** — `IGameStateView`, a **read-only** projection of game state (vitals, room, hands, skills) so plugins observe without mutating. This preserves Genie's one-way data flow.
 - **Diagnostics** — `Log(message)`.
