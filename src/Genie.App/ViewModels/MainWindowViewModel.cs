@@ -4003,18 +4003,19 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     /// <summary>
     /// Persist the per-window settings (font / colour / timestamp / name-list /
-    /// title) to <c>windows.json</c> in the connected profile's config dir — the
-    /// same target the Configuration → Layout tab writes. Called when a window
-    /// right-click menu toggles Time Stamp or Name List Only so the choice
-    /// survives a restart. Best-effort: a write failure must not disrupt play.
+    /// title) to <c>windows.json</c>, split by layer (#315): each window's row
+    /// goes back to the file it came from — the connected profile's, or the
+    /// shared Config one — the same split the Configuration → Layout tab
+    /// writes. Called when a window right-click menu toggles Time Stamp or
+    /// Name List Only so the choice survives a restart. Best-effort: a write
+    /// failure must not disrupt play.
     /// </summary>
     public void SaveWindowSettings()
     {
         try
         {
-            var dir = GetProfileConfigDir(ConnectedProfile);
-            new PersistenceService()
-                .SaveWindowSettings(Path.Combine(dir, "windows.json"), WindowSettings);
+            new PersistenceService().SaveWindowSettingsSplit(
+                WindowSettings, GetProfileConfigDir(ConnectedProfile), _configDir);
         }
         catch { /* best-effort — never block gameplay on a settings write */ }
     }
@@ -4133,9 +4134,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // windows.json is a LIST keyed by window Id, not a monolithic layout
         // doc — global entries first, profile entries override per Id.
         {
-            try { foreach (var m in p.LoadWindowSettings(Path.Combine(globalDir, "windows.json"))) WindowSettings.Apply(m); } catch { }
+            // Each row is tagged with the layer it came from (#315) so a save
+            // writes it back there instead of forking globals into the profile.
+            try { foreach (var m in p.LoadWindowSettings(Path.Combine(globalDir, "windows.json"))) WindowSettings.Apply(m, RuleScope.Global); } catch { }
             if (!single)
-                try { foreach (var m in p.LoadWindowSettings(Path.Combine(profileDir, "windows.json"))) WindowSettings.Apply(m); } catch { }
+                try { foreach (var m in p.LoadWindowSettings(Path.Combine(profileDir, "windows.json"))) WindowSettings.Apply(m, RuleScope.Character); } catch { }
 
             // The dock (StreamTools + their right-click window menus) was built
             // in the constructor, before this connect-time load, so each menu

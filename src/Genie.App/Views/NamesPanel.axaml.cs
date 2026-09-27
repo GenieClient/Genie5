@@ -53,6 +53,7 @@ public partial class NamesPanel : UserControl
         var twoLayers = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        ScopeEditing.InitFilter(ScopeFilterBox, twoLayers, Refresh);
         // A re-Initialize (profile switch) must not carry the previous
         // profile's filter or form over — a stale filter renders the new
         // profile's list empty for no visible reason.
@@ -66,6 +67,7 @@ public partial class NamesPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as NameRow)?.Name;
         ItemsList.ItemsSource = _engine.Rules
+            .Where(r => ScopeEditing.PassesFilter(ScopeFilterBox.SelectedIndex, r.Scope))
             .Select(r => new NameRow(ScopeEditing.RowLabel(r.Scope), r.Name, r.ForegroundColor, r.BackgroundColor))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Name))
             .ToList();
@@ -148,11 +150,15 @@ public partial class NamesPanel : UserControl
         }
 
         _engine.Remove(rule.Name);
+        // A removed per-character name un-shadows its shared twin now (#315).
+        var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, rule.Scope, rule.Name);
         ClearForm();
         Refresh();
         _onChanged?.Invoke();
         UserHighlights.NotifyRulesChanged();
-        StatusText.Text = $"Removed '{rule.Name}'.";
+        StatusText.Text = restored
+            ? $"Removed this character's '{rule.Name}' — the shared (all characters) version is active again."
+            : $"Removed '{rule.Name}'.";
     }
 
     private void OnClear(object? sender, RoutedEventArgs e) => ClearForm();

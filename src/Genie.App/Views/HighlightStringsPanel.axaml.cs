@@ -77,6 +77,7 @@ public partial class HighlightStringsPanel : UserControl
         var twoLayers   = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        ScopeEditing.InitFilter(ScopeFilterBox, twoLayers, Refresh);
         // A re-Initialize (profile switch) must not carry the previous
         // profile's filter or form over — a stale filter renders the new
         // profile's list empty for no visible reason.
@@ -90,6 +91,7 @@ public partial class HighlightStringsPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as HighlightRow)?.Pattern;
         ItemsList.ItemsSource = _engine.Rules
+            .Where(r => ScopeEditing.PassesFilter(ScopeFilterBox.SelectedIndex, r.Scope))
             .Select(r => new HighlightRow(
                 r.IsEnabled ? "✓" : "✗",
                 ScopeEditing.RowLabel(r.Scope),
@@ -183,6 +185,10 @@ public partial class HighlightStringsPanel : UserControl
         added.Scope = _scopeCtx?.TwoLayers == true
             ? ScopeEditing.FromIndex(ScopeBox.SelectedIndex)
             : existing?.Scope ?? RuleScope.Character;
+        // Renaming a this-character override away un-shadows the shared rule
+        // under the old pattern, exactly like deleting it (#315).
+        if (existing is not null && !string.Equals(editKey, pattern, StringComparison.Ordinal))
+            ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, existing.Scope, editKey);
         _editingPattern = pattern;   // keep the editor pointed at the saved rule
         Refresh();
         // Re-select the saved row so the editor stays consistent after a rename
@@ -218,11 +224,13 @@ public partial class HighlightStringsPanel : UserControl
         }
 
         _engine.RemoveRule(row.Pattern);
+        // A deleted per-character override un-shadows its shared twin now (#315).
+        var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, rule.Scope, row.Pattern);
         ClearForm();
         Refresh();
         _onRulesChanged?.Invoke();
         UserHighlights.NotifyRulesChanged();
-        StatusText.Text = "Deleted.";
+        StatusText.Text = restored ? ScopeEditing.DeletedStatus(row.Pattern, true) : "Deleted.";
     }
 
     private void OnToggle(object? sender, RoutedEventArgs e)

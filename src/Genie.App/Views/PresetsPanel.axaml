@@ -9,10 +9,13 @@
          names + combat hits render bold in the 'creatures' preset colour, in
          every window that shows them (main, stream windows, Room panel). Edit
          the colour via the 'creatures' row below. -->
-    <CheckBox Name="MonsterBoldCheck" Grid.Row="0"
-              Content="MonsterBold — bold creatures (uses the 'creatures' colour) in every window"
-              Margin="0,0,0,6"
-              IsCheckedChanged="OnMonsterBoldToggled"/>
+    <DockPanel Grid.Row="0" Margin="0,0,0,6">
+      <ComboBox Name="ScopeFilterBox" DockPanel.Dock="Right" MinWidth="120" VerticalAlignment="Center"
+                ToolTip.Tip="Show every preset, only this character's overrides, or only the shared ones every character loads."/>
+      <CheckBox Name="MonsterBoldCheck"
+                Content="MonsterBold — bold creatures (uses the 'creatures' colour) in every window"
+                IsCheckedChanged="OnMonsterBoldToggled"/>
+    </DockPanel>
 
     <DataGrid Name="PresetList"
               Grid.Row="1"

@@ -44,6 +44,7 @@ public partial class AliasesPanel : UserControl
         var twoLayers = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        ScopeEditing.InitFilter(ScopeFilterBox, twoLayers, Refresh);
         // A re-Initialize (profile switch) must not carry the previous
         // profile's filter or form over — a stale filter renders the new
         // profile's list empty for no visible reason.
@@ -57,6 +58,7 @@ public partial class AliasesPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as AliasRow)?.Name;
         ItemsList.ItemsSource = _engine.Aliases
+            .Where(a => ScopeEditing.PassesFilter(ScopeFilterBox.SelectedIndex, a.Scope))
             .Select(a => new AliasRow(a.IsEnabled ? "✓" : "✗", ScopeEditing.RowLabel(a.Scope), a.Name, a.Expansion, a.IsEnabled))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Name, r.Expansion))
             .ToList();
@@ -128,10 +130,13 @@ public partial class AliasesPanel : UserControl
         }
 
         _engine.RemoveAlias(row.Name);
+        // A deleted per-character override un-shadows its shared twin now,
+        // not at the next connect (#315).
+        var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, alias.Scope, row.Name);
         ClearForm();
         Refresh();
         _onChanged?.Invoke();
-        StatusText.Text = $"Deleted '{row.Name}'.";
+        StatusText.Text = ScopeEditing.DeletedStatus(row.Name, restored);
     }
 
     private void OnToggle(object? sender, RoutedEventArgs e)

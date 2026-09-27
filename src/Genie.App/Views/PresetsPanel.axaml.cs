@@ -49,6 +49,7 @@ public partial class PresetsPanel : UserControl
         var twoLayers    = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(PresetList, "Scope", twoLayers);
+        ScopeEditing.InitFilter(ScopeFilterBox, twoLayers, Refresh);
 
         // #131 MonsterBold on/off. Reflect the persisted setting without firing
         // the change handler (which would re-persist + re-render on load). The
@@ -79,6 +80,7 @@ public partial class PresetsPanel : UserControl
         if (_engine is null) return;
         var keep = (PresetList.SelectedItem as PresetRow)?.Id;
         PresetList.ItemsSource = _engine.Presets
+            .Where(kv => ScopeEditing.PassesFilter(ScopeFilterBox.SelectedIndex, kv.Value.Scope))
             .OrderBy(kv => kv.Key)
             .Select(kv => new PresetRow(
                 ScopeEditing.RowLabel(kv.Value.Scope),
@@ -138,6 +140,18 @@ public partial class PresetsPanel : UserControl
         if (_engine is null || PresetList.SelectedItem is not PresetRow row) return;
         var id = row.Id;
 
+        // A this-character override resets to the SHARED value when one is
+        // saved (#315) — resetting it to the built-in default would write that
+        // default over every character's shared colour at the save below.
+        var current = _engine.Get(id);
+        if (current?.Scope == RuleScope.Character && _scopeCtx?.TwoLayers == true
+            && _scopeCtx.RestoreGlobalTwin?.Invoke(id) == true
+            && _engine.Get(id) is { } shared)
+        {
+            AfterReset(shared, "Reset to the shared (all characters) colour.");
+            return;
+        }
+
         // Build a fresh engine to recover the default for this preset id, then
         // apply that defaults rule back into the live engine.
         var fresh = new PresetEngine();
@@ -145,14 +159,20 @@ public partial class PresetsPanel : UserControl
         if (rule is null) { StatusText.Text = "No default for this preset."; return; }
 
         _engine.Apply(rule);
+        AfterReset(rule, "Reset to default.");
+    }
+
+    private void AfterReset(PresetRule rule, string status)
+    {
         ColorPickerHelpers.LoadColor(FgColorPicker, FgDefaultCheck, rule.ForegroundColor, "Default");
         ColorPickerHelpers.LoadColor(BgColorPicker, BgNoneCheck,    rule.BackgroundColor, "");
         HighlightLineCheck.IsChecked = rule.HighlightLine;
+        ScopeBox.SelectedIndex       = ScopeEditing.ToIndex(rule.Scope);
         UpdatePreview(rule.ForegroundColor, rule.BackgroundColor);
         Refresh();
         _onChanged?.Invoke();
         UserHighlights.NotifyRulesChanged();
-        StatusText.Text = "Reset to default.";
+        StatusText.Text = status;
     }
 
     private void UpdatePreview(string fg, string bg)

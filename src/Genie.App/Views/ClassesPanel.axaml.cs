@@ -4,6 +4,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Genie.Core.Classes;
 using Genie.Core.Import;
+using Genie.Core.Persistence;
 
 namespace Genie.App.Views;
 
@@ -14,11 +15,12 @@ namespace Genie.App.Views;
 /// </summary>
 public partial class ClassesPanel : UserControl
 {
-    public sealed record ClassRow(string EnabledGlyph, string Name, bool IsActive);
+    public sealed record ClassRow(string EnabledGlyph, string Name, bool IsActive, string Scope = "");
 
-    private ClassEngine? _engine;
-    private Action?      _onChanged;
-    private string       _filter = string.Empty;
+    private ClassEngine?         _engine;
+    private Action?              _onChanged;
+    private ScopeEditingContext? _scopeCtx;
+    private string               _filter = string.Empty;
 
     /// <summary>Name of the class currently loaded in the editor form. When a
     /// Refresh restores the selection to this same class (a Find… keystroke),
@@ -26,12 +28,23 @@ public partial class ClassesPanel : UserControl
     /// Null when composing a new entry.</summary>
     private string?      _loadedName;
 
-    public ClassesPanel() => InitializeComponent();
+    public ClassesPanel()
+    {
+        InitializeComponent();
+        ScopeBox.ItemsSource   = ScopeEditing.Labels;
+        ScopeBox.SelectedIndex = 0;   // new classes default to This character (#315)
+    }
 
-    public void Initialize(ClassEngine engine, Action? onChanged = null)
+    public void Initialize(ClassEngine engine, Action? onChanged = null,
+                           ScopeEditingContext? scopeContext = null)
     {
         _engine    = engine;
         _onChanged = onChanged;
+        _scopeCtx  = scopeContext;
+        var twoLayers = scopeContext?.TwoLayers == true;
+        ScopeGroup.IsVisible = twoLayers;
+        ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        ScopeEditing.InitFilter(ScopeFilterBox, twoLayers, Refresh);
         // A re-Initialize (profile switch) must not carry the previous
         // profile's filter or form over — a stale filter renders the new
         // profile's list empty for no visible reason.
@@ -44,8 +57,11 @@ public partial class ClassesPanel : UserControl
     {
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as ClassRow)?.Name;
-        ItemsList.ItemsSource = _engine.GetAll()
-            .Select(kv => new ClassRow(kv.Value ? "✓" : "✗", kv.Key, kv.Value))
+        var engine = _engine;
+        ItemsList.ItemsSource = engine.GetAll()
+            .Where(kv => ScopeEditing.PassesFilter(ScopeFilterBox.SelectedIndex, engine.ScopeOf(kv.Key)))
+            .Select(kv => new ClassRow(kv.Value ? "✓" : "✗", kv.Key, kv.Value,
+                                       ScopeEditing.RowLabel(engine.ScopeOf(kv.Key))))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Name))
             .ToList();
         if (keep is not null)
@@ -66,6 +82,7 @@ public partial class ClassesPanel : UserControl
         _loadedName           = row.Name;
         NameBox.Text          = row.Name;
         ActiveCheck.IsChecked = row.IsActive;
+        ScopeBox.SelectedIndex = ScopeEditing.ToIndex(_engine.ScopeOf(row.Name));
         StatusText.Text       = string.Empty;
     }
 
@@ -107,7 +124,7 @@ public partial class ClassesPanel : UserControl
         FilterBox.Text = string.Empty;
     }
 
-    private void OnRemove(object? sender, RoutedEventArgs e)
+    private async void OnRemove(object? sender, RoutedEventArgs e)
     {
         if (_engine is null) return;
         var name = NameBox.Text?.Trim() ?? string.Empty;
@@ -121,12 +138,25 @@ public partial class ClassesPanel : UserControl
             StatusText.Text = "Cannot remove the default class.";
             return;
         }
+        var scope = _engine.ScopeOf(name);
+        // Removing a shared class affects every character: confirm (#257/#315).
+        if (scope == RuleScope.Global && _scopeCtx?.TwoLayers == true && _engine.GetAll().ContainsKey(name))
+        {
+            if (this.GetVisualRoot() is not Window owner) return;
+            var choice = await ScopeDeleteDialog.Show(owner, name, allowOptOut: false);
+            if (choice != ScopeDeleteChoice.RemoveForAll) return;
+            _scopeCtx.NoteGlobalDelete?.Invoke(name);
+        }
         if (_engine.Remove(name))
         {
+            // A removed per-character class un-shadows the shared one now (#315).
+            var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, scope, name);
             ClearForm();
             Refresh();
             _onChanged?.Invoke();
-            StatusText.Text = $"Removed '{name}'.";
+            StatusText.Text = restored
+                ? $"Removed this character's '{name}' — the shared (all characters) state is active again."
+                : $"Removed '{name}'.";
         }
         else
         {
@@ -145,6 +175,9 @@ public partial class ClassesPanel : UserControl
             return;
         }
         _engine.Set(name, ActiveCheck.IsChecked == true);
+        // The Scope field decides which file the class saves to (#315).
+        if (_scopeCtx?.TwoLayers == true)
+            _engine.SetScope(name, ScopeEditing.FromIndex(ScopeBox.SelectedIndex));
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = "Saved.";
@@ -158,6 +191,7 @@ public partial class ClassesPanel : UserControl
         ItemsList.SelectedItem = null;
         NameBox.Text           = string.Empty;
         ActiveCheck.IsChecked  = true;
+        ScopeBox.SelectedIndex = 0;   // new classes default to This character
         StatusText.Text        = string.Empty;
     }
 

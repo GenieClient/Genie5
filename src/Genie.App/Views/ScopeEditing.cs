@@ -22,6 +22,11 @@ public sealed class ScopeEditingContext
     /// rule, keyed by the rule's natural key — without it the next save's
     /// shadowed-twin merge would resurrect the rule in the shared file.</summary>
     public Action<string>? NoteGlobalDelete { get; init; }
+
+    /// <summary>After deleting a this-character rule (by its natural key),
+    /// put the shared rule it was shadowing back into the engine now (public
+    /// #315). Returns true when a shared twin was restored.</summary>
+    public Func<string, bool>? RestoreGlobalTwin { get; init; }
 }
 
 /// <summary>Shared bits for the per-panel scope UI.</summary>
@@ -39,6 +44,46 @@ public static class ScopeEditing
     /// <summary>Short grid-column label.</summary>
     public static string RowLabel(RuleScope scope) =>
         scope == RuleScope.Global ? "Global" : "Char";
+
+    /// <summary>After a panel removed a rule from its engine: when the rule
+    /// was a this-character one in two-layer editing, put the shared rule it
+    /// shadowed back into the engine (#315). True when one was restored.</summary>
+    public static bool RestoreTwinAfterDelete(ScopeEditingContext? ctx, RuleScope deletedScope, string key) =>
+        ctx is { TwoLayers: true } && deletedScope == RuleScope.Character
+        && ctx.RestoreGlobalTwin?.Invoke(key) == true;
+
+    /// <summary>Status line for a delete, naming a restored shared twin.</summary>
+    public static string DeletedStatus(string key, bool restoredTwin) => restoredTwin
+        ? $"Deleted this character's '{key}' — the shared (all characters) version is active again."
+        : $"Deleted '{key}'.";
+
+    // ── Scope filter (#315) ─────────────────────────────────────────────────
+
+    /// <summary>Scope-filter combo labels, index-aligned with <see cref="PassesFilter"/>.</summary>
+    public static readonly string[] FilterLabels = ["All scopes", "This character", "All characters"];
+
+    /// <summary>True when a row of <paramref name="scope"/> shows under the
+    /// scope filter's <paramref name="index"/> (0 = everything).</summary>
+    public static bool PassesFilter(int index, RuleScope scope) => index switch
+    {
+        1 => scope == RuleScope.Character,
+        2 => scope == RuleScope.Global,
+        _ => true,
+    };
+
+    /// <summary>Wire a panel's scope-filter combo: fill it, reset it to "All
+    /// scopes", show it only in two-layer editing (a filter over one layer
+    /// hides nothing), and hook <paramref name="refresh"/> once.</summary>
+    public static void InitFilter(ComboBox box, bool twoLayers, Action refresh)
+    {
+        if (box.ItemsSource is null)
+        {
+            box.ItemsSource = FilterLabels;
+            box.SelectionChanged += (_, _) => refresh();
+        }
+        box.SelectedIndex = 0;
+        box.IsVisible     = twoLayers;
+    }
 
     /// <summary>Hide/show a named DataGrid column (the Scope column is
     /// informational and meaningless in single-layer editing).</summary>

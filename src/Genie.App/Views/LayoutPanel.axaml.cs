@@ -3,6 +3,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Genie.App.Controls;
 using Genie.Core.Layout;
+using Genie.Core.Persistence;
 
 namespace Genie.App.Views;
 
@@ -23,10 +24,14 @@ public partial class LayoutPanel : UserControl
     private const string IfClosedDefaultLabel  = "(default)";
     private const string IfClosedDisabledLabel = "(disabled)";
 
+    private ScopeEditingContext? _scopeCtx;
+
     public LayoutPanel()
     {
         InitializeComponent();
         PopulateFontFamilies();
+        ScopeBox.ItemsSource   = ScopeEditing.Labels;
+        ScopeBox.SelectedIndex = 0;
     }
 
     /// <summary>
@@ -49,19 +54,30 @@ public partial class LayoutPanel : UserControl
         FontFamilyCombo.ItemsSource = names;
     }
 
-    public void Initialize(WindowSettingsStore store, Action? onChanged = null)
+    public void Initialize(WindowSettingsStore store, Action? onChanged = null,
+                           ScopeEditingContext? scopeContext = null)
     {
         _store     = store;
         _onChanged = onChanged;
+        _scopeCtx  = scopeContext;
+        ScopeGroup.IsVisible = scopeContext?.TwoLayers == true;
         Refresh();
     }
+
+    /// <summary>Window-list label: the title, plus the layer its settings
+    /// save to when two layers exist (#315) — the list's Scope "column".</summary>
+    private string ListLabel(WindowSettings s) =>
+        _scopeCtx?.TwoLayers == true
+            ? $"{s.DisplayTitle}   [{ScopeEditing.RowLabel(s.Scope)}]"
+            : s.DisplayTitle;
 
     private void Refresh()
     {
         if (_store is null) return;
 
+        var keep = WindowList.SelectedIndex;
         WindowList.ItemsSource = _store.All.Values
-            .Select(s => s.DisplayTitle)
+            .Select(ListLabel)
             .ToList();
 
         // IfClosed dropdown: (default), (disabled), then every other window's title.
@@ -69,7 +85,8 @@ public partial class LayoutPanel : UserControl
         items.AddRange(_store.All.Values.Select(s => s.DisplayTitle));
         IfClosedBox.ItemsSource = items;
 
-        if (_store.All.Count > 0) WindowList.SelectedIndex = 0;
+        if (_store.All.Count > 0)
+            WindowList.SelectedIndex = keep >= 0 && keep < _store.All.Count ? keep : 0;
     }
 
     private void OnWindowSelected(object? sender, SelectionChangedEventArgs e)
@@ -101,6 +118,7 @@ public partial class LayoutPanel : UserControl
         EchoToMainCheck.IsChecked = s.EchoToMain;
         FlashCheck.IsChecked = s.FlashOnActivity;
         IfClosedBox.SelectedItem = IfClosedToLabel(s.IfClosed);
+        ScopeBox.SelectedIndex   = ScopeEditing.ToIndex(s.Scope);
     }
 
     private void OnApply(object? sender, RoutedEventArgs e)
@@ -134,6 +152,9 @@ public partial class LayoutPanel : UserControl
         _current.EchoToMain   = EchoToMainCheck.IsChecked == true;
         _current.FlashOnActivity = FlashCheck.IsChecked == true;
         _current.IfClosed     = LabelToIfClosed(IfClosedBox.SelectedItem as string);
+        // The Scope field decides which windows.json the row saves to (#315).
+        if (_scopeCtx?.TwoLayers == true)
+            _current.Scope = ScopeEditing.FromIndex(ScopeBox.SelectedIndex);
         _current.NotifyChanged();
 
         Refresh();   // Window list might reflect a renamed title
@@ -145,10 +166,23 @@ public partial class LayoutPanel : UserControl
     {
         if (_current is null || _store is null) return;
 
-        // Reset to the registration-time defaults. Register() returns a fresh
-        // template; we copy its fields into the live instance so anyone subscribed
-        // to `_current.Changed` sees the update.
-        var fresh = _store.Register(_current.Id, _current.DefaultTitle);
+        // A this-character window with a shared row goes back to the shared
+        // settings (#315), the Layout-tab form of deleting an override.
+        if (ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, _current.Scope, _current.Id))
+        {
+            LoadForm(_current);
+            Refresh();
+            _onChanged?.Invoke();
+            StatusText.Text = "Reset to the shared (all characters) settings.";
+            return;
+        }
+
+        // Reset to the registration-time defaults. DefaultsFor() builds a
+        // detached template; we copy its fields into the live instance so anyone
+        // subscribed to `_current.Changed` sees the update. (It used to
+        // re-Register, which swapped a new instance into the store and left the
+        // open window listening to the old one — later edits never reached it.)
+        var fresh = _store.DefaultsFor(_current.Id, _current.DefaultTitle);
         _current.DisplayTitle = _current.DefaultTitle;
         _current.FontFamily   = fresh.FontFamily;
         _current.FontSize     = fresh.FontSize;

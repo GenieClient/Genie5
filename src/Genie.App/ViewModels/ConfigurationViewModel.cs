@@ -361,19 +361,40 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var store = VariableStore;
         if (store is null) return;
-        SaveRuleJson("variables.json", path => _persistence.SaveVariables(path, store));
-        SyncCfg("variables.cfg", () => CfgFormat.VariableLines(store));
+        // Split by layer like the eight rule types (#315): each variable goes
+        // back to the file it came from, and a this-character value that
+        // shadows a shared one never drops the shared one from its file.
+        var mergedGlobal = SaveRuleJsonSplit("variables.json", store.GetAll().Values.ToList(),
+            v => v.ConfigScope, v => v.Name, DiskGlobal().Variables.GetAll().Values,
+            (path, subset) => _persistence.SaveVariables(path, subset));
+        SyncCfgSplit("variables.cfg", store.GetAll().Values.ToList(), v => v.ConfigScope, mergedGlobal,
+            CfgFormat.VariableLines);
     }
+
+    /// <summary>One class for the split save: name, state, and layer.</summary>
+    private readonly record struct ClassEntry(string Name, bool IsActive, RuleScope Scope);
 
     public void OnClassesChanged()
     {
-        // ClassEngine still has no PersistenceService (.json) writer — see
-        // follow-ups — but when the profile carries a classes.cfg (Genie 4
-        // import / #class save) the connect-time replay makes that file the
-        // effective truth, so keep it current with panel edits.
+        // Classes save to classes.json like the other rule types, split by
+        // layer (#315) — before this the panel only kept a coexisting
+        // classes.cfg current, so on a json-only profile a panel edit lasted
+        // the session. The .cfg (Genie 4 import / #class save) still wins at
+        // connect when it exists, so it is rewritten per layer too.
         var engine = ClassEngine;
         if (engine is null) return;
-        SyncCfg("classes.cfg", () => CfgFormat.ClassLines(engine.GetAll()));
+        var entries = engine.GetAll()
+            .Where(kv => !kv.Key.Equals("default", StringComparison.OrdinalIgnoreCase))
+            .Select(kv => new ClassEntry(kv.Key, kv.Value, engine.ScopeOf(kv.Key)))
+            .ToList();
+        var diskGlobal = DiskGlobal().Classes.GetAll()
+            .Where(kv => !kv.Key.Equals("default", StringComparison.OrdinalIgnoreCase))
+            .Select(kv => new ClassEntry(kv.Key, kv.Value, RuleScope.Global));
+        static IEnumerable<KeyValuePair<string, bool>> Pairs(IEnumerable<ClassEntry> e) =>
+            e.Select(c => new KeyValuePair<string, bool>(c.Name, c.IsActive));
+        var mergedGlobal = SaveRuleJsonSplit("classes.json", entries, c => c.Scope, c => c.Name, diskGlobal,
+            (path, subset) => _persistence.SaveClasses(path, Pairs(subset)));
+        SyncCfgSplit("classes.cfg", entries, c => c.Scope, mergedGlobal, e => CfgFormat.ClassLines(Pairs(e)));
     }
 
     /// <summary>Persist the Server Dialogs panel's edits to the selected
@@ -389,9 +410,17 @@ public class ConfigurationViewModel : ReactiveObject
             TrySave(() => draft.Save(PathFor(Genie.Core.Dialogs.ServerDialogMappings.FileName)));
     }
 
+    /// <summary>Persist the Layout tab, split by layer (#315): each window's
+    /// row goes back to the file it came from — this character's
+    /// <c>windows.json</c> or the shared one — keeping shadowed shared rows.</summary>
     public void OnWindowSettingsChanged()
     {
-        TrySave(() => _persistence.SaveWindowSettings(PathFor("windows.json"), _windowSettings));
+        var profileDir = _profileDirResolver(SelectedProfile);
+        TrySave(() =>
+        {
+            Directory.CreateDirectory(profileDir);
+            _persistence.SaveWindowSettingsSplit(_windowSettings, profileDir, _configRoot);
+        });
     }
 
     /// <summary>Persist global script settings to <c>settings.cfg</c>. The
@@ -426,15 +455,6 @@ public class ConfigurationViewModel : ReactiveObject
         try { save(); } catch { /* non-fatal */ }
     }
 
-    /// <summary>Save one of the live-reload-watched rule .json files, marking
-    /// the write first so the host's <see cref="RuleFileWatcher"/> doesn't
-    /// bounce our own save back as an "external edit" reload.</summary>
-    private void SaveRuleJson(string fileName, Action<string> save)
-    {
-        var path = PathFor(fileName);
-        RuleFileWatcher.MarkAppWrite(path);
-        TrySave(() => save(path));
-    }
 
     /// <summary>True when the selected profile's dir IS the global Config dir
     /// (profile-less / legacy-global editing) — a single config layer.</summary>
@@ -470,9 +490,80 @@ public class ConfigurationViewModel : ReactiveObject
     /// global-delete channel bound to that panel's rule file.</summary>
     public Views.ScopeEditingContext ScopeContextFor(string fileName) => new()
     {
-        TwoLayers        = !SingleLayer,
-        NoteGlobalDelete = key => NoteGlobalDelete(fileName, key),
+        TwoLayers         = !SingleLayer,
+        NoteGlobalDelete  = key => NoteGlobalDelete(fileName, key),
+        RestoreGlobalTwin = key => RestoreGlobalTwin(fileName, key),
     };
+
+    /// <summary>
+    /// A panel just deleted a this-character rule (or reset a window's
+    /// per-character row): put its shared twin back into the engine the panel
+    /// edits — live or draft — so it applies now instead of at the next
+    /// connect (public #315). The twin comes from the on-disk global layer and
+    /// is tagged Global, so the save that follows leaves the shared file
+    /// alone. False when there is no twin, when this is single-layer editing,
+    /// or when the twin itself was deleted for everyone earlier in this edit.
+    /// </summary>
+    public bool RestoreGlobalTwin(string fileName, string key)
+    {
+        if (SingleLayer || string.IsNullOrEmpty(key)) return false;
+        if (PendingDeletes(fileName).Contains(key, StringComparer.OrdinalIgnoreCase)) return false;
+        try
+        {
+            switch (fileName.ToLowerInvariant())
+            {
+                case "names.json":
+                {
+                    if (NameHighlightEngine is not { } names) return false;
+                    if (names.Rules.Any(r => r.Name.Equals(key, StringComparison.OrdinalIgnoreCase))) return false;
+                    var twin = _persistence.LoadNames(Path.Combine(_configRoot, "names.json"))
+                        .FirstOrDefault(m => m.Name.Equals(key, StringComparison.OrdinalIgnoreCase));
+                    if (twin is null) return false;
+                    names.Add(twin.Name, twin.ForegroundColor, twin.BackgroundColor);
+                    if (names.Rules.FirstOrDefault(r => r.Name.Equals(key, StringComparison.OrdinalIgnoreCase)) is { } added)
+                        added.Scope = RuleScope.Global;
+                    return true;
+                }
+                case "presets.json":
+                {
+                    // Every preset id always exists (seeded defaults), so the
+                    // twin REPLACES the override rather than filling a gap.
+                    if (PresetEngine is not { } presets) return false;
+                    var twin = _persistence.LoadPresets(Path.Combine(_configRoot, "presets.json"))
+                        .FirstOrDefault(m => m.Id.Equals(key, StringComparison.OrdinalIgnoreCase));
+                    if (twin is null) return false;
+                    presets.Apply(new PresetRule
+                    {
+                        Id = twin.Id, ForegroundColor = twin.ForegroundColor,
+                        BackgroundColor = twin.BackgroundColor, HighlightLine = twin.HighlightLine,
+                        Scope = RuleScope.Global,
+                    });
+                    return true;
+                }
+                case "windows.json":
+                {
+                    if (!_windowSettings.All.TryGetValue(key, out var window)) return false;
+                    var twin = _persistence.LoadWindowSettings(Path.Combine(_configRoot, "windows.json"))
+                        .FirstOrDefault(m => m.Id.Equals(key, StringComparison.OrdinalIgnoreCase));
+                    if (twin is null) return false;
+                    _windowSettings.Apply(twin, RuleScope.Global);
+                    window.NotifyChanged();
+                    return true;
+                }
+                default:
+                    return LayeredRuleLoad.RestoreGlobalTwin(DiskGlobal(), fileName, key,
+                        highlights:  HighlightEngine,
+                        triggers:    TriggerEngine,
+                        substitutes: SubstituteEngine,
+                        gags:        GagEngine,
+                        aliases:     AliasEngine,
+                        macros:      MacroEngine,
+                        classes:     ClassEngine,
+                        variables:   VariableStore);
+            }
+        }
+        catch { return false; }   // unreadable shared file: the twin returns at the next connect
+    }
 
     private IReadOnlyCollection<string> PendingDeletes(string fileName) =>
         _pendingGlobalDeletes.TryGetValue(fileName, out var set)
@@ -527,7 +618,7 @@ public class ConfigurationViewModel : ReactiveObject
         return global;
     }
 
-    /// <summary>Scope-split companion to <see cref="SyncCfg"/>: the profile
+    /// <summary>Scope-split companion to <see cref="SyncCfgAt"/>: the profile
     /// .cfg is rewritten from the Character subset and the global .cfg from
     /// the SAME merged global content the .json save produced, so the .cfg
     /// dual-write can't re-fork global rules or drop shadowed twins. Same
@@ -559,12 +650,6 @@ public class ConfigurationViewModel : ReactiveObject
         _draftScopesBuilt  = false;
     }
 
-    private void SyncCfgAt(string path, Func<IEnumerable<string>> lines)
-    {
-        if (!File.Exists(path)) return;
-        TrySave(() => ConfigPersistence.WriteLines(path, lines()));
-    }
-
     /// <summary>
     /// Keep a coexisting Genie 4-style .cfg in lockstep with the .json we just
     /// wrote. The connect sequence replays .cfg files AFTER the host's .json
@@ -574,9 +659,8 @@ public class ConfigurationViewModel : ReactiveObject
     /// edit at the next connect. Only rewrites a file that already exists:
     /// json-only profiles never get a .cfg forked for them.
     /// </summary>
-    private void SyncCfg(string fileName, Func<IEnumerable<string>> lines)
+    private void SyncCfgAt(string path, Func<IEnumerable<string>> lines)
     {
-        var path = PathFor(fileName);
         if (!File.Exists(path)) return;
         TrySave(() => ConfigPersistence.WriteLines(path, lines()));
     }

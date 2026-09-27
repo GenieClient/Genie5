@@ -3,6 +3,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Genie.Core.Import;
+using Genie.Core.Persistence;
 using Genie.Core.Variables;
 
 namespace Genie.App.Views;
@@ -13,11 +14,12 @@ namespace Genie.App.Views;
 /// </summary>
 public partial class VariablesPanel : UserControl
 {
-    public sealed record VariableRow(string Name, string Value);
+    public sealed record VariableRow(string Name, string Value, string Scope = "");
 
-    private VariableStore? _store;
-    private Action?        _onChanged;
-    private string         _filter = string.Empty;
+    private VariableStore?       _store;
+    private Action?              _onChanged;
+    private ScopeEditingContext? _scopeCtx;
+    private string               _filter = string.Empty;
 
     /// <summary>
     /// The live session globals when this panel is editing the CONNECTED
@@ -35,14 +37,25 @@ public partial class VariablesPanel : UserControl
     /// survive. Null when composing a new entry.</summary>
     private string?        _loadedName;
 
-    public VariablesPanel() => InitializeComponent();
+    public VariablesPanel()
+    {
+        InitializeComponent();
+        ScopeBox.ItemsSource   = ScopeEditing.Labels;
+        ScopeBox.SelectedIndex = 0;   // new variables default to This character (#315)
+    }
 
     public void Initialize(VariableStore store, Action onChanged,
-                           IDictionary<string, string>? liveGlobals = null)
+                           IDictionary<string, string>? liveGlobals = null,
+                           ScopeEditingContext? scopeContext = null)
     {
         _store       = store;
         _onChanged   = onChanged;
         _liveGlobals = liveGlobals;
+        _scopeCtx    = scopeContext;
+        var twoLayers = scopeContext?.TwoLayers == true;
+        ScopeGroup.IsVisible = twoLayers;
+        ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        ScopeEditing.InitFilter(ScopeFilterBox, twoLayers, Refresh);
         // A re-Initialize (profile switch) must not carry the previous
         // profile's filter or form over — a stale filter renders the new
         // profile's list empty for no visible reason.
@@ -58,7 +71,8 @@ public partial class VariablesPanel : UserControl
             .Select(r => r.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
         ItemsList.ItemsSource = _store.GetAll().Values
-            .Select(v => new VariableRow(v.Name, v.Value))
+            .Where(v => ScopeEditing.PassesFilter(ScopeFilterBox.SelectedIndex, v.ConfigScope))
+            .Select(v => new VariableRow(v.Name, v.Value, ScopeEditing.RowLabel(v.ConfigScope)))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Name, r.Value))
             .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -82,6 +96,8 @@ public partial class VariablesPanel : UserControl
         _loadedName     = row.Name;
         NameBox.Text    = row.Name;
         ValueBox.Text   = row.Value;
+        if (_store.GetAll().TryGetValue(row.Name, out var v))
+            ScopeBox.SelectedIndex = ScopeEditing.ToIndex(v.ConfigScope);
         StatusText.Text = string.Empty;
     }
 
@@ -94,6 +110,9 @@ public partial class VariablesPanel : UserControl
         if (string.IsNullOrEmpty(name)) { StatusText.Text = "Name is required."; return; }
 
         _store.Set(name, value);
+        // The Scope field decides which file the variable saves to (#315).
+        if (_scopeCtx?.TwoLayers == true)
+            _store.SetConfigScope(name, ScopeEditing.FromIndex(ScopeBox.SelectedIndex));
         // Keep a shadowing live global in step (#340). This also covers the
         // reserved names Store.Set refuses (`connected`): the store write is a
         // no-op and the live global — which always exists, seeded at launch —
@@ -105,7 +124,7 @@ public partial class VariablesPanel : UserControl
         StatusText.Text = $"Saved '{name}'.";
     }
 
-    private void OnDelete(object? sender, RoutedEventArgs e)
+    private async void OnDelete(object? sender, RoutedEventArgs e)
     {
         if (_store is null) return;
         if (ItemsList.SelectedItem is not VariableRow row)
@@ -113,16 +132,30 @@ public partial class VariablesPanel : UserControl
             StatusText.Text = "Select a variable to delete.";
             return;
         }
+        var scope = _store.GetAll().TryGetValue(row.Name, out var v) ? v.ConfigScope : RuleScope.Character;
+
+        // Deleting a shared variable affects every character; variables have
+        // no enabled flag, so confirm the for-all removal (#257/#315).
+        if (scope == RuleScope.Global && _scopeCtx?.TwoLayers == true)
+        {
+            if (this.GetVisualRoot() is not Window owner) return;
+            var choice = await ScopeDeleteDialog.Show(owner, row.Name, allowOptOut: false);
+            if (choice != ScopeDeleteChoice.RemoveForAll) return;
+            _scopeCtx.NoteGlobalDelete?.Invoke(row.Name);
+        }
+
         _store.Remove(row.Name);
         // Removing the store row alone would leave $name resolving the value
         // the shadowing global still holds (#340). A reserved connection var
         // keeps its live global — #294 owns that name.
         if (_liveGlobals is not null && !ReservedConnectionVars.Contains(row.Name))
             _liveGlobals.Remove(row.Name);
+        // A deleted per-character value un-shadows the shared one now (#315).
+        var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, scope, row.Name);
         _onChanged?.Invoke();
         ClearForm();
         Refresh();
-        StatusText.Text = $"Deleted '{row.Name}'.";
+        StatusText.Text = ScopeEditing.DeletedStatus(row.Name, restored);
     }
 
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();
@@ -179,6 +212,7 @@ public partial class VariablesPanel : UserControl
         ItemsList.SelectedItem = null;
         NameBox.Text           = string.Empty;
         ValueBox.Text          = string.Empty;
+        ScopeBox.SelectedIndex = 0;   // new variables default to This character
         StatusText.Text        = string.Empty;
     }
 

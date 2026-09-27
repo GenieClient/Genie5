@@ -45,6 +45,7 @@ public partial class TriggersPanel : UserControl
         var twoLayers = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        ScopeEditing.InitFilter(ScopeFilterBox, twoLayers, Refresh);
         // A re-Initialize (profile switch) must not carry the previous
         // profile's filter or form over — a stale filter renders the new
         // profile's list empty for no visible reason.
@@ -58,6 +59,7 @@ public partial class TriggersPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as TriggerRow)?.Pattern;
         ItemsList.ItemsSource = _engine.Triggers
+            .Where(t => ScopeEditing.PassesFilter(ScopeFilterBox.SelectedIndex, t.Scope))
             .Select(t => new TriggerRow(t.IsEnabled ? "✓" : "✗", ScopeEditing.RowLabel(t.Scope), t.Pattern, t.Action, t.ClassName))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Pattern, r.Action, r.ClassName))
             .ToList();
@@ -144,10 +146,12 @@ public partial class TriggersPanel : UserControl
         }
 
         _engine.RemoveTrigger(row.Pattern);
+        // A deleted per-character override un-shadows its shared twin now (#315).
+        var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, rule.Scope, row.Pattern);
         ClearForm();
         Refresh();
         _onChanged?.Invoke();
-        StatusText.Text = "Deleted.";
+        StatusText.Text = restored ? ScopeEditing.DeletedStatus(row.Pattern, true) : "Deleted.";
     }
 
     private void OnToggle(object? sender, RoutedEventArgs e)

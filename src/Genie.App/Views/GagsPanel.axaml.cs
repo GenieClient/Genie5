@@ -44,6 +44,7 @@ public partial class GagsPanel : UserControl
         var twoLayers = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        ScopeEditing.InitFilter(ScopeFilterBox, twoLayers, Refresh);
         // A re-Initialize (profile switch) must not carry the previous
         // profile's filter or form over — a stale filter renders the new
         // profile's list empty for no visible reason.
@@ -57,6 +58,7 @@ public partial class GagsPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as GagRow)?.Pattern;
         ItemsList.ItemsSource = _engine.Rules
+            .Where(r => ScopeEditing.PassesFilter(ScopeFilterBox.SelectedIndex, r.Scope))
             .Select(r => new GagRow(r.IsEnabled ? "✓" : "✗", ScopeEditing.RowLabel(r.Scope), r.Pattern, r.ClassName))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Pattern, r.ClassName))
             .ToList();
@@ -133,10 +135,12 @@ public partial class GagsPanel : UserControl
         }
 
         _engine.RemoveRule(row.Pattern);
+        // A deleted per-character override un-shadows its shared twin now (#315).
+        var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, rule.Scope, row.Pattern);
         ClearForm();
         Refresh();
         _onChanged?.Invoke();
-        StatusText.Text = "Deleted.";
+        StatusText.Text = restored ? ScopeEditing.DeletedStatus(row.Pattern, true) : "Deleted.";
     }
 
     private void OnToggle(object? sender, RoutedEventArgs e)

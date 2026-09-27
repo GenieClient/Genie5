@@ -46,6 +46,7 @@ public partial class MacrosPanel : UserControl
         var twoLayers = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        ScopeEditing.InitFilter(ScopeFilterBox, twoLayers, Refresh);
         // A re-Initialize (profile switch) must not carry the previous
         // profile's filter or form over — a stale filter renders the new
         // profile's list empty for no visible reason.
@@ -59,6 +60,7 @@ public partial class MacrosPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as MacroRow)?.Key;
         ItemsList.ItemsSource = _engine.Rules
+            .Where(r => ScopeEditing.PassesFilter(ScopeFilterBox.SelectedIndex, r.Scope))
             .Select(r => new MacroRow(ScopeEditing.RowLabel(r.Scope), r.Key, r.Action))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Key, r.Action))
             .ToList();
@@ -133,10 +135,12 @@ public partial class MacrosPanel : UserControl
         }
 
         _engine.Remove(rule.Key);
+        // A deleted per-character binding un-shadows its shared twin now (#315).
+        var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, rule.Scope, rule.Key);
         ClearForm();
         Refresh();
         _onChanged?.Invoke();
-        StatusText.Text = $"Deleted '{rule.Key}'.";
+        StatusText.Text = ScopeEditing.DeletedStatus(rule.Key, restored);
     }
 
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();

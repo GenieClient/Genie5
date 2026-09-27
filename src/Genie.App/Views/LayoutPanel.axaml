@@ -89,8 +89,14 @@
 
       <StackPanel Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="3"
                   Orientation="Horizontal" Spacing="4" Margin="0,2,0,4">
+        <StackPanel Name="ScopeGroup" Orientation="Horizontal" Spacing="6" Margin="0,0,12,0">
+          <TextBlock Text="Scope:" VerticalAlignment="Center"/>
+          <ComboBox Name="ScopeBox" MinWidth="130" VerticalAlignment="Center"
+                    ToolTip.Tip="This character = this window's settings are saved in this profile's windows.json. All characters = saved in the shared global windows.json every character loads."/>
+        </StackPanel>
         <Button Content="Apply" Click="OnApply"/>
-        <Button Content="Reset" Click="OnReset"/>
+        <Button Content="Reset" Click="OnReset"
+                ToolTip.Tip="Back to the defaults. A this-character window that has shared (all characters) settings goes back to those instead."/>
       </StackPanel>
 
       <TextBlock Grid.Row="9" Grid.Column="1" Grid.ColumnSpan="3"
