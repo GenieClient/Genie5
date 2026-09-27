@@ -231,6 +231,11 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// and written off the game thread; closed at disconnect.</summary>
     public WindowLogging.WindowLogSink WindowLogs { get; }
 
+    /// <summary>Healing panel settings — per-spell mana and prep-to-cast wait
+    /// (public #263). Loaded from the connected profile's <c>healing.json</c>;
+    /// the host writes through <see cref="SaveHealingSettings"/>.</summary>
+    public Health.HealingSettings Healing { get; } = new();
+
     // ── Command pipeline ───────────────────────────────────────────────────────
     private readonly CommandQueue _commandQueue;
     private readonly EventQueue   _eventQueue;
@@ -1251,6 +1256,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // shared Config copy for a character with none of its own (public #270).
         WindowLogs.Rules.Load(WindowLogging.WindowLogRules.PathToLoad(
             Config.ConfigProfileDir, Config.ConfigDir));
+
+        // Healing panel mana/wait values follow the profile too (public #263),
+        // and are mirrored into the Genie 4 GCTextBox* globals so a script
+        // reading $GCTextBoxManaHW sees what the panel will send.
+        Healing.Load(Path.Combine(Config.ConfigProfileDir, Health.HealingSettings.FileName));
+        Healing.MirrorTo((name, value) => Scripts.Globals[name] = value);
 
         // ── Auto-load persisted rule sets ──────────────────────────────────────
         // Genie 4 loads classes.cfg / aliases.cfg / variables.cfg /
@@ -2317,6 +2328,23 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     public bool SaveDialogMappings() =>
         DialogMappings.Save(Path.Combine(
             Config.ConfigProfileDir, Dialogs.ServerDialogMappings.FileName));
+
+    /// <summary>Persist the Healing panel settings to the connected profile and
+    /// refresh their <c>GCTextBox*</c> globals (public #263). False on a write
+    /// failure; the in-memory values stand.</summary>
+    public bool SaveHealingSettings()
+    {
+        Healing.MirrorTo((name, value) => Scripts.Globals[name] = value);
+        return Healing.Save(Path.Combine(Config.ConfigProfileDir, Health.HealingSettings.FileName));
+    }
+
+    /// <summary>
+    /// Look up a variable the way a script's <c>$name</c> would see it — live
+    /// globals first, then the <c>#var</c> store. Used by the Healing panel's
+    /// Genie 4 <c>GCTextBox*</c> fallback.
+    /// </summary>
+    public string? LookupVariable(string name)
+        => Scripts.Globals.TryGetValue(name, out var g) ? g : Variables.Store.Get(name);
 
     public void ResetRuleEngines()
     {
