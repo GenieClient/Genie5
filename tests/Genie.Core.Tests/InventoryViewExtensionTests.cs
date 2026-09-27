@@ -38,7 +38,11 @@ public class InventoryViewExtensionTests
         public IDictionary<string, string> Globals => Vars;
         public string ConfigDir { get; } = Directory.CreateDirectory(
             Path.Combine(Path.GetTempPath(), "genie-iv-" + Guid.NewGuid().ToString("N"))).FullName;
-        public void Echo(string text) => Echoed.Add(text);
+        // The scan watchdog echoes from its own thread, so the sink locks and the
+        // tests read through Saw(), never the list, while a scan may still end.
+        private readonly object _echoLock = new();
+        public void Echo(string text) { lock (_echoLock) Echoed.Add(text); }
+        public bool Saw(string fragment) { lock (_echoLock) return Echoed.Any(e => e.Contains(fragment)); }
         public void SendCommand(string command) => Sent.Add(command);
         public void SetWindow(string window, string content) { }
         public void Log(string message) { }
@@ -304,7 +308,9 @@ public class InventoryViewExtensionTests
         // the clock runs well past the idle window (plus the RT grace) untouched.
         now += TimeSpan.FromSeconds(10);
 
-        await WaitUntil(() => !ext.ScanInProgress);
+        // AbandonScan clears the scan first and echoes last (after a disk reload),
+        // so wait for the message itself, not just the cleared state.
+        await WaitUntil(() => !ext.ScanInProgress && host.Saw("gave up waiting"));
 
         Assert.Contains(host.Echoed, e => e.Contains("gave up waiting"));
         Assert.Empty(ext.SnapshotCatalog());          // the partial rows went with it
@@ -343,7 +349,9 @@ public class InventoryViewExtensionTests
         // And the deadline really did ride along with the LAST line: one full
         // idle window after it, the watchdog gives up.
         now += TimeSpan.FromMilliseconds(401);
-        await WaitUntil(() => !ext.ScanInProgress);
+        // AbandonScan clears the scan first and echoes last (after a disk reload),
+        // so wait for the message itself, not just the cleared state.
+        await WaitUntil(() => !ext.ScanInProgress && host.Saw("gave up waiting"));
         Assert.Contains(host.Echoed, e => e.Contains("gave up waiting"));
     }
 
