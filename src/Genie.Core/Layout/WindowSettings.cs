@@ -62,11 +62,13 @@ public sealed class WindowSettings
     /// hidden from the main feed until the user opts a stream <i>out</i> (via the
     /// window right-click menu or the Layout tab). Only consulted for the text
     /// stream windows (Combat, Talk, Whispers, Thoughts, Familiar, Deaths,
-    /// Logons, Assess, Atmospherics, OOC, ItemLog); a no-op for other dockables.
+    /// Logons, Assess, Atmospherics, OOC, Conversation, Group, ItemLog); a no-op
+    /// for other dockables.
     /// Distinct from <see cref="IfClosed"/>, which only fires when the panel
     /// is <i>closed</i>.
     /// <para>
-    /// The default is per-window: <c>ooc</c> ships with it OFF, because DR sends
+    /// The default is per-window: <c>ooc</c> (and <c>conversation</c> /
+    /// <c>group</c>, declared the same way) ship with it OFF, because DR sends
     /// every OOC line to <c>main</c> itself in addition to the stream copy
     /// (public #256) — echoing on top of that shows it twice. See
     /// <c>WindowSettingsStore.DefaultNoEchoToMain</c>.

@@ -39,15 +39,18 @@ public sealed class WindowSettingsStore
     // Values must be registered ids (or the "main"/game-text main-window target)
     // or the IfClosedResolver treats them as unknown and safely routes to Main.
     //
-    // "" = drop when closed. DR declares the OOC window that way itself
-    // (<streamWindow id='ooc' … ifClosed=''/>) because it already sends a bare
-    // `main` copy of every OOC line as the fallback — see DefaultNoEchoToMain.
+    // "" = drop when closed. DR declares the OOC, Conversation and Group
+    // windows that way itself (<streamWindow id='ooc' … ifClosed=''/>, and the
+    // same for 'conversation' and 'group') because it already sends a bare
+    // `main` copy of every such line as the fallback — see DefaultNoEchoToMain.
     private static readonly Dictionary<string, string?> DefaultIfClosed =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ["talk"]     = "log",
-            ["whispers"] = "log",
-            ["ooc"]      = "",
+            ["talk"]         = "log",
+            ["whispers"]     = "log",
+            ["ooc"]          = "",
+            ["conversation"] = "",
+            ["group"]        = "",
         };
 
     // Windows whose EchoToMain starts OFF. The property defaults to true (Genie
@@ -55,9 +58,46 @@ public sealed class WindowSettingsStore
     // ONCE. OOC is not one of those: DR sends each OOC line on `whispers`, again
     // on `ooc`, and a third time bare on `main` (public #256). The bare copy is
     // already the main-window rendering, so echoing the `ooc` copy on top of it
-    // puts the line in Main twice — the very duplicate #256 fixed.
+    // puts the line in Main twice — the very duplicate #256 fixed. DR declares
+    // `conversation` and `group` the same way (ifClosed=''), i.e. their text
+    // reaches Main on its own, so they start with the echo off too.
     private static readonly HashSet<string> DefaultNoEchoToMain =
-        new(StringComparer.OrdinalIgnoreCase) { "ooc" };
+        new(StringComparer.OrdinalIgnoreCase) { "ooc", "conversation", "group" };
+
+    /// <summary>
+    /// Revision of the persisted <see cref="WindowSettings.IfClosed"/> values.
+    /// Written on every saved row; a row below it gets the
+    /// <see cref="DeadTargetMigrations"/> rewrite once, on load, and the next
+    /// save stamps it current so the rewrite never runs on that row again.
+    /// </summary>
+    public const int IfClosedRevision = 1;
+
+    /// <summary>
+    /// Persisted <see cref="WindowSettings.IfClosed"/> targets that named a
+    /// window Genie 5 did not have before revision 1 (public #260), mapped to
+    /// what they are rewritten to. An unregistered target falls back to Main
+    /// (<see cref="IfClosedResolver"/>'s anti-rot rule), so those values were
+    /// dead; registering the real window would silently bring them to life and
+    /// move the text into a panel the user has never opened.
+    /// <list type="bullet">
+    /// <item><c>conversation</c> → <c>log</c>. DR declares talk and whispers
+    /// <c>ifClosed='conversation'</c>, and that value reaches windows.json in
+    /// the wild (Genie 4 imports, hand edits). Our Log window is the
+    /// consolidated conversation feed and <c>log</c> is the shipped talk /
+    /// whispers default, so such a row lands on the default.</item>
+    /// <item><c>group</c> → <c>null</c> (Main). DR declares nothing that
+    /// redirects into Group and no profile seen carries it, but the exposure is
+    /// identical; Main is exactly what such a row did before.</item>
+    /// </list>
+    /// A user who picks Conversation or Group AFTER upgrading saves at the
+    /// current revision and keeps the choice.
+    /// </summary>
+    private static readonly Dictionary<string, string?> DeadTargetMigrations =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["conversation"] = "log",
+            ["group"]        = null,
+        };
 
     public WindowSettings Register(string id, string defaultTitle)
         => Register(id, defaultTitle, "Cascadia Mono,Consolas,Courier New,monospace", 13);
@@ -139,6 +179,11 @@ public sealed class WindowSettingsStore
         s.EchoToMain = m.EchoToMain;
         s.WordWrap   = m.WordWrap;
         s.FlashOnActivity = m.FlashOnActivity;
-        if (m.HasIfClosed) s.IfClosed = m.IfClosed;
+        if (m.HasIfClosed)
+            s.IfClosed = m.IfClosedRevision < IfClosedRevision
+                         && m.IfClosed is { } target
+                         && DeadTargetMigrations.TryGetValue(target.Trim(), out var migrated)
+                ? migrated
+                : m.IfClosed;
     }
 }

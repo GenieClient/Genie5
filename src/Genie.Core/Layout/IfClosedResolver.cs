@@ -37,8 +37,11 @@ public readonly record struct IfClosedDecision(IfClosedSinkKind Kind, string? St
 /// <para><b>Never silently drops.</b> An unknown / unregistered target id
 /// resolves to <see cref="IfClosedSinkKind.Main"/>, never
 /// <see cref="IfClosedSinkKind.Drop"/> — the namespace-rot failure mode from
-/// #211, where a dangling id (<c>"main"</c>, <c>"conversation"</c>) would have
-/// dropped combat/talk/whispers text. Only an explicit <c>""</c> drops.</para>
+/// #211, where a dangling id (<c>"main"</c>, or <c>"conversation"</c> before
+/// that window existed) would have dropped combat/talk/whispers text. Only an
+/// explicit <c>""</c> drops. Registering a window that persisted values
+/// already name brings those values to life, so it needs a load-time
+/// migration — see <c>WindowSettingsStore.IfClosedRevision</c> (public #260).</para>
 ///
 /// <para>Kept in <c>Genie.Core</c> as a pure function of (stream id, settings
 /// store, visibility predicate) so the chain/cycle logic is unit-testable —

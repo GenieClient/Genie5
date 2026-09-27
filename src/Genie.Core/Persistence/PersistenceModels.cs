@@ -187,4 +187,9 @@ public sealed class WindowSettingsPersistenceModel
     public bool    FlashOnActivity { get; set; } = true;
     public string? IfClosed     { get; set; }
     public bool    HasIfClosed  { get; set; }
+    /// <summary>Which <c>WindowSettingsStore.IfClosedRevision</c> wrote this
+    /// row. Absent (0) on every file from before public #260, which is what
+    /// lets the one-time dead-target rewrite tell an old value from a choice
+    /// the user made since.</summary>
+    public int     IfClosedRevision { get; set; }
 }
