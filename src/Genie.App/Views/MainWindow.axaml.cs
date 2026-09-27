@@ -603,6 +603,14 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         ViewModel?.PersistFloatMemoryNow();
         if (e.Cancel)            return;   // something upstream already vetoed
         if (_closeConfirmed)     return;   // second pass after user said Yes
+        // Unsaved script edits (public #243) come first: they are lost for good,
+        // a connection is not.
+        if (!_editorsResolved && ViewModel?.ScriptEditors.HasUnsavedChanges == true)
+        {
+            e.Cancel = true;
+            ResolveUnsavedScriptsAndMaybeReclose();
+            return;
+        }
         if (ViewModel?.IsConnected != true) return;
         // IgnoreCloseAlert (Genie 4 parity): user opted out of the
         // "still connected, really close?" prompt — let the close proceed.
@@ -635,10 +643,51 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             "Closing will disconnect from the game. Continue?");
 
         var confirmed = await dlg.ShowDialog<bool>(this);
-        if (!confirmed) return;
+        if (!confirmed)
+        {
+            // Staying open: a later close asks about script edits again.
+            _editorsResolved = false;
+            return;
+        }
 
         _closeConfirmed = true;
         Close();
+    }
+
+    /// <summary>Set once the unsaved-script prompt has been answered for this
+    /// close, so the re-issued <see cref="Window.Close()"/> moves on.</summary>
+    private bool _editorsResolved;
+
+    /// <summary>
+    /// Ask what to do with unsaved script editor windows before the app closes
+    /// (public #243): Save All, Discard, or Cancel. Save All that fails for any
+    /// file keeps everything open — that window says why.
+    /// </summary>
+    private async void ResolveUnsavedScriptsAndMaybeReclose()
+    {
+        if (ViewModel is not { } vm) return;
+        var dirty = vm.ScriptEditors.DirtyWindows;
+        var names = string.Join(", ", dirty.Select(w => System.IO.Path.GetFileName(w.FilePath)));
+        var dlg = new ConfirmDialog(
+            "Unsaved scripts",
+            dirty.Count == 1
+                ? $"{names} has unsaved changes. Save it before closing?"
+                : $"{dirty.Count} scripts have unsaved changes: {names}. Save them before closing?",
+            dirty.Count == 1 ? "_Save" : "_Save All", "_Discard", "_Cancel");
+        var answer = await dlg.ShowDialog<bool?>(this);
+        if (answer is null) return;
+        if (answer == true && !vm.ScriptEditors.SaveAll()) return;
+
+        _editorsResolved = true;
+        Close();
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        // The editors are separate top-level windows, so the app would stay up
+        // for them after the main window closes. Their edits were settled above.
+        ViewModel?.ScriptEditors.CloseAll();
     }
 
     private void CommandInput_KeyDown(object? sender, KeyEventArgs e)

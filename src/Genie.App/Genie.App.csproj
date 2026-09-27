@@ -69,7 +69,8 @@
     <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.9" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.18" />
     <!-- AvaloniaEdit backs the experimental editor-based Game window
-         (GenieConfig.UseEditorGameWindow, default off). Pinned to 11.4.1: it
+         (GenieConfig.UseEditorGameWindow, default off) and the built-in
+         script editor (ScriptEditorWindow, public #243). Pinned to 11.4.1: it
          floors at Avalonia >= 11.0.0 (no ceiling), so it resolves against our
          Avalonia pin (11.3.18) without lifting it. 12.0.0 is NOT usable — it requires
          Avalonia 12 exactly, which would drag the whole app plus the
@@ -184,6 +185,12 @@
        independent of the GitHub Releases page. Sourced from the repo root. -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\RELEASE_NOTES.md" LogicalName="Genie.App.RELEASE_NOTES.md" />
+  </ItemGroup>
+
+  <!-- Syntax highlighting for .cmd / .inc in the built-in script editor
+       (public #243). Loaded by ScriptSyntax under this exact name. -->
+  <ItemGroup>
+    <EmbeddedResource Include="ScriptEditing\GenieCmd.xshd" LogicalName="Genie.App.ScriptEditing.GenieCmd.xshd" />
   </ItemGroup>
 
   <ItemGroup>

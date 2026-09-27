@@ -654,12 +654,13 @@
         </MenuItem>
         <Separator/>
         <!-- External editor for Edit Script (Script Manager, Script Bar ✏,
-             #edit). Shows the resolved launch-ladder rung; Change… writes the
+             #edit) when #config externaleditor is on — otherwise those open
+             the built-in script editor (public #243). Shows the resolved launch-ladder rung; Change… writes the
              Display-settings override (same value as Display Settings →
              External editor), Use OS Default clears it. -->
         <MenuItem Header="External _Editor"
                   SubmenuOpened="OnScriptsEditorMenuOpened"
-                  ToolTip.Tip="The program Edit Script opens files with — override → #config editor → OS default.">
+                  ToolTip.Tip="The program scripts open in when #config externaleditor is on (or via the Script Manager's Edit in external editor) — override → #config editor → OS default. Otherwise Edit uses the built-in script editor.">
           <MenuItem Header="{Binding Scripts.EditorDisplay}" IsEnabled="False"/>
           <Separator/>
           <MenuItem Header="_Change…"

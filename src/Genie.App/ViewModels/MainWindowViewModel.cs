@@ -748,6 +748,27 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// </summary>
     public GenieCore? Core => _core;
 
+    /// <summary>The open built-in script editor windows (public #243). The main
+    /// window asks it about unsaved edits before closing.</summary>
+    public Genie.App.ScriptEditing.ScriptEditorService ScriptEditors { get; } = new();
+
+    private Genie.App.ScriptEditing.ScriptEditRouter? _editRouter;
+
+    /// <summary>Built-in editor unless <c>#config externaleditor on</c> (public
+    /// #243); read per request, so the setting applies to the next edit.</summary>
+    private Genie.App.ScriptEditing.ScriptEditRouter EditRouter
+    {
+        get
+        {
+            if (_editRouter is not null) return _editRouter;
+            ScriptEditors.Notice += line => GameText.AddSystemLine(line);
+            return _editRouter = new Genie.App.ScriptEditing.ScriptEditRouter(
+                useExternal:  () => _core?.Config?.ExternalEditor == true,
+                openBuiltIn:  path => ScriptEditors.Open(path),
+                openExternal: path => LaunchExternalEditor(path));
+        }
+    }
+
     // ── Profile store ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -5654,26 +5675,29 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     StopCapture("recipe complete");
             });
 
-        // Edit-in-editor requests come from two places, both routed to the
+        // Edit-in-editor requests come from three places, all routed to the
         // same handler: the Script Bar's pencil button (per-running-script),
-        // and the `#edit <name>` meta-command (from the command bar). Both
-        // ultimately want to open the script file in the user-configured
-        // editor (or OS default `.cmd` handler) — so the App owns the
-        // launch logic and both sources fan in here.
+        // the Script Manager, and the `#edit <name>` meta-command (from the
+        // command bar). All open the built-in script editor, or the external
+        // editor ladder with `#config externaleditor on` (public #243) — the
+        // App owns that choice, so every source fans in here.
         ScriptBar.EditScript          += OpenScriptInEditor;
         Scripts.EditScriptRequested   += OpenScriptInEditor;
-        Scripts.EditFileRequested     += path =>
+        // Exact-path variant for subfolder scripts / running rows — the
+        // name-based OpenScriptInEditor rejects path separators by design.
+        Scripts.EditFileRequested     += path => OpenScriptPath(path, "ScriptManager.EditFile");
+        // "Edit in external editor" always takes the external ladder,
+        // whatever #config externaleditor says.
+        Scripts.EditExternalRequested += path =>
         {
-            // Exact-path variant for subfolder scripts / running rows — the
-            // name-based OpenScriptInEditor rejects path separators by design.
             try
             {
-                LaunchExternalEditor(path);
-                GameText.AddSystemLine($"[editor] opened '{Path.GetFileName(path)}'");
+                var used = LaunchExternalEditor(path);
+                GameText.AddSystemLine($"[editor] opened '{Path.GetFileName(path)}' in {used}");
             }
             catch (Exception ex)
             {
-                ErrorLog.Log("ScriptManager.EditFile", ex);
+                ErrorLog.Log("ScriptManager.EditExternal", ex);
                 GameText.AddSystemLine($"[editor] failed to open '{path}': {ex.Message}");
             }
         };
@@ -7156,16 +7180,19 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public static readonly string[] SupportedScriptExtensions = { ".cmd", ".inc", ".js" };
 
     /// <summary>
-    /// Opens the named script in the user-configured external editor
+    /// Opens the named script in the built-in script editor, or — with
+    /// <c>#config externaleditor on</c> — the user-configured external editor
     /// (Display Settings → Editor Path, then <c>#config editor</c>; see
-    /// <see cref="LaunchExternalEditor"/> for the full ladder).
+    /// <see cref="LaunchExternalEditor"/> for the full ladder). Public #243.
     /// <para>
-    /// Lookup: if <paramref name="name"/> carries a supported extension that
-    /// exact file is used; otherwise <c>{name}.cmd</c> → <c>.inc</c> → <c>.js</c>
-    /// are tried in turn. When no file exists the script is <b>created</b> first
-    /// (Genie 4 <c>#edit</c> parity): the typed extension is used if given, else
-    /// a small dialog asks which supported type to create. Cancelling the dialog
-    /// creates nothing.
+    /// Lookup is the one a script start uses
+    /// (<see cref="Genie.App.ScriptEditing.ScriptEditRouter.ResolveExisting"/>): the
+    /// typed name as-is, then the default extension, then <c>.cmd</c> →
+    /// <c>.inc</c> → <c>.js</c>, the Scripts folder before the repo-scripts folder
+    /// — so the editor opens the copy that actually runs. When no file exists the
+    /// script is <b>created</b> in the Scripts folder first (Genie 4 <c>#edit</c>
+    /// parity): the typed extension is used if given, else a small dialog asks
+    /// which supported type to create. Cancelling the dialog creates nothing.
     /// </para>
     /// </summary>
     public async void OpenScriptInEditor(string name)
@@ -7184,9 +7211,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // Script names are bare basenames living directly under ScriptsDir.
         // Reject anything that could escape it (path separators, `..`, or a
         // rooted/drive-qualified path) before we ever touch the filesystem.
-        if (name.IndexOfAny(new[] { '/', '\\' }) >= 0
-            || name.Contains("..")
-            || Path.IsPathRooted(name))
+        if (!Genie.App.ScriptEditing.ScriptEditRouter.IsValidName(name))
         {
             GameText.AddSystemLine($"[editor] invalid script name: '{name}'");
             return;
@@ -7198,21 +7223,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             SupportedScriptExtensions.Contains(typedExt, StringComparer.OrdinalIgnoreCase);
         var baseName = hasSupportedExt ? Path.GetFileNameWithoutExtension(name) : name;
 
-        // Locate an existing file.
-        string? candidate = null;
-        if (hasSupportedExt)
-        {
-            var p = Path.Combine(dir, baseName + typedExt);
-            if (File.Exists(p)) candidate = p;
-        }
-        else
-        {
-            foreach (var ext in SupportedScriptExtensions)
-            {
-                var p = Path.Combine(dir, baseName + ext);
-                if (File.Exists(p)) { candidate = p; break; }
-            }
-        }
+        // Locate an existing file, exactly as a start of this name would.
+        var candidate = Genie.App.ScriptEditing.ScriptEditRouter.ResolveExisting(_core.Scripts, name);
 
         // Not found → create it (Genie 4 #edit parity). Honour the typed
         // extension; otherwise ask which supported type to create.
@@ -7239,15 +7251,24 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
         }
 
+        OpenScriptPath(candidate, "OpenScriptInEditor");
+    }
+
+    /// <summary>Open an already-resolved script file in the built-in editor or
+    /// the external one (<see cref="EditRouter"/>), echoing the outcome.</summary>
+    private void OpenScriptPath(string path, string logContext)
+    {
         try
         {
-            LaunchExternalEditor(candidate);
-            GameText.AddSystemLine($"[editor] opened '{Path.GetFileName(candidate)}'");
+            var route = EditRouter.Open(path);
+            GameText.AddSystemLine(route == Genie.App.ScriptEditing.ScriptEditRoute.External
+                ? $"[editor] opened '{Path.GetFileName(path)}' in the external editor"
+                : $"[editor] opened '{Path.GetFileName(path)}'");
         }
         catch (Exception ex)
         {
-            ErrorLog.Log("OpenScriptInEditor", ex);
-            GameText.AddSystemLine($"[editor] failed to open '{name}': {ex.Message}");
+            ErrorLog.Log(logContext, ex);
+            GameText.AddSystemLine($"[editor] failed to open '{Path.GetFileName(path)}': {ex.Message}");
         }
     }
 

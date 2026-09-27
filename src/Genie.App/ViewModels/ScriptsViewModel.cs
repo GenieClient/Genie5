@@ -96,6 +96,7 @@ public class ScriptsViewModel : ReactiveObject
 
     public ReactiveCommand<Unit, Unit> RunSelectedCommand    { get; }
     public ReactiveCommand<Unit, Unit> EditSelectedCommand   { get; }
+    public ReactiveCommand<Unit, Unit> EditExternalCommand   { get; }
     public ReactiveCommand<Unit, Unit> DeleteSelectedCommand { get; }
     public ReactiveCommand<Unit, Unit> CopyRunCommandCommand { get; }
     public ReactiveCommand<Unit, Unit> CopyPathCommand       { get; }
@@ -112,20 +113,26 @@ public class ScriptsViewModel : ReactiveObject
     public ReactiveCommand<Unit, Unit> ChangeEditorCommand   { get; }
     public ReactiveCommand<Unit, Unit> DefaultEditorCommand  { get; }
 
-    /// <summary>Open a script in the external editor (creates it via the
-    /// type dialog when missing). Handled by <see cref="MainWindowViewModel"/>,
-    /// which owns editor resolution — same fan-in as the Script Bar pencil.</summary>
+    /// <summary>Open a script in the script editor — built-in, or external with
+    /// <c>#config externaleditor on</c> (public #243) — creating it via the type
+    /// dialog when missing. Handled by <see cref="MainWindowViewModel"/>, which
+    /// owns editor resolution — same fan-in as the Script Bar pencil.</summary>
     public event Action<string>? EditScriptRequested;
 
     /// <summary>Open the scripts folder in the OS file manager. Handled by
     /// the host's existing folder-open logic (issue #37 pathing).</summary>
     public event Action? OpenFolderRequested;
 
-    /// <summary>Open an exact file path in the external editor — used when a
+    /// <summary>Open an exact file path in the script editor — used when a
     /// bare name can't identify the file (<see cref="EditScriptRequested"/>'s
     /// handler rejects path separators and probes extensions): subfolder
     /// scripts and running rows, whose snapshot carries the real path.</summary>
     public event Action<string>? EditFileRequested;
+
+    /// <summary>Open an exact file path in the EXTERNAL editor whatever
+    /// <c>#config externaleditor</c> says — the library menu's "Edit in external
+    /// editor" (public #243).</summary>
+    public event Action<string>? EditExternalRequested;
 
     /// <summary>"Confirm delete" while the two-step Delete is armed — bound by
     /// the context menu so its Delete item mirrors the toolbar button's state.</summary>
@@ -143,6 +150,9 @@ public class ScriptsViewModel : ReactiveObject
 
         RunSelectedCommand    = ReactiveCommand.Create(RunSelected,    fileSelected);
         EditSelectedCommand   = ReactiveCommand.Create(EditSelected,   fileSelected);
+        EditExternalCommand   = ReactiveCommand.Create(
+            () => { if (SelectedFile is { IsFolder: false } f) EditExternalRequested?.Invoke(f.FullPath); },
+            fileSelected);
         DeleteSelectedCommand = ReactiveCommand.Create(DeleteSelected, fileSelected);
         CopyRunCommandCommand = ReactiveCommand.CreateFromTask(
             () => CopyToClipboardAsync(SelectedFile is { IsFolder: false } f

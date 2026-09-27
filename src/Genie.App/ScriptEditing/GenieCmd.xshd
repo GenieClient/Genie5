@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Syntax highlighting for Genie .cmd / .inc scripts in the built-in script
+  editor (public #243). The colours below are the light-theme defaults;
+  ScriptSyntax repaints every named colour from its dark or light palette when
+  the definition loads, so keep the names in step with ScriptSyntax.RoleFor.
+
+  Rules follow the script engine, not guesswork:
+  - a line whose first non-blank character is # is ALWAYS a comment (ScriptEngine
+    skips it whole: #debug, #goto, prose alike). A #command further along a line
+    (put #echo …) is live, and gets the MetaCommand colour instead;
+  - a label is a line that is one word ending in : (or starting with :) — the
+    engine's own test, so "echo Note: …" is not a label;
+  - commands are keywords only where a command can stand: at the start of a
+    line, after an action verb, after then / else, or after an opening brace.
+    "echo You wait for the ferry" does not light up "wait".
+-->
+<SyntaxDefinition name="Genie Script" extensions=".cmd;.inc"
+                  xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+  <Color name="Comment"     foreground="#008000" exampleText="# a comment" />
+  <Color name="String"      foreground="#A31515" exampleText="&quot;text&quot;" />
+  <Color name="Label"       foreground="#795E26" fontWeight="bold" exampleText="loop:" />
+  <Color name="Variable"    foreground="#001080" exampleText="$health %1" />
+  <Color name="Keyword"     foreground="#0000FF" exampleText="put" />
+  <Color name="MetaCommand" foreground="#AF00DB" exampleText="#echo" />
+  <Color name="Number"      foreground="#098658" exampleText="42" />
+
+  <!-- Variables are highlighted inside strings too: "%target" is the common case. -->
+  <RuleSet name="StringBody" ignoreCase="true">
+    <Rule color="Variable">[\$%]+[A-Za-z0-9_][A-Za-z0-9_.]*</Rule>
+  </RuleSet>
+
+  <RuleSet ignoreCase="true">
+    <!-- Comment: first non-blank character is #. Must stay first. -->
+    <Span color="Comment" begin="^\s*\#" />
+
+    <!-- Label: the whole line is one word ending (or starting) with a colon. -->
+    <Rule color="Label">^\s*(?::[^\s]+|[^\s]+:)\s*$</Rule>
+
+    <Span color="String" ruleSet="StringBody" multiline="false">
+      <Begin>"</Begin>
+      <End>"</End>
+    </Span>
+
+    <!-- Commands, only where a command can start. -->
+    <Rule color="Keyword">
+      (?&lt;=^\s*|^\s*action\s+|\b(?:then|else)\s+|\{\s*)
+      (?:put|send|pause|wait|waitfor|waitforre|waiteval|waitpause|waitforp|
+         match|matchre|matchwait|gosub|goto|return|if|else|elseif|while|
+         var|variable|setvar|setvariable|unvar|unvariable|unsetvar|unsetvariable|deletevariable|
+         echo|exit|shift|counter|math|eval|evalmath|evaluate|evaluatemath|timer|random|
+         save|move|nextroom|action|include|debug|delay|start|stop|setstart|reset|clear|
+         javascript|js|jscall|plugin|pluginscript|do|vars)
+      \b
+    </Rule>
+    <Rule color="Keyword">\b(?:then|when)\b</Rule>
+
+    <!-- A #command anywhere past the start of the line (the start is a comment). -->
+    <Rule color="MetaCommand">\#[A-Za-z]+</Rule>
+
+    <Rule color="Variable">[\$%]+[A-Za-z0-9_][A-Za-z0-9_.]*</Rule>
+
+    <Rule color="Number">\b\d+(?:\.\d+)?\b</Rule>
+  </RuleSet>
+</SyntaxDefinition>

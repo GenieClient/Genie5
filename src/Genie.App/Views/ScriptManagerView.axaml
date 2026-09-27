@@ -37,7 +37,7 @@
     <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4">
       <Button Content="New" FontSize="11" Padding="8,2" Margin="0,0,4,2"
               Command="{Binding NewScriptCommand}"
-              ToolTip.Tip="Create a new script (opens in your editor)"/>
+              ToolTip.Tip="Create a new script (opens in the script editor)"/>
       <Button Content="Run" FontSize="11" Padding="8,2" Margin="0,0,4,2"
               Command="{Binding RunSelectedCommand}"
               ToolTip.Tip="Run the selected script (double-click or Enter also runs)"/>
@@ -47,7 +47,7 @@
                ToolTip.Tip="Optional arguments passed to the script on Run (%1, %2, …)"/>
       <Button Content="Edit" FontSize="11" Padding="8,2" Margin="0,0,4,2"
               Command="{Binding EditSelectedCommand}"
-              ToolTip.Tip="Open the selected script in your editor"/>
+              ToolTip.Tip="Open the selected script in the script editor (#config externaleditor on uses your external editor instead)"/>
       <Button Content="Delete" FontSize="11" Padding="8,2" Margin="0,0,4,2"
               Command="{Binding DeleteSelectedCommand}"
               IsVisible="{Binding !ConfirmingDelete}"
@@ -102,6 +102,8 @@
               <ContextMenu>
                 <MenuItem Header="Run" Command="{Binding RunSelectedCommand}"/>
                 <MenuItem Header="Edit" Command="{Binding EditSelectedCommand}"/>
+                <MenuItem Header="Edit in external editor" Command="{Binding EditExternalCommand}"
+                          ToolTip.Tip="Open in the program under Scripts → External Editor, whatever #config externaleditor says"/>
                 <Separator/>
                 <MenuItem Header="Copy run command" Command="{Binding CopyRunCommandCommand}"
                           ToolTip.Tip="Copy the .name invocation to the clipboard"/>

@@ -48,9 +48,8 @@
     <!-- DataGrid likewise — used by the Configuration dialog's rule tables. -->
     <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
     <!-- AvaloniaEdit ships its own control theme; without this the experimental
-         editor-backed Game window (#config useeditorgamewindow) renders as blank
-         space. Inert when the flag is off — nothing else in the app is a
-         TextEditor, so these styles match no control. -->
+         editor-backed Game window (#config useeditorgamewindow) and the built-in
+         script editor (ScriptEditorWindow, public #243) render as blank space. -->
     <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml"/>
 
     <!-- Tool header: the title, plus the unread-activity flash. IsModified is
