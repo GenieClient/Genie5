@@ -1933,32 +1933,44 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         });
 
         // Switch between tabbed/docked and windowed (MDI) document modes.
-        // Rebuilds the dock layout from scratch — the panel view-models are
-        // reused, only the container tree changes — then re-syncs the
-        // Window-menu check marks against the freshly built tree.
+        // Rebuilds the container tree — the panel view-models are reused — but
+        // CARRIES the arrangement across (public #363): the panels that are open
+        // stay open, closed ones stay closed, and the grouping/sizing is
+        // translated as far as the other mode can express it. It used to build
+        // the other mode's canonical default, throwing the user's layout away.
+        // Then re-syncs the Window-menu check marks against the new tree.
         ToggleWindowedModeCommand = ReactiveCommand.Create(() =>
         {
             if (DockFactory is not GenieDockFactory factory) return;
-            // Leaving windowed mode — capture the current window geometry into
-            // the in-memory cache so toggling back restores positions within
-            // this session. (Not written to disk; restart-persistence is via a
-            // saved layout only.)
             if (Display.WindowedMode)
-                _mdiBoundsCache = factory.CaptureMdiBounds();
-            Display.WindowedMode = !Display.WindowedMode;
-            // Close any floating windows on the outgoing root so a floated tool
-            // (e.g. the Mapper) doesn't survive the tree swap as an orphan next
-            // to its rebuilt copy — same duplicate-window guard as ApplyLayout.
-            factory.CloseFloatingWindows();
-            DockLayout = Display.WindowedMode
-                ? factory.BuildMdiLayout(_mdiBoundsCache)
-                : factory.BuildDefaultLayout();
-            // Returning to tabbed mode presents the default → float the Mapper.
-            // (MDI mode already shows it as its own window, so don't arm there.)
-            if (!Display.WindowedMode)
             {
-                factory.PendingMapperFloat = true;
-                FloatMapperAfterLayout();
+                // Leaving windowed mode — capture the current window geometry
+                // into the in-memory cache so toggling back restores positions
+                // within this session. (Not written to disk; restart-persistence
+                // is via a saved layout only.)
+                _mdiBoundsCache = factory.CaptureMdiBounds();
+                Display.WindowedMode = false;
+                var tabbed = factory.ConvertToTabbedLayout();
+                DockLayout = tabbed.Root;
+                // Floats need the new tree live and the owner window realized —
+                // the same deferral ApplyLayout uses.
+                if (tabbed.Floats.Count > 0)
+                    Avalonia.Threading.Dispatcher.UIThread.Post(
+                        () => { factory.RestoreFloatingWindows(tabbed.Floats); RefreshVisibilityBools(); },
+                        Avalonia.Threading.DispatcherPriority.Background);
+                // Landing on the default structure presents its floating Mapper.
+                if (tabbed.FloatMapper)
+                {
+                    factory.PendingMapperFloat = true;
+                    FloatMapperAfterLayout();
+                }
+            }
+            else
+            {
+                Display.WindowedMode = true;
+                // Reads the open panels + floats, closes the floats (the
+                // duplicate-window guard ApplyLayout also needs), then builds.
+                DockLayout = factory.ConvertToMdiLayout(_mdiBoundsCache);
             }
             RefreshVisibilityBools();
             GameText.AddSystemLine($"[layout] {(Display.WindowedMode ? "windowed (MDI)" : "tabbed")} mode");
@@ -6232,6 +6244,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             // as an orphaned window beside the freshly-floated copy (duplicate
             // travel window on Reset to Default Layout).
             factory.CloseFloatingWindows();
+            // A loaded layout supersedes the tabbed arrangement remembered for
+            // the next windowed → tabbed toggle (public #363).
+            factory.ForgetTabbedArrangement();
 
             if (layout.WindowedMode)
             {

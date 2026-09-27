@@ -419,6 +419,7 @@ public class GenieDockFactory : Factory
         root.ActiveDockable   = rootLayout;
         root.DefaultDockable  = rootLayout;
         _root                 = root;
+        _mdiDock              = null;   // tabbed: no MDI host (public #364 routing keys on this)
 
         // ── Dockable registry for Window-menu visibility toggles ──────────
         // Includes the Game document so the user can re-open it from the menu
@@ -512,6 +513,10 @@ public class GenieDockFactory : Factory
         // re-opens via Window → Plugin Windows, same as Vitals/Experience.
         foreach (var (id, tool) in _pluginWindowTools)
             _tools[id] = (tool, backpackDock.Id);
+        // Same for server dialog windows, so one that was open when the layout
+        // was rebuilt (a windowed-mode toggle, public #363) can be re-opened.
+        foreach (var (id, tool) in _serverDialogTools)
+            _tools[id] = (tool, PluginWindowParentId);
 
         AttachWindowMenus();
         return root;
@@ -570,6 +575,7 @@ public class GenieDockFactory : Factory
         var activeSpells = new ActiveSpellsTool(_vm.ActiveSpells,       ws.Get("active-spells"));
         var timeTracker = new TimeTrackerTool (_vm.TimeTracker,        ws.Get("time-tracker"));
         var inventoryView = new InventoryViewTool(_vm.InventoryView,   ws.Get("inventory-view"));
+        var scripts    = new ScriptsTool      (_vm.Scripts,            ws.Get("scripts"));
         var scene      = new SceneTool        (_vm.Scene,              ws.Get("scene"));
         var mobs       = new MobsTool         (_vm.Mobs,               ws.Get("mobs"));
         var players    = new PlayersTool      (_vm.Players,            ws.Get("players"));
@@ -586,7 +592,8 @@ public class GenieDockFactory : Factory
             ("atmospherics", atmospherics), ("ooc", ooc), ("log", log), ("itemlog", itemlog),
             ("vitals", vitals), ("experience", experience), ("analytics", analytics),
             ("active-spells", activeSpells),
-            ("time-tracker", timeTracker), ("inventory-view", inventoryView), ("scene", scene),
+            ("time-tracker", timeTracker), ("inventory-view", inventoryView),
+            ("scripts", scripts), ("scene", scene),
             ("mobs", mobs), ("players", players), ("objects", objects), ("raw-xml", rawXml),
             ("injuries", injuries),
         };
@@ -637,6 +644,17 @@ public class GenieDockFactory : Factory
         root.VisibleDockables = CreateList<IDockable>(rootLayout);
         root.ActiveDockable   = rootLayout;
         root.DefaultDockable  = rootLayout;
+        // Windowed mode CONTAINS its children, as Genie 4's did (public #364).
+        // Without this a child dragged by its title text started a Dock
+        // drag-drop, and releasing it anywhere that wasn't a drop target —
+        // outside the main window, say — floated it into a native OS window
+        // with ordinary float chrome instead of the skinned bar. The root
+        // policy outranks each panel's own CanFloat, and every float path
+        // (that drag, the context menus, FactoryBase.FloatDockable) resolves
+        // through it, so nothing can leave the host. ShowToolFloating/FloatTool
+        // route to an MDI child on their own, because a refused float would
+        // otherwise leave the panel shown nowhere.
+        root.RootDockCapabilityPolicy = new DockCapabilityPolicy { CanFloat = false };
         _root                 = root;
 
         // Registry for Window-menu visibility toggles — ALL panels are
@@ -649,6 +667,8 @@ public class GenieDockFactory : Factory
         _dockHomes.Clear();
 
         foreach (var (id, tool) in _pluginWindowTools)
+            _tools[id] = (tool, mdiDock.Id);
+        foreach (var (id, tool) in _serverDialogTools)
             _tools[id] = (tool, mdiDock.Id);
 
         AttachWindowMenus();
@@ -670,6 +690,155 @@ public class GenieDockFactory : Factory
         if (savedBounds is { Count: > 0 }) ApplyMdiBounds(savedBounds);
         CaptureAllPositions();
         return root;
+    }
+
+    /// <summary>True while the live layout is windowed (MDI) mode — set by
+    /// <see cref="CreateMdiLayout"/>, cleared by every tabbed build.</summary>
+    public bool IsWindowedLayout => _mdiDock is not null;
+
+    // ── Carrying the arrangement across a mode toggle (public #363) ──────────
+    // Toggling Windowed Mode used to rebuild the other mode's canonical default
+    // from scratch, so the panels the user had open, how they were grouped and
+    // how big they were all vanished the moment the item was clicked.
+
+    /// <summary>The tabbed tree (and its floats) as it stood when windowed mode
+    /// was last entered, so going back restores it rather than the default.
+    /// In-memory only, like the VM's MDI bounds cache; a layout load forgets it
+    /// (<see cref="ForgetTabbedArrangement"/>).</summary>
+    private DockNodeSnapshot? _tabbedTreeCache;
+    private List<FloatingWindowSnapshot>? _tabbedFloatsCache;
+
+    /// <summary>Every registered panel currently shown anywhere — docked, in a
+    /// float, or as an MDI child.</summary>
+    public IReadOnlyList<string> OpenPanelIds() =>
+        _tools.Keys.Where(IsToolVisible).ToList();
+
+    /// <summary>Drop the remembered tabbed arrangement — a layout the user
+    /// loads is a fresher statement of what they want than the one they had
+    /// before it.</summary>
+    public void ForgetTabbedArrangement()
+    {
+        _tabbedTreeCache   = null;
+        _tabbedFloatsCache = null;
+    }
+
+    /// <summary>
+    /// Tabbed → windowed, keeping the arrangement: every open panel (docked or
+    /// floating) becomes an MDI child and every closed one stays closed. A panel
+    /// with geometry in <paramref name="cachedBounds"/> (it was a window earlier
+    /// this session) goes back there; the rest tile where their dock group was
+    /// (<see cref="MdiTiler"/>). The area defaults to the dock area's measured
+    /// size. Closes the outgoing floats itself, since it has to read them first.
+    /// </summary>
+    public IRootDock ConvertToMdiLayout(
+        IReadOnlyDictionary<string, Settings.MdiWindowBounds>? cachedBounds,
+        double areaWidth = double.NaN, double areaHeight = double.NaN)
+    {
+        var open   = OpenPanelIds();
+        var tree   = CaptureLayout();
+        var floats = CaptureFloatingWindows();
+
+        if (!(double.IsFinite(areaWidth) && areaWidth > 0 && double.IsFinite(areaHeight) && areaHeight > 0))
+            (areaWidth, areaHeight) = MeasureDockArea();
+
+        // Extras: floats first (they aren't in the tree), then anything else
+        // open that the tree walk didn't place.
+        var extras = floats.SelectMany(f => f.ToolIds).Concat(open);
+        var tiles  = MdiTiler.Tile(tree, areaWidth, areaHeight, extras);
+
+        var bounds = new Dictionary<string, Settings.MdiWindowBounds>(StringComparer.OrdinalIgnoreCase);
+        foreach (var id in open)
+        {
+            if (cachedBounds is not null && cachedBounds.TryGetValue(id, out var cached))
+                bounds[id] = cached;
+            else if (tiles.TryGetValue(id, out var tile))
+                bounds[id] = tile;
+        }
+
+        _tabbedTreeCache   = tree;
+        _tabbedFloatsCache = floats;
+
+        CloseFloatingWindows();
+        var root = BuildMdiLayout(bounds);
+
+        // Plugin windows and server dialogs aren't in the MDI panel table, so
+        // BuildMdiLayout can't open them; do it here. ApplyMdiBounds already
+        // gave their (session-long) dockables their geometry.
+        foreach (var id in open)
+            if (!IsToolVisible(id)) SetToolVisibility(id, true);
+        return root;
+    }
+
+    /// <summary>What <see cref="ConvertToTabbedLayout"/> leaves for the host to
+    /// finish once the new tree is live on the DockControl: floats to restore
+    /// (they need the owner window realised) and whether the default layout's
+    /// floating Mapper should be floated.</summary>
+    public sealed record TabbedConversion(
+        IRootDock Root, List<FloatingWindowSnapshot> Floats, bool FloatMapper);
+
+    /// <summary>
+    /// Windowed → tabbed, keeping the set of open panels. The structure is the
+    /// tabbed arrangement the user had before entering windowed mode this
+    /// session, or the default when there wasn't one; either way a panel closed
+    /// in windowed mode stays closed and one opened there comes back docked at
+    /// its last docked spot (or its home).
+    /// </summary>
+    public TabbedConversion ConvertToTabbedLayout()
+    {
+        var open = new HashSet<string>(OpenPanelIds(), StringComparer.OrdinalIgnoreCase);
+        CloseFloatingWindows();
+
+        IRootDock root;
+        var floats = new List<FloatingWindowSnapshot>();
+        var floatMapper = false;
+        if (_tabbedTreeCache is { } tree)
+        {
+            // CreateLayout first: it resets the registry and home-dock map to the
+            // tabbed ones (the MDI build pointed every panel at "mdi"), and
+            // BuildLayout then reuses those registered instances as its leaves.
+            CreateLayout();
+            root = BuildLayout(tree);
+            foreach (var f in _tabbedFloatsCache ?? new List<FloatingWindowSnapshot>())
+            {
+                var ids = f.ToolIds.Where(open.Contains).ToList();
+                if (ids.Count > 0)
+                    floats.Add(new FloatingWindowSnapshot
+                    {
+                        ToolIds = ids, X = f.X, Y = f.Y, Width = f.Width, Height = f.Height,
+                    });
+            }
+        }
+        else
+        {
+            root = BuildDefaultLayout();
+            // The default presents the Mapper floating — only if it's open.
+            floatMapper = open.Contains("mapper");
+        }
+        ForgetTabbedArrangement();
+
+        // Reconcile the tree with what was open. A panel headed back to a float
+        // is left to RestoreFloatingWindows, which floats it from wherever it is.
+        var floated = new HashSet<string>(floats.SelectMany(f => f.ToolIds), StringComparer.OrdinalIgnoreCase);
+        foreach (var id in _tools.Keys.ToList())
+        {
+            var want = open.Contains(id);
+            if (want && floated.Contains(id)) continue;
+            if (IsToolVisible(id) != want) SetToolVisibility(id, want);
+        }
+        return new TabbedConversion(root, floats, floatMapper);
+    }
+
+    /// <summary>The dock area's size in DIPs, from the bounds Dock tracks on
+    /// the top-level layout node; the tiler's fallback when it hasn't been
+    /// measured (no window yet).</summary>
+    private (double Width, double Height) MeasureDockArea()
+    {
+        if (_root?.VisibleDockables is { Count: > 0 } top)
+        {
+            top[0].GetVisibleBounds(out _, out _, out var w, out var h);
+            if (double.IsFinite(w) && w > 0 && double.IsFinite(h) && h > 0) return (w, h);
+        }
+        return (MdiTiler.FallbackWidth, MdiTiler.FallbackHeight);
     }
 
     // ── Windowed-mode (MDI) per-window geometry ────────────────────────────
@@ -808,6 +977,7 @@ public class GenieDockFactory : Factory
         root.ActiveDockable   = rootLayout;
         root.DefaultDockable  = rootLayout;
         _root                 = root;
+        _mdiDock              = null;
 
         InitLayout(root);
         // Re-prime the "last-known position" cache against the snapshot's
@@ -1327,6 +1497,19 @@ public class GenieDockFactory : Factory
         {
             if (_root is null) return;
 
+            // Windowed mode has exactly one place a panel can go: the MDI host
+            // (public #364). The Stage-0 memory below describes the TABBED tree
+            // — CapturePosition doesn't overwrite it in windowed mode — and
+            // following it here could rebuild a tabbed ToolDock beside the MDI
+            // area (root-layout exists in both trees).
+            if (_mdiDock is not null && FindByIdInTree(_root, _mdiDock.Id) is IDock mdiHost)
+            {
+                InitDockable(dockable, mdiHost);
+                AddDockable(mdiHost, dockable);
+                Reveal(dockable);
+                return;
+            }
+
             // Stage 0: last-known-location. If the user dragged this panel
             // somewhere custom and then closed it, restore it to exactly
             // that spot — better UX than always going back to the default
@@ -1703,6 +1886,9 @@ public class GenieDockFactory : Factory
     public void FloatTool(string id)
     {
         if (_root is null) return;
+        // Windowed mode contains its children (public #364) — the root policy
+        // would refuse the float anyway; don't mark it floated-last either.
+        if (IsWindowedLayout) return;
         var current = FindByIdInTree(_root, id);
         if (current is null) return;
 
@@ -2141,6 +2327,12 @@ public class GenieDockFactory : Factory
     public void ShowToolFloating(string id)
     {
         if (_root is null) return;
+        // Windowed mode: "open it floated" means "open it as a child window".
+        // Every reopen-floating preference (a panel floated last, public #359's
+        // Script Manager, a server dialog that asks to float) lands here, and a
+        // float is refused inside the MDI host (public #364), so without this
+        // route the panel would be shown nowhere.
+        if (IsWindowedLayout) { SetToolVisibility(id, true); return; }
         if (FindByIdInTree(_root, id) is not null) return;   // already shown
         if (!_tools.TryGetValue(id, out var entry)) return;
 
@@ -2166,6 +2358,11 @@ public class GenieDockFactory : Factory
     {
         if (dockable?.Id is not { Length: > 0 } id) return;
         if (_root is null) return;
+
+        // Windowed mode: an MDI child's "position" is its window geometry, not
+        // a dock slot. Keep the tabbed memory (and the floated-last flags)
+        // intact for when the user switches back (public #363).
+        if (_mdiDock is not null) return;
 
         // Don't overwrite the last DOCKED location with a floating one. While a
         // tool sits in a HostWindow, its parent/grandparent are the ephemeral
