@@ -118,6 +118,7 @@ The Genie 4 **menu-script toolkit** — the commands classic scripts like `mm_tr
 | `#clear [window]` | Wipe a window's scrollback in place. The name works with or without the `>` prefix (`#clear "Moonmage Training Menu"`, Genie 4 style); a bare `#clear` wipes the main Game window. |
 | `#script abort\|pause\|resume [name\|all]` | Script lifecycle control, Genie 4 style. Acts on the named script, or every script for `all` (or no name). `#script` never *starts* a script — use `.name` for that; bare `#script` lists what's running, like `#scripts`. |
 | `#log [>file] text` | Append to a log file under your Logs folder. The `>filename` form writes verbatim; the bare form appends to the per-character daily log (with the Genie 4 `LOG CREATED` banner). Writes are serialized across scripts. |
+| `#windowlog add\|remove\|on\|off\|timestamp\|defaults …` | Per-stream log files with filename templates (`{charactername}`, `{yyyy}`, …) — the Genie 4 Window Logger. See [Configuration → Window logs](Configuration#window-logs--a-file-per-stream). |
 
 Windows created this way render full text lines — clickable links and your highlight rules both apply.
 

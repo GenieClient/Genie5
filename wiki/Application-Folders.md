@@ -61,7 +61,7 @@ Genie5/
 | `Profiles/` | One subfolder per character (`<Char>-<Account>/`) holding the rules that belong to **that character only**. They **layer over** the shared `Config/` set — the character's rules apply first, and shared rules show through unless the character has overridden them. | Created automatically. Edit the per-character files here (rule `.json` edits hot-reload too), or via the GUI while that character is connected. |
 | `Scripts/` | Your `.cmd` script files, plus any helper scripts you pull from the community repo. | Drop any script here to run it as `.scriptname` (or `put .scriptname`). |
 | `Maps/` | Zone files in Genie 4's XML format (`Map1_Crossing.xml`, …) and `ZoneConnections.xml` (the cross-zone transit graph). | Populated via **File → Import from Genie 4…** or **Maps ▸ Update from Official Repo…**. Jump there via **Maps ▸ Open Maps Folder**. |
-| `Logs/` | When AutoLog is on, each session writes a `<character>_<timestamp>` log of plain in/out text. Toggle it live with the **File → Auto Log** checkbox — it applies mid-session. | Read-only from the app's view. Safe to delete or archive. |
+| `Logs/` | When AutoLog is on, each session writes a `<character>_<timestamp>` log of plain in/out text. Toggle it live with the **File → Auto Log** checkbox — it applies mid-session. Per-stream window logs (`#windowlog`, see [Configuration](Configuration#window-logs--a-file-per-stream)) also write here, in whatever sub-folders their file templates name. | Read-only from the app's view. Safe to delete or archive. |
 
 > **Jumping to any of these:** **File → Open Directory** opens the folder of your choice — Data root, Config (profile-aware), Logs, Maps, Scripts, or Plugins — in your system file manager.
 

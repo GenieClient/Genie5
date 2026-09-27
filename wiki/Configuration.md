@@ -125,6 +125,47 @@ A **class** is an on/off switch that gates a group of rules. Tag highlights, tri
 
 This is how you keep, say, a full set of combat triggers ready but inactive until you start hunting.
 
+## Window logs — a file per stream
+
+**Auto Log** (File → Auto Log) records the whole game window for a session. **Window logs** are the Genie 4 Window Logger: pick a stream — thoughts, talk, whispers, logons, deaths, or any other — and every line of it is appended to a file of its own, for a permanent, greppable archive that isn't mixed in with combat.
+
+```
+#windowlog defaults
+#windowlog add thoughts GenieWindows\Thoughts\{charactername}\Thoughts-{charactername}-{yyyy}.txt
+#windowlog timestamp thoughts HH:mm
+#windowlog off logons
+#windowlog
+```
+
+| Command | What it does |
+| --- | --- |
+| `#windowlog` or `#windowlog list` | Show every rule, the file it writes to right now, and the streams seen this session. |
+| `#windowlog streams` | List the stream ids that have carried text this session — the names you can log. |
+| `#windowlog add <stream> [file]` | Log a stream. With no file, it uses `{stream}\{stream}-{charactername}-{yyyy}.txt`. Adding a stream that already has a rule changes its file and turns it on. |
+| `#windowlog remove <stream\|all>` | Drop a rule. |
+| `#windowlog on\|off <stream\|all>` | Pause or resume a rule without losing it. |
+| `#windowlog timestamp <stream\|all> <format\|none>` | Set the timestamp put in front of each line, in brackets. The default is `yyyy-MM-dd HH:mm` (Genie 4's default), which gives `[2026-09-27 14:03]`; `none` turns it off. |
+| `#windowlog defaults` | Add the Genie 4 Window Logger's default set: thoughts, talk, whispers, logons and deaths, each with its own yearly file under `Logs\GenieWindows\`. Streams you already have a rule for are left alone. |
+
+**The file name** is a template. These tokens are filled in for each line:
+
+| Token | Becomes |
+| --- | --- |
+| `{charactername}` or `{character}` | The character's name. |
+| `{gamename}` or `{game}` | The game instance code, e.g. `DR` (the same value as `$game`). |
+| `{stream}` | The stream id, e.g. `thoughts`. |
+| `{yyyy}` `{yy}` `{MM}` `{dd}` | Year, two-digit year, month and day of the line. These are case-sensitive: `{MM}` is the month. |
+
+The date comes from each line, so a `{yyyy}` file moves on to next year's file at midnight on New Year's Eve without a reconnect. Anything in braces that isn't a token is written as-is, and `#windowlog add` points it out.
+
+**Where files go.** As with `#log`, a name is relative to your Logs folder and may include folders, which are created as needed. A leading `\` (the way Genie 4's config wrote it) is also relative to Logs. A window log can't be written outside the Logs folder: absolute paths, drive letters and `..` are refused.
+
+**Two streams can share a file.** Genie 4's defaults send talk and whispers to the same `Conversations-…` file, so a conversation reads in order. Lines from both land in the order they arrived.
+
+**What gets logged** is what the window shows. A Game-window (`main`) log applies your substitutes and leaves out gagged lines. Stream windows show their text unsubstituted, and their logs do too. Lines are buffered and written about once a second, so logging never slows the game down. If a file can't be opened (another copy of Genie has it, or the folder is read-only), you get one line saying so and Genie tries again later. The session carries on either way.
+
+Rules are saved in `windowlog.json`. While you're connected, that's the character's own copy in `Profiles/<Character>-<Account>/`. Rules you set up before logging in go to the shared copy in `Config/`, which applies to every character that has no rules of its own. Changes apply to the next line.
+
 ## Themes
 
 The whole client is themeable from the **Edit → Theme** submenu. Seven themes are built in — **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light**, and **Wrayth-style** — and a **theme editor** lets you tweak any of them into your own. Custom themes are saved as JSON files in `Config/Themes`, so they're easy to back up or share.

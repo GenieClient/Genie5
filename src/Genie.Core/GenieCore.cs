@@ -224,6 +224,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// changes one.</summary>
     public Dialogs.ServerDialogMappings DialogMappings { get; } = new();
 
+    /// <summary>Per-window logging (public #270, Genie 4 Window Logger parity):
+    /// rules loaded from the connected profile's <c>windowlog.json</c>, fed every
+    /// displayed stream line from <see cref="ProcessGameTextEvent"/>. Buffered
+    /// and written off the game thread; closed at disconnect.</summary>
+    public WindowLogging.WindowLogSink WindowLogs { get; }
+
     // ── Command pipeline ───────────────────────────────────────────────────────
     private readonly CommandQueue _commandQueue;
     private readonly EventQueue   _eventQueue;
@@ -641,6 +647,13 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Substitutes.Classes = Classes;
         Commands.Substitutes = Substitutes;  // wire #substitute command → engine
         Commands.DialogTracker = _dialogTracker;   // wire #dialogs → session inventory (#156)
+
+        // Per-window logs (public #270). Warnings arrive on the flush thread and
+        // are posted to the loop so they echo in order with everything else.
+        WindowLogs = new WindowLogging.WindowLogSink(
+            new WindowLogging.WindowLogRules(), () => Config.LogDir);
+        WindowLogs.Warning += msg => RunOnLoop(() => RaiseEchoLine(msg));
+        Commands.WindowLogs = WindowLogs;          // wire #windowlog → rules + sink
 
         Gags           = new GagEngine();
         Gags.Classes   = Classes;
@@ -1226,6 +1239,11 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         DialogMappings.Load(Path.Combine(
             Config.ConfigProfileDir, Dialogs.ServerDialogMappings.FileName));
 
+        // Per-window logging rules follow the profile too, falling back to the
+        // shared Config copy for a character with none of its own (public #270).
+        WindowLogs.Rules.Load(WindowLogging.WindowLogRules.PathToLoad(
+            Config.ConfigProfileDir, Config.ConfigDir));
+
         // ── Auto-load persisted rule sets ──────────────────────────────────────
         // Genie 4 loads classes.cfg / aliases.cfg / variables.cfg /
         // highlights.cfg / triggers.cfg / substitutes.cfg / gags.cfg from
@@ -1600,7 +1618,33 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             if (fires)
                 Triggers.ProcessLine(ev.Text);                                     // user-defined triggers
         }));
+        Guard("window log", () => LogWindowLine(ev));
         _gameEventsRelay.OnNext(ev);                        // UI consumers see the approved text
+    }
+
+    /// <summary>
+    /// Offer a displayed line to the per-window logs (public #270). Only enqueues
+    /// — the sink writes off the game thread. A <c>main</c> line is logged as the
+    /// game window shows it: substitutes applied, gagged lines and DR's bare
+    /// duplicate of a talk/whisper line skipped. Stream windows show their text
+    /// unsubstituted, so it is logged as-is.
+    /// </summary>
+    private void LogWindowLine(TextEvent ev)
+    {
+        var stream = string.IsNullOrEmpty(ev.Stream) ? "main" : ev.Stream;
+        WindowLogs.NoteStream(stream);
+        if (!WindowLogs.Covers(stream)) return;
+
+        var text = ev.Text;
+        if (stream.Equals("main", StringComparison.OrdinalIgnoreCase))
+        {
+            if (ev.DuplicateEcho) return;
+            text = Substitutes.Apply(text);
+            if (Gags.ShouldGag(text)) return;
+        }
+        Scripts.Globals.TryGetValue("charactername", out var character);
+        Scripts.Globals.TryGetValue("game", out var game);
+        WindowLogs.Observe(stream, text, character, game);
     }
 
     /// <summary>
@@ -2300,6 +2344,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _skillHistory?.Dispose();    _skillHistory    = null;
         _mapperAdapter?.Dispose();   _mapperAdapter   = null;
         AiBuffer?.Dispose();         AiBuffer         = null;
+        WindowLogs.CloseAll();       // write the tail, release the files (#270)
         _stateEngine?.Dispose();     _stateEngine     = null;
         _parser?.Dispose();          _parser          = null;
 
@@ -2508,6 +2553,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // Then the once-per-app layer. The game loop drains and joins BEFORE the
         // relay subjects are completed/disposed below, so a queued pipeline item
         // can't land on a dead relay.
+        WindowLogs.Dispose();        // stop the flush timer (teardown closed the files)
         _heartbeat?.Dispose();
         _heartbeat = null;
         _loop?.Dispose();

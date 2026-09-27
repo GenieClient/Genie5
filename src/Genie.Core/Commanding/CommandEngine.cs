@@ -896,6 +896,10 @@ public sealed class CommandEngine
             case "dialogs":
                 HandleDialogs(parts);
                 break;
+            case "windowlog":
+            case "windowlogs":
+                HandleWindowLog(command);
+                break;
             case "eval":
             case "evalmath":
             {
@@ -1683,6 +1687,250 @@ public sealed class CommandEngine
             _userTvars.Remove(name);
         }
     }
+
+    // ── #windowlog (public #270) ─────────────────────────────────────────────
+
+    /// <summary>Per-window log rules + sink — wired by GenieCore; null in a bare
+    /// engine (the command explains itself in that case).</summary>
+    public WindowLogging.WindowLogSink? WindowLogs { get; set; }
+
+    private const string WindowLogUsage =
+        "Usage: #windowlog [list] | streams | add <stream> [file template] | remove <stream|all> | " +
+        "on|off <stream|all> | timestamp <stream|all> <format|none> | defaults";
+
+    /// <summary>
+    /// <c>#windowlog</c> — per-window logging rules (Genie 4 Window Logger
+    /// parity). Parsed from the RAW command text rather than
+    /// <see cref="ArgumentParser.ParseArgs"/>, because that strips <c>{…}</c>
+    /// groups and a filename template is made of them: everything after the
+    /// stream id is the template (or timestamp format), verbatim, with one pair
+    /// of surrounding quotes removed. Every change is saved to the profile's
+    /// <c>windowlog.json</c> at once and applies to the next line.
+    /// </summary>
+    private void HandleWindowLog(string command)
+    {
+        if (WindowLogs is null)
+        {
+            _host.Echo("#windowlog: window logging is not available here.");
+            return;
+        }
+        var rules = WindowLogs.Rules;
+        var words = SplitHead(command, 3, out var rest);   // [windowlog, sub, stream]
+        var sub    = words.Count > 1 ? words[1].ToLowerInvariant() : "list";
+        var stream = words.Count > 2 ? words[2] : "";
+
+        switch (sub)
+        {
+            case "list":
+                ListWindowLogs();
+                return;
+
+            case "streams":
+            {
+                var seen = WindowLogs.SeenStreams;
+                _host.Echo(seen.Count == 0
+                    ? "#windowlog: no stream text seen yet this session."
+                    : "Streams seen this session: " + string.Join(", ", seen));
+                return;
+            }
+
+            case "add":
+            case "set":
+            {
+                if (stream.Length == 0) { _host.Echo(WindowLogUsage); return; }
+                var template = Unquote(rest);
+                if (template.Length == 0)
+                    template = rules.TryGet(stream)?.File ?? WindowLogging.WindowLogPath.DefaultTemplate;
+
+                if (!ValidateWindowLogTemplate(stream, template)) return;
+
+                var rule = rules.TryGet(stream) ?? new WindowLogging.WindowLogRule { Stream = stream };
+                rule.File    = template;
+                rule.Enabled = true;
+                rules.Set(rule);
+                SaveWindowLogs();
+                _host.Echo($"[windowlog] {stream} → {DescribeWindowLogPath(rule)}");
+                return;
+            }
+
+            case "remove":
+            case "delete":
+            {
+                if (stream.Length == 0) { _host.Echo(WindowLogUsage); return; }
+                if (stream.Equals("all", StringComparison.OrdinalIgnoreCase))
+                {
+                    rules.Clear();
+                    SaveWindowLogs();
+                    _host.Echo("[windowlog] all rules removed.");
+                    return;
+                }
+                if (rules.Remove(stream)) { SaveWindowLogs(); _host.Echo($"[windowlog] {stream}: rule removed."); }
+                else _host.Echo($"#windowlog: no rule for '{stream}'. #windowlog list shows them.");
+                return;
+            }
+
+            case "on":
+            case "off":
+            {
+                if (stream.Length == 0) { _host.Echo(WindowLogUsage); return; }
+                var on = sub == "on";
+                if (!EditWindowLogRules(stream, r => r.Enabled = on)) return;
+                _host.Echo($"[windowlog] {stream}: logging {(on ? "on" : "off")}.");
+                return;
+            }
+
+            case "timestamp":
+            case "timestamps":
+            {
+                if (stream.Length == 0) { _host.Echo(WindowLogUsage); return; }
+                var format = Unquote(rest);
+                if (format.Length == 0) { _host.Echo(WindowLogUsage); return; }
+                if (format.Equals("none", StringComparison.OrdinalIgnoreCase) ||
+                    format.Equals("off", StringComparison.OrdinalIgnoreCase))
+                    format = "";
+                else if (WindowLogging.WindowLogPath.FormatTimestamp(format, DateTime.Now) is null)
+                {
+                    _host.Echo($"#windowlog: '{format}' is not a usable date format (try yyyy-MM-dd HH:mm).");
+                    return;
+                }
+                if (!EditWindowLogRules(stream, r => r.TimestampFormat = format)) return;
+                _host.Echo(format.Length == 0
+                    ? $"[windowlog] {stream}: no timestamps."
+                    : $"[windowlog] {stream}: timestamps as [{DateTime.Now.ToString(format, System.Globalization.CultureInfo.InvariantCulture)}].");
+                return;
+            }
+
+            case "defaults":
+            case "genie4":
+            {
+                var added = new List<string>();
+                foreach (var d in WindowLogging.WindowLogRules.Genie4Defaults)
+                {
+                    if (rules.TryGet(d.Stream) is not null) continue;   // never overwrite a user rule
+                    rules.Set(d);
+                    added.Add(d.Stream);
+                }
+                SaveWindowLogs();
+                _host.Echo(added.Count == 0
+                    ? "[windowlog] every Genie 4 default stream already has a rule; nothing changed."
+                    : $"[windowlog] added the Genie 4 defaults for: {string.Join(", ", added)}. talk and whispers share one conversation file.");
+                ListWindowLogs();
+                return;
+            }
+
+            default:
+                _host.Echo(WindowLogUsage);
+                return;
+        }
+    }
+
+    private void ListWindowLogs()
+    {
+        var all = WindowLogs!.Rules.All();
+        if (all.Count == 0)
+        {
+            _host.Echo("#windowlog: no window logs set up. Add one with #windowlog add <stream> [file], " +
+                       "or #windowlog defaults for the Genie 4 set.");
+        }
+        else
+        {
+            _host.Echo($"Window logs (files under {_config.LogDir}):");
+            foreach (var r in all)
+            {
+                var ts = string.IsNullOrEmpty(r.TimestampFormat) ? "no timestamp" : $"[{r.TimestampFormat}]";
+                _host.Echo($"  {r.Stream,-12} {(r.Enabled ? "on " : "off")}  {r.File}  {ts}");
+                _host.Echo($"  {"",-12}      → {DescribeWindowLogPath(r)}");
+            }
+        }
+        var seen = WindowLogs.SeenStreams;
+        if (seen.Count > 0)
+            _host.Echo("Streams seen this session: " + string.Join(", ", seen));
+    }
+
+    /// <summary>Apply an edit to one rule, or to every rule for <c>all</c>, and
+    /// save. Echoes and returns false when there is nothing to edit.</summary>
+    private bool EditWindowLogRules(string stream, Action<WindowLogging.WindowLogRule> edit)
+    {
+        var rules = WindowLogs!.Rules;
+        if (stream.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            var all = rules.All();
+            if (all.Count == 0) { _host.Echo("#windowlog: no rules to change."); return false; }
+            foreach (var r in all) rules.Update(r.Stream, edit);
+        }
+        else if (!rules.Update(stream, edit))
+        {
+            _host.Echo($"#windowlog: no rule for '{stream}'. Add one first: #windowlog add {stream}");
+            return false;
+        }
+        SaveWindowLogs();
+        return true;
+    }
+
+    /// <summary>Refuse a template that could never resolve (absolute, escapes the
+    /// Logs folder, empty) and warn about unknown tokens, before it is stored.</summary>
+    private bool ValidateWindowLogTemplate(string stream, string template)
+    {
+        var (ch, game) = WindowLogIdentity();
+        var sample = WindowLogging.WindowLogPath.Expand(template,
+            new WindowLogging.WindowLogContext(ch, game, stream, DateTime.Now));
+        if (WindowLogging.WindowLogPath.Resolve(_config.LogDir, sample, out var error) is null)
+        {
+            _host.Echo($"#windowlog: '{template}' can't be used: {error}.");
+            return false;
+        }
+        var unknown = WindowLogging.WindowLogPath.UnknownTokens(template);
+        if (unknown.Count > 0)
+            _host.Echo($"[windowlog] note: {string.Join(", ", unknown.Select(u => "{" + u + "}"))} " +
+                       "is not a token and will be written literally. Tokens: {charactername} {gamename} {game} {stream} {yyyy} {yy} {MM} {dd}.");
+        return true;
+    }
+
+    private string DescribeWindowLogPath(WindowLogging.WindowLogRule rule)
+    {
+        var (ch, game) = WindowLogIdentity();
+        var expanded = WindowLogging.WindowLogPath.Expand(rule.File,
+            new WindowLogging.WindowLogContext(ch, game, rule.Stream, DateTime.Now));
+        return WindowLogging.WindowLogPath.Resolve(_config.LogDir, expanded, out var error)
+               ?? $"(unusable: {error})";
+    }
+
+    private (string Character, string Game) WindowLogIdentity()
+    {
+        var globals = _host.GetGlobalVariables();
+        globals.TryGetValue("charactername", out var ch);
+        globals.TryGetValue("game", out var game);
+        return (ch ?? "", game ?? "");
+    }
+
+    private void SaveWindowLogs()
+    {
+        var path = Path.Combine(_config.ConfigProfileDir, WindowLogging.WindowLogRules.FileName);
+        if (!WindowLogs!.Rules.Save(path))
+            _host.Echo($"#windowlog: could not save {path}; the change applies this session only.");
+    }
+
+    /// <summary>The first <paramref name="count"/> whitespace-separated words of
+    /// <paramref name="text"/>, with everything after them (trimmed) in
+    /// <paramref name="rest"/>.</summary>
+    private static List<string> SplitHead(string text, int count, out string rest)
+    {
+        var words = new List<string>(count);
+        int i = 0;
+        while (words.Count < count)
+        {
+            while (i < text.Length && char.IsWhiteSpace(text[i])) i++;
+            if (i >= text.Length) break;
+            int start = i;
+            while (i < text.Length && !char.IsWhiteSpace(text[i])) i++;
+            words.Add(text[start..i]);
+        }
+        rest = i < text.Length ? text[i..].Trim() : "";
+        return words;
+    }
+
+    private static string Unquote(string s) =>
+        s.Length >= 2 && s[0] == '"' && s[^1] == '"' ? s[1..^1].Trim() : s;
 
     // ── #dialogs (public #156 Phase 0c) ──────────────────────────────────────
 
