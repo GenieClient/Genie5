@@ -647,10 +647,10 @@ public sealed class CommandEngine
                 break;
             case "edit":
             {
-                // #edit <name> — open Scripts/<name>.cmd in the user's
-                // configured external editor (or OS default). Genie 4
-                // pairs this with the `editor` setting in settings.cfg;
-                // we honour the same setting via DisplaySettings.EditorPath.
+                // #edit <name> — open Scripts/<name>.cmd in the built-in
+                // script editor (public #243). Genie 4 opened the `editor`
+                // setting from settings.cfg; `#config externaleditor on`
+                // keeps that (plus DisplaySettings.EditorPath / OS default).
                 if (parts.Count < 2)
                 {
                     _host.Echo("Usage: #edit <script-name>");

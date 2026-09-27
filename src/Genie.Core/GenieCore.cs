@@ -2005,9 +2005,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     void ICommandHost.EditScript(string name)
     {
-        // The actual editor launch lives in the App layer (cross-platform
-        // Process.Start with the user's configured EditorPath). We just
-        // raise the event so the App-layer subscriber can do the work.
+        // The actual editor lives in the App layer: the built-in script
+        // editor, or (#config externaleditor on) a cross-platform
+        // Process.Start of the user's configured editor. We just raise the
+        // event so the App-layer subscriber can do the work.
         // If no one is listening (Console / headless test harness), echo a
         // diagnostic so callers know nothing happened.
         if (EditScriptRequested is null)
@@ -2017,10 +2018,11 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     }
 
     /// <summary>
-    /// Raised when something asks to open a script in the external editor
-    /// — <c>#edit foo</c> from the command bar, or the pencil button on
-    /// the Script Bar. The App subscribes and handles the actual file
-    /// resolution + <c>Process.Start</c> with the user's configured editor.
+    /// Raised when something asks to open a script for editing — <c>#edit
+    /// foo</c> from the command bar. The App subscribes and handles the file
+    /// resolution and opens the built-in script editor, or the user's
+    /// configured external editor with <c>#config externaleditor on</c>
+    /// (public #243).
     /// </summary>
     public event Action<string>? EditScriptRequested;
 

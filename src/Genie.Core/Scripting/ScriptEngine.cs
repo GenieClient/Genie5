@@ -615,6 +615,31 @@ public sealed class ScriptEngine
     /// anything.</summary>
     public bool ScriptFileExists(string name) => ResolveScriptPath(name) is not null;
 
+    /// <summary>The file a start of <paramref name="name"/> would run, or null
+    /// when none exists — the same lookup as
+    /// <see cref="TryStart(string, IReadOnlyList{string})"/>. <c>#edit</c> uses it
+    /// (public #243) so the editor opens the copy that actually runs. Callers
+    /// must vet <paramref name="name"/> for <c>..</c> and rooted paths first.</summary>
+    public string? ResolveScriptFile(string name) => ResolveScriptPath(name);
+
+    /// <summary>True when <paramref name="path"/> lies inside one of the script
+    /// search dirs (the Scripts dir, or the repo-scripts dir when configured).
+    /// The script editor refuses to open anything else (public #243).</summary>
+    public bool IsUnderScriptRoots(string path)
+    {
+        string full;
+        try { full = Path.GetFullPath(path); }
+        catch (Exception) { return false; }
+        foreach (var dir in SearchDirs())
+        {
+            if (string.IsNullOrWhiteSpace(dir)) continue;
+            var root = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                       + Path.DirectorySeparatorChar;
+            if (full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
     private string? ResolveScriptPath(string name)
     {
         // Try the configured default extension first (Genie 4 ScriptExtension),
