@@ -4,7 +4,7 @@
         x:Class="Genie.App.Views.DisplaySettingsDialog"
         x:DataType="vm:DisplaySettingsViewModel"
         Title="Display Settings"
-        Width="500" Height="512"
+        Width="500" Height="560"
         CanResize="False"
         WindowStartupLocation="CenterOwner">
 
@@ -65,6 +65,12 @@
                          IsAlphaEnabled="False"
                          Margin="0,8,0,0"/>
           </Grid>
+
+          <!-- #304: these two also appear in the theme editor. It is the SAME
+               value (display.json), not a second copy — say so here too. -->
+          <TextBlock Text="{x:Static vm:DisplaySettingsViewModel.GameColorsNote}"
+                     FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
+                     TextWrapping="Wrap"/>
 
           <CheckBox Content="Italicize local echoes (typed commands, #echo, scripts)"
                     IsChecked="{Binding EchoItalic}"

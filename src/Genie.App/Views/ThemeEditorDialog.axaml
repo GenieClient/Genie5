@@ -77,7 +77,7 @@
 
         <TextBlock Classes="section" Text="GAME TEXT"/>
         <ItemsControl ItemsSource="{Binding GameRoles}"/>
-        <TextBlock Text="Per-window and per-stream (preset) colour overrides still win over these defaults."
+        <TextBlock Text="These two are the same Game text and Echoes colours as Display Settings: changing them here or there changes one value. Saving the theme also stores them as this theme's colours, so picking the theme again restores them. Per-window and per-stream (preset) colour overrides still win."
                    FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
                    TextWrapping="Wrap"/>
       </StackPanel>

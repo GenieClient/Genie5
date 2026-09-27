@@ -41,6 +41,12 @@ public sealed class ThemeEditorViewModel : ReactiveObject
     private readonly string          _originalGameHex;
     private readonly string          _originalEchoHex;
 
+    /// <summary>Editor labels for the two game-text roles — named for the
+    /// Display Settings field they share a value with (public #304).</summary>
+    public const string GameTextLabel = "Game text (same as Display Settings → Game text)";
+    /// <inheritdoc cref="GameTextLabel"/>
+    public const string GameEchoLabel = "Echoes (same as Display Settings → Echoes)";
+
     [Reactive] public string ThemeName      { get; set; }
     [Reactive] public bool   IsLightVariant { get; set; }
 
@@ -110,9 +116,12 @@ public sealed class ThemeEditorViewModel : ReactiveObject
         Add(Vitals, ThemeKeys.ConcBar,    "Concentration bar", FromTheme(ThemeKeys.ConcBar));
 
         // Seed from the LIVE display values, not the theme file — "edit what
-        // I'm looking at", including any Display Settings tweaks.
-        Add(GameRoles, ThemeKeys.GameText, "Game text (default)", FromHex(_originalGameHex));
-        Add(GameRoles, ThemeKeys.GameEcho, "Echo (typed commands)", FromHex(_originalEchoHex));
+        // I'm looking at", including any Display Settings tweaks. These two
+        // ARE Display Settings' Game text / Echoes (one value each, in
+        // display.json); the labels say so (public #304) because the same
+        // colour appearing in two dialogs read as two separate settings.
+        Add(GameRoles, ThemeKeys.GameText, GameTextLabel,  FromHex(_originalGameHex));
+        Add(GameRoles, ThemeKeys.GameEcho, GameEchoLabel,  FromHex(_originalEchoHex));
 
         _canSave = this.WhenAnyValue(x => x.ThemeName,
                 name => !string.IsNullOrWhiteSpace(name) &&

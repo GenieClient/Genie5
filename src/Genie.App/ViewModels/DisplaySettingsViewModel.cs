@@ -40,6 +40,17 @@ public class DisplaySettingsViewModel : ReactiveObject
     /// </summary>
     public IReadOnlyList<string> SystemFonts { get; }
 
+    /// <summary>
+    /// Hint under the Game text / Echoes pickers (public #304). The theme
+    /// editor shows the same two colours; both dialogs edit ONE value each
+    /// (<see cref="DisplaySettings.GameColorHex"/> / <see cref="DisplaySettings.EchoColorHex"/>),
+    /// and a theme only seeds them when it is picked.
+    /// </summary>
+    public const string GameColorsNote =
+        "Game text and Echoes are the same two colours the theme editor shows " +
+        "(Edit → Theme → Edit Theme…): one setting each, editable in either place. " +
+        "Picking a theme sets them to that theme's colours; Reset puts back the active theme's colours.";
+
     [Reactive] public Color  GameColor  { get; set; }
     [Reactive] public Color  EchoColor  { get; set; }
     [Reactive] public bool   EchoItalic { get; set; }
@@ -250,8 +261,13 @@ public class DisplaySettingsViewModel : ReactiveObject
     private void ResetToDefaults()
     {
         var d = new DisplaySettings();
-        GameColor  = TryParseColor(d.GameColorHex, Colors.LightGray);
-        EchoColor  = TryParseColor(d.EchoColorHex, Avalonia.Media.Color.FromRgb(0x88, 0xBB, 0xCC));
+        // Game text / Echoes reset to the ACTIVE theme's colours (#304) — the
+        // built-in DisplaySettings defaults are the Dark palette's, which on a
+        // light theme meant Reset painted light-grey text on a white window.
+        var theme = _themes?.Current;
+        GameColor  = TryParseColor(theme?.Get(ThemeKeys.GameText) ?? d.GameColorHex, Colors.LightGray);
+        EchoColor  = TryParseColor(theme?.Get(ThemeKeys.GameEcho) ?? d.EchoColorHex,
+                                   Avalonia.Media.Color.FromRgb(0x88, 0xBB, 0xCC));
         EchoItalic = d.EchoItalic;
         AlwaysShowScrollbars = d.AlwaysShowScrollbars;
         FontFamily = d.FontFamily.Split(',')[0].Trim();
