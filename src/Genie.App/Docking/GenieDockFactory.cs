@@ -1718,6 +1718,28 @@ public class GenieDockFactory : Factory
             {
                 // home rebuild succeeded — nothing more to do.
             }
+            // Neither the home nor its grandparent survives — normal for any
+            // layout the user rearranged, since drag-created containers carry
+            // synthetic "auto-" ids. Go where the panels that share this home
+            // went (the Backpack and its neighbours for a plugin window), not
+            // into whatever group happens to come first in the tree: that was
+            // public #305, a plugin's "Spider" window opening as a tab of the
+            // stream group holding Atmospherics.
+            else if (FindDockHostingHomeSibling(id, parentId) is IDock siblingParent)
+            {
+                InitDockable(dockable, siblingParent);
+                AddDockable(siblingParent, dockable);
+                Reveal(dockable);
+            }
+            // A plugin / script / server-dialog window has no natural place
+            // among the built-in groups, so a stray tab inside one of them
+            // reads as "my window's text went to Atmospherics". Float it where
+            // the user can see it's its own window, and let them dock it.
+            else if (IsPluginWindowId(id) || IsServerDialogId(id))
+            {
+                InitDockable(dockable, _root);
+                FloatDockable(dockable);
+            }
             // Both the original parent and the home-rebuild failed. This
             // typically happens when a saved layout was loaded that doesn't
             // include the original grandparent (e.g. "center-col" was renamed
@@ -1760,6 +1782,33 @@ public class GenieDockFactory : Factory
             CloseDockable(current!);
         }
     }
+
+    /// <summary>
+    /// The group currently holding another panel registered to the same home
+    /// dock as <paramref name="id"/>, wherever the user moved it — or null
+    /// when none of them is open. Only tab-hosting docks qualify.
+    /// </summary>
+    private IDock? FindDockHostingHomeSibling(string id, string parentId)
+    {
+        if (_root is null) return null;
+        foreach (var (otherId, entry) in _tools)
+        {
+            if (string.Equals(otherId, id, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!string.Equals(entry.ParentId, parentId, StringComparison.OrdinalIgnoreCase)) continue;
+            if (FindByIdInTree(_root, otherId) is { } sibling
+                && FindParentInTree(_root, sibling) is IDock dock and (IToolDock or IDocumentDock))
+                return dock;
+        }
+        return null;
+    }
+
+    /// <summary>Home dock for a newly created on-demand window (plugin, script
+    /// or server dialog): the MDI container while windowed mode is live —
+    /// there are no column docks then — else the right column.</summary>
+    private string OnDemandWindowParentId() =>
+        _mdiDock is not null && _root is not null && FindByIdInTree(_root, _mdiDock.Id) is not null
+            ? _mdiDock.Id
+            : PluginWindowParentId;
 
     /// <summary>Share handed back to an ancestor found squeezed to nothing.
     /// Matches the default layout's left column (0.22), rounded.</summary>
@@ -2614,7 +2663,7 @@ public class GenieDockFactory : Factory
         var id = PluginWindowId(name);
         if (!_pluginWindowVms.TryGetValue(id, out var vm))
         {
-            var tool = CreatePluginWindowTool(id, name);
+            var tool = CreatePluginWindowTool(id, name, OnDemandWindowParentId());
             vm = _pluginWindowVms[tool.Id];
             show = revealOnCreate;   // first sight: open so it's actually visible
         }
@@ -2629,7 +2678,9 @@ public class GenieDockFactory : Factory
 
     /// <summary>Create + register a plugin-window VM/Tool for an id (no show).
     /// Shared by the runtime path and snapshot restore.</summary>
-    private PluginWindowTool CreatePluginWindowTool(string id, string? name)
+    /// <param name="parentId">Home dock; the snapshot-restore path takes the
+    /// right-column default, the runtime path follows the live layout mode.</param>
+    private PluginWindowTool CreatePluginWindowTool(string id, string? name, string parentId = PluginWindowParentId)
     {
         var title = string.IsNullOrWhiteSpace(name)
             ? id.Substring(PluginWindowPrefix.Length)
@@ -2644,7 +2695,7 @@ public class GenieDockFactory : Factory
 
         _pluginWindowVms[id]   = vm;
         _pluginWindowTools[id] = tool;
-        _tools[id]             = (tool, PluginWindowParentId);
+        _tools[id]             = (tool, parentId);
         tool.WindowMenu        = BuildWindowMenu(id, tool);
         return tool;
     }
