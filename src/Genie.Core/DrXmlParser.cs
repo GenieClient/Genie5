@@ -456,7 +456,12 @@ public sealed partial class DrXmlParser : IDisposable
     private int  _newsCategory;
 
     // ── Raw buffer ───────────────────────────────────────────────────────────
+    // Holds only the UNCONSUMED tail between feeds: a partial tag, a lone '<'
+    // (or "</") waiting for the char that decides it (#238), or input queued
+    // by a re-entrant Feed. Live chunks from GameConnection are almost always
+    // complete, so this is usually empty and a chunk is scanned in place.
     private readonly System.Text.StringBuilder _rawBuffer = new(2048);
+    private bool _feeding;
 
     public DrXmlParser(ILogger<DrXmlParser> log) => _log = log;
 
@@ -465,34 +470,73 @@ public sealed partial class DrXmlParser : IDisposable
     /// </summary>
     public void Feed(string chunk)
     {
-        _rawBuffer.Append(chunk);
-        ProcessBuffer();
+        // Re-entrant feed (a synchronous subscriber feeding back in): queue it
+        // behind whatever the outer pass has left; that pass drains it.
+        if (_feeding) { _rawBuffer.Append(chunk); return; }
+        if (string.IsNullOrEmpty(chunk) && _rawBuffer.Length == 0) return;
+
+        // Scan one string with an advancing cursor (public #286). The old loop
+        // re-materialized the whole pending buffer (ToString) and shifted it
+        // (Remove(0, n)) for every segment — both O(buffer), so one large feed
+        // was O(n²). Now: the chunk itself when nothing is pending, otherwise
+        // a single ToString of pending + chunk.
+        string raw;
+        if (_rawBuffer.Length == 0) raw = chunk;
+        else { _rawBuffer.Append(chunk); raw = _rawBuffer.ToString(); _rawBuffer.Clear(); }
+
+        int pos = 0;
+        _feeding = true;
+        try
+        {
+            while (true)
+            {
+                ProcessBuffer(raw, ref pos);
+                if (_rawBuffer.Length == 0) break;
+                // A re-entrant Feed queued more input: carry on from our tail.
+                _rawBuffer.Insert(0, raw.Substring(pos));
+                raw = _rawBuffer.ToString();
+                _rawBuffer.Clear();
+                pos = 0;
+            }
+        }
+        finally
+        {
+            // Keep the unconsumed tail for the next Feed — also when a handler
+            // threw, exactly as the old buffer retained it.
+            if (pos < raw.Length) _rawBuffer.Insert(0, raw.Substring(pos));
+            _feeding = false;
+        }
     }
 
     // ── Core processing ──────────────────────────────────────────────────────
 
-    private void ProcessBuffer()
+    /// <summary>
+    /// Consume <paramref name="raw"/> from <paramref name="pos"/>, dispatching
+    /// bare text and complete tags. Stops at the end or at an incomplete tail
+    /// with <paramref name="pos"/> on the first unconsumed char. The cursor
+    /// moves at the same points the old buffer was trimmed: after a text
+    /// segment is accumulated, before a tag is parsed.
+    /// </summary>
+    private void ProcessBuffer(string raw, ref int pos)
     {
-        while (_rawBuffer.Length > 0)
+        while (pos < raw.Length)
         {
-            var raw = _rawBuffer.ToString();
-
             // Look for the next '<' to split bare text from tags
-            int tagStart = raw.IndexOf('<');
+            int tagStart = raw.IndexOf('<', pos);
 
             if (tagStart < 0)
             {
-                // All bare text — accumulate and clear
-                AccumulateText(raw);
-                _rawBuffer.Clear();
+                // All bare text — accumulate and consume
+                AccumulateText(raw[pos..]);
+                pos = raw.Length;
                 return;
             }
 
-            if (tagStart > 0)
+            if (tagStart > pos)
             {
                 // Text before the tag
-                AccumulateText(raw[..tagStart]);
-                _rawBuffer.Remove(0, tagStart);
+                AccumulateText(raw[pos..tagStart]);
+                pos = tagStart;
                 continue;
             }
 
@@ -502,27 +546,28 @@ public sealed partial class DrXmlParser : IDisposable
             // angle-bracket literals — "<1-20>", "I <3 you", "a < b" — and
             // consuming those to the next '>' silently deletes them (#238).
             // Deciding needs the char after '<' (and after "</"): wait for it.
-            if (raw.Length < 2 || (raw[1] == '/' && raw.Length < 3))
+            int left = raw.Length - pos;
+            if (left < 2 || (raw[pos + 1] == '/' && left < 3))
                 return; // '<' (or "</") at buffer end — need the next char
 
-            char after = raw[1];
+            char after = raw[pos + 1];
             bool opensTag =
                 char.IsAsciiLetter(after) || after == '_' || after == '!' || after == '?' ||
-                (after == '/' && (char.IsAsciiLetter(raw[2]) || raw[2] == '_'));
+                (after == '/' && (char.IsAsciiLetter(raw[pos + 2]) || raw[pos + 2] == '_'));
             if (!opensTag)
             {
                 AccumulateText("<");
-                _rawBuffer.Remove(0, 1);
+                pos++;
                 continue; // "1-20>" etc. re-enters as bare text
             }
 
             // Find the matching '>'
-            int tagEnd = raw.IndexOf('>');
+            int tagEnd = raw.IndexOf('>', pos);
             if (tagEnd < 0)
                 return; // incomplete tag — wait for more data
 
-            var fullTag = raw[..(tagEnd + 1)];
-            _rawBuffer.Remove(0, tagEnd + 1);
+            var fullTag = raw[pos..(tagEnd + 1)];
+            pos = tagEnd + 1;
 
             ParseTag(fullTag);
         }
