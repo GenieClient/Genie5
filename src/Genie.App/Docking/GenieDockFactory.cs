@@ -306,6 +306,7 @@ public class GenieDockFactory : Factory
         var objects    = new ObjectsTool   (_vm.Objects,            ws.Get("objects"));
         var rawXml     = NewRawXmlTool(ws);
         var injuries   = new InjuriesTool  (_vm.Injuries,           ws.Get("injuries"));
+        var healing    = new HealingTool   (_vm.Healing,            ws.Get("healing"));
 
         // ── Default ship layout — three vertical columns ─────────────────
         //   ┌──────────┬─────────────────────┬──────────┐
@@ -502,6 +503,9 @@ public class GenieDockFactory : Factory
         // Injuries (#18): body-silhouette wound/scar display — hidden by
         // default, re-opens beside the Backpack (with Vitals it complements).
         _tools[injuries.Id]   = (injuries,   backpackDock.Id);
+        // Healing (public #263): the Empath console — hidden by default, homes
+        // beside the Injuries panel it complements.
+        _tools[healing.Id]    = (healing,    backpackDock.Id);
 
         // ── Home-dock recreation map ─────────────────────────────────────
         // Mirrors the proportions/alignments set on the ToolDocks above so a
@@ -591,6 +595,7 @@ public class GenieDockFactory : Factory
         var objects    = new ObjectsTool      (_vm.Objects,            ws.Get("objects"));
         var rawXml     = NewRawXmlTool(ws);
         var injuries   = new InjuriesTool     (_vm.Injuries,           ws.Get("injuries"));
+        var healing    = new HealingTool      (_vm.Healing,            ws.Get("healing"));
 
         // Every MDI panel in canonical order, paired with its id.
         var panels = new (string Id, IDockable Dockable)[]
@@ -605,7 +610,7 @@ public class GenieDockFactory : Factory
             ("time-tracker", timeTracker), ("inventory-view", inventoryView),
             ("scripts", scripts), ("scene", scene),
             ("mobs", mobs), ("players", players), ("objects", objects), ("raw-xml", rawXml),
-            ("injuries", injuries),
+            ("injuries", injuries), ("healing", healing),
         };
 
         // Which panels open as windows. Default mirrors the tabbed layout

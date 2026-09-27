@@ -1872,6 +1872,13 @@
       <views:InventoryViewPanel DataContext="{Binding ViewModel}"/>
     </DataTemplate>
 
+    <!-- ── Healing (Empath console, public #263) ─────────────────────────── -->
+    <!-- Layout lives in Views/HealingPanel.axaml; readings come from Core's  -->
+    <!-- perceive-health parser via HealingViewModel.                        -->
+    <DataTemplate DataType="docking:HealingTool">
+      <views:HealingPanel DataContext="{Binding ViewModel}"/>
+    </DataTemplate>
+
     <!-- ── Plugin-created windows (generic) ───────────────────────────────── -->
     <!-- One template serves EVERY plugin window. A plugin calls               -->
     <!-- IPluginHost.SetWindow("My Panel", text) and the dock factory spins up -->

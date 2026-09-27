@@ -368,6 +368,11 @@
                   IsChecked="{Binding InjuriesVisible, Mode=OneWay}"
                   Command="{Binding ToggleInjuriesCommand}"
                   ToolTip.Tip="Body-region wound/scar display from the server's injuries panel. Shows whichever view your injury display mode (_injury) has selected."/>
+        <MenuItem Header="_Healing"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding HealingVisible, Mode=OneWay}"
+                  Command="{Binding ToggleHealingCommand}"
+                  ToolTip.Tip="Empath healing console: each patient's perceive-health reading as a body diagram, with click-to-heal, Take All, and spell buttons."/>
         <MenuItem Header="_Room"
                   ToggleType="CheckBox"
                   IsChecked="{Binding RoomVisible, Mode=OneWay}"

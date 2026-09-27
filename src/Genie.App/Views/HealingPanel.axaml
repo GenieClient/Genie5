@@ -1,0 +1,199 @@
+<!-- Healing dock tool (public #263): an Empath healing console in the spirit
+     of Genie 4's Crutch, fed by Genie 5's own perceive-health parser.
+     Patients list → body diagram (one wound axis at a time, coloured on DR's
+     1–13 ladder) → click a wounded region to heal it. Every button sends
+     through HealingViewModel's click entry points; nothing here sends on its
+     own. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Genie.App.ViewModels"
+             x:Class="Genie.App.Views.HealingPanel"
+             x:DataType="vm:HealingViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="Button.heal">
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Padding" Value="8,2"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+    </Style>
+    <Style Selector="WrapPanel > Button.heal">
+      <Setter Property="Margin" Value="0,0,4,4"/>
+    </Style>
+    <Style Selector="TextBlock.hdr">
+      <Setter Property="Foreground" Value="{DynamicResource Theme.SectionHeader}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="FontSize" Value="10"/>
+    </Style>
+    <!-- Place each region cell in the body grid. Reflection binding by
+         necessity: style setters carry no x:DataType, and the container's
+         DataContext IS the RegionCell. -->
+    <Style Selector="ItemsControl.body > ContentPresenter">
+      <Setter Property="Grid.Row"    Value="{ReflectionBinding Row}"/>
+      <Setter Property="Grid.Column" Value="{ReflectionBinding Column}"/>
+    </Style>
+    <!-- A region is a flat coloured tile; only a wounded one is pressable. -->
+    <Style Selector="Button.region">
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Padding" Value="2"/>
+      <Setter Property="Margin" Value="2"/>
+      <Setter Property="MinHeight" Value="34"/>
+      <Setter Property="CornerRadius" Value="3"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.region:pointerover /template/ ContentPresenter">
+      <Setter Property="BorderBrush" Value="{DynamicResource Theme.Accent}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Spacing="8" Margin="8">
+
+      <!-- ── Patient ─────────────────────────────────────────────────── -->
+      <StackPanel Spacing="4">
+        <TextBlock Classes="hdr" Text="PATIENT"/>
+        <TextBox Text="{Binding PatientName}" FontSize="12"
+                 Watermark="Patient name — blank for yourself"
+                 ToolTip.Tip="Who Touch, Perceive and the heal buttons act on. Leave blank to act on yourself."/>
+        <WrapPanel>
+          <Button Classes="heal" Content="Perceive" Click="OnPerceive"
+                  ToolTip.Tip="perceive health (yourself) or perceive health &lt;patient&gt;"/>
+          <Button Classes="heal" Content="Touch" Click="OnTouch" IsEnabled="{Binding !IsSelf}"
+                  ToolTip.Tip="touch &lt;patient&gt; — diagnose the patient's wounds"/>
+          <Button Classes="heal" Content="Forget" Click="OnForget" IsEnabled="{Binding HasReading}"
+                  ToolTip.Tip="Remove the selected reading from the list. Sends nothing."/>
+        </WrapPanel>
+        <ListBox ItemsSource="{Binding Patients}" SelectedItem="{Binding SelectedPatient}"
+                 MaxHeight="110" FontSize="11">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:HealingViewModel+PatientEntry">
+              <TextBlock Text="{Binding Display}" TextTrimming="CharacterEllipsis"/>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </StackPanel>
+
+      <!-- ── Body diagram ────────────────────────────────────────────── -->
+      <StackPanel Spacing="4">
+        <TextBlock Text="{Binding ReadingTitle}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding TargetLabel}" FontSize="11" Opacity="0.8"/>
+        <ComboBox ItemsSource="{Binding Source={x:Static vm:HealingViewModel.AxisOptions}}"
+                  SelectedItem="{Binding SelectedAxis}" FontSize="11" MinWidth="150"
+                  ToolTip.Tip="Which wound axis the body diagram colours. Clicking a region heals it on this axis."/>
+        <ItemsControl Classes="body" ItemsSource="{Binding Cells}" MaxWidth="320" HorizontalAlignment="Left">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"/>
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:HealingViewModel+RegionCell">
+              <Button Classes="region"
+                      Background="{Binding Fill}"
+                      ToolTip.Tip="{Binding Tip}"
+                      Tag="{Binding}"
+                      Click="OnRegionClicked">
+                <StackPanel Spacing="0">
+                  <TextBlock Text="{Binding Label}" FontSize="10" HorizontalAlignment="Center"
+                             Foreground="{Binding Foreground}"/>
+                  <TextBlock Text="{Binding Rung}" FontSize="11" FontWeight="SemiBold"
+                             HorizontalAlignment="Center" Foreground="{Binding Foreground}"
+                             IsVisible="{Binding IsWounded}"/>
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="{Binding VitalityText}" FontSize="11"/>
+          <TextBlock Text="Poisoned" FontSize="11" Foreground="#6fbf3a" FontWeight="SemiBold"
+                     IsVisible="{Binding IsPoisoned}"/>
+          <TextBlock Text="Diseased" FontSize="11" Foreground="#c08a2e" FontWeight="SemiBold"
+                     IsVisible="{Binding IsDiseased}"/>
+        </StackPanel>
+      </StackPanel>
+
+      <!-- ── Actions ─────────────────────────────────────────────────── -->
+      <StackPanel Spacing="4">
+        <TextBlock Classes="hdr" Text="ACTIONS"/>
+        <WrapPanel>
+          <Button Classes="heal" Content="Take All" Click="OnTakeAll" IsEnabled="{Binding !IsSelf}"
+                  ToolTip.Tip="Queue one take per wound on this patient's latest reading — fresh wounds first, worst first."/>
+          <Button Classes="heal" Content="Vitality" Tag="Vitality" Click="OnCondition"
+                  ToolTip.Tip="Patient: take &lt;patient&gt; vitality. Yourself: Vitality Healing."/>
+          <Button Classes="heal" Content="Poison" Tag="Poison" Click="OnCondition"
+                  ToolTip.Tip="Patient: take &lt;patient&gt; poison. Yourself: Flush Poisons."/>
+          <Button Classes="heal" Content="Disease" Tag="Disease" Click="OnCondition"
+                  ToolTip.Tip="Patient: take &lt;patient&gt; disease. Yourself: Cure Disease."/>
+          <Button Classes="heal" Content="Stop" Click="OnStop"
+                  ToolTip.Tip="#queue clear — cancel any take or cast still waiting to be sent."/>
+        </WrapPanel>
+        <CheckBox Content="Quick takes" FontSize="11" MinHeight="0" Padding="4,0"
+                  IsChecked="{Binding QuickTake}"
+                  ToolTip.Tip="Append quick to every take."/>
+      </StackPanel>
+
+      <!-- ── Spells ──────────────────────────────────────────────────── -->
+      <StackPanel Spacing="4">
+        <TextBlock Classes="hdr" Text="SPELLS"/>
+        <ItemsControl ItemsSource="{Binding Spells}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel/>
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:HealingViewModel+SpellRow">
+              <Button Classes="heal" Margin="0,0,4,4" Content="{Binding Abbreviation}"
+                      ToolTip.Tip="{Binding Tip}" Tag="{Binding}" Click="OnSpell"/>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasPendingCast}">
+          <Button Classes="heal" Content="Cast" Click="OnCast"
+                  ToolTip.Tip="Send the prepared spell's cast."/>
+          <TextBlock Text="{Binding PendingCast}" FontSize="11" VerticalAlignment="Center" Opacity="0.8"/>
+        </StackPanel>
+        <Expander Header="Mana and cast wait" FontSize="11" HorizontalAlignment="Stretch">
+          <StackPanel Spacing="2">
+            <TextBlock FontSize="10" Opacity="0.75" TextWrapping="Wrap"
+                       Text="Mana blank: use your Genie 4 GCTextBoxMana variable, else the minimum. Wait 0: prepare only, then click Cast. A wait above 0 queues the cast that many seconds after the prep."/>
+            <ItemsControl ItemsSource="{Binding Spells}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:HealingViewModel+SpellRow">
+                  <Grid ColumnDefinitions="44,*,80,80" Margin="0,1" ToolTip.Tip="{Binding Tip}">
+                    <TextBlock Grid.Column="0" Text="{Binding Abbreviation}" FontSize="11" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="11" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"/>
+                    <NumericUpDown Grid.Column="2" Value="{Binding Mana}" Minimum="0" Maximum="999"
+                                   Increment="1" FormatString="0" FontSize="11" Watermark="mana"
+                                   ShowButtonSpinner="False" Margin="2,0"/>
+                    <NumericUpDown Grid.Column="3" Value="{Binding Delay}" Minimum="0" Maximum="60"
+                                   Increment="0.5" FormatString="0.##" FontSize="11" Watermark="wait s"
+                                   ShowButtonSpinner="False" Margin="2,0"/>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Expander>
+      </StackPanel>
+
+      <!-- ── Wounds in words ─────────────────────────────────────────── -->
+      <StackPanel Spacing="2" IsVisible="{Binding HasReading}">
+        <TextBlock Classes="hdr" Text="WOUNDS (ALL AXES)"/>
+        <TextBlock Text="No wounds." FontSize="11" Opacity="0.7" IsVisible="{Binding !HasWounds}"/>
+        <ItemsControl ItemsSource="{Binding Wounds}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <SelectableTextBlock Text="{Binding}" FontSize="11" TextWrapping="Wrap" Margin="0,1"/>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

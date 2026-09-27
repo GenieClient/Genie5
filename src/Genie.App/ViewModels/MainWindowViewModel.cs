@@ -82,6 +82,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>Backs the dockable Injuries panel — body-silhouette wound/scar
     /// display from the server's injuries dialog (#18). Hidden by default.</summary>
     public InjuriesViewModel   Injuries   { get; } = new();
+    /// <summary>Backs the dockable Healing panel — the Empath healing console
+    /// fed by perceive-health readings (public #263). Hidden by default.</summary>
+    public HealingViewModel    Healing    { get; } = new();
 
     /// <summary>Backs the dockable Analytics panel — skill-history charts
     /// (XP/hour, gain curves, session comparison) over the local recorder's
@@ -647,6 +650,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     [Reactive] public bool ObjectsVisible  { get; private set; }   // hidden by default (opt-in)
     [Reactive] public bool RawXmlVisible   { get; private set; }   // hidden by default (opt-in, #14)
     [Reactive] public bool InjuriesVisible { get; private set; }   // hidden by default (opt-in, #18)
+    [Reactive] public bool HealingVisible  { get; private set; }   // hidden by default (opt-in, public #263)
 
     /// <summary>
     /// Is a text stream's dock panel currently open? Handed to
@@ -718,6 +722,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ToggleObjectsCommand  { get; }
     public ReactiveCommand<Unit, Unit> ToggleRawXmlCommand   { get; }
     public ReactiveCommand<Unit, Unit> ToggleInjuriesCommand { get; }
+    public ReactiveCommand<Unit, Unit> ToggleHealingCommand { get; }
 
     // ── Core ──────────────────────────────────────────────────────────────────
 
@@ -1408,6 +1413,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         WindowSettings.Register("objects",   "Objects");
         WindowSettings.Register("raw-xml",   "Raw XML");
         WindowSettings.Register("injuries",  "Injuries");
+        WindowSettings.Register("healing",   "Healing");
 
         // ── Global → per-window propagation ─────────────────────────────
         // When the user changes DisplaySettings (color, font, etc.), the
@@ -2306,6 +2312,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleObjectsCommand  = MakeToggleCommand("objects",   v => ObjectsVisible  = v);
         ToggleRawXmlCommand   = MakeToggleCommand("raw-xml",   v => RawXmlVisible   = v);
         ToggleInjuriesCommand = MakeToggleCommand("injuries",  v => InjuriesVisible = v);
+        ToggleHealingCommand  = MakeToggleCommand("healing",   v => HealingVisible = v);
 
         // (ResetLayoutCommand is assigned earlier — using ApplyLayout() with a
         // SavedLayout that goes through factory.BuildDefaultLayout(). A second
@@ -3315,6 +3322,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         SetVisibilityBool("objects",   factory.IsToolVisible("objects"));
         SetVisibilityBool("raw-xml",   factory.IsToolVisible("raw-xml"));
         SetVisibilityBool("injuries",  factory.IsToolVisible("injuries"));
+        SetVisibilityBool("healing",   factory.IsToolVisible("healing"));
     }
 
     // ── Plugin-created windows ───────────────────────────────────────────────
@@ -4481,6 +4489,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "objects":   ForceSet(visible, v => ObjectsVisible  = v, () => ObjectsVisible);  break;
             case "raw-xml":   ForceSet(visible, v => RawXmlVisible   = v, () => RawXmlVisible);   break;
             case "injuries":  ForceSet(visible, v => InjuriesVisible = v, () => InjuriesVisible); break;
+            case "healing":   ForceSet(visible, v => HealingVisible  = v, () => HealingVisible);  break;
         }
 
         static void ForceSet(bool target, Action<bool> set, Func<bool> get)
@@ -5617,6 +5626,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Objects.Attach(_core);
         RawXml.Attach(_core);
         Injuries.Attach(_core);
+        Healing.Attach(_core);
         AttachServerDialogs(_core);
         AttachPluginWindows(_core);
 
