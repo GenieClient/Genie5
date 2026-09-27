@@ -290,6 +290,8 @@ public class GenieDockFactory : Factory
         var assess   = NewStreamTool(_vm.StreamTabs.Assess,   ws);
         var atmospherics = NewStreamTool(_vm.StreamTabs.Atmospherics, ws);
         var ooc      = NewStreamTool(_vm.StreamTabs.Ooc,      ws);
+        var conversation = NewStreamTool(_vm.StreamTabs.Conversation, ws);
+        var group    = NewStreamTool(_vm.StreamTabs.Group,    ws);
         var log      = NewStreamTool(_vm.StreamTabs.Log,      ws);
         var itemlog  = NewStreamTool(_vm.StreamTabs.ItemLog,  ws);
         var experience = new ExperienceTool(_vm.Experience,          ws.Get("experience"));
@@ -453,6 +455,11 @@ public class GenieDockFactory : Factory
         // bare `main` copy of every OOC line, so the text is never lost while
         // this panel is closed and a new default tab would be intrusive.
         _tools[ooc.Id]      = (ooc,      streamDock.Id);
+        // Conversation / Group (public #260): the other two stream windows DR
+        // declares with ifClosed='' — same opt-in, hidden-by-default treatment
+        // as OOC, for the same reason.
+        _tools[conversation.Id] = (conversation, streamDock.Id);
+        _tools[group.Id]    = (group,    streamDock.Id);
         _tools[log.Id]      = (log,      streamDock.Id);
         _tools[itemlog.Id]  = (itemlog,  streamDock.Id);
         // Experience: registered but hidden by default (like Vitals) — re-opens
@@ -568,6 +575,8 @@ public class GenieDockFactory : Factory
         var assess     = NewStreamTool(_vm.StreamTabs.Assess,   ws);
         var atmospherics = NewStreamTool(_vm.StreamTabs.Atmospherics, ws);
         var ooc        = NewStreamTool(_vm.StreamTabs.Ooc,      ws);
+        var conversation = NewStreamTool(_vm.StreamTabs.Conversation, ws);
+        var group      = NewStreamTool(_vm.StreamTabs.Group,    ws);
         var log        = NewStreamTool(_vm.StreamTabs.Log,      ws);
         var itemlog    = NewStreamTool(_vm.StreamTabs.ItemLog,  ws);
         var experience = new ExperienceTool  (_vm.Experience,          ws.Get("experience"));
@@ -589,7 +598,8 @@ public class GenieDockFactory : Factory
             ("game-text", gameText), ("room", room), ("mapper", mapper), ("backpack", backpack),
             ("logons", logons), ("talk", talk), ("whispers", whispers), ("thoughts", thoughts),
             ("combat", combat), ("familiar", familiar), ("death", death), ("assess", assess),
-            ("atmospherics", atmospherics), ("ooc", ooc), ("log", log), ("itemlog", itemlog),
+            ("atmospherics", atmospherics), ("ooc", ooc),
+            ("conversation", conversation), ("group", group), ("log", log), ("itemlog", itemlog),
             ("vitals", vitals), ("experience", experience), ("analytics", analytics),
             ("active-spells", activeSpells),
             ("time-tracker", timeTracker), ("inventory-view", inventoryView),

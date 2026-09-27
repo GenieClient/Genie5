@@ -69,7 +69,8 @@ public class StreamTabsViewModelTests
         private static readonly string[] StreamIds =
         {
             "talk", "whispers", "thoughts", "combat", "logons",
-            "familiar", "death", "assess", "atmospherics", "ooc", "log", "itemlog",
+            "familiar", "death", "assess", "atmospherics", "ooc",
+            "conversation", "group", "log", "itemlog",
         };
 
         public Harness()
@@ -96,6 +97,8 @@ public class StreamTabsViewModelTests
             Tabs.Assess.Settings       = Store.Get("assess");
             Tabs.Atmospherics.Settings = Store.Get("atmospherics");
             Tabs.Ooc.Settings          = Store.Get("ooc");
+            Tabs.Conversation.Settings = Store.Get("conversation");
+            Tabs.Group.Settings        = Store.Get("group");
             Tabs.Log.Settings          = Store.Get("log");
             Tabs.ItemLog.Settings      = Store.Get("itemlog");
 
@@ -388,5 +391,101 @@ public class StreamTabsViewModelTests
         Assert.Single(h.Tabs.Ooc.Lines);
         Assert.Single(h.Main.Lines);
         Assert.Equal("You whisper to Athlya, \"OOC: brb\"", h.Main.Lines[0].Text); // plain, no prefix
+    }
+
+    // ── Conversation / Group (public #260) ──────────────────────────────
+    // The two other stream windows DR declares with ifClosed='' — same
+    // hidden-by-default, echo-off, drop-when-closed treatment as OOC.
+
+    [Theory]
+    [InlineData("conversation")]
+    [InlineData("group")]
+    public async Task Conversation_and_group_ship_with_echo_off_and_drop_when_closed(string id)
+    {
+        await using var h = new Harness();
+
+        Assert.False(h.Store.Get(id).EchoToMain);
+        Assert.Equal("", h.Store.Get(id).IfClosed);
+    }
+
+    [Fact]
+    public async Task Conversation_line_fills_its_own_panel_and_adds_nothing_to_main()
+    {
+        await using var h = new Harness();
+        h.Open("conversation");
+
+        h.Publish(new TextEvent("conversation", "a conversation line"));
+
+        Assert.Single(h.Tabs.Conversation.Lines);
+        Assert.Equal("a conversation line", h.Tabs.Conversation.Lines[0].Text);
+        Assert.Empty(h.Main.Lines);
+    }
+
+    [Fact]
+    public async Task Group_panel_closed_keeps_history_and_drops_the_fallback()
+    {
+        await using var h = new Harness();
+        // Group panel closed (the shipped state).
+
+        h.Publish(new TextEvent("group", "a group line"));
+
+        Assert.Single(h.Tabs.Group.Lines);   // re-opening shows it
+        Assert.Empty(h.Main.Lines);          // DR's own bare main copy is the fallback
+    }
+
+    [Fact]
+    public async Task Talk_retargeted_to_conversation_lands_there_when_talk_is_closed()
+    {
+        // With a real Conversation window, a deliberately chosen
+        // IfClosed=conversation now resolves for real.
+        await using var h = new Harness();
+        h.Store.Get("talk").EchoToMain = false;
+        h.Store.Get("talk").IfClosed   = "conversation";
+        h.Open("conversation");
+
+        h.Publish(new TextEvent("talk", "Athlya says, \"Hello.\""));
+
+        Assert.Single(h.Tabs.Conversation.Lines);
+        Assert.Empty(h.Main.Lines);
+    }
+
+    // ── Unknown-stream safety net (public #260 step 3) ───────────────────
+
+    [Fact]
+    public async Task Unknown_stream_goes_to_main_prefixed_instead_of_vanishing()
+    {
+        await using var h = new Harness();
+
+        h.Publish(new TextEvent("someNewWindow", "text from a stream this build does not know"));
+
+        Assert.Single(h.Main.Lines);
+        Assert.Equal("[someNewWindow] text from a stream this build does not know", h.Main.Lines[0].Text);
+    }
+
+    [Theory]
+    [InlineData("inv")]
+    [InlineData("percWindow")]
+    [InlineData("room")]
+    [InlineData("experience")]
+    [InlineData("container:stow")]
+    public async Task Streams_consumed_elsewhere_stay_out_of_main(string stream)
+    {
+        await using var h = new Harness();
+
+        h.Publish(new TextEvent(stream, "a line some other panel owns"));
+
+        Assert.Empty(h.Main.Lines);
+    }
+
+    [Fact]
+    public async Task Unknown_stream_skips_blank_lines_and_flagged_re_sends()
+    {
+        await using var h = new Harness();
+
+        h.Publish(new TextEvent("someNewWindow", ""));
+        h.Publish(new TextEvent("someNewWindow", "   "));
+        h.Publish(new TextEvent("someNewWindow", "You whisper to Athlya, \"hi\"", DuplicateEcho: true));
+
+        Assert.Empty(h.Main.Lines);
     }
 }

@@ -440,6 +440,16 @@
                   IsChecked="{Binding OocVisible, Mode=OneWay}"
                   Command="{Binding ToggleOocCommand}"
                   ToolTip.Tip="Out-of-character chat — the server `ooc` stream. Its own system, separate from Whispers and from Thoughts (Gweth). OOC lines also appear in the main game window, so this panel is opt-in."/>
+        <MenuItem Header="Con_versation"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding ConversationVisible, Mode=OneWay}"
+                  Command="{Binding ToggleConversationCommand}"
+                  ToolTip.Tip="The server `conversation` stream. Its lines also appear in the main game window, so this panel is opt-in. Talk and Whispers still go to the Log window when their own panels are closed."/>
+        <MenuItem Header="Gro_up"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding GroupVisible, Mode=OneWay}"
+                  Command="{Binding ToggleGroupCommand}"
+                  ToolTip.Tip="The server `group` stream. Its lines also appear in the main game window, so this panel is opt-in."/>
         <MenuItem Header="Lo_g"
                   ToggleType="CheckBox"
                   IsChecked="{Binding LogVisible, Mode=OneWay}"

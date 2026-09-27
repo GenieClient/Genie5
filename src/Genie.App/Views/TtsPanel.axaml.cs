@@ -47,6 +47,8 @@ public partial class TtsPanel : UserControl
         ("assess",       "Assess",       null),
         ("atmospherics", "Atmospherics", null),
         ("ooc",          "OOC",          "An OOC message is also sent on whispers — reading OOC plus whispers speaks it twice."),
+        ("conversation", "Conversation", "Conversation lines also reach the main window — reading both speaks them twice."),
+        ("group",        "Group",        "Group lines also reach the main window — reading both speaks them twice."),
         ("log",          "Log",          null),
         ("itemlog",      "ItemLog",      null),
     };

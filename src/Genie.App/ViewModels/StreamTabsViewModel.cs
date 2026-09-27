@@ -49,6 +49,26 @@ public class StreamTabsViewModel : ReactiveObject
     /// </para></summary>
     public StreamBuffer Ooc      { get; } = new("OOC");
 
+    /// <summary>The server's <c>conversation</c> stream, declared
+    /// <c>&lt;streamWindow id='conversation' title='Conversation' … timestamp='on' ifClosed=''/&gt;</c>
+    /// (public #260). Same treatment as <see cref="Ooc"/>: hidden by default,
+    /// <c>EchoToMain</c> off and <c>IfClosed = ""</c>, DR's own values — DR
+    /// declares it drop-when-closed because its text also reaches Main.
+    /// <para>
+    /// Not to be confused with the Genie 4 IfClosed chain: DR (and Genie 4)
+    /// point talk and whispers at <c>conversation</c> when their panels are
+    /// closed. Genie 5 sends them to <see cref="Log"/> instead, and a persisted
+    /// <c>'conversation'</c> from before this window existed is rewritten to
+    /// <c>log</c> on load (<c>WindowSettingsStore.IfClosedRevision</c>).
+    /// </para></summary>
+    public StreamBuffer Conversation { get; } = new("Conversation");
+
+    /// <summary>The server's <c>group</c> stream, declared
+    /// <c>&lt;streamWindow id='group' title='Group' … ifClosed=''/&gt;</c>
+    /// (public #260) — no timestamp in DR's declaration. Same hidden-by-default,
+    /// echo-off, drop-when-closed treatment as <see cref="Ooc"/>.</summary>
+    public StreamBuffer Group    { get; } = new("Group");
+
     /// <summary>Consolidated conversation log — mirrors the speech streams
     /// (talk / whispers), Genie 4 "Log" window parity. Also an <c>#echo &gt;log</c>
     /// target (wired in MainWindowViewModel).</summary>
@@ -59,7 +79,24 @@ public class StreamTabsViewModel : ReactiveObject
     public StreamBuffer ItemLog  { get; } = new("ItemLog");
 
     public IReadOnlyList<StreamBuffer> All =>
-        [Logons, Talk, Whispers, Thoughts, Combat, Familiar, Death, Assess, Atmospherics, Ooc, Log, ItemLog];
+        [Logons, Talk, Whispers, Thoughts, Combat, Familiar, Death, Assess, Atmospherics, Ooc,
+         Conversation, Group, Log, ItemLog];
+
+    /// <summary>
+    /// Streams with no buffer here because something else consumes them — the
+    /// Inventory panel (<c>inv</c>, plus every <c>container:</c> stream, see
+    /// <see cref="ContainerStreams"/>), the Spell Timer (<c>percWindow</c>),
+    /// the Room and Experience panels. The unknown-stream safety net in
+    /// <see cref="Attach"/> must leave these alone: echoing them into Main
+    /// would dump inventory listings and room descriptions over the game text.
+    /// </summary>
+    private static readonly HashSet<string> ConsumedElsewhere =
+        new(StringComparer.OrdinalIgnoreCase) { "inv", "percWindow", "room", "experience" };
+
+    /// <summary>True for a stream another panel or extension owns (see
+    /// <see cref="ConsumedElsewhere"/>).</summary>
+    internal static bool IsConsumedElsewhere(string stream) =>
+        ConsumedElsewhere.Contains(stream) || ContainerStreams.IdOf(stream) is not null;
 
     /// <summary>Main game-window sink, handed in by <see cref="Attach"/> so a
     /// stream with its <c>EchoToMain</c> toggle on can also post into Main.</summary>
@@ -115,25 +152,41 @@ public class StreamTabsViewModel : ReactiveObject
                     "assess"               => Assess,
                     "atmospherics"         => Atmospherics,
                     "ooc"                  => Ooc,
+                    "conversation"         => Conversation,
+                    "group"                => Group,
                     "itemlog" or "itemLog" => ItemLog,
-                    // No buffer. Two very different reasons, neither of which
-                    // may be "route it to Main" — see public #260:
-                    //   • consumed elsewhere — `inv` (InventoryViewModel),
-                    //     `percWindow` (SpellTimerExtension), `room`,
-                    //     `experience`. Echoing these into Main would dump
-                    //     inventory and room descriptions over the game text.
-                    //   • declared by DR but not built yet — `conversation`,
-                    //     `group`. These DO silently vanish today; harmless
-                    //     only because DR also sends a bare `main` copy.
                     _                      => null
                 };
+
+                // No buffer (public #260 step 3). A stream another panel owns
+                // is left to it. Anything else is a stream id this build does
+                // not know — a window DR adds later, or a proxy's own — and
+                // under the #211 anti-rot rule it goes to Main, [id]-prefixed
+                // like any closed-panel fallback, rather than vanishing.
+                //
+                // Duplicates: DR does send a bare `main` copy for some streams
+                // (the ifClosed='' ones: ooc, conversation, group — all of
+                // which now have buffers, so none of them reach this line),
+                // and a new stream might do the same. That cannot be known
+                // when the stream copy arrives — the main copy comes after —
+                // so the net accepts a possible prefixed double over a silent
+                // loss: the prefix makes it visible and attributable, and the
+                // cure is registering that stream. A copy the parser already
+                // flagged as a re-send of a talk/whispers line is skipped, as
+                // are blank lines (DR's paragraph breaks).
+                if (buf is null)
+                {
+                    if (!IsConsumedElsewhere(e.Stream) && !e.DuplicateEcho &&
+                        !string.IsNullOrWhiteSpace(e.Text))
+                        _main?.AddStreamLine(e.Stream, e.Text);
+                    return;
+                }
+
                 // #187: pass the parser's span metadata (bold / link / preset)
                 // through so the stream panel renders monster-bold, clickable
                 // links and preset colours just like the main window does.
-                buf?.Add(e.Text, e.BoldSpans, e.Links, e.PresetSpans);
-
-                if (buf is not null)
-                    RouteToMain(buf, e);
+                buf.Add(e.Text, e.BoldSpans, e.Links, e.PresetSpans);
+                RouteToMain(buf, e);
 
                 // The Log window is a consolidated conversation feed: mirror
                 // the speech streams into it (matches the Genie 4 / dylb0t
@@ -241,6 +294,8 @@ public class StreamTabsViewModel : ReactiveObject
         "assess"               => Assess,
         "atmospherics"         => Atmospherics,
         "ooc"                  => Ooc,
+        "conversation"         => Conversation,
+        "group"                => Group,
         "log"                  => Log,
         "itemlog" or "itemLog" => ItemLog,
         _                      => null,

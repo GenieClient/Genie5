@@ -635,6 +635,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     [Reactive] public bool AssessVisible   { get; private set; } = true;
     [Reactive] public bool AtmosphericsVisible { get; private set; }   // hidden by default (opt-in, #85)
     [Reactive] public bool OocVisible      { get; private set; }   // hidden by default (opt-in, #260)
+    [Reactive] public bool ConversationVisible { get; private set; }   // hidden by default (opt-in, #260)
+    [Reactive] public bool GroupVisible    { get; private set; }   // hidden by default (opt-in, #260)
     [Reactive] public bool LogVisible      { get; private set; } = true;
     [Reactive] public bool ItemLogVisible  { get; private set; } = true;
     [Reactive] public bool ScriptsVisible  { get; private set; }   // hidden by default (opt-in)
@@ -663,7 +665,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// letter — the resolver is only consulted for a panel reported closed. Its
     /// shipped default resolves to Drop, matching DR's own <c>ifClosed=''</c>,
     /// so the net behaviour is the same; the difference is that a user who
-    /// retargets OOC somewhere else now gets what they asked for.
+    /// retargets OOC somewhere else now gets what they asked for. The same holds
+    /// for <c>conversation</c> and <c>group</c>, declared the same way.
     /// </para>
     /// </summary>
     private bool IsStreamPanelVisible(string stream) => stream.ToLowerInvariant() switch
@@ -677,6 +680,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         "death"    => DeathVisible,
         "assess"   => AssessVisible,
         "ooc"      => OocVisible,
+        "conversation" => ConversationVisible,
+        "group"    => GroupVisible,
         _          => true,
     };
 
@@ -701,6 +706,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ToggleAssessCommand   { get; }
     public ReactiveCommand<Unit, Unit> ToggleAtmosphericsCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleOocCommand      { get; }
+    public ReactiveCommand<Unit, Unit> ToggleConversationCommand { get; }
+    public ReactiveCommand<Unit, Unit> ToggleGroupCommand    { get; }
     public ReactiveCommand<Unit, Unit> ToggleLogCommand      { get; }
     public ReactiveCommand<Unit, Unit> ToggleItemLogCommand  { get; }
     public ReactiveCommand<Unit, Unit> ToggleScriptsCommand  { get; }
@@ -1383,6 +1390,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         WindowSettings.Register("assess",    "Assess");
         WindowSettings.Register("atmospherics", "Atmospherics");
         WindowSettings.Register("ooc",       "OOC");
+        WindowSettings.Register("conversation", "Conversation");
+        WindowSettings.Register("group",     "Group");
         WindowSettings.Register("log",       "Log");
         WindowSettings.Register("itemlog",   "ItemLog");
         WindowSettings.Register("mapper",    "Mapper");
@@ -2272,6 +2281,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleAssessCommand   = MakeToggleCommand("assess",    v => AssessVisible   = v);
         ToggleAtmosphericsCommand = MakeToggleCommand("atmospherics", v => AtmosphericsVisible = v);
         ToggleOocCommand      = MakeToggleCommand("ooc",       v => OocVisible      = v);
+        ToggleConversationCommand = MakeToggleCommand("conversation", v => ConversationVisible = v);
+        ToggleGroupCommand    = MakeToggleCommand("group",     v => GroupVisible    = v);
         ToggleLogCommand      = MakeToggleCommand("log",       v => LogVisible      = v);
         ToggleItemLogCommand  = MakeToggleCommand("itemlog",   v => ItemLogVisible  = v);
         // The panel reads live off Core (script library scan, running-scripts
@@ -3292,6 +3303,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         SetVisibilityBool("assess",    factory.IsToolVisible("assess"));
         SetVisibilityBool("atmospherics", factory.IsToolVisible("atmospherics"));
         SetVisibilityBool("ooc",       factory.IsToolVisible("ooc"));
+        SetVisibilityBool("conversation", factory.IsToolVisible("conversation"));
+        SetVisibilityBool("group",     factory.IsToolVisible("group"));
         SetVisibilityBool("log",       factory.IsToolVisible("log"));
         SetVisibilityBool("itemlog",   factory.IsToolVisible("itemlog"));
         SetVisibilityBool("scripts",   factory.IsToolVisible("scripts"));
@@ -3324,6 +3337,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             "backpack", "mapper", "scripts", "scene",
             "logons", "talk", "whispers", "thoughts", "combat",
             "familiar", "death", "assess", "atmospherics", "ooc",
+            "conversation", "group",
             "mobs", "players", "objects", "injuries", "raw-xml",
             "log", "itemlog",
         };
@@ -3356,6 +3370,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             "assess"         => "assess",
             "atmospherics"   => "atmospherics",
             "ooc"            => "ooc",
+            "conversation"   => "conversation",
+            "group"          => "group",
             "mobs"           => "mobs",
             "players"        => "players",
             "objects"        => "objects",
@@ -3646,6 +3662,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 "assess"       => StreamTabs.Assess,
                 "atmospherics" => StreamTabs.Atmospherics,
                 "ooc"          => StreamTabs.Ooc,
+                "conversation" => StreamTabs.Conversation,
+                "group"        => StreamTabs.Group,
                 "log"          => StreamTabs.Log,
                 "itemlog"      => StreamTabs.ItemLog,
                 _              => null,
@@ -4401,6 +4419,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "assess":    ForceSet(visible, v => AssessVisible   = v, () => AssessVisible);   break;
             case "atmospherics": ForceSet(visible, v => AtmosphericsVisible = v, () => AtmosphericsVisible); break;
             case "ooc":       ForceSet(visible, v => OocVisible       = v, () => OocVisible);       break;
+            case "conversation": ForceSet(visible, v => ConversationVisible = v, () => ConversationVisible); break;
+            case "group":     ForceSet(visible, v => GroupVisible     = v, () => GroupVisible);     break;
             case "log":       ForceSet(visible, v => LogVisible      = v, () => LogVisible);      break;
             case "itemlog":   ForceSet(visible, v => ItemLogVisible  = v, () => ItemLogVisible);  break;
             case "scripts":

@@ -33,6 +33,7 @@ public static class Genie4LayoutConverter
         ["whispers"]     = "whispers",
         ["thoughts"]     = "thoughts",
         ["ooc"]          = "ooc",
+        ["conversation"] = "conversation",
         ["familiar"]     = "familiar",
         ["experience"]   = "experience",
         ["percwindow"]   = "active-spells",
