@@ -1508,6 +1508,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 (DockFactory as GenieDockFactory)?.DialogTargetWindows(dialogId)
                 ?? (IReadOnlyList<(string, string)>)Array.Empty<(string, string)>();
             cfgVm.TtsInstallVoice = () => InstallTtsVoiceAsync(Services.VoiceCatalog.Default);
+            // One voice list across Piper + system voices (public #368).
+            var tts = _tts;
+            cfgVm.TtsListVoices = tts is null
+                ? null
+                : () => tts.ListVoices().Select(v => (v.SettingValue, tts.Label(v))).ToList();
             await ShowConfigurationDialog.Handle(cfgVm);
         });
 
@@ -4853,16 +4858,39 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "select":
             {
                 if (parts.Length < 2) { Echo("Usage: #tts use <voice>"); break; }
-                var v = Services.VoiceCatalog.Find(parts[1]);
-                string id = v?.Id ?? parts[1];   // allow a raw folder name too
-                if (!Services.VoiceInstaller.IsInstalled(System.IO.Path.Combine(voiceDir, id)))
+                // System voice names have spaces ("Microsoft Zira Desktop").
+                string typed = string.Join(' ', parts[1..]);
+                var (backend, name) = Services.TtsVoiceSetting.Parse(typed);
+
+                // Piper first — a catalog alias or a raw folder name, stored bare
+                // exactly as before system voices existed.
+                if (backend == Services.TtsVoiceSetting.PiperBackend)
                 {
-                    Echo($"[tts] '{parts[1]}' isn't installed — try #tts install {parts[1]}, or #tts voices.");
+                    var v = Services.VoiceCatalog.Find(name);
+                    string id = v?.Id ?? name;   // allow a raw folder name too
+                    if (Services.VoiceInstaller.IsInstalled(System.IO.Path.Combine(voiceDir, id)))
+                    {
+                        _core.Config.TtsVoice = id;
+                        _tts?.Reset();
+                        Echo($"[tts] now using {v?.DisplayName ?? id}. Persists when settings are saved.");
+                        break;
+                    }
+                }
+
+                // Then the computer's own voices (public #368): exact name, or a
+                // unique part of one ("zira").
+                if (_tts is not null &&
+                    Services.TtsVoiceList.Find(
+                        _tts.ListVoices().Where(o => o.Backend == Services.TtsVoiceSetting.SystemBackend).ToList(),
+                        typed) is { } sys)
+                {
+                    _core.Config.TtsVoice = sys.SettingValue;
+                    _tts.Reset();
+                    Echo($"[tts] now using {_tts.Label(sys)}. Persists when settings are saved.");
                     break;
                 }
-                _core.Config.TtsVoice = id;
-                _tts?.Reset();
-                Echo($"[tts] now using {v?.DisplayName ?? id}. Persists when settings are saved.");
+
+                Echo($"[tts] '{typed}' isn't installed — try #tts install {typed}, or #tts voices.");
                 break;
             }
 
@@ -4876,6 +4904,23 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     bool active = string.Equals(_core.Config.TtsVoice, v.Id, StringComparison.OrdinalIgnoreCase);
                     Echo($"  {v.Alias,-8} {v.DisplayName} (~{v.ApproxMb} MB)" +
                          $"{(inst ? "  [installed]" : "")}{(active ? "  [active]" : "")}");
+                }
+                // The computer's own installed voices (public #368).
+                {
+                    var sysVoices = _tts?.ListVoices()
+                        .Where(o => o.Backend == Services.TtsVoiceSetting.SystemBackend).ToList()
+                        ?? new List<Services.TtsVoiceOption>();
+                    if (sysVoices.Count == 0)
+                        Echo("[tts] no system voices found on this computer.");
+                    else
+                    {
+                        Echo("[tts] system voices (select with #tts use <name>):");
+                        foreach (var sv in sysVoices)
+                        {
+                            bool active = string.Equals(_core.Config.TtsVoice, sv.SettingValue, StringComparison.OrdinalIgnoreCase);
+                            Echo($"  {sv.Display}{(active ? "  [active]" : "")}");
+                        }
+                    }
                 }
                 break;
 
@@ -4997,6 +5042,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     if (Services.VoiceInstaller.IsInstalled(System.IO.Path.Combine(voiceDir, v.Id)))
                     { Echo($"  installed: {v.DisplayName}"); n++; }
                 if (n == 0) Echo("  no voices installed — run #tts install");
+                {
+                    var (be, nm) = Services.TtsVoiceSetting.Parse(_core.Config.TtsVoice);
+                    Echo(nm.Length == 0
+                        ? "  voice: first installed Piper voice"
+                        : $"  voice: {nm} ({(be == Services.TtsVoiceSetting.PiperBackend ? "Piper" : "system")})");
+                }
                 Echo($"  read-aloud: {(_core.Config.TtsRead ? "on" : "off")}; " +
                      $"streams: {_core.Config.TtsReadStreamsRaw}");
                 if (!string.IsNullOrEmpty(_core.Config.TtsStreamPriorityRaw))

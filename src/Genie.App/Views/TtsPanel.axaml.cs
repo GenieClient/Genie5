@@ -25,6 +25,7 @@ public partial class TtsPanel : UserControl
     private Action<string>? _speakSample;
     private Action?         _voiceChanged;
     private Func<System.Threading.Tasks.Task<bool>>? _installVoice;
+    private Func<IReadOnlyList<(string Value, string Label)>>? _listVoices;
     private bool            _loading;
 
     private readonly List<(string Id, CheckBox Check, ComboBox Priority)> _rows = new();
@@ -114,15 +115,20 @@ public partial class TtsPanel : UserControl
     /// <paramref name="installVoice"/> runs the <c>#tts install</c> download of the
     /// default voice and completes with its success; null disables Install voice….
     /// </summary>
+    /// <paramref name="listVoices"/> returns every voice to offer — Piper and
+    /// system voices, labelled by origin (public #368); null lists only the Piper
+    /// voices in the voice folder.
     public void Initialize(GenieConfig? config, Action? onChanged = null,
                            Action<string>? speakSample = null, Action? voiceChanged = null,
-                           Func<System.Threading.Tasks.Task<bool>>? installVoice = null)
+                           Func<System.Threading.Tasks.Task<bool>>? installVoice = null,
+                           Func<IReadOnlyList<(string Value, string Label)>>? listVoices = null)
     {
         _config       = config;
         _onChanged    = onChanged;
         _speakSample  = speakSample;
         _voiceChanged = voiceChanged;
         _installVoice = installVoice;
+        _listVoices   = listVoices;
 
         IsEnabled = config is not null;
         OfflineBanner.IsVisible = config is null;
@@ -195,41 +201,37 @@ public partial class TtsPanel : UserControl
 
     private void LoadVoices(GenieConfig c)
     {
-        var items = new List<VoiceItem>();
         string voiceDir = c.TtsVoiceDir;
 
-        foreach (var v in Services.VoiceCatalog.All)
-            if (Services.VoiceInstaller.IsInstalled(System.IO.Path.Combine(voiceDir, v.Id)))
-                items.Add(new VoiceItem(v.Id, v.DisplayName));
-
-        // Raw voice folders installed by hand (matches #tts use accepting a
-        // folder name that isn't in the catalog).
+        // One list for both sources (public #368): Piper voices from the voice
+        // folder (catalog voices, then hand-installed folders — what #tts use
+        // accepts) and the OS's installed voices, each labelled by origin.
+        IReadOnlyList<(string Value, string Label)> choices;
         try
         {
-            if (System.IO.Directory.Exists(voiceDir))
-                foreach (var sub in System.IO.Directory.GetDirectories(voiceDir))
-                {
-                    string name = System.IO.Path.GetFileName(sub);
-                    if (Services.VoiceInstaller.IsInstalled(sub) &&
-                        !items.Any(i => string.Equals(i.Id, name, StringComparison.OrdinalIgnoreCase)))
-                        items.Add(new VoiceItem(name, name));
-                }
+            choices = _listVoices?.Invoke()
+                ?? Services.PiperTextToSpeech.ListVoices(voiceDir)
+                       .Select(v => (v.SettingValue, $"{v.Display} (Piper)")).ToList();
         }
-        catch { /* unreadable voice dir — the catalog list still stands */ }
+        catch { choices = Array.Empty<(string, string)>(); }
+        var items = choices.Select(ch => new VoiceItem(ch.Value, ch.Label)).ToList();
 
         VoiceCombo.ItemsSource = items;
         VoiceCombo.SelectedItem =
             items.FirstOrDefault(i => string.Equals(i.Id, c.TtsVoice, StringComparison.OrdinalIgnoreCase))
-            ?? items.FirstOrDefault();   // empty TtsVoice = first installed, like TtsService
+            ?? items.FirstOrDefault();   // empty TtsVoice = first Piper voice, like TtsService
 
         bool any = items.Count > 0;
+        bool anyPiper = items.Any(i => Services.TtsVoiceSetting.Parse(i.Id).Backend == Services.TtsVoiceSetting.PiperBackend);
         VoiceCombo.IsEnabled = any;
         TestButton.IsEnabled = any && _speakSample is not null;
         InstallButton.IsEnabled = _installVoice is not null;
         VoiceDirBox.Text = voiceDir;
-        VoiceHint.Text = any
-            ? ""
-            : "No voices installed yet — use Install voice… (or #tts install) to download a free offline voice.";
+        VoiceHint.Text = !any
+            ? "No voices installed yet — use Install voice… (or #tts install) to download a free offline voice."
+            : !anyPiper
+                ? "No Piper voice installed — Install voice… adds the offline default, which stands in if a system voice goes missing."
+                : "";
     }
 
     /// <summary>Re-read the voice list after the folder or the installed set

@@ -234,6 +234,11 @@ public class ConfigurationViewModel : ReactiveObject
     /// default voice, as <c>#tts install</c> does; completes with its success.</summary>
     public Func<System.Threading.Tasks.Task<bool>>? TtsInstallVoice { get; set; }
 
+    /// <summary>Every voice the tab can offer — Piper and system voices in one
+    /// list (public #368) — as (ttsvoice value, labelled name). Null lists only
+    /// the Piper voices in the voice folder.</summary>
+    public Func<IReadOnlyList<(string Value, string Label)>>? TtsListVoices { get; set; }
+
     // ── Persistence hooks (called by every panel after an edit) ──────────────
 
     public void OnHighlightsChanged()

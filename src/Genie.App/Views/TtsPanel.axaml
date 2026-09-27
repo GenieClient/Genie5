@@ -46,7 +46,7 @@
       <StackPanel Orientation="Horizontal" Spacing="4">
         <ComboBox Name="VoiceCombo" Width="280"
                   AutomationProperties.Name="Voice"
-                  ToolTip.Tip="Installed voices (folders under the voice directory). Install more with #tts install."/>
+                  ToolTip.Tip="Installed voices: Piper voices from the voice folder, plus the voices installed on this computer (system). Install more Piper voices with #tts install."/>
         <Button Name="TestButton" Content="Test" Click="OnTest"
                 AutomationProperties.Name="Test voice"
                 AutomationProperties.HelpText="Speak a sample line with the selected voice."

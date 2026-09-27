@@ -82,6 +82,7 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
         // The speak-sample / voice-reset hooks come from the main window
         // (which owns the TtsService); null just disables the Test button.
         TtsPanelCtrl.Initialize(vm.ScriptConfig, vm.OnScriptSettingsChanged,
-                                vm.SpeakSample, vm.TtsVoiceChanged, vm.TtsInstallVoice);
+                                vm.SpeakSample, vm.TtsVoiceChanged, vm.TtsInstallVoice,
+                                vm.TtsListVoices);
     }
 }

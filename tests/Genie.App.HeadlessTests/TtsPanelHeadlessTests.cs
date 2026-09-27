@@ -113,6 +113,47 @@ public sealed class TtsPanelHeadlessTests : IDisposable
         window.Close();
     }
 
+    /// <summary>Public #368 — Piper and system voices sit in one list, labelled by
+    /// origin, and picking a system voice stores its backend.</summary>
+    [AvaloniaFact]
+    public void Voice_list_shows_both_sources_and_a_system_pick_is_stored_with_its_backend()
+    {
+        var cfg = NewConfig();
+        cfg.TtsVoice = "vits-piper-en_US-amy-low";   // an existing saved Piper voice
+        int voiceChanged = 0;
+        var (panel, window) = Host();
+        panel.Initialize(cfg, voiceChanged: () => voiceChanged++, listVoices: () => new[]
+        {
+            ("vits-piper-en_US-amy-low", "Amy (Piper)"),
+            ("system:Microsoft Zira Desktop", "Microsoft Zira Desktop (system)"),
+        });
+        var combo = Find<ComboBox>(panel, "VoiceCombo");
+
+        Assert.Equal(new[] { "Amy (Piper)", "Microsoft Zira Desktop (system)" },
+            System.Linq.Enumerable.Select(System.Linq.Enumerable.Cast<object>(combo.Items), i => i.ToString()));
+        Assert.Equal("Amy (Piper)", combo.SelectedItem?.ToString());   // saved Piper value still selects
+        Assert.Equal(0, voiceChanged);                                  // loading writes nothing back
+
+        combo.SelectedIndex = 1;
+
+        Assert.Equal("system:Microsoft Zira Desktop", cfg.TtsVoice);
+        Assert.Equal(1, voiceChanged);
+        Assert.Equal("", Find<TextBlock>(panel, "VoiceHint").Text);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Only_system_voices_still_points_at_the_piper_install()
+    {
+        var cfg = NewConfig();
+        var (panel, window) = Host();
+        panel.Initialize(cfg, listVoices: () => new[] { ("system:Microsoft David Desktop", "Microsoft David Desktop (system)") });
+
+        Assert.True(Find<ComboBox>(panel, "VoiceCombo").IsEnabled);
+        Assert.Contains("Install voice", Find<TextBlock>(panel, "VoiceHint").Text);
+        window.Close();
+    }
+
     [AvaloniaFact]
     public async Task A_failed_install_says_where_to_look()
     {

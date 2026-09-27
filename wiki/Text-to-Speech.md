@@ -24,11 +24,46 @@ directory (see [Application Folders](Application-Folders)).
 |---|---|
 | `#tts install` | Download and select the default voice |
 | `#tts install <name>` | Download a specific voice (e.g. `#tts install lessac`) |
-| `#tts voices` | List available voices and which are installed |
-| `#tts use <name>` | Switch the active voice |
-| `#tts status` | Show the voice folder, installed voices, and read-aloud state |
+| `#tts voices` | List the downloadable voices, which are installed, and the voices already on your computer |
+| `#tts use <name>` | Switch the active voice (a downloaded voice or a system voice) |
+| `#tts status` | Show the voice folder, installed voices, the active voice, and read-aloud state |
 
-Voices work identically on Windows, macOS, and Linux.
+The downloadable voices work identically on Windows, macOS, and Linux.
+
+## Using your computer's own voices
+
+If you already have voices set up for your screen reader or other apps, Genie
+can use them. They're listed next to the downloaded voices, with the source in
+brackets, for example **Amy (Piper)** and **Microsoft Zira Desktop (system)**.
+
+| Platform | Where system voices come from |
+|---|---|
+| Windows | SAPI5 voices: Microsoft David and Zira, plus third-party SAPI5 voices such as Ivona 2 |
+| macOS | The voices `say` offers (System Settings ▸ Accessibility ▸ Spoken Content) |
+| Linux | speech-dispatcher (`spd-say`), or `espeak-ng` when speech-dispatcher isn't installed |
+
+Pick one in the **Text-to-Speech** tab, or by name:
+
+```
+#tts voices                 list everything, system voices included
+#tts use zira               any unique part of the name works
+#tts use Microsoft Zira Desktop
+```
+
+The downloaded (Piper) voices stay the default. If the system voice you picked
+is later uninstalled, Genie says so once and speaks with a Piper voice instead.
+
+A few limits worth knowing:
+
+- **Windows:** only SAPI5 voices appear. The newer "natural" and OneCore voices
+  that Windows 10/11 add for Narrator aren't SAPI5, so they're not listed.
+- **Rate** maps onto each engine's own scale: SAPI's −10 to 10, `say` and
+  `espeak-ng` words per minute (1 = 175 wpm), and speech-dispatcher's −100 to 100.
+  Speeds won't match the Piper voices exactly.
+- **Volume** on speech-dispatcher sets its own level from quietest to loudest, so
+  it can sound louder than the other engines at the same percentage.
+- **Stopping:** `#tts stop` and urgent lines interrupt every engine. On Linux,
+  speech-dispatcher can finish the word or sentence it has already started.
 
 ## Speaking text
 
@@ -91,7 +126,7 @@ These persist with your profile (see [Configuration & Rules](Configuration)):
 | Setting | Meaning |
 |---|---|
 | `ttsvoicedir` | Folder holding installed voices (default `Voices`) |
-| `ttsvoice` | Selected voice folder name (set by `#tts use`) |
+| `ttsvoice` | Selected voice: a downloaded voice's folder name, or `system:<name>` for a system voice (set by `#tts use`) |
 | `ttsread` | Master read-aloud on/off |
 | `ttsreadstreams` | Comma-separated streams to read aloud |
 | `ttsstreampriority` | Per-stream priority overrides, `stream:level` pairs (set by `#tts priority`) |

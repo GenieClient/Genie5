@@ -455,7 +455,10 @@ public sealed class GenieConfig
 
     /// <summary>Selected TTS voice — the folder name under
     /// <see cref="TtsVoiceDir"/> (e.g. <c>vits-piper-en_US-lessac-medium</c>).
-    /// Empty = use the first installed voice found. Set by <c>#tts use</c>.</summary>
+    /// Empty = use the first installed voice found. Set by <c>#tts use</c>.
+    /// A voice installed on the computer itself (SAPI5 / say / spd-say, public
+    /// #368) is stored as <c>system:&lt;name&gt;</c>; a bare value is always a
+    /// Piper folder, so older settings load unchanged.</summary>
     public string TtsVoice { get; set; } = "";
 
     /// <summary>Master switch for per-stream read-aloud (auto-speak game text).
