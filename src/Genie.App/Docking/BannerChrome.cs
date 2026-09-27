@@ -126,8 +126,17 @@ public static class BannerChrome
             if (child is Grid g) { root = g; break; }
         if (root is null) return;
 
+        // Public #299: a window docked alone in its frame can hide this band for
+        // itself even while banners are on globally. Folded in here so the band
+        // keeps one writer — two mechanisms assigning the same part would undo
+        // each other on every re-template.
+        var show = _visible && !DockedTitleBar.WantsHidden(chrome);
         foreach (var child in root.GetVisualChildren())
             if (child is Control { Name: "PART_Border" } band)
-                band.IsVisible = _visible;
+                band.IsVisible = show;
     }
+
+    /// <summary>Re-evaluate one chrome's band — called by <see cref="DockedTitleBar"/>
+    /// when the frame's occupancy or its lone window's setting changes.</summary>
+    internal static void Refresh(ToolChromeControl chrome) => Apply(chrome);
 }

@@ -94,6 +94,16 @@ public sealed class WindowSettings
     /// </summary>
     public bool    FlashOnActivity { get; set; } = true;
 
+    /// <summary>
+    /// Collapse the dock frame's header (a tool frame's title bar, or the Game
+    /// group's tab strip) while this window is docked ALONE in its frame
+    /// (public #299). Off by default. A frame holding several tabs keeps its
+    /// header regardless — the tabs are how you switch between them — and a
+    /// floating window uses its own session-only title-bar toggle instead.
+    /// Toggled from the window right-click menu ("Hide Title Bar").
+    /// </summary>
+    public bool    HideTitleBarWhenAlone { get; set; } = false;
+
     public string? IfClosed     { get; set; }
     public event Action? Changed;
     public void NotifyChanged() => Changed?.Invoke();

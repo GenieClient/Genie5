@@ -263,7 +263,8 @@ public sealed class PersistenceService
             EchoToMain   = s.EchoToMain,
             WordWrap     = s.WordWrap,
             FlashOnActivity = s.FlashOnActivity,
-            IfClosed     = s.IfClosed,
+            HideTitleBarWhenAlone = s.HideTitleBarWhenAlone,
+            IfClosed    = s.IfClosed,
             HasIfClosed  = true,    // value above is authoritative
             IfClosedRevision = WindowSettingsStore.IfClosedRevision,   // #260 rewrite done
         })

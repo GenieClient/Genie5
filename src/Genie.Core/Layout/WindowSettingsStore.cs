@@ -179,6 +179,7 @@ public sealed class WindowSettingsStore
         s.EchoToMain = m.EchoToMain;
         s.WordWrap   = m.WordWrap;
         s.FlashOnActivity = m.FlashOnActivity;
+        s.HideTitleBarWhenAlone = m.HideTitleBarWhenAlone;
         if (m.HasIfClosed)
             s.IfClosed = m.IfClosedRevision < IfClosedRevision
                          && m.IfClosed is { } target

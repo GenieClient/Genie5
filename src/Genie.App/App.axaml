@@ -218,6 +218,9 @@
                       ToggleType="CheckBox"
                       IsChecked="{Binding WindowMenu.IsScrollPaused, Mode=TwoWay}"
                       IsVisible="{Binding WindowMenu.ShowPauseScroll}" />
+            <MenuItem Header="{Binding WindowMenu.TitleBarHeader}"
+                      Command="{Binding WindowMenu.ToggleTitleBarCommand}"
+                      IsVisible="{Binding WindowMenu.ShowHideTitleBar}" />
           </ContextMenu>
         </Grid.ContextMenu>
 
@@ -324,6 +327,11 @@
                       ToggleType="CheckBox"
                       IsChecked="{Binding WindowMenu.IsScrollPaused, Mode=TwoWay}"
                       IsVisible="{Binding WindowMenu.ShowPauseScroll}" />
+            <!-- Public #299: hide the Game group's tab strip while this is the
+                 only window in it. -->
+            <MenuItem Header="{Binding WindowMenu.TitleBarHeader}"
+                      Command="{Binding WindowMenu.ToggleTitleBarCommand}"
+                      IsVisible="{Binding WindowMenu.ShowHideTitleBar}" />
           </ContextMenu>
         </Grid.ContextMenu>
         <!-- PageScroll (#136): PageUp/PageDown page the last-clicked game

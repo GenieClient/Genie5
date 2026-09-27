@@ -197,6 +197,9 @@ public sealed class WindowSettingsPersistenceModel
     /// <summary>Defaults true so windows.json files predating the toggle (no
     /// field) keep the shipped flash-on-unread-activity behaviour.</summary>
     public bool    FlashOnActivity { get; set; } = true;
+    /// <summary>Public #299. Defaults false, so windows.json files predating the
+    /// toggle keep every frame header shown.</summary>
+    public bool    HideTitleBarWhenAlone { get; set; }
     public string? IfClosed     { get; set; }
     public bool    HasIfClosed  { get; set; }
     /// <summary>Which <c>WindowSettingsStore.IfClosedRevision</c> wrote this

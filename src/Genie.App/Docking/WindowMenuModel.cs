@@ -43,6 +43,10 @@ public sealed class WindowMenuModel : ReactiveObject
     private readonly Func<bool>?   _floatStateProbe;
     private readonly Action?       _onToggleTitleBar;
     private readonly Func<bool>?   _titleBarHiddenProbe;
+    private bool _isDockedTitleBarHidden;
+    private bool _isAloneInFrame;
+    private readonly Action<bool>? _onDockedTitleBarToggled;
+    private readonly Func<bool>?   _aloneInFrameProbe;
 
     public WindowMenuModel(
         ICommand?     clear                 = null,
@@ -67,7 +71,10 @@ public sealed class WindowMenuModel : ReactiveObject
         bool          configBarOn           = true,
         Action<bool>? onConfigBarToggled    = null,
         bool          flashOn               = true,
-        Action<bool>? onFlashToggled        = null)
+        Action<bool>? onFlashToggled        = null,
+        bool          dockedTitleBarHidden    = false,
+        Action<bool>? onDockedTitleBarToggled = null,
+        Func<bool>?   aloneInFrameProbe       = null)
     {
         ClearCommand           = clear;
         CloseCommand           = close;
@@ -91,6 +98,9 @@ public sealed class WindowMenuModel : ReactiveObject
         _floatStateProbe       = floatStateProbe;
         _onToggleTitleBar      = onToggleTitleBar;
         _titleBarHiddenProbe   = titleBarHiddenProbe;
+        _isDockedTitleBarHidden  = dockedTitleBarHidden;
+        _onDockedTitleBarToggled = onDockedTitleBarToggled;
+        _aloneInFrameProbe       = aloneInFrameProbe;
 
         if (onToggleFloat is not null)
             ToggleFloatCommand = ReactiveCommand.Create(() =>
@@ -99,10 +109,16 @@ public sealed class WindowMenuModel : ReactiveObject
                 RefreshFloatState();   // verb flips immediately after the action
             });
 
-        if (onToggleTitleBar is not null)
+        // One item, two targets (public #299): a floating window collapses its
+        // float's title bar (session-only, #181); a docked window alone in its
+        // frame flips the persisted per-window setting instead.
+        if (onToggleTitleBar is not null || onDockedTitleBarToggled is not null)
             ToggleTitleBarCommand = ReactiveCommand.Create(() =>
             {
-                onToggleTitleBar();
+                if (_isFloating && onToggleTitleBar is not null)
+                    onToggleTitleBar();
+                else if (onDockedTitleBarToggled is not null)
+                    IsDockedTitleBarHidden = !IsDockedTitleBarHidden;
                 RefreshFloatState();   // "Hide" ⇄ "Show" flips immediately
             });
 
@@ -119,8 +135,9 @@ public sealed class WindowMenuModel : ReactiveObject
     /// <summary>"Find…" — open the window's in-window search bar (#120).</summary>
     public ICommand? FindCommand        { get; }
     public ICommand? ToggleFloatCommand { get; }
-    /// <summary>#181: collapse / restore the float's title bar (only meaningful when
-    /// floating; the item hides itself when docked via <see cref="ShowHideTitleBar"/>).</summary>
+    /// <summary>Collapse / restore the title bar: the float's own bar while floating
+    /// (#181), the frame header while docked alone in a frame (public #299). The
+    /// item hides itself when neither applies, via <see cref="ShowHideTitleBar"/>.</summary>
     public ICommand? ToggleTitleBarCommand { get; }
 
     // Capability flags drive each MenuItem's IsVisible — a window only shows the
@@ -146,16 +163,40 @@ public sealed class WindowMenuModel : ReactiveObject
     public bool ShowFlash        => _onFlashToggled       is not null;
     public bool ShowFloat        => ToggleFloatCommand    is not null;
 
-    /// <summary>#181: "Hide/Show Title Bar" applies only to a window that's floating
-    /// in its own frame — a docked panel has no float title bar — so the item shows
-    /// only when the toggle was wired AND the window is currently floating. Kept live
-    /// by <see cref="RefreshFloatState"/> on each menu-open.</summary>
-    public bool ShowHideTitleBar => ToggleTitleBarCommand is not null && _isFloating;
+    /// <summary>"Hide/Show Title Bar" shows in two cases. <b>Floating</b> (#181):
+    /// the float's own title bar. <b>Docked and alone in its frame</b> (public
+    /// #299): the frame's header — a tool frame's title bar, or the Game group's
+    /// tab strip — which only repeats the one window's name. A docked window that
+    /// shares its frame keeps the header (it is how you switch tabs), so the item
+    /// hides there, unless the setting is already on and still needs turning off.
+    /// Kept live by <see cref="RefreshFloatState"/> on each menu-open.</summary>
+    public bool ShowHideTitleBar =>
+        _isFloating
+            ? _onToggleTitleBar is not null
+            : _onDockedTitleBarToggled is not null && (_isAloneInFrame || _isDockedTitleBarHidden);
 
-    /// <summary>#181: "Hide Title Bar" when the bar is shown, "Show Title Bar" when
-    /// it's collapsed. Reflects the live float-window state (probed on menu-open).</summary>
+    /// <summary>"Hide Title Bar" when the bar is shown, "Show Title Bar" when it's
+    /// collapsed. Floating reads the live float window (#181); docked reads the
+    /// persisted per-window setting (public #299).</summary>
     public string TitleBarHeader =>
-        (_titleBarHiddenProbe?.Invoke() ?? false) ? "Show Title Bar" : "Hide Title Bar";
+        (_isFloating ? (_titleBarHiddenProbe?.Invoke() ?? false) : _isDockedTitleBarHidden)
+            ? "Show Title Bar" : "Hide Title Bar";
+
+    /// <summary>Public #299: collapse this window's frame header while it is docked
+    /// alone in that frame. Mirrors <c>WindowSettings.HideTitleBarWhenAlone</c>;
+    /// setting it runs the toggle handler, which persists. The header itself is
+    /// collapsed by <see cref="DockedTitleBar"/>, which watches this property.</summary>
+    public bool IsDockedTitleBarHidden
+    {
+        get => _isDockedTitleBarHidden;
+        set
+        {
+            if (_isDockedTitleBarHidden == value) return;
+            this.RaiseAndSetIfChanged(ref _isDockedTitleBarHidden, value);
+            this.RaisePropertyChanged(nameof(TitleBarHeader));
+            _onDockedTitleBarToggled?.Invoke(value);
+        }
+    }
 
     /// <summary>Render the separator above "Close Window" only when Close
     /// coexists with at least one item above it (so a Close-only menu has no
@@ -282,6 +323,10 @@ public sealed class WindowMenuModel : ReactiveObject
         // #181: the title-bar item's visibility and its Hide/Show verb both depend on
         // live float-window state, so re-raise them on every open even when the float
         // flag itself didn't move (the user may have hidden/shown the bar since).
+        // Public #299: "alone in its frame" also moves without the menu knowing
+        // (a tab dragged in or out), so re-probe it on the same schedule.
+        if (_aloneInFrameProbe is not null)
+            _isAloneInFrame = _aloneInFrameProbe();
         this.RaisePropertyChanged(nameof(ShowHideTitleBar));
         this.RaisePropertyChanged(nameof(TitleBarHeader));
 
@@ -291,6 +336,7 @@ public sealed class WindowMenuModel : ReactiveObject
         _isFloating = floating;
         this.RaisePropertyChanged(nameof(FloatHeader));
         this.RaisePropertyChanged(nameof(ShowHideTitleBar));
+        this.RaisePropertyChanged(nameof(TitleBarHeader));
     }
 
     /// <summary>Mirror an external Time Stamp change (e.g. the Layout tab) into
@@ -316,6 +362,14 @@ public sealed class WindowMenuModel : ReactiveObject
     /// re-invoking the toggle handler.</summary>
     public void SyncConfigBar(bool value) =>
         this.RaiseAndSetIfChanged(ref _isConfigBarOn, value, nameof(IsConfigBarOn));
+
+    /// <summary>Mirror an external "Hide Title Bar" change (e.g. the Layout tab)
+    /// into the model without re-invoking the toggle handler.</summary>
+    public void SyncDockedTitleBar(bool value)
+    {
+        this.RaiseAndSetIfChanged(ref _isDockedTitleBarHidden, value, nameof(IsDockedTitleBarHidden));
+        this.RaisePropertyChanged(nameof(TitleBarHeader));
+    }
 
     /// <summary>Mirror an external "Flash on Activity" change (e.g. the Layout
     /// tab) into the checkmark without re-invoking the toggle handler.</summary>

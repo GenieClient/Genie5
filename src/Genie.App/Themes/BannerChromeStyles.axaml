@@ -23,6 +23,15 @@
   -->
   <Style Selector="ToolChromeControl">
     <Setter Property="(docking:BannerChrome.Managed)" Value="True"/>
+    <!-- Public #299: per-window "Hide Title Bar" for a window docked alone in
+         its frame. Feeds BannerChrome, which stays the band's only writer. -->
+    <Setter Property="(docking:DockedTitleBar.Enabled)" Value="True"/>
+  </Style>
+
+  <!-- Public #299, document side: the Game group's tab strip when the Game
+       window is alone in it. -->
+  <Style Selector="DocumentControl">
+    <Setter Property="(docking:DockedTitleBar.Enabled)" Value="True"/>
   </Style>
 
 </Styles>

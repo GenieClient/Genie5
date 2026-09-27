@@ -1320,6 +1320,19 @@ public class GenieDockFactory : Factory
             };
         }
 
+        // Public #299: Hide Title Bar while docked alone in a frame — every
+        // dockable, the Game window included. Persisted per window; the header
+        // itself is collapsed by DockedTitleBar, which watches the menu model.
+        var           titleSettings    = _vm.WindowSettings.Get(id);
+        bool          dockedTitleInit  = titleSettings.HideTitleBarWhenAlone;
+        Action<bool>  dockedTitleToggle = on =>
+        {
+            titleSettings.HideTitleBarWhenAlone = on;
+            titleSettings.NotifyChanged();
+            _vm.SaveWindowSettings();
+        };
+        Func<bool>    aloneProbe = () => IsAloneInFrame(dockable);
+
         // Time Stamp + Name List Only + Pause Scrolling only make sense for the
         // per-line text feeds; everything else gets Copy All / Save As (where
         // it has a buffer) + Find + Clear + Float + Close.
@@ -1340,7 +1353,10 @@ public class GenieDockFactory : Factory
                 configBarOn:        configBarInit,
                 onConfigBarToggled: configBarToggle,
                 flashOn:            flashInit,
-                onFlashToggled:     flashToggle);
+                onFlashToggled:     flashToggle,
+                dockedTitleBarHidden:    dockedTitleInit,
+                onDockedTitleBarToggled: dockedTitleToggle,
+                aloneInFrameProbe:       aloneProbe);
 
             // Keep the checkmark honest when the visibility changes outside the
             // menu — the value seeded from settings.cfg on connect (Attach), or
@@ -1356,6 +1372,8 @@ public class GenieDockFactory : Factory
             // Same for Flash on Activity edited from the Layout tab.
             if (dockable is ActivityTool { ActivitySettings: { } fsSync })
                 fsSync.Changed += () => toolMenu.SyncFlash(fsSync.FlashOnActivity);
+
+            titleSettings.Changed += () => toolMenu.SyncDockedTitleBar(titleSettings.HideTitleBarWhenAlone);
 
             return toolMenu;
         }
@@ -1423,7 +1441,10 @@ public class GenieDockFactory : Factory
             onToggleTitleBar:      toggleTitleBar,
             titleBarHiddenProbe:   titleBarHidden,
             flashOn:               flashInit,
-            onFlashToggled:        flashToggle);
+            onFlashToggled:        flashToggle,
+            dockedTitleBarHidden:    dockedTitleInit,
+            onDockedTitleBarToggled: dockedTitleToggle,
+            aloneInFrameProbe:       aloneProbe);
 
         // Keep the checkmarks in sync if the same settings are edited elsewhere
         // (e.g. the Configuration → Layout tab's Time Stamp checkbox).
@@ -1434,6 +1455,7 @@ public class GenieDockFactory : Factory
             menu.SyncWordWrap(settings.WordWrap);
             menu.SyncEchoToMain(settings.EchoToMain);
             menu.SyncFlash(settings.FlashOnActivity);
+            menu.SyncDockedTitleBar(settings.HideTitleBarWhenAlone);
         };
 
         return menu;
@@ -2338,6 +2360,13 @@ public class GenieDockFactory : Factory
         if (IsToolFloating(id)) RedockTool(id);
         else                    FloatTool(id);
     }
+
+    /// <summary>Public #299: whether the dockable is the only visible occupant of
+    /// its frame (tool dock or document group) — the case where the frame's
+    /// header only repeats this window's name and "Hide Title Bar" is offered.
+    /// Reads the live model, since tabs are dragged in and out freely.</summary>
+    public static bool IsAloneInFrame(IDockable dockable) =>
+        dockable.Owner is IDock { VisibleDockables: { Count: 1 } only } && ReferenceEquals(only[0], dockable);
 
     /// <summary>#181: whether the tool's floating window currently has its title bar
     /// (Dock chrome) collapsed. False when the tool is docked or its host isn't a
