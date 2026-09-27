@@ -35,6 +35,7 @@ Out of the box you get a three-column arrangement:
 | **Analytics** | Charts over your experience history — session gain bars, a long-horizon rank curve per skill, and session-vs-session comparison. See [the Analytics panel](#the-analytics-panel) below. |
 | **Script Manager** | Your script library, the running-script list with pause/abort controls, and a separate scrollback for script output (`[script]` lines, `#echo`, debug traces) — so a busy hunt script doesn't clutter the main window. Toggled from the top-level **Scripts** menu (not Window), which also has List / Pause All / Resume All / Abort All and external-editor entries. |
 | **Injuries** | A body silhouette showing per-region wounds and scars from the game's injury data, colour-coded by severity, with a text list alongside. Typing `health` refines the nervous-system reading (wound vs scar) and clears any region the report no longer names. |
+| **Healing** | An Empath healing console: each patient's `perceive health` or `touch` reading as a body diagram coloured on DragonRealms' full 13-step wound scale, with click-to-heal, **Take All**, and spell buttons. See [the Healing window](#the-healing-window) below. |
 | **Portrait** | DragonRealms room/scene artwork for the current area (`#config showimages`) — the panel Genie 4 called Portrait. |
 | **Raw XML** | The unparsed server stream, for debugging and parser spelunking. |
 | **Stream tabs** | DragonRealms routes certain text to named streams. Genie surfaces **Talk**, **Whispers**, **Thoughts**, **OOC**, **Conversation**, **Group**, **Combat**, **Logons**, **Familiar**, **Deaths**, **Assess**, **Atmospherics**, **Log**, and **Item Log** as their own windows so they each keep a clean scrollback. (Speech and whispers also appear in the main window — DragonRealms sends them to both by design.) OOC, Conversation, Group and Atmospherics start hidden; turn them on from the Window menu. A stream Genie has no window for yet still shows in the main window, marked with its name in brackets (for example `[newstream] …`), rather than disappearing. |
@@ -78,6 +79,21 @@ A character dropdown switches whose history you're looking at. The store lives i
 - **Remove** — drops the selected character's data from the catalog (two-step confirm).
 
 The catalog is saved to `InventoryView.xml` in your data folder in the same format the Genie 4 InventoryView plugin used, so an existing file carries over as-is. Scans finish with a `InventoryView scan complete` line through the parse pipeline, so a login script can `waitforre` it. Type `/iv help` for the full command list.
+
+## The Healing window
+
+**Healing** (toggle it from the **Window** menu; hidden until you open it) is an Empath's healing console, in the spirit of Genie 4's Crutch plugin. It is fed by the text DragonRealms prints for `perceive health` and for an empath's `touch` — nothing else — and it acts only when you click one of its buttons.
+
+- **Patient.** Type a name (leave it blank for yourself) and click **Touch** to diagnose a patient or **Perceive** to send `perceive health` (`perceive health <name>` for someone else). Every reading lands in the list underneath, one row per patient with its time, and stays there until a newer reading for that patient replaces it or you click **Forget**. Picking a row shows that patient and points the buttons at them.
+- **Body diagram.** One tile per body region, coloured from green through amber to deep red across all thirteen severities, with the step number on the tile. The dropdown chooses which of the four readings the tiles show — **Fresh External**, **Fresh Internal**, **Scar External**, **Scar Internal**. Hover a tile for all four at once; the **Wounds** list under the panel spells out every wound in words. Vitality, **Poisoned** and **Diseased** show under the diagram.
+- **Click a wounded tile** to heal it on the axis you're viewing. For a patient that sends `take <patient> <part>` (with `internal` and/or `scar` as the axis needs). For yourself it prepares **Heal Wounds** (fresh) or **Heal Scars** (scar) and casts at that part.
+- **Take All** queues one `take` per wound on the patient's latest reading — fresh wounds first, worst first — through the ordinary `#send` queue, so each goes when your roundtime clears. **Stop** sends `#queue clear` and cancels whatever hasn't gone yet. **Quick takes** adds `quick` to every take.
+- **Vitality / Poison / Disease** take that condition from a patient (`take <patient> vitality`), or for yourself prepare Vitality Healing, Flush Poisons, or Cure Disease.
+- **Spells.** One button per Empath spell — **HW** Heal Wounds, **HS** Heal Scars, **HEAL** Heal, **REGE** Regenerate, **VH** Vitality Healing, **BS** Blood Staunching, **FP** Flush Poisons, **CD** Cure Disease, **REFR** Refresh.
+
+**Mana and cast wait.** Open **Mana and cast wait** to set each spell's mana and the seconds between preparing and casting. With a wait of **0** (the default) a spell button only prepares the spell; a **Cast** button then appears and sends the cast when you click it. Set a wait and the cast is queued that many seconds after the prep instead. A blank mana uses your Genie 4 `GCTextBoxMana…` variable if you imported one, otherwise the spell's minimum. The values are saved per character (`healing.json` in your profile folder), and every value you set is also published under Crutch's variable names — `$GCTextBoxManaHW`, `$GCTextBoxDelayHW` and so on — so scripts that read them keep working.
+
+Nothing in this window sends on its own: a reading arriving only redraws it, and there is no timer. Every command goes through the same path as a line you type.
 
 ## The Alterations menu
 

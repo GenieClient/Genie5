@@ -91,6 +91,14 @@ The original authors, with thanks:
   the stacking `query` filters, and the clickable result rows. Its spell data
   comes from Etherian's nightly Elanthipedia-derived spell feed rather than the
   plugin's bundled list.
+- **Crutch** — *Conny* (original author) and *Jon* (v2 and later), with later
+  maintenance by *LaegotKit* and *Sekmeht*
+  ([SekmehtDR/Genie_Crutch](https://github.com/SekmehtDR/Genie_Crutch)). The
+  Healing window takes its idea and its behaviour from this Genie 4 Empath
+  healing console — a clickable body diagram per patient, one-click takes, and
+  the `GCTextBoxMana*` / `GCTextBoxDelay*` variable names. It is a clean
+  reimplementation on Genie 5's own `perceive health` reader; no Crutch code is
+  used.
 
 Plugins that remain plugins are credited in their own `Plugin_*V5` repositories.
 
