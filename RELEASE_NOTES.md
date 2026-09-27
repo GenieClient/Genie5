@@ -102,6 +102,12 @@ finally remembering where you left every panel.
   with a trackball or a tremor. A global toggle keeps them at full width:
   Display Settings ▸ General, or `#config alwaysshowscrollbars on` (#365).
 
+- **The roundtime badge can stay put** — it only existed during roundtime, so
+  the command box (or the hands strip's L/R/S row) jumped sideways every time
+  roundtime started and ended. **Layout ▸ Roundtime Position ▸ Keep Visible**
+  pins it in place: dimmed at `0.0s` between roundtimes, full red during one.
+  Off by default, so nothing moves on upgrade.
+
 - **The Window menu lists script windows apart from plugin windows** —
   windows a script made with `#echo >name`, `#link >name` or `#window` were
   indistinguishable from a plugin's in one Plugin Windows list (#367).

@@ -21,7 +21,7 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.9.5 "Carried Over"
+## Where we are — v5.0.0-beta.9.6 "Well Placed"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
@@ -56,24 +56,23 @@ garbage rules, macros fire, alias arguments substitute, braced payloads
 survive, and the importer now reports every rule it dropped instead of a
 bare skip count. It also stops Update Maps damaging the user's maps through
 a lossy exporter (#352), ships the Genie 4 workspace as the "Heirloom"
-layout, and brings SimuCoins in-house (#328).
+layout, and brings SimuCoins in-house (#328); and **beta.9.6** teaches the
+windows DragonRealms sends where they belong — server dialogs get a settings
+page, honour the game's placement hints and can open beside any window you
+name, while Friends & Enemies and another character's injuries render as
+content rather than sprite names (#156, #341, #342, #345). The mapper draws
+rooms and labels at their Genie 4 pixels, edits labels, tags and notes, keeps
+a floor you are not on as a faint map, builds its legend from what the floor
+actually shows, and offers map spoiler settings (#254) and a one-click
+**Repair Maps** (#352). Around that: Genie 4's `{display:command}` inline
+links (#362) and `@` / `\x` directives (#348), `#scriptcheck` (#239), Genie 4
+`.layout` import (#319), panels that reopen floating where you left them
+(#359), bars that dock top or bottom and ride on saved layouts (#349, #357),
+and a script-engine parity and durability batch — `%list.length`, bare sigil
+assignment, `genie.put("#…")`, container contents in their own window (#336)
+and charged spells keeping their time left (#301).
 Self-update is now **verified end-to-end on all three platforms** (#27 —
 thanks @dylb0t for the macOS validation).
-
-**On `main`, not yet released (staged for beta.9.6):** server dialogs get a
-settings page, honour DragonRealms' placement hints, and can open beside
-any window you name, while Friends & Enemies and another character's
-injuries render as content rather than sprite names (#156, #341, #342,
-#345); Genie 4's `{display:command}` inline click links (#362) and its `@`
-/ `\x` command-bar directives (#348); `#scriptcheck` reports every problem
-in a script without running it (#239); map spoiler settings (#254) and a
-one-click **Repair Maps** (#352); Genie 4 `.layout` files import (#319);
-every panel reopens floating where you left it (#359) and the Icon, Health
-and Script bars dock top or bottom (#349, #357); plus the script-engine
-parity and durability batch — `%list.length`, bare sigil assignment,
-`genie.put("#…")`, container contents in their own window (#336), charged
-spells keeping their time left (#301), and the mapper drawing a floor you are
-not on as a faint map rather than a grey grid.
 
 Highlights of what works today:
 
@@ -133,11 +132,11 @@ where the next commit does the most good:
    tail. (The P1 script-correctness bugs that used to lead this list — rule
    layering #257 and eval composition #300 — shipped in beta.8; roundtime on
    the server clock and script-engine thread safety shipped in beta.6.)
-2. **The script validator**
-   ([#239](https://github.com/GenieClient/Genie5/issues/239)) before the in-app
-   editor (Track E). It's the cheaper half and a whole-corpus scan is a far
-   better regression signal for the script engine than waiting for a specific
-   line to execute.
+2. **The in-app editor (Track E)** now that its cheaper half has shipped: the
+   script validator landed in beta.9.6 as `#scriptcheck`
+   ([#239](https://github.com/GenieClient/Genie5/issues/239)), which reports
+   every problem in a script without running it and doubles as a whole-corpus
+   regression signal for the script engine.
 3. **Track B** (server-driven dialogs) and **Track E** (editor) — the two
    multi-week builds. Track B's capture groundwork shipped in beta.8; player
    `#dialogs` reports during the soak feed the renderer design directly.
