@@ -56,7 +56,7 @@ public sealed class PipelineMetrics
         public long   Timeouts;
     }
 
-    private readonly object   _gate = new();
+    private readonly System.Threading.Lock _gate = new();
     private readonly Bucket[] _buckets;
 
     public PipelineMetrics()

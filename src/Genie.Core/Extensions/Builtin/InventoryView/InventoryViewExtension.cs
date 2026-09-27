@@ -28,7 +28,7 @@ namespace Genie.Core.Extensions.Builtin.InventoryView;
 /// parse. Catalogs saved by the pre-fix plugin (one giant merged tap) are
 /// repaired on load.</para>
 /// </summary>
-public sealed class InventoryViewExtension : IGameExtension
+public sealed partial class InventoryViewExtension : IGameExtension
 {
     public string Name        => "InventoryView";
     public string Version     => "2.1";
@@ -40,7 +40,7 @@ public sealed class InventoryViewExtension : IGameExtension
 
     /// <summary>Guards <see cref="_characterData"/> — the scan mutates on the
     /// parser thread while the App reads snapshots on the UI thread.</summary>
-    private readonly object _sync = new();
+    private readonly System.Threading.Lock _sync = new();
     private List<CharacterData> _characterData = new();
 
     // ── Scan state (mirrors the Genie 4 plugin's FSM fields) ──────────────────
@@ -70,7 +70,7 @@ public sealed class InventoryViewExtension : IGameExtension
     private int _scanGeneration;
     /// <summary>Serializes the claim on ending a scan — <c>/iv cancel</c>, the
     /// watchdog and a character switch can race for it.</summary>
-    private readonly object _scanLifecycle = new();
+    private readonly System.Threading.Lock _scanLifecycle = new();
 
     /// <summary>How long one scan step may go without the game advancing it before
     /// the scan gives up. Every FSM phase blocks on specific trigger text, so a
@@ -809,7 +809,9 @@ public sealed class InventoryViewExtension : IGameExtension
 
     /// <summary>Matches the indent run that precedes every list entry. Item taps
     /// are single-spaced, so a run of 2+ spaces can only be indentation.</summary>
-    private static readonly Regex IndentRun = new(@" {2,}", RegexOptions.Compiled);
+    private static readonly Regex IndentRun = IndentRunRegex();
+    [GeneratedRegex(@" {2,}", RegexOptions.None)]
+    private static partial Regex IndentRunRegex();
 
     /// <summary>Split one raw list line (merged or classic) into items and add
     /// each to the tree. Returns false when the line was not list output at all —

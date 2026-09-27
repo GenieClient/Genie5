@@ -12,15 +12,16 @@ namespace Genie.Core.Dialogs;
 /// schemas are already test fixtures. Never throws: a journaling failure
 /// must not touch the game loop.
 /// </summary>
-public sealed class DialogJournal
+public sealed partial class DialogJournal
 {
     public const string FileName = "dialog_journal.xml";
 
-    private static readonly Regex MarkerRe =
-        new("<!-- dialog id=\"([^\"]+)\"", RegexOptions.Compiled);
+    private static readonly Regex MarkerRe = MarkerRegex();
+    [GeneratedRegex("<!-- dialog id=\"([^\"]+)\"", RegexOptions.None)]
+    private static partial Regex MarkerRegex();
 
     private readonly string _path;
-    private readonly object _gate = new();
+    private readonly System.Threading.Lock _gate = new();
     private readonly HashSet<string> _seen = new(StringComparer.OrdinalIgnoreCase)
     {
         "injuries", "minivitals",

@@ -89,7 +89,7 @@ public sealed class ServerDialogMappings
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
     };
 
-    private readonly object _gate = new();
+    private readonly System.Threading.Lock _gate = new();
 
     private readonly Dictionary<string, ServerDialogMapping> _mappings =
         new(StringComparer.OrdinalIgnoreCase);

@@ -19,7 +19,7 @@ public sealed class DialogSessionTracker
         public Dictionary<DialogControlType, int> ControlCounts { get; } = new();
     }
 
-    private readonly object _gate = new();
+    private readonly System.Threading.Lock _gate = new();
     private readonly Dictionary<string, Row> _rows = new(StringComparer.OrdinalIgnoreCase);
 
     public void Observe(OpenDialogEvent e)

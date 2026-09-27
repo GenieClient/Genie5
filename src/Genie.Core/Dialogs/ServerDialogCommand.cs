@@ -57,7 +57,7 @@ public sealed record ServerDialogAction(
 /// <c>ArgumentParser.SafeSplit</c> already understands (#132). Note the
 /// separator is configurable, so this must never hardcode <c>;</c>.</para>
 /// </summary>
-public static class ServerDialogCommand
+public static partial class ServerDialogCommand
 {
     /// <summary>Base for the server's root-relative <c>url:</c> paths
     /// (<c>url:/dr/info/</c>, <c>url:/bounce/redirect.asp?URL=…</c>).</summary>
@@ -67,8 +67,9 @@ public static class ServerDialogCommand
 
     // A token is %name% with no whitespace inside, so ordinary prose percentages
     // ("50% of 100%") cannot be mistaken for one.
-    private static readonly Regex TokenRe =
-        new(@"%([A-Za-z0-9_][A-Za-z0-9_.\-]*)%", RegexOptions.Compiled);
+    private static readonly Regex TokenRe = TokenRegex();
+    [GeneratedRegex(@"%([A-Za-z0-9_][A-Za-z0-9_.\-]*)%", RegexOptions.None)]
+    private static partial Regex TokenRegex();
 
     /// <summary>
     /// Resolve <paramref name="cmd"/> against its sibling controls.

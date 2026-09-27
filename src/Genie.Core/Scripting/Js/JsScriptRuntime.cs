@@ -37,7 +37,7 @@ internal sealed class JsScriptRuntime
     private readonly Action<string, string?, string?>?       _echoTo;
 
     private readonly List<JsScriptInstance>                  _instances  = new();
-    private readonly object                                  _listGate   = new();
+    private readonly System.Threading.Lock                   _listGate   = new();
     private readonly ConcurrentDictionary<string, Regex>     _regexCache = new();
 
     /// <summary>Runaway-loop backstop: abort a <c>.js</c> that runs this many

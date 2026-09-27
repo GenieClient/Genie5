@@ -46,7 +46,7 @@ public sealed class AnalystCapture : IDisposable
 
     private readonly string          _captureDir;
     private readonly Action<string>? _diag;
-    private readonly object          _gate = new();
+    private readonly System.Threading.Lock _gate = new();
 
     private StreamWriter? _xml;
     private StreamWriter? _streams;

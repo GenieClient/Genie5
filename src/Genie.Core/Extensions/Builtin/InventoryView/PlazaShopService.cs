@@ -30,7 +30,7 @@ public sealed class PlazaShopService
     public static readonly TimeSpan CacheTtl = TimeSpan.FromHours(6);
 
     private readonly string _cacheFile;
-    private readonly object _sync = new();
+    private readonly System.Threading.Lock _sync = new();
     private List<ShopListing>? _listings;
 
     /// <summary>Overridable download seam for tests: → raw xlsx bytes (null on

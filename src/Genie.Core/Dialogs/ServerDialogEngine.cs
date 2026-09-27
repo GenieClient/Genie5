@@ -120,7 +120,7 @@ public sealed class ServerDialogEngine
     public static readonly IReadOnlyCollection<string> BespokeDialogIds =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "injuries", "minivitals" };
 
-    private readonly object _gate = new();
+    private readonly System.Threading.Lock _gate = new();
     private readonly Dictionary<string, Entry> _dialogs = new(StringComparer.OrdinalIgnoreCase);
 
     // Stream text is keyed by CONTROL id and lives outside any one dialog,

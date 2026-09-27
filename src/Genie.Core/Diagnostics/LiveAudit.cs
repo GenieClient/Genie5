@@ -45,7 +45,7 @@ public enum AuditMode
 /// </summary>
 public sealed partial class LiveAudit : IDisposable
 {
-    private readonly object                  _lock = new();
+    private readonly System.Threading.Lock   _lock = new();
     private readonly string                  _path;
     private readonly IObservable<string>     _rawXml;
     private readonly IObservable<GameEvent>  _events;

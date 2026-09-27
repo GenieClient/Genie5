@@ -59,7 +59,7 @@ public sealed class WikiItemInfoCache
     private const int AskChunk = 12;
 
     private readonly string _cacheFile;
-    private readonly object _sync = new();
+    private readonly System.Threading.Lock _sync = new();
     private readonly Dictionary<string, WikiItemInfo> _cache = new(StringComparer.OrdinalIgnoreCase);
     private bool _loaded;
 
