@@ -19,6 +19,7 @@ using Genie.Core.Presets;
 using Genie.Core.Queue;
 using Genie.Core.Runtime;
 using Genie.Core.Scripting;
+using Genie.Core.Shunts;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
 using Genie.Core.Variables;
@@ -247,6 +248,9 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     public PresetEngine        Presets        { get; }
     public SubstituteEngine    Substitutes    { get; }
     public GagEngine           Gags           { get; }
+    /// <summary><c>#shunt</c> rules (public #248) — consulted by the display
+    /// layer after substitutes and gags.</summary>
+    public ShuntEngine         Shunts         { get; }
     public MacroEngine         Macros         { get; }
     public AutoMapperEngine    AutoMapper     { get; }
 
@@ -658,6 +662,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Gags           = new GagEngine();
         Gags.Classes   = Classes;
         Commands.Gags = Gags;                // wire #gag command → engine
+
+        Shunts          = new ShuntEngine();
+        Shunts.Classes  = Classes;
+        Commands.Shunts = Shunts;            // wire #shunt command → engine (public #248)
 
         Macros = new MacroEngine();
         Macros.Classes  = Classes;           // class-scope filter (Genie 4 parity)
@@ -1287,6 +1295,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                     Commands.ProcessInput("#gag load");
                 if (File.Exists(Path.Combine(profileDir, "macros.cfg")))
                     Commands.ProcessInput("#macro load");
+                if (File.Exists(Path.Combine(profileDir, "shunts.cfg")))
+                    Commands.ProcessInput("#shunt load");
             });
         }
 
@@ -2317,6 +2327,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Highlights.Clear();
         Substitutes.Clear();
         Gags.Clear();
+        Shunts.Clear();
         Macros.Clear();
     }
 

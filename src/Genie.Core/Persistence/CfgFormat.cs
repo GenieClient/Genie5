@@ -4,6 +4,7 @@ using Genie.Core.Highlights;
 using Genie.Core.Macros;
 using Genie.Core.Presets;
 using Genie.Core.Runtime;
+using Genie.Core.Shunts;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
 using Genie.Core.Variables;
@@ -54,6 +55,13 @@ public static class CfgFormat
     public static IEnumerable<string> GagLines(IEnumerable<GagRule> rules) =>
         rules.Select(r =>
             $"#gag add {ConfigPersistence.FormatArg(r.Pattern)} {ConfigPersistence.FormatArg(r.ClassName)}");
+
+    /// <summary><c>#shunt add {pattern} {window} {class}[ copy]</c> (public #248).
+    /// The class slot is always written so the trailing keyword can never be
+    /// read as a class name.</summary>
+    public static IEnumerable<string> ShuntLines(IEnumerable<ShuntRule> rules) =>
+        rules.Select(r =>
+            $"#shunt add {ConfigPersistence.FormatArg(r.Pattern)} {ConfigPersistence.FormatArg(r.Window)} {ConfigPersistence.FormatArg(r.ClassName)}{(r.Copy ? " copy" : "")}");
 
     public static IEnumerable<string> MacroLines(IEnumerable<MacroRule> rules) =>
         rules.Select(m =>

@@ -9,7 +9,7 @@ namespace Genie.Core.Tests;
 /// <summary>
 /// Pins <see cref="RuleFileWatcher"/> — the live-reload watcher behind
 /// "hand-edit a rule .json while the app is running and it applies without a
-/// reconnect". Debounced FS events for the seven watched rule files raise
+/// reconnect". Debounced FS events for the eight watched rule files raise
 /// <c>RuleFileChanged</c> with the bare file name; the app's own saves
 /// (marked via <see cref="RuleFileWatcher.MarkAppWrite"/>) and non-rule .json
 /// files must stay silent.

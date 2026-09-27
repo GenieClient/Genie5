@@ -18,6 +18,7 @@ public enum PipelineStage
     Plugins,      // third-party plugin dispatch
     JavaScript,   // .js line-dispatch (waking waitFor/matchWait waiters) — note this
                   // also runs inside the Scripts pass, so its time is counted there too
+    Shunts,       // #shunt regex match (public #248) — UI thread, after Gags
 }
 
 /// <summary>One stage's rolling stats, as read by the perf overlay.</summary>

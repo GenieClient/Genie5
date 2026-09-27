@@ -5,7 +5,7 @@ namespace Genie.Core.Persistence;
 /// <summary>
 /// Watches config directories for external edits to the JSON rule files
 /// (<c>highlights.json</c>, <c>triggers.json</c>, <c>substitutes.json</c>,
-/// <c>gags.json</c>, <c>aliases.json</c>, <c>variables.json</c>,
+/// <c>gags.json</c>, <c>shunts.json</c>, <c>aliases.json</c>, <c>variables.json</c>,
 /// <c>classes.json</c>) so the host can reload them into the live engines
 /// without a reconnect. Raises <see cref="RuleFileChanged"/> with the bare
 /// file name (lower-case) after a per-file debounce — editors typically emit
@@ -33,6 +33,7 @@ public sealed class RuleFileWatcher : IDisposable
         "triggers.json",
         "substitutes.json",
         "gags.json",
+        "shunts.json",     // public #248
         "aliases.json",
         "variables.json",
         "classes.json",

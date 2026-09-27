@@ -9,6 +9,7 @@ using Genie.Core.Classes;
 using Genie.Core.Gags;
 using Genie.Core.Highlights;
 using Genie.Core.Persistence;
+using Genie.Core.Shunts;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
 using Genie.Core.Variables;
@@ -44,7 +45,7 @@ public class RuleFileLiveReloadSmokeTests : IDisposable
     }
 
     [Fact]
-    public void SmokeTest_ExternalEditsFlowThroughWatcherIntoAllSevenEngines()
+    public void SmokeTest_ExternalEditsFlowThroughWatcherIntoAllEightEngines()
     {
         // Live engines, as GenieCore holds them.
         var highlights  = new HighlightEngine();
@@ -54,11 +55,13 @@ public class RuleFileLiveReloadSmokeTests : IDisposable
         var aliases     = new AliasEngine();
         var variables   = new VariableStore();
         var classes     = new ClassEngine();
+        var shunts      = new ShuntEngine();
 
         int Reload(string fileName) => RuleFileLiveReload.Reload(
             fileName, _profileDir, _globalDir,
             highlights: highlights, triggers: triggers, substitutes: substitutes,
-            gags: gags, aliases: aliases, variables: variables, classes: classes);
+            gags: gags, aliases: aliases, variables: variables, classes: classes,
+            shunts: shunts);
 
         using var watcher  = new RuleFileWatcher(debounceMs: 100);
         var pending        = new ConcurrentQueue<string>();
@@ -78,7 +81,7 @@ public class RuleFileLiveReloadSmokeTests : IDisposable
             return seen;
         }
 
-        // ── 1. Drop all seven files externally (the on-disk PascalCase format
+        // ── 1. Drop all eight files externally (the on-disk PascalCase format
         //       the app writes; a user's hand edit looks exactly like this). ──
         File.WriteAllText(Path.Combine(_profileDir, "highlights.json"),
             """[{"Pattern":"Renucci","ForegroundColor":"Red","MatchType":"String"}]""");
@@ -88,6 +91,8 @@ public class RuleFileLiveReloadSmokeTests : IDisposable
             """[{"Pattern":"gobbo","Replacement":"goblin"}]""");
         File.WriteAllText(Path.Combine(_profileDir, "gags.json"),
             """[{"Pattern":"The silvery light"}]""");
+        File.WriteAllText(Path.Combine(_profileDir, "shunts.json"),
+            """[{"Pattern":"A kitten","Window":"Atmospherics"}]""");
         File.WriteAllText(Path.Combine(_profileDir, "aliases.json"),
             """[{"Name":"hp","Expansion":"health"}]""");
         File.WriteAllText(Path.Combine(_profileDir, "variables.json"),
@@ -97,8 +102,8 @@ public class RuleFileLiveReloadSmokeTests : IDisposable
             """[{"Name":"combat","IsActive":false}]""");
 
         var seen = AwaitEvents("highlights.json", "triggers.json", "substitutes.json",
-                               "gags.json", "aliases.json", "variables.json", "classes.json");
-        Assert.Equal(7, seen.Count);
+                               "gags.json", "shunts.json", "aliases.json", "variables.json", "classes.json");
+        Assert.Equal(8, seen.Count);
 
         // ── 2. Apply each reported file — the same call the app makes. ──
         foreach (var name in seen) Reload(name);
@@ -107,6 +112,7 @@ public class RuleFileLiveReloadSmokeTests : IDisposable
         Assert.Contains(triggers.Triggers, t => t.Pattern == "You are stunned" && t.Action == "#echo ouch");
         Assert.Contains(substitutes.Rules, r => r.Pattern == "gobbo" && r.Replacement == "goblin");
         Assert.Contains(gags.Rules,        r => r.Pattern == "The silvery light");
+        Assert.Contains(shunts.Rules,      r => r.Pattern == "A kitten" && r.Window == "Atmospherics");
         Assert.Contains(aliases.Aliases,   a => a.Name == "hp" && a.Expansion == "health");
         Assert.Contains(variables.GetAll().Values, v => v.Name == "hunt_room" && v.Value == "117");
         Assert.Contains(classes.GetAll(),  kv => kv.Key.Equals("combat", StringComparison.OrdinalIgnoreCase) && !kv.Value);

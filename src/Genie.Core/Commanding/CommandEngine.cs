@@ -8,6 +8,7 @@ using Genie.Core.Persistence;
 using Genie.Core.Queue;
 using Genie.Core.Parsing;
 using Genie.Core.Runtime;
+using Genie.Core.Shunts;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
 using Genie.Core.Variables;
@@ -81,6 +82,10 @@ public sealed class CommandEngine
 
     /// <summary>Gag rules (suppress lines from the display). Backs <c>#gag</c>.</summary>
     public GagEngine?           Gags        { get; set; }
+
+    /// <summary>Shunt rules (route lines to a named window). Backs <c>#shunt</c>
+    /// (public #248).</summary>
+    public ShuntEngine?         Shunts      { get; set; }
 
     /// <summary>Keyboard macros (F-keys, Ctrl-letter, etc.). Backs <c>#macro</c>.</summary>
     public MacroEngine?         Macros      { get; set; }
@@ -1023,6 +1028,17 @@ public sealed class CommandEngine
                 {
                     Gags.RemoveRule(parts[1]);
                     _host.Echo($"Gag removed: {parts[1]}");
+                }
+                break;
+            case "shunt":
+            case "shunts":
+                HandleShunt(parts);
+                break;
+            case "unshunt":
+                if (parts.Count > 1 && Shunts is not null)
+                {
+                    if (Shunts.RemoveRule(parts[1])) _host.Echo($"Shunt removed: {parts[1]}");
+                    else _host.Echo($"No shunt with pattern: {parts[1]}");
                 }
                 break;
             case "macro":
@@ -2990,6 +3006,145 @@ public sealed class CommandEngine
         }
         RunCfgFileLines(lines, "gags.cfg");
         _host.Echo("Gags Loaded");
+    }
+
+    // ── #shunt ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>#shunt</c> (public #248) — send game lines matching a pattern to a
+    /// named window. New in Genie 5 (Genie 4 issue #81 asked for it; it never
+    /// shipped there), shaped like <c>#gag</c> with a target. Forms:
+    /// <list type="bullet">
+    /// <item><c>#shunt</c> / <c>#shunt list [filter]</c> — list.</item>
+    /// <item><c>#shunt {pattern} {window} [{class}] [copy]</c> — add or replace
+    /// (<c>#shunt add …</c> is the same). Without <c>copy</c> the line MOVES
+    /// out of the main window; with it, the line shows in both.</item>
+    /// <item><c>#shunt remove {pattern}</c> — drop (or <c>#unshunt {pattern}</c>).</item>
+    /// <item><c>#shunt clear</c>, <c>#shunt save</c>, <c>#shunt load</c>.</item>
+    /// </list>
+    /// <c>copy</c> is a trailing keyword, recognised only after the window slot,
+    /// so it can never be mistaken for a pattern, a window or a class.
+    /// </summary>
+    private void HandleShunt(IReadOnlyList<string> parts)
+    {
+        if (Shunts is null) { _host.Echo("#shunt is unavailable."); return; }
+
+        if (parts.Count == 1) { ListShunts(null); return; }
+
+        var sub = parts[1].ToLowerInvariant();
+        if (parts.Count == 2)
+        {
+            switch (sub)
+            {
+                case "list":  ListShunts(null); return;
+                case "load":  LoadShunts(); return;
+                case "save":  SaveShunts(); return;
+                case "clear": Shunts.Clear(); _host.Echo("Shunts Cleared"); return;
+                // One argument that isn't a subcommand has no window to go to:
+                // treat it as a list filter, the way #substitute does.
+                default:      ListShunts(parts[1]); return;
+            }
+        }
+
+        switch (sub)
+        {
+            case "list":
+                ListShunts(parts[2]);
+                return;
+            case "remove":
+            case "delete":
+                if (Shunts.RemoveRule(parts[2])) _host.Echo($"Shunt removed: {parts[2]}");
+                else _host.Echo($"No shunt with pattern: {parts[2]}");
+                return;
+        }
+
+        // add / implicit: pattern, window, optional class, optional trailing copy.
+        var first = sub == "add" ? 2 : 1;
+        var args  = parts.Skip(first).ToList();
+        var copy  = args.Count > 2 && args[^1].Equals("copy", StringComparison.OrdinalIgnoreCase);
+        if (copy) args.RemoveAt(args.Count - 1);
+        if (args.Count < 2 || string.IsNullOrWhiteSpace(args[0]) || string.IsNullOrWhiteSpace(args[1]))
+        {
+            _host.Echo("Usage: #shunt {pattern} {window} [{class}] [copy]");
+            return;
+        }
+
+        var pattern = args[0];
+        var window  = args[1].Trim().TrimStart('>');   // tolerate the #echo >Window spelling
+        var cls     = args.Count > 2 ? args[2] : "";
+
+        if (window.Equals("main", StringComparison.OrdinalIgnoreCase) ||
+            window.Equals("game", StringComparison.OrdinalIgnoreCase))
+        {
+            _host.Echo($"#shunt: {window} is the main window — lines are already shown there. Name another window.");
+            return;
+        }
+        try { _ = new System.Text.RegularExpressions.Regex(pattern); }
+        catch (ArgumentException ex)
+        {
+            _host.Echo($"#shunt: invalid pattern {pattern} — {ex.Message}");
+            return;
+        }
+
+        Shunts.RemoveRule(pattern);
+        Shunts.AddRule(pattern, window, copy, false, true, cls);
+        EchoRule($"Shunt added: {pattern} → {window}{(copy ? " (copy)" : "")}");
+    }
+
+    private void ListShunts(string? filter)
+    {
+        if (Shunts is null) return;
+        _host.Echo("");
+        _host.Echo("Shunts: ");
+        if (!string.IsNullOrEmpty(filter)) _host.Echo($"Filter: {filter}");
+        int shown = 0;
+        foreach (var r in Shunts.Rules.OrderBy(r => r.Pattern, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrEmpty(filter) &&
+                r.Pattern.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0 &&
+                r.Window.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
+            var mode = r.Copy ? " (copy)" : "";
+            var flag = r.IsEnabled ? "" : " (disabled)";
+            var cls  = string.IsNullOrEmpty(r.ClassName) ? "" : $" [{r.ClassName}]";
+            _host.Echo($"{r.Pattern} → {r.Window}{mode}{cls}{flag}");
+            shown++;
+        }
+        if (shown == 0) _host.Echo("None.");
+    }
+
+    private void SaveShunts()
+    {
+        if (Shunts is null) return;
+        var path  = Path.Combine(_config.ConfigProfileDir, "shunts.cfg");
+        var lines = CfgFormat.ShuntLines(Shunts.Rules);
+        if (ConfigPersistence.WriteLines(path, lines))
+            _host.Echo("Shunts Saved");
+        else
+            _host.Echo($"Failed to save shunts: {path}");
+    }
+
+    private void LoadShunts()
+    {
+        var path  = Path.Combine(_config.ConfigProfileDir, "shunts.cfg");
+        var lines = ConfigPersistence.ReadLines(path);
+        if (lines is null) { _host.Echo($"No shunts file: {path}"); return; }
+        Shunts?.Clear();
+        if (Shunts is not null && LooksLikeJson(lines))
+        {
+            var models = new PersistenceService().LoadShunts(path);
+            if (models.Count == 0)
+            {
+                _host.Echo($"shunts.cfg: JSON-format save with no readable entries — not converted: {path}");
+                return;
+            }
+            foreach (var m in models)
+                Shunts.AddRule(m.Pattern, m.Window, m.Copy, m.CaseSensitive, m.IsEnabled, m.ClassName);
+            SaveShunts();
+            EchoJsonHealed("shunts.cfg", models.Count);
+            return;
+        }
+        RunCfgFileLines(lines, "shunts.cfg");
+        _host.Echo("Shunts Loaded");
     }
 
     // ── #macro ──────────────────────────────────────────────────────────────

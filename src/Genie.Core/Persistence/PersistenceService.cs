@@ -6,6 +6,7 @@ using Genie.Core.Highlights;
 using Genie.Core.Layout;
 using Genie.Core.Macros;
 using Genie.Core.Presets;
+using Genie.Core.Shunts;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
 using Genie.Core.Variables;
@@ -172,6 +173,27 @@ public sealed class PersistenceService
     {
         if (!File.Exists(path)) return new();
         try { return JsonSerializer.Deserialize<List<GagPersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new(); }
+        catch { return new(); }
+    }
+
+    public void SaveShunts(string path, IEnumerable<ShuntRule> rules)
+    {
+        var data = rules.Select(r => new ShuntPersistenceModel
+        {
+            Pattern       = r.Pattern,
+            Window        = r.Window,
+            Copy          = r.Copy,
+            CaseSensitive = r.CaseSensitive,
+            IsEnabled     = r.IsEnabled,
+            ClassName     = r.ClassName,
+        });
+        File.WriteAllText(path, JsonSerializer.Serialize(data, _options));
+    }
+
+    public List<ShuntPersistenceModel> LoadShunts(string path)
+    {
+        if (!File.Exists(path)) return new();
+        try { return JsonSerializer.Deserialize<List<ShuntPersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new(); }
         catch { return new(); }
     }
 

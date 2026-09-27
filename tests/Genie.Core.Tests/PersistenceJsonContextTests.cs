@@ -27,6 +27,7 @@ public class PersistenceJsonContextTests
         typeof(IEnumerable<NamePersistenceModel>),         typeof(List<NamePersistenceModel>),
         typeof(IEnumerable<SubstitutePersistenceModel>),   typeof(List<SubstitutePersistenceModel>),
         typeof(IEnumerable<GagPersistenceModel>),          typeof(List<GagPersistenceModel>),
+        typeof(IEnumerable<ShuntPersistenceModel>),        typeof(List<ShuntPersistenceModel>),
         typeof(IEnumerable<MacroPersistenceModel>),        typeof(List<MacroPersistenceModel>),
         typeof(IEnumerable<PresetPersistenceModel>),       typeof(List<PresetPersistenceModel>),
         typeof(IEnumerable<WindowSettingsPersistenceModel>), typeof(List<WindowSettingsPersistenceModel>),

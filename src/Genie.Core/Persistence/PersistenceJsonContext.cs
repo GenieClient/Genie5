@@ -30,6 +30,8 @@ namespace Genie.Core.Persistence;
 [JsonSerializable(typeof(List<SubstitutePersistenceModel>))]
 [JsonSerializable(typeof(IEnumerable<GagPersistenceModel>))]
 [JsonSerializable(typeof(List<GagPersistenceModel>))]
+[JsonSerializable(typeof(IEnumerable<ShuntPersistenceModel>))]
+[JsonSerializable(typeof(List<ShuntPersistenceModel>))]
 [JsonSerializable(typeof(IEnumerable<MacroPersistenceModel>))]
 [JsonSerializable(typeof(List<MacroPersistenceModel>))]
 [JsonSerializable(typeof(IEnumerable<PresetPersistenceModel>))]

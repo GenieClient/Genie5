@@ -7,6 +7,7 @@ using Genie.Core.Highlights;
 using Genie.Core.Macros;
 using Genie.Core.Queue;
 using Genie.Core.Runtime;
+using Genie.Core.Shunts;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
 using Genie.Core.Variables;
@@ -47,7 +48,8 @@ public static class CfgReplay
         TriggerEngineFinal? triggers    = null,
         SubstituteEngine?   substitutes = null,
         GagEngine?          gags        = null,
-        MacroEngine?        macros      = null)
+        MacroEngine?        macros      = null,
+        ShuntEngine?        shunts      = null)
     {
         if (string.IsNullOrWhiteSpace(profileDir) || !Directory.Exists(profileDir)) return;
 
@@ -61,6 +63,7 @@ public static class CfgReplay
             (substitutes, "substitutes.cfg", "#substitute load"),
             (gags,        "gags.cfg",        "#gag load"),
             (macros,      "macros.cfg",      "#macro load"),
+            (shunts,      "shunts.cfg",      "#shunt load"),
         };
         if (!wanted.Any(w => w.Engine is not null && File.Exists(Path.Combine(profileDir, w.File))))
             return;
@@ -79,6 +82,7 @@ public static class CfgReplay
             Substitutes = substitutes,
             Gags        = gags,
             Macros      = macros,
+            Shunts      = shunts,
         };
 
         // #var routes through a VariableEngine that owns its store, so replay

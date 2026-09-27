@@ -91,6 +91,18 @@ public sealed class GagPersistenceModel
     public string ClassName     { get; set; } = string.Empty;
 }
 
+/// <summary>A <c>#shunt</c> rule (public #248).</summary>
+public sealed class ShuntPersistenceModel
+{
+    public string Pattern       { get; set; } = string.Empty;
+    public string Window        { get; set; } = string.Empty;
+    /// <summary>True = also keep the line in the main window.</summary>
+    public bool   Copy          { get; set; }
+    public bool   CaseSensitive { get; set; }
+    public bool   IsEnabled     { get; set; } = true;
+    public string ClassName     { get; set; } = string.Empty;
+}
+
 public sealed class MacroPersistenceModel
 {
     public string Key    { get; set; } = string.Empty;

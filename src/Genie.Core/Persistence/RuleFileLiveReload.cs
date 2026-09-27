@@ -4,6 +4,7 @@ using Genie.Core.Classes;
 using Genie.Core.Gags;
 using Genie.Core.Highlights;
 using Genie.Core.Runtime;
+using Genie.Core.Shunts;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
 using Genie.Core.Variables;
@@ -56,7 +57,8 @@ public static class RuleFileLiveReload
         GagEngine?          gags        = null,
         AliasEngine?        aliases     = null,
         VariableStore?      variables   = null,
-        ClassEngine?        classes     = null)
+        ClassEngine?        classes     = null,
+        ShuntEngine?        shunts      = null)
     {
         var single = ScopedRuleLoader.SameDirectory(profileDir, globalDir);
         var (profilePath, globalPath) = ScopedRuleLoader.Paths(profileDir, globalDir, fileName);
@@ -120,6 +122,19 @@ public static class RuleFileLiveReload
                     gags.AddRule(m.Pattern, m.CaseSensitive, m.IsEnabled, m.ClassName).Scope = scope;
                 SyncScopedCfg(single, profileDir, globalDir, "gags.cfg",
                     sc => CfgFormat.GagLines(gags.Rules.Where(r => sc is null || r.Scope == sc)));
+                return layered.Count;
+            }
+            case "shunts.json":
+            {
+                if (shunts is null) return 0;
+                var character = Character<ShuntPersistenceModel>();
+                var global    = Global<ShuntPersistenceModel>();
+                shunts.Clear();
+                var layered = ScopedRuleLoader.Layer(character, global, x => x.Pattern);
+                foreach (var (m, scope) in layered)
+                    shunts.AddRule(m.Pattern, m.Window, m.Copy, m.CaseSensitive, m.IsEnabled, m.ClassName).Scope = scope;
+                SyncScopedCfg(single, profileDir, globalDir, "shunts.cfg",
+                    sc => CfgFormat.ShuntLines(shunts.Rules.Where(r => sc is null || r.Scope == sc)));
                 return layered.Count;
             }
             case "aliases.json":

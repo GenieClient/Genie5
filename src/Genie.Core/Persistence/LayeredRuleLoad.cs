@@ -3,6 +3,7 @@ using Genie.Core.Classes;
 using Genie.Core.Gags;
 using Genie.Core.Highlights;
 using Genie.Core.Macros;
+using Genie.Core.Shunts;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
 using Genie.Core.Variables;
@@ -10,7 +11,8 @@ using Genie.Core.Variables;
 namespace Genie.Core.Persistence;
 
 /// <summary>
-/// The shared #257 load machinery for the eight cfg-capable rule types.
+/// The shared #257 load machinery for the nine cfg-capable rule types
+/// (shunts joined the set with public #248).
 /// <see cref="BuildEffectiveScope"/> resolves ONE directory's effective set —
 /// its <c>.json</c> content with any coexisting <c>.cfg</c> replayed on top
 /// through the real loaders (the .cfg stays the persisted truth for its dir,
@@ -32,7 +34,8 @@ public static class LayeredRuleLoad
         AliasEngine         Aliases,
         MacroEngine         Macros,
         ClassEngine         Classes,
-        VariableStore       Variables);
+        VariableStore       Variables,
+        ShuntEngine         Shunts);
 
     /// <summary>
     /// Load <paramref name="dir"/>'s effective set into fresh scratch engines:
@@ -47,7 +50,7 @@ public static class LayeredRuleLoad
         var s = new EffectiveScope(
             new HighlightEngine(), new TriggerEngineFinal(), new SubstituteEngine(),
             new GagEngine(), new AliasEngine(), new MacroEngine(),
-            new ClassEngine(), new VariableStore());
+            new ClassEngine(), new VariableStore(), new ShuntEngine());
 
         try { foreach (var m in p.LoadClasses(Path.Combine(dir, "classes.json"))) s.Classes.Set(m.Name, m.IsActive); } catch { }
         try
@@ -98,13 +101,23 @@ public static class LayeredRuleLoad
             }
         }
         catch { }
+        try
+        {
+            foreach (var m in p.LoadShunts(Path.Combine(dir, "shunts.json")))
+            {
+                s.Shunts.RemoveRule(m.Pattern);
+                s.Shunts.AddRule(m.Pattern, m.Window, m.Copy, m.CaseSensitive, m.IsEnabled, m.ClassName);
+            }
+        }
+        catch { }
         try { foreach (var m in p.LoadMacros(Path.Combine(dir, "macros.json"))) s.Macros.Add(m.Key, m.Action); } catch { }
         try { foreach (var m in p.LoadVariables(Path.Combine(dir, "variables.json"))) s.Variables.Set(m.Name, m.Value); } catch { }
         try
         {
             CfgReplay.LoadInto(dir, classes: s.Classes, aliases: s.Aliases, variables: s.Variables,
                                highlights: s.Highlights, triggers: s.Triggers,
-                               substitutes: s.Substitutes, gags: s.Gags, macros: s.Macros);
+                               substitutes: s.Substitutes, gags: s.Gags, macros: s.Macros,
+                               shunts: s.Shunts);
         }
         catch { /* a corrupt .cfg leaves the json view standing */ }
         return s;
@@ -131,7 +144,8 @@ public static class LayeredRuleLoad
         AliasEngine?        aliases     = null,
         MacroEngine?        macros      = null,
         ClassEngine?        classes     = null,
-        VariableStore?      variables   = null)
+        VariableStore?      variables   = null,
+        ShuntEngine?        shunts      = null)
     {
         if (classes is not null)
         {
@@ -177,6 +191,15 @@ public static class LayeredRuleLoad
             {
                 gags.RemoveRule(r.Pattern);
                 gags.AddRule(r.Pattern, r.CaseSensitive, r.IsEnabled, r.ClassName).Scope = scope;
+            }
+
+        if (shunts is not null)
+            foreach (var (r, scope) in ScopedRuleLoader.Layer(
+                (IEnumerable<ShuntRule>?)character?.Shunts.Rules ?? Array.Empty<ShuntRule>(),
+                global.Shunts.Rules, x => x.Pattern))
+            {
+                shunts.RemoveRule(r.Pattern);
+                shunts.AddRule(r.Pattern, r.Window, r.Copy, r.CaseSensitive, r.IsEnabled, r.ClassName).Scope = scope;
             }
 
         if (aliases is not null)
