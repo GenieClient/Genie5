@@ -273,6 +273,10 @@ public sealed class ScriptEngine
         // the host wires AccountProvider after construction the same way it gates
         // the trackers from settings.cfg. Never runs on its own (public #328).
         Extensions.Register(new global::Genie.Core.Extensions.Builtin.SimuCoins.SimuCoinsExtension());
+        // SpellInfo: command-driven (/spellinfo) spell reference over the nightly
+        // Elanthipedia feed. Downloads only when a command needs the data, never on
+        // the game-line path, so it is always on (public #267).
+        Extensions.Register(new global::Genie.Core.Extensions.Builtin.SpellInfo.SpellInfoExtension());
         Directory.CreateDirectory(_scriptsDir);
 
         _js = new JsScriptRuntime(

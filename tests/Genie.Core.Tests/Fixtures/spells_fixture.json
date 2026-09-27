@@ -1,0 +1,1021 @@
+{
+  "query": {
+    "printrequests": [
+      {
+        "label": "",
+        "key": "",
+        "redi": "",
+        "typeid": "_wpg",
+        "mode": 2
+      },
+      {
+        "label": "Abbrev",
+        "key": "Spell_abbreviation_is",
+        "redi": "",
+        "typeid": "_txt",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Guild",
+        "key": "Guild_association_is",
+        "redi": "",
+        "typeid": "_wpg",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Mana Type",
+        "key": "Magic_type_is",
+        "redi": "",
+        "typeid": "_txt",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Spellbook",
+        "key": "Spellbook_is",
+        "redi": "",
+        "typeid": "_txt",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Difficulty",
+        "key": "Ability_difficulty_is",
+        "redi": "",
+        "typeid": "_txt",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Signature",
+        "key": "Signature_spell",
+        "redi": "",
+        "typeid": "_boo",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Effect",
+        "key": "Ability_effect_is",
+        "redi": "",
+        "typeid": "_txt",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Cast Type",
+        "key": "Spell_cast_type_is",
+        "redi": "",
+        "typeid": "_txt",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Skill",
+        "key": "Ability_skill_is",
+        "redi": "",
+        "typeid": "_txt",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Spell Type",
+        "key": "Ability_type_is",
+        "redi": "",
+        "typeid": "_txt",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Off Contest",
+        "key": "Offensive_contest_is",
+        "redi": "",
+        "typeid": "_txt",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Def Contest",
+        "key": "Defensive_contest_is",
+        "redi": "",
+        "typeid": "_txt",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Min Prep",
+        "key": "Minimum_prep_is",
+        "redi": "",
+        "typeid": "_num",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Cap",
+        "key": "Casting_cap_is",
+        "redi": "",
+        "typeid": "_num",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Min Skill",
+        "key": "Minimum_skill_is",
+        "redi": "",
+        "typeid": "_num",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Max Skill",
+        "key": "Maximum_skill_is",
+        "redi": "",
+        "typeid": "_num",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Min Duration",
+        "key": "Minimum_duration_is",
+        "redi": "",
+        "typeid": "_num",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Max Duration",
+        "key": "Maximum_duration_is",
+        "redi": "",
+        "typeid": "_num",
+        "mode": 1,
+        "format": ""
+      },
+      {
+        "label": "Slots",
+        "key": "Slot_cost_is",
+        "redi": "",
+        "typeid": "_num",
+        "mode": 1,
+        "format": ""
+      }
+    ],
+    "results": {
+      "Abandoned Heart": {
+        "printouts": {
+          "Abbrev": [
+            "ABAN"
+          ],
+          "Guild": [
+            {
+              "fulltext": "Bard",
+              "fullurl": "https://elanthipedia.play.net/Bard",
+              "namespace": 0,
+              "exists": "1",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Elemental Magic"
+          ],
+          "Spellbook": [
+            "Emotion Control"
+          ],
+          "Difficulty": [
+            "advanced"
+          ],
+          "Signature": [
+            "t"
+          ],
+          "Effect": [
+            "Fatigue damage, Spirit damage,&nbsp;Area of Effect."
+          ],
+          "Cast Type": [
+            "cyclic"
+          ],
+          "Skill": [
+            "targeted"
+          ],
+          "Spell Type": [
+            "area of effect"
+          ],
+          "Off Contest": [],
+          "Def Contest": [],
+          "Min Prep": [
+            7
+          ],
+          "Cap": [
+            37
+          ],
+          "Min Skill": [
+            250
+          ],
+          "Max Skill": [
+            1000
+          ],
+          "Min Duration": [
+            999
+          ],
+          "Max Duration": [],
+          "Slots": [
+            3
+          ]
+        },
+        "fulltext": "Abandoned Heart",
+        "fullurl": "https://elanthipedia.play.net/Abandoned_Heart",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Albreda's Balm": {
+        "printouts": {
+          "Abbrev": [
+            "alb"
+          ],
+          "Guild": [
+            {
+              "fulltext": "Bard",
+              "fullurl": "https://elanthipedia.play.net/Bard",
+              "namespace": 0,
+              "exists": "1",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Elemental Magic"
+          ],
+          "Spellbook": [
+            "Emotion Control"
+          ],
+          "Difficulty": [
+            "advanced"
+          ],
+          "Signature": [
+            "t"
+          ],
+          "Effect": [
+            "AOE calm."
+          ],
+          "Cast Type": [
+            "cyclic"
+          ],
+          "Skill": [
+            "debilitation",
+            "utility"
+          ],
+          "Spell Type": [
+            "area of effect"
+          ],
+          "Off Contest": [
+            "charm"
+          ],
+          "Def Contest": [
+            "willpower"
+          ],
+          "Min Prep": [
+            5
+          ],
+          "Cap": [
+            25
+          ],
+          "Min Skill": [
+            250
+          ],
+          "Max Skill": [
+            1000
+          ],
+          "Min Duration": [
+            999
+          ],
+          "Max Duration": [],
+          "Slots": [
+            1
+          ]
+        },
+        "fulltext": "Albreda's Balm",
+        "fullurl": "https://elanthipedia.play.net/Albreda%27s_Balm",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Air Lash": {
+        "printouts": {
+          "Abbrev": [
+            "ala"
+          ],
+          "Guild": [
+            {
+              "fulltext": "Warrior Mage",
+              "fullurl": "https://elanthipedia.play.net/Warrior_Mage",
+              "namespace": 0,
+              "exists": "1",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Elemental Magic"
+          ],
+          "Spellbook": [
+            "Air Manipulation"
+          ],
+          "Difficulty": [
+            "intro"
+          ],
+          "Signature": [
+            "f"
+          ],
+          "Effect": [
+            "Puncture damage, Slice damage,&nbsp;Single target."
+          ],
+          "Cast Type": [
+            "battle"
+          ],
+          "Skill": [
+            "targeted"
+          ],
+          "Spell Type": [],
+          "Off Contest": [],
+          "Def Contest": [],
+          "Min Prep": [
+            1
+          ],
+          "Cap": [
+            50
+          ],
+          "Min Skill": [
+            0
+          ],
+          "Max Skill": [
+            400
+          ],
+          "Min Duration": [
+            -1
+          ],
+          "Max Duration": [],
+          "Slots": [
+            1
+          ]
+        },
+        "fulltext": "Air Lash",
+        "fullurl": "https://elanthipedia.play.net/Air_Lash",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Fire Shards": {
+        "printouts": {
+          "Abbrev": [
+            "fs"
+          ],
+          "Guild": [
+            {
+              "fulltext": "Warrior Mage",
+              "fullurl": "https://elanthipedia.play.net/Warrior_Mage",
+              "namespace": 0,
+              "exists": "1",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Elemental Magic"
+          ],
+          "Spellbook": [
+            "Fire Manipulation"
+          ],
+          "Difficulty": [
+            "intro"
+          ],
+          "Signature": [
+            "f"
+          ],
+          "Effect": [
+            "Impact damage, Fire damage,&nbsp;Single target multi-strike."
+          ],
+          "Cast Type": [
+            "battle"
+          ],
+          "Skill": [
+            "targeted"
+          ],
+          "Spell Type": [
+            "multistrike"
+          ],
+          "Off Contest": [],
+          "Def Contest": [],
+          "Min Prep": [
+            1
+          ],
+          "Cap": [
+            50
+          ],
+          "Min Skill": [
+            0
+          ],
+          "Max Skill": [
+            400
+          ],
+          "Min Duration": [
+            -1
+          ],
+          "Max Duration": [],
+          "Slots": [
+            1
+          ]
+        },
+        "fulltext": "Fire Shards",
+        "fullurl": "https://elanthipedia.play.net/Fire_Shards",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Gar Zeng": {
+        "printouts": {
+          "Abbrev": [
+            "gz"
+          ],
+          "Guild": [
+            {
+              "fulltext": "Warrior Mage",
+              "fullurl": "https://elanthipedia.play.net/Warrior_Mage",
+              "namespace": 0,
+              "exists": "1",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Elemental Magic"
+          ],
+          "Spellbook": [
+            "Electricity Manipulation"
+          ],
+          "Difficulty": [
+            "intro"
+          ],
+          "Signature": [
+            "f"
+          ],
+          "Effect": [
+            "Fire damage, Electrical damage,&nbsp;Single target multi-strike."
+          ],
+          "Cast Type": [
+            "battle"
+          ],
+          "Skill": [
+            "targeted"
+          ],
+          "Spell Type": [
+            "multistrike"
+          ],
+          "Off Contest": [],
+          "Def Contest": [],
+          "Min Prep": [
+            1
+          ],
+          "Cap": [
+            50
+          ],
+          "Min Skill": [
+            0
+          ],
+          "Max Skill": [
+            400
+          ],
+          "Min Duration": [
+            -1
+          ],
+          "Max Duration": [],
+          "Slots": [
+            1
+          ]
+        },
+        "fulltext": "Gar Zeng",
+        "fullurl": "https://elanthipedia.play.net/Gar_Zeng",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Stone Strike": {
+        "printouts": {
+          "Abbrev": [
+            "sts"
+          ],
+          "Guild": [
+            {
+              "fulltext": "Warrior Mage",
+              "fullurl": "https://elanthipedia.play.net/Warrior_Mage",
+              "namespace": 0,
+              "exists": "1",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Elemental Magic"
+          ],
+          "Spellbook": [
+            "Earth Manipulation"
+          ],
+          "Difficulty": [
+            "intro"
+          ],
+          "Signature": [
+            "f"
+          ],
+          "Effect": [
+            "Puncture damage, Impact damage,&nbsp;Single target multi-strike."
+          ],
+          "Cast Type": [
+            "battle"
+          ],
+          "Skill": [
+            "targeted"
+          ],
+          "Spell Type": [
+            "multistrike"
+          ],
+          "Off Contest": [],
+          "Def Contest": [],
+          "Min Prep": [
+            1
+          ],
+          "Cap": [
+            50
+          ],
+          "Min Skill": [
+            0
+          ],
+          "Max Skill": [
+            400
+          ],
+          "Min Duration": [
+            -1
+          ],
+          "Max Duration": [],
+          "Slots": [
+            1
+          ]
+        },
+        "fulltext": "Stone Strike",
+        "fullurl": "https://elanthipedia.play.net/Stone_Strike",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Aether Cloak": {
+        "printouts": {
+          "Abbrev": [
+            "ac"
+          ],
+          "Guild": [
+            {
+              "fulltext": "Warrior Mage",
+              "fullurl": "https://elanthipedia.play.net/Warrior_Mage",
+              "namespace": 0,
+              "exists": "1",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Elemental Magic"
+          ],
+          "Spellbook": [
+            "Aether Manipulation"
+          ],
+          "Difficulty": [
+            "advanced"
+          ],
+          "Signature": [
+            "t"
+          ],
+          "Effect": [
+            "TM barrier and reflect."
+          ],
+          "Cast Type": [
+            "cyclic"
+          ],
+          "Skill": [
+            "warding"
+          ],
+          "Spell Type": [],
+          "Off Contest": [],
+          "Def Contest": [],
+          "Min Prep": [
+            4
+          ],
+          "Cap": [
+            25
+          ],
+          "Min Skill": [
+            250
+          ],
+          "Max Skill": [
+            1000
+          ],
+          "Min Duration": [
+            999
+          ],
+          "Max Duration": [],
+          "Slots": [
+            2
+          ]
+        },
+        "fulltext": "Aether Cloak",
+        "fullurl": "https://elanthipedia.play.net/Aether_Cloak",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Burden (spell)": {
+        "printouts": {
+          "Abbrev": [
+            "none"
+          ],
+          "Guild": [
+            {
+              "fulltext": "None",
+              "fullurl": "https://elanthipedia.play.net/None",
+              "namespace": 0,
+              "exists": "",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Analogous Patterns"
+          ],
+          "Spellbook": [
+            "Analogous Patterns"
+          ],
+          "Difficulty": [
+            "intro"
+          ],
+          "Signature": [
+            "f"
+          ],
+          "Effect": [
+            "-Strength (stat),&nbsp;increases encumbrance"
+          ],
+          "Cast Type": [
+            "battle"
+          ],
+          "Skill": [
+            "debilitation"
+          ],
+          "Spell Type": [],
+          "Off Contest": [
+            "magic"
+          ],
+          "Def Contest": [
+            "fortitude"
+          ],
+          "Min Prep": [
+            1
+          ],
+          "Cap": [
+            33
+          ],
+          "Min Skill": [
+            0
+          ],
+          "Max Skill": [
+            400
+          ],
+          "Min Duration": [
+            10
+          ],
+          "Max Duration": [
+            10
+          ],
+          "Slots": [
+            1
+          ]
+        },
+        "fulltext": "Burden (spell)",
+        "fullurl": "https://elanthipedia.play.net/Burden_(spell)",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Ease Burden": {
+        "printouts": {
+          "Abbrev": [
+            "EASE"
+          ],
+          "Guild": [
+            {
+              "fulltext": "None",
+              "fullurl": "https://elanthipedia.play.net/None",
+              "namespace": 0,
+              "exists": "",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Analogous Patterns"
+          ],
+          "Spellbook": [
+            "Analogous Patterns"
+          ],
+          "Difficulty": [
+            "intro"
+          ],
+          "Signature": [
+            "f"
+          ],
+          "Effect": [
+            "reduces encumbrance"
+          ],
+          "Cast Type": [
+            "standard"
+          ],
+          "Skill": [
+            "augmentation"
+          ],
+          "Spell Type": [],
+          "Off Contest": [],
+          "Def Contest": [],
+          "Min Prep": [
+            1
+          ],
+          "Cap": [
+            100
+          ],
+          "Min Skill": [
+            0
+          ],
+          "Max Skill": [
+            400
+          ],
+          "Min Duration": [
+            10
+          ],
+          "Max Duration": [
+            40
+          ],
+          "Slots": [
+            1
+          ]
+        },
+        "fulltext": "Ease Burden",
+        "fullurl": "https://elanthipedia.play.net/Ease_Burden",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Cheetah Swiftness": {
+        "printouts": {
+          "Abbrev": [
+            "CS"
+          ],
+          "Guild": [
+            {
+              "fulltext": "Ranger",
+              "fullurl": "https://elanthipedia.play.net/Ranger",
+              "namespace": 0,
+              "exists": "1",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Life Magic"
+          ],
+          "Spellbook": [
+            "Animal Abilities"
+          ],
+          "Difficulty": [
+            "advanced"
+          ],
+          "Signature": [
+            "t"
+          ],
+          "Effect": [
+            "+Agility (stat), +Balance,&nbsp;Balance heal,&nbsp;auto-stand"
+          ],
+          "Cast Type": [
+            "battle",
+            "cyclic"
+          ],
+          "Skill": [
+            "augmentation"
+          ],
+          "Spell Type": [],
+          "Off Contest": [],
+          "Def Contest": [],
+          "Min Prep": [
+            5
+          ],
+          "Cap": [
+            25
+          ],
+          "Min Skill": [
+            250
+          ],
+          "Max Skill": [
+            1000
+          ],
+          "Min Duration": [
+            999
+          ],
+          "Max Duration": [],
+          "Slots": [
+            2
+          ]
+        },
+        "fulltext": "Cheetah Swiftness",
+        "fullurl": "https://elanthipedia.play.net/Cheetah_Swiftness",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Adaptive Curing": {
+        "printouts": {
+          "Abbrev": [
+            "adc"
+          ],
+          "Guild": [
+            {
+              "fulltext": "Empath",
+              "fullurl": "https://elanthipedia.play.net/Empath",
+              "namespace": 0,
+              "exists": "1",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Life Magic"
+          ],
+          "Spellbook": [
+            "Body Purification"
+          ],
+          "Difficulty": [],
+          "Signature": [
+            "t"
+          ],
+          "Effect": [
+            "allows preemptive casting of Flush Poisons and Cure Disease; allows Heal to remain active even with no wounds"
+          ],
+          "Cast Type": [
+            "metamagic"
+          ],
+          "Skill": [],
+          "Spell Type": [],
+          "Off Contest": [],
+          "Def Contest": [],
+          "Min Prep": [],
+          "Cap": [],
+          "Min Skill": [],
+          "Max Skill": [],
+          "Min Duration": [],
+          "Max Duration": [],
+          "Slots": [
+            1
+          ]
+        },
+        "fulltext": "Adaptive Curing",
+        "fullurl": "https://elanthipedia.play.net/Adaptive_Curing",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Aethrolysis": {
+        "printouts": {
+          "Abbrev": [
+            "none"
+          ],
+          "Guild": [
+            {
+              "fulltext": "Warrior Mage",
+              "fullurl": "https://elanthipedia.play.net/Warrior_Mage",
+              "namespace": 0,
+              "exists": "1",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Elemental Magic"
+          ],
+          "Spellbook": [
+            "Hylomorphic Sorcery"
+          ],
+          "Difficulty": [
+            "basic"
+          ],
+          "Signature": [
+            "t"
+          ],
+          "Effect": [
+            "Cold damage, Electrical damage"
+          ],
+          "Cast Type": [
+            "battle"
+          ],
+          "Skill": [
+            "targeted"
+          ],
+          "Spell Type": [],
+          "Off Contest": [],
+          "Def Contest": [],
+          "Min Prep": [
+            2
+          ],
+          "Cap": [
+            50
+          ],
+          "Min Skill": [
+            10
+          ],
+          "Max Skill": [
+            600
+          ],
+          "Min Duration": [
+            -1
+          ],
+          "Max Duration": [],
+          "Slots": [
+            1
+          ]
+        },
+        "fulltext": "Aethrolysis",
+        "fullurl": "https://elanthipedia.play.net/Aethrolysis",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      },
+      "Chain Lightning": {
+        "printouts": {
+          "Abbrev": [
+            "cl"
+          ],
+          "Guild": [
+            {
+              "fulltext": "Warrior Mage",
+              "fullurl": "https://elanthipedia.play.net/Warrior_Mage",
+              "namespace": 0,
+              "exists": "1",
+              "displaytitle": ""
+            }
+          ],
+          "Mana Type": [
+            "Elemental Magic"
+          ],
+          "Spellbook": [
+            "Electricity Manipulation"
+          ],
+          "Difficulty": [
+            "intermediate"
+          ],
+          "Signature": [
+            "t"
+          ],
+          "Effect": [
+            "Fire damage, Electrical damage,&nbsp;AoE."
+          ],
+          "Cast Type": [
+            "battle"
+          ],
+          "Skill": [
+            "targeted"
+          ],
+          "Spell Type": [
+            "area of effect"
+          ],
+          "Off Contest": [],
+          "Def Contest": [],
+          "Min Prep": [
+            15
+          ],
+          "Cap": [
+            100
+          ],
+          "Min Skill": [
+            80
+          ],
+          "Max Skill": [
+            800
+          ],
+          "Min Duration": [
+            -1
+          ],
+          "Max Duration": [],
+          "Slots": [
+            1
+          ]
+        },
+        "fulltext": "Chain Lightning",
+        "fullurl": "https://elanthipedia.play.net/Chain_Lightning",
+        "namespace": 0,
+        "exists": "1",
+        "displaytitle": ""
+      }
+    },
+    "serializer": "SMW\\Serializers\\QueryResultSerializer",
+    "version": 2,
+    "meta": {
+      "hash": "3998d0e63475d8ba19a89c854ff3b649",
+      "count": 13,
+      "offset": 0,
+      "source": "",
+      "time": "0.159455"
+    }
+  },
+  "SyncedAt": "2026-09-27T06:00:29.9320815Z"
+}

@@ -24,4 +24,10 @@
     <ProjectReference Include="../../src/Genie.Core/Genie.Core.csproj" />
   </ItemGroup>
 
+  <!-- Small data fixtures read by tests at run time (e.g. a trimmed copy of the
+       nightly spell feed for SpellInfo, public #267). -->
+  <ItemGroup>
+    <None Include="Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
