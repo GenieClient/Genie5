@@ -273,7 +273,7 @@ public sealed class RuleScopeFollowupTests : IDisposable
     [Fact]
     public void LiveReload_GlobalCfgKeepsASharedRuleThatACharacterOverrides()
     {
-        // The pre-#315 reload wrote the global .cfg from the engine's Global
+        // Before public #315, the reload wrote the global .cfg from the engine's Global
         // subset — which never holds a shadowed twin — so a profile override
         // silently deleted the shared rule from the global .cfg, the dir's
         // persisted truth at the next connect.

@@ -26,7 +26,7 @@ public sealed class VariableStore
         if (_variables.TryGetValue(name, out var existing))
         {
             // A runtime change to a shared variable (#var, a script, the
-            // panel) becomes this character's override (#315): the outcome
+            // panel) becomes this character's override (public #315): the outcome
             // the pre-split save produced, and it keeps one character's
             // session state out of every other character's shared file.
             // Loaders re-tag the layer explicitly after Set.
@@ -42,7 +42,7 @@ public sealed class VariableStore
     public string? Get(string name)
         => _variables.TryGetValue(name, out var v) ? v.Value : null;
 
-    /// <summary>Tag an existing variable with its config layer (#257/#315);
+    /// <summary>Tag an existing variable with its config layer (public #257/#315);
     /// a no-op for an unknown name.</summary>
     public void SetConfigScope(string name, Persistence.RuleScope scope)
     {

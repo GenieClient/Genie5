@@ -147,7 +147,7 @@ public static class LayeredRuleLoad
         VariableStore?      variables   = null,
         ShuntEngine?        shunts      = null)
     {
-        // Upsert stores tag each key with the layer that last wrote it (#315),
+        // Upsert stores tag each key with the layer that last wrote it (public #315),
         // so a profile value overriding a global one saves back to the profile.
         if (classes is not null)
         {

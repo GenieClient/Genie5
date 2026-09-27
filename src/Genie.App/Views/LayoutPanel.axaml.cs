@@ -65,7 +65,7 @@ public partial class LayoutPanel : UserControl
     }
 
     /// <summary>Window-list label: the title, plus the layer its settings
-    /// save to when two layers exist (#315) — the list's Scope "column".</summary>
+    /// save to when two layers exist (public #315) — the list's Scope "column".</summary>
     private string ListLabel(WindowSettings s) =>
         _scopeCtx?.TwoLayers == true
             ? $"{s.DisplayTitle}   [{ScopeEditing.RowLabel(s.Scope)}]"
@@ -152,7 +152,7 @@ public partial class LayoutPanel : UserControl
         _current.EchoToMain   = EchoToMainCheck.IsChecked == true;
         _current.FlashOnActivity = FlashCheck.IsChecked == true;
         _current.IfClosed     = LabelToIfClosed(IfClosedBox.SelectedItem as string);
-        // The Scope field decides which windows.json the row saves to (#315).
+        // The Scope field decides which windows.json the row saves to (public #315).
         if (_scopeCtx?.TwoLayers == true)
             _current.Scope = ScopeEditing.FromIndex(ScopeBox.SelectedIndex);
         _current.NotifyChanged();
@@ -167,7 +167,7 @@ public partial class LayoutPanel : UserControl
         if (_current is null || _store is null) return;
 
         // A this-character window with a shared row goes back to the shared
-        // settings (#315), the Layout-tab form of deleting an override.
+        // settings (public #315), the Layout-tab form of deleting an override.
         if (ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, _current.Scope, _current.Id))
         {
             LoadForm(_current);

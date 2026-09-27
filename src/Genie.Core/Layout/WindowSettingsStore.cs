@@ -19,7 +19,7 @@ public sealed class WindowSettingsStore
     /// </summary>
     private readonly Dictionary<string, WindowSettingsPersistenceModel> _held = new();
 
-    /// <summary>Config layer of each held row (#315), so a dynamic window
+    /// <summary>Config layer of each held row (public #315), so a dynamic window
     /// that opens late still saves back to the file its row came from.</summary>
     private readonly Dictionary<string, RuleScope> _heldScope = new();
 
@@ -207,7 +207,7 @@ public sealed class WindowSettingsStore
     public void Apply(WindowSettingsPersistenceModel m) => Apply(m, null);
 
     /// <summary>Apply a persisted row loaded from the <paramref name="scope"/>
-    /// layer (#257/#315): the window then saves back to that file.</summary>
+    /// layer (public #257/#315): the window then saves back to that file.</summary>
     public void Apply(WindowSettingsPersistenceModel m, RuleScope? scope)
     {
         if (string.IsNullOrEmpty(m.Id)) return;

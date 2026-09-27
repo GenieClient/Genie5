@@ -64,7 +64,7 @@ public sealed class PersistenceService
     public void SaveVariables(string path, VariableStore store)
         => SaveVariables(path, store.GetAll().Values);
 
-    /// <summary>Write a subset of a store's variables — the #315 split save
+    /// <summary>Write a subset of a store's variables — the public #315 split save
     /// sends each config layer's rows to its own file.</summary>
     public void SaveVariables(string path, IEnumerable<VariableValue> variables)
     {
@@ -104,7 +104,7 @@ public sealed class PersistenceService
 
     public void SaveClasses(string path, ClassEngine engine) => SaveClasses(path, engine.GetAll());
 
-    /// <summary>Write a subset of class states (the #315 split save). The
+    /// <summary>Write a subset of class states (the public #315 split save). The
     /// built-in <c>default</c> class is never written.</summary>
     public void SaveClasses(string path, IEnumerable<KeyValuePair<string, bool>> classes)
     {
@@ -266,7 +266,7 @@ public sealed class PersistenceService
         => File.WriteAllText(path, JsonSerializer.Serialize(rows, _options));
 
     /// <summary>
-    /// The #315 split save for <c>windows.json</c>: Character rows to the
+    /// The public #315 split save for <c>windows.json</c>: Character rows to the
     /// profile file, Global rows to the shared one. The global side is the
     /// store's Global rows merged with every on-disk global row the store no
     /// longer carries at Global scope — a per-character override replaces its

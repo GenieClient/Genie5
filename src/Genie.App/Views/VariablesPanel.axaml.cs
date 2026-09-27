@@ -41,7 +41,7 @@ public partial class VariablesPanel : UserControl
     {
         InitializeComponent();
         ScopeBox.ItemsSource   = ScopeEditing.Labels;
-        ScopeBox.SelectedIndex = 0;   // new variables default to This character (#315)
+        ScopeBox.SelectedIndex = 0;   // new variables default to This character (public #315)
     }
 
     public void Initialize(VariableStore store, Action onChanged,
@@ -110,7 +110,7 @@ public partial class VariablesPanel : UserControl
         if (string.IsNullOrEmpty(name)) { StatusText.Text = "Name is required."; return; }
 
         _store.Set(name, value);
-        // The Scope field decides which file the variable saves to (#315).
+        // The Scope field decides which file the variable saves to (public #315).
         if (_scopeCtx?.TwoLayers == true)
             _store.SetConfigScope(name, ScopeEditing.FromIndex(ScopeBox.SelectedIndex));
         // Keep a shadowing live global in step (#340). This also covers the
@@ -135,7 +135,7 @@ public partial class VariablesPanel : UserControl
         var scope = _store.GetAll().TryGetValue(row.Name, out var v) ? v.ConfigScope : RuleScope.Character;
 
         // Deleting a shared variable affects every character; variables have
-        // no enabled flag, so confirm the for-all removal (#257/#315).
+        // no enabled flag, so confirm the for-all removal (public #257/#315).
         if (scope == RuleScope.Global && _scopeCtx?.TwoLayers == true)
         {
             if (this.GetVisualRoot() is not Window owner) return;
@@ -150,7 +150,7 @@ public partial class VariablesPanel : UserControl
         // keeps its live global — #294 owns that name.
         if (_liveGlobals is not null && !ReservedConnectionVars.Contains(row.Name))
             _liveGlobals.Remove(row.Name);
-        // A deleted per-character value un-shadows the shared one now (#315).
+        // A deleted per-character value un-shadows the shared one now (public #315).
         var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, scope, row.Name);
         _onChanged?.Invoke();
         ClearForm();

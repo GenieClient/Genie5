@@ -171,7 +171,7 @@ public static class RuleFileLiveReload
                 var global    = Global<VariablePersistenceModel>();
                 variables.ClearUserVariables();   // system/reserved globals persist, as at connect
                 // Upsert store: the profile value wins, and each key is tagged
-                // with the layer that wrote it (#315) so saves split correctly.
+                // with the layer that wrote it (public #315) so saves split correctly.
                 foreach (var m in global)
                     if (variables.Set(m.Name, m.Value)) variables.SetConfigScope(m.Name, RuleScope.Global);
                 foreach (var m in character)
@@ -214,7 +214,7 @@ public static class RuleFileLiveReload
     /// full content. Not the engine's Global subset: a character override
     /// shadows its global twin out of the engine, so deriving the global .cfg
     /// from the engine dropped every shadowed twin — and a dir's .cfg is its
-    /// persisted truth at the next connect (#315). Only rewrites a file that
+    /// persisted truth at the next connect (public #315). Only rewrites a file that
     /// already exists — json-only dirs never get a .cfg forked for them (same
     /// rule as the panels' SyncCfg).</summary>
     private static void SyncScopedCfg(bool single, string profileDir, string globalDir, string fileName,

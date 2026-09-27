@@ -186,7 +186,7 @@ public partial class HighlightStringsPanel : UserControl
             ? ScopeEditing.FromIndex(ScopeBox.SelectedIndex)
             : existing?.Scope ?? RuleScope.Character;
         // Renaming a this-character override away un-shadows the shared rule
-        // under the old pattern, exactly like deleting it (#315).
+        // under the old pattern, exactly like deleting it (public #315).
         if (existing is not null && !string.Equals(editKey, pattern, StringComparison.Ordinal))
             ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, existing.Scope, editKey);
         _editingPattern = pattern;   // keep the editor pointed at the saved rule
@@ -224,7 +224,7 @@ public partial class HighlightStringsPanel : UserControl
         }
 
         _engine.RemoveRule(row.Pattern);
-        // A deleted per-character override un-shadows its shared twin now (#315).
+        // A deleted per-character override un-shadows its shared twin now (public #315).
         var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, rule.Scope, row.Pattern);
         ClearForm();
         Refresh();

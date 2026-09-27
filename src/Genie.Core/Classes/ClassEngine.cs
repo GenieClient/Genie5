@@ -60,7 +60,7 @@ public sealed class ClassEngine
     }
 
     /// <summary>Which config file <paramref name="className"/> saves back to
-    /// (#257/#315). Unknown names and <c>default</c> report Character.</summary>
+    /// (public #257/#315). Unknown names and <c>default</c> report Character.</summary>
     public RuleScope ScopeOf(string className) =>
         _global.Contains(className) ? RuleScope.Global : RuleScope.Character;
 

@@ -261,7 +261,7 @@ public class DisplaySettingsViewModel : ReactiveObject
     private void ResetToDefaults()
     {
         var d = new DisplaySettings();
-        // Game text / Echoes reset to the ACTIVE theme's colours (#304) — the
+        // Game text / Echoes reset to the ACTIVE theme's colours (public #304) — the
         // built-in DisplaySettings defaults are the Dark palette's, which on a
         // light theme meant Reset painted light-grey text on a white window.
         var theme = _themes?.Current;

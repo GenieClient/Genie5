@@ -71,7 +71,7 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
 
         // WindowSettingsStore is always present — it's app-level state, not
         // per-profile, so no nullability check. Its rows still save back to
-        // the layer they came from (#315).
+        // the layer they came from (public #315).
         LayoutPanelCtrl.Initialize(vm.WindowSettings, vm.OnWindowSettingsChanged,
                                    vm.ScopeContextFor("windows.json"));
 

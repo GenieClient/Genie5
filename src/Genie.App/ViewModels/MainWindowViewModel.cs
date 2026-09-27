@@ -4003,7 +4003,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     /// <summary>
     /// Persist the per-window settings (font / colour / timestamp / name-list /
-    /// title) to <c>windows.json</c>, split by layer (#315): each window's row
+    /// title) to <c>windows.json</c>, split by layer (public #315): each window's row
     /// goes back to the file it came from — the connected profile's, or the
     /// shared Config one — the same split the Configuration → Layout tab
     /// writes. Called when a window right-click menu toggles Time Stamp or
@@ -4134,7 +4134,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // windows.json is a LIST keyed by window Id, not a monolithic layout
         // doc — global entries first, profile entries override per Id.
         {
-            // Each row is tagged with the layer it came from (#315) so a save
+            // Each row is tagged with the layer it came from (public #315) so a save
             // writes it back there instead of forking globals into the profile.
             try { foreach (var m in p.LoadWindowSettings(Path.Combine(globalDir, "windows.json"))) WindowSettings.Apply(m, RuleScope.Global); } catch { }
             if (!single)

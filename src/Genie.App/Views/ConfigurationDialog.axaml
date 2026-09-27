@@ -108,7 +108,7 @@
       <!-- ════════════════════════════════════════════════════════════════
            Presets — the game's own text categories + the creatures colour
            the Mobs window uses. Its own tab, ahead of Highlights (public
-           #304): it used to be a Highlights sub-tab, where nobody looking
+           public #304): it used to be a Highlights sub-tab, where nobody looking
            for a panel colour thought to look.
            ════════════════════════════════════════════════════════════════ -->
       <TabItem Header="Presets">

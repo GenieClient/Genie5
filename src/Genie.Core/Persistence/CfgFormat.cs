@@ -38,7 +38,7 @@ public static class CfgFormat
     public static IEnumerable<string> VariableLines(VariableStore store) =>
         VariableLines(store.GetAll().Values);
 
-    /// <summary>A subset of a store's variables (the #315 per-layer sync).</summary>
+    /// <summary>A subset of a store's variables (the public #315 per-layer sync).</summary>
     public static IEnumerable<string> VariableLines(IEnumerable<VariableValue> variables) =>
         variables
             .Where(v => v.Scope == VariableScope.User)

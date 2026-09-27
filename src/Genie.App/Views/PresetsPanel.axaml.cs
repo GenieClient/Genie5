@@ -141,7 +141,7 @@ public partial class PresetsPanel : UserControl
         var id = row.Id;
 
         // A this-character override resets to the SHARED value when one is
-        // saved (#315) — resetting it to the built-in default would write that
+        // saved (public #315) — resetting it to the built-in default would write that
         // default over every character's shared colour at the save below.
         var current = _engine.Get(id);
         if (current?.Scope == RuleScope.Character && _scopeCtx?.TwoLayers == true

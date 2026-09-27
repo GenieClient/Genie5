@@ -32,7 +32,7 @@ public partial class ClassesPanel : UserControl
     {
         InitializeComponent();
         ScopeBox.ItemsSource   = ScopeEditing.Labels;
-        ScopeBox.SelectedIndex = 0;   // new classes default to This character (#315)
+        ScopeBox.SelectedIndex = 0;   // new classes default to This character (public #315)
     }
 
     public void Initialize(ClassEngine engine, Action? onChanged = null,
@@ -139,7 +139,7 @@ public partial class ClassesPanel : UserControl
             return;
         }
         var scope = _engine.ScopeOf(name);
-        // Removing a shared class affects every character: confirm (#257/#315).
+        // Removing a shared class affects every character: confirm (public #257/#315).
         if (scope == RuleScope.Global && _scopeCtx?.TwoLayers == true && _engine.GetAll().ContainsKey(name))
         {
             if (this.GetVisualRoot() is not Window owner) return;
@@ -149,7 +149,7 @@ public partial class ClassesPanel : UserControl
         }
         if (_engine.Remove(name))
         {
-            // A removed per-character class un-shadows the shared one now (#315).
+            // A removed per-character class un-shadows the shared one now (public #315).
             var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, scope, name);
             ClearForm();
             Refresh();
@@ -175,7 +175,7 @@ public partial class ClassesPanel : UserControl
             return;
         }
         _engine.Set(name, ActiveCheck.IsChecked == true);
-        // The Scope field decides which file the class saves to (#315).
+        // The Scope field decides which file the class saves to (public #315).
         if (_scopeCtx?.TwoLayers == true)
             _engine.SetScope(name, ScopeEditing.FromIndex(ScopeBox.SelectedIndex));
         Refresh();

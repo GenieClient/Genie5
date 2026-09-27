@@ -150,7 +150,7 @@ public partial class NamesPanel : UserControl
         }
 
         _engine.Remove(rule.Name);
-        // A removed per-character name un-shadows its shared twin now (#315).
+        // A removed per-character name un-shadows its shared twin now (public #315).
         var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, rule.Scope, rule.Name);
         ClearForm();
         Refresh();

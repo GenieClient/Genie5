@@ -155,7 +155,7 @@ public sealed class ConfigurationScopeSplitTests : IDisposable
     [Fact]
     public void Classes_JsonOnlyProfile_PanelEditIsPersisted()
     {
-        // Before #315 the panel only rewrote an existing classes.cfg, so on a
+        // Before public #315 the panel only rewrote an existing classes.cfg, so on a
         // json-only profile a class edit lasted the session.
         var vm = Build();
         vm.ClassEngine!.Set("hunting", false);

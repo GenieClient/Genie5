@@ -361,7 +361,7 @@ public class ConfigurationViewModel : ReactiveObject
     {
         var store = VariableStore;
         if (store is null) return;
-        // Split by layer like the eight rule types (#315): each variable goes
+        // Split by layer like the eight rule types (public #315): each variable goes
         // back to the file it came from, and a this-character value that
         // shadows a shared one never drops the shared one from its file.
         var mergedGlobal = SaveRuleJsonSplit("variables.json", store.GetAll().Values.ToList(),
@@ -377,7 +377,7 @@ public class ConfigurationViewModel : ReactiveObject
     public void OnClassesChanged()
     {
         // Classes save to classes.json like the other rule types, split by
-        // layer (#315) — before this the panel only kept a coexisting
+        // layer (public #315) — before this the panel only kept a coexisting
         // classes.cfg current, so on a json-only profile a panel edit lasted
         // the session. The .cfg (Genie 4 import / #class save) still wins at
         // connect when it exists, so it is rewritten per layer too.
@@ -410,7 +410,7 @@ public class ConfigurationViewModel : ReactiveObject
             TrySave(() => draft.Save(PathFor(Genie.Core.Dialogs.ServerDialogMappings.FileName)));
     }
 
-    /// <summary>Persist the Layout tab, split by layer (#315): each window's
+    /// <summary>Persist the Layout tab, split by layer (public #315): each window's
     /// row goes back to the file it came from — this character's
     /// <c>windows.json</c> or the shared one — keeping shadowed shared rows.</summary>
     public void OnWindowSettingsChanged()

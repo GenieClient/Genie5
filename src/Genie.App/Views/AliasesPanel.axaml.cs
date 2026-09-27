@@ -131,7 +131,7 @@ public partial class AliasesPanel : UserControl
 
         _engine.RemoveAlias(row.Name);
         // A deleted per-character override un-shadows its shared twin now,
-        // not at the next connect (#315).
+        // not at the next connect (public #315).
         var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, alias.Scope, row.Name);
         ClearForm();
         Refresh();

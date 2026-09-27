@@ -135,7 +135,7 @@ public partial class MacrosPanel : UserControl
         }
 
         _engine.Remove(rule.Key);
-        // A deleted per-character binding un-shadows its shared twin now (#315).
+        // A deleted per-character binding un-shadows its shared twin now (public #315).
         var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, rule.Scope, rule.Key);
         ClearForm();
         Refresh();

@@ -140,7 +140,7 @@ public partial class SubstitutesPanel : UserControl
         }
 
         _engine.RemoveRule(row.Pattern);
-        // A deleted per-character override un-shadows its shared twin now (#315).
+        // A deleted per-character override un-shadows its shared twin now (public #315).
         var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, rule.Scope, row.Pattern);
         ClearForm();
         Refresh();

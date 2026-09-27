@@ -47,7 +47,7 @@ public static class ScopeEditing
 
     /// <summary>After a panel removed a rule from its engine: when the rule
     /// was a this-character one in two-layer editing, put the shared rule it
-    /// shadowed back into the engine (#315). True when one was restored.</summary>
+    /// shadowed back into the engine (public #315). True when one was restored.</summary>
     public static bool RestoreTwinAfterDelete(ScopeEditingContext? ctx, RuleScope deletedScope, string key) =>
         ctx is { TwoLayers: true } && deletedScope == RuleScope.Character
         && ctx.RestoreGlobalTwin?.Invoke(key) == true;
@@ -57,7 +57,7 @@ public static class ScopeEditing
         ? $"Deleted this character's '{key}' — the shared (all characters) version is active again."
         : $"Deleted '{key}'.";
 
-    // ── Scope filter (#315) ─────────────────────────────────────────────────
+    // ── Scope filter (public #315) ─────────────────────────────────────────────────
 
     /// <summary>Scope-filter combo labels, index-aligned with <see cref="PassesFilter"/>.</summary>
     public static readonly string[] FilterLabels = ["All scopes", "This character", "All characters"];

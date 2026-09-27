@@ -14,7 +14,7 @@ using Xunit;
 namespace Genie.App.HeadlessTests;
 
 /// <summary>
-/// Public #315 and #304 through the real panels: the Scope filter next to
+/// Public #315 and public #304 through the real panels: the Scope filter next to
 /// each rule grid, a deleted per-character override handing back to its
 /// shared twin via the Delete button, the Scope column/field on Variables and
 /// Classes, and Presets as its own top-level Configuration tab.
@@ -141,7 +141,7 @@ public class RuleScopePanelsHeadlessTests
         Assert.Equal("Global", h.Rows<ClassesPanel.ClassRow>().Single(r => r.Name == "combat").Scope);
     }
 
-    // ── #304: Presets is a top-level tab, before Highlights ────────────────
+    // ── public #304: Presets is a top-level tab, before Highlights ────────────────
 
     private static List<string> Headers(TabControl tabs) =>
         tabs.Items.OfType<TabItem>().Select(t => t.Header as string ?? "").ToList();
