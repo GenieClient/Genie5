@@ -202,7 +202,7 @@ Genie ships **seven built-in themes** under **Edit → Theme** — **Dark** (the
 
 ## Display settings
 
-**Edit → Display Settings…** controls fonts, game-text and echo colors, theme selection, and the external editor used by `#edit`. (The roundtime indicator's position and the hands-strip position are set from the **Layout** menu.)
+**Edit → Display Settings…** controls fonts, game-text and echo colors, theme selection, and the external editor used by `#edit`. (The roundtime indicator's position and the hands-strip position are set from the **Layout** menu.) The theme editor shows the same Game text and Echoes colors. They're one setting each, not two copies; see [Themes](Configuration#themes). Panel and category colors, such as the creature color used by the Mobs panel, are on the **Configuration → Presets** tab.
 
 A few more odds and ends:
 

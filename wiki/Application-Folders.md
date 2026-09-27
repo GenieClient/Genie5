@@ -74,7 +74,7 @@ Settings come in two **layers**:
 - **All characters** (`Config/`) — the shared set, and the one used by sessions without a character (LIST mode, dev replay).
 - **This character** (`Profiles/<Char>-<Account>/`) — rules that belong to one character. At connect, the character's rules load **over** the shared set: they win where the two overlap, and every shared rule the character hasn't overridden still applies. So combat triggers saved to one character don't follow you onto a shopping alt, while the highlights you share stay live everywhere.
 
-Every rule editor has a **Scope** field choosing which layer a rule lives in (new rules default to "This character"), and deleting or toggling a shared rule while connected offers a reversible per-character opt-out instead of changing it for everyone. See [Configuration](Configuration#where-rules-are-stored) for the details. The active profile directory is chosen at connect time from the character + account names.
+Every rule editor has a **Scope** field choosing which layer a rule lives in (new rules default to "This character"). That includes variables, classes and per-window settings (`windows.json`). Deleting or toggling a shared rule while connected offers a reversible per-character opt-out instead of changing it for everyone, and deleting a character's override brings the shared rule back at once. See [Configuration](Configuration#where-rules-are-stored) for the details. The active profile directory is chosen at connect time from the character + account names.
 
 ## Backups, syncing, multiple machines
 

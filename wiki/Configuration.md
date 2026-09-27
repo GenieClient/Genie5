@@ -2,7 +2,7 @@
 
 Genie 5 ships all of Genie 4's **rule engines** — the pattern-driven helpers that color text, expand shortcuts, react to the game, and bind keys. You manage them two ways:
 
-- **The Configuration dialog** — **Edit → Configuration…** opens a tabbed, form-based editor. The tabs are **Layout** (with Windows and Settings sub-tabs), **Highlights**, **Triggers**, **Substitutes**, **Gags**, **Shunts**, **Aliases**, **Scripts**, **Text-to-Speech**, **Macros**, **Variables**, and **Classes** — so it covers script settings and [Text-to-Speech](Text-to-Speech) alongside the rule engines. The list-based rule tabs each have a **type-to-filter box**, so a several-hundred-line trigger list stays navigable.
+- **The Configuration dialog** — **Edit → Configuration…** opens a tabbed, form-based editor. The tabs are **Layout** (with Windows, Settings and Server Dialogs sub-tabs), **Presets**, **Highlights** (with Strings and Names sub-tabs), **Triggers**, **Substitutes**, **Gags**, **Shunts**, **Aliases**, **Scripts**, **Text-to-Speech**, **Macros**, **Variables**, and **Classes** — so it covers script settings and [Text-to-Speech](Text-to-Speech) alongside the rule engines. The list-based rule tabs each have a **type-to-filter box**, so a several-hundred-line trigger list stays navigable.
 - **The command bar** — `#`-prefixed commands add and remove rules on the fly, exactly as in Genie 4.
 
 Either way, rules are saved to disk automatically — a `.json` file per rule type, with a Genie 4-style `.cfg` twin kept in sync (see [Where rules are stored](#where-rules-are-stored)). Command syntax follows the **Genie 4 dialect**; when in doubt about a specific option, the Configuration dialog is the reliable surface.
@@ -75,8 +75,8 @@ A rule can also be **scoped to specific windows**: the Highlights tab's **Window
 
 Two built-in colorings live alongside your own rules:
 
-- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change under **Config → Highlights → Presets**.
-- **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it under **Config → Highlights → Presets** or with `#config monsterbold on|off`.
+- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Config → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
+- **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it on the **Config → Presets** tab or with `#config monsterbold on|off`.
 
 ### Substitutes — rewriting text
 
@@ -190,6 +190,8 @@ Rules are saved in `windowlog.json`. While you're connected, that's the characte
 
 The whole client is themeable from the **Edit → Theme** submenu. Seven themes are built in — **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light**, and **Wrayth-style** — and a **theme editor** lets you tweak any of them into your own. Custom themes are saved as JSON files in `Config/Themes`, so they're easy to back up or share.
 
+**Game text and Echoes colors have one home.** They show up both in **Edit → Display Settings…** and in the theme editor, but it's the same two settings: changing either one in either place changes the same value. A theme carries its own game-text and echo colors, and picking that theme sets both to the theme's colors. After that, a tweak in Display Settings sticks until you pick a theme again. Display Settings' **Reset** puts back the active theme's colors. Per-window colors (Layout tab) and presets still win over both.
+
 ## Where rules are stored
 
 Each rule type saves to its own **`.json` file** — `highlights.json`, `triggers.json`, `substitutes.json`, `gags.json`, `shunts.json`, `aliases.json`, `variables.json`, `classes.json` (plus `macros.json`) — with a Genie 4-format **`.cfg` twin** (one entry per line, the commands that recreate the rule) written alongside it so your rules still round-trip with the Genie 4 ecosystem. Rules live in **two layers**:
@@ -197,7 +199,11 @@ Each rule type saves to its own **`.json` file** — `highlights.json`, `trigger
 - **All characters** — the shared set in `Config/`.
 - **This character** — that character's own rules in `Profiles/<Character>-<Account>/`, which **layer over** the shared set: the character's rules apply first, and every shared rule the character hasn't overridden (same rule key) shows through underneath.
 
-Every rule editor has a **Scope** field ("This character" / "All characters" — new rules default to this character) and a Scope column, and each edit saves back to the file the rule actually lives in. Shared rules get per-character safeguards: deleting a shared rule while connected asks whether to **disable it just for this character** (a reversible local opt-out) or remove it for everyone, and the Toggle button on a shared rule quietly writes the same local opt-out. See [Application Folders](Application-Folders) for the full layout.
+Every rule editor has a **Scope** field ("This character" / "All characters" — new rules default to this character) and a Scope column, and each edit saves back to the file the rule actually lives in. That includes **Variables**, **Classes** and the **Layout → Windows** settings (`windows.json`), where the window list shows each window's layer in brackets. A **scope filter** next to each tab's Find box shows every rule, only this character's, or only the shared ones.
+
+Shared rules get per-character safeguards: deleting a shared rule while connected asks whether to **disable it just for this character** (a reversible local opt-out) or remove it for everyone, and the Toggle button on a shared rule quietly writes the same local opt-out. Going the other way, **deleting a this-character rule that was overriding a shared one brings the shared one back straight away**, with no reconnect needed. The status line says so. On the Presets and Layout tabs, **Reset** on a this-character override does the same: it goes back to the shared setting when there is one, and to the built-in default otherwise.
+
+A variable or class that a script or command changes while you play (for example `#var`, `#class combat off`) becomes this character's value when it's next saved, so one character's session never rewrites the shared set. See [Application Folders](Application-Folders) for the full layout.
 
 **Hand-editing is supported — even live.** External edits to the eight rule `.json` files (all of the above except `macros.json`) — in either layer — apply to the running client **without a reconnect**: Genie watches them, reloads the engines, and prints a `[config] … reloaded` line in the game window. (A file with a syntax error is left alone — nothing is cleared until it parses.) Other config files — display settings, themes, layouts, macro keybindings — still load at startup/connect.
 
