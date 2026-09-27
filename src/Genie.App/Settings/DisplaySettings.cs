@@ -255,6 +255,17 @@ public sealed class DisplaySettings : ReactiveObject
     [JsonIgnore] public bool RoundTimeOnCommandBar => !RoundTimeOnHandsStrip;
 
     /// <summary>
+    /// Keep the RT badge on screen when there is no roundtime, instead of
+    /// collapsing it away. <c>false</c> (default) = the badge appears only
+    /// while in RT, so neither the command bar nor the hands strip shifts
+    /// during ordinary play. <c>true</c> = the badge stays in whichever
+    /// position <see cref="RoundTimeOnHandsStrip"/> picks, dimmed and
+    /// reading 0.0s when idle, so the input row never jumps sideways as RT
+    /// starts and ends. Toggle via Layout → Roundtime Position → Keep Visible.
+    /// </summary>
+    [Reactive] public bool   KeepRoundTimeVisible { get; set; }
+
+    /// <summary>
     /// Where the Script Bar (the running-script chip strip) docks.
     /// <c>true</c> (default) = BOTTOM, between the hands strip and the command
     /// bar, which is where the strip has sat since it shipped.

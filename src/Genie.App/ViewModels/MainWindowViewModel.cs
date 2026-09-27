@@ -452,6 +452,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit>                    RoundTimeToCommandBarCommand { get; }
     /// <summary>Window → Roundtime Position → Hands Strip. Moves the RT badge onto the L/R/S row.</summary>
     public ReactiveCommand<Unit, Unit>                    RoundTimeToHandsStripCommand { get; }
+    /// <summary>Window → Roundtime Position → Keep Visible. Stops the RT badge collapsing between roundtimes, in either position.</summary>
+    public ReactiveCommand<Unit, Unit>                    ToggleKeepRoundTimeVisibleCommand { get; }
     /// <summary>Layout → Script Bar Position → Top. Docks the running-script strip under the menu — Genie 4's default (#357).</summary>
     public ReactiveCommand<Unit, Unit>                    ScriptBarToTopCommand    { get; }
     /// <summary>Layout → Script Bar Position → Bottom. Docks it above the command bar (the Genie 5 arrangement).</summary>
@@ -481,6 +483,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>True iff the RT badge should render inline on the hands strip
     /// (in RT AND user chose hands-strip position).</summary>
     [Reactive] public bool ShowRtOnHandsStrip  { get; private set; }
+
+    /// <summary>Opacity for both RT badges — full while in RT, dimmed when the
+    /// badge is only showing because <see cref="DisplaySettings.KeepRoundTimeVisible"/>
+    /// keeps it on screen between roundtimes.</summary>
+    [Reactive] public double RtBadgeOpacity    { get; private set; } = 0.45;
 
     /// <summary>True iff the Script Bar should render in its TOP slot — i.e. a
     /// script is running AND the user picked the top position (#357). The strip
@@ -2013,6 +2020,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Display.Save(_displayPath);
         });
 
+        ToggleKeepRoundTimeVisibleCommand = ReactiveCommand.Create(() =>
+        {
+            Display.KeepRoundTimeVisible = !Display.KeepRoundTimeVisible;
+            Display.Save(_displayPath);
+        });
+
         ScriptBarToTopCommand = ReactiveCommand.Create(() =>
         {
             Display.ScriptBarAtBottom = false;
@@ -2163,13 +2176,18 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // ShowRtOnHandsStrip is its mirror. Bind both XAML badges to these
         // so toggling the position re-routes the visible badge live without
         // needing a converter or MultiBinding in the XAML.
+        // KeepRoundTimeVisible pins the badge on outside RT (dimmed via
+        // RtBadgeOpacity) so the slot doesn't collapse between roundtimes.
         this.WhenAnyValue(
                 x => x.Vitals.InRoundTime,
-                x => x.Display.RoundTimeOnHandsStrip)
+                x => x.Display.RoundTimeOnHandsStrip,
+                x => x.Display.KeepRoundTimeVisible)
             .Subscribe(_ =>
             {
-                ShowRtInCommandBar = Vitals.InRoundTime && !Display.RoundTimeOnHandsStrip;
-                ShowRtOnHandsStrip = Vitals.InRoundTime &&  Display.RoundTimeOnHandsStrip;
+                var shown = Vitals.InRoundTime || Display.KeepRoundTimeVisible;
+                ShowRtInCommandBar = shown && !Display.RoundTimeOnHandsStrip;
+                ShowRtOnHandsStrip = shown &&  Display.RoundTimeOnHandsStrip;
+                RtBadgeOpacity     = Vitals.InRoundTime ? 1.0 : 0.45;
             });
 
         // Same shape for the Script Bar's two slots (#357): the strip only
