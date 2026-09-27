@@ -950,15 +950,24 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         if (!IsConnected || _autoLogCharacter.Length == 0) return;
         if (_core.Config.AutoLog && !AutoLogger.IsLogging)
         {
-            // Notice BEFORE Start subscribes, so it isn't itself logged.
-            GameText.AddSystemLine("[autolog] session logging on → Logs folder. Turn off with File ▸ Auto Log or #config autolog false.");
-            AutoLogger.Start(GameText, _autoLogCharacter, _autoLogGame);
+            StartAutoLog(_autoLogCharacter, _autoLogGame);
         }
         else if (!_core.Config.AutoLog && AutoLogger.IsLogging)
         {
             AutoLogger.Stop();
             GameText.AddSystemLine("[autolog] session logging off.");
         }
+    }
+
+    /// <summary>Open the AutoLog file for this session. The notice is emitted
+    /// BEFORE Start subscribes, so it isn't itself logged. Start never throws; a
+    /// file it cannot open (another instance holding it, a read-only folder)
+    /// leaves logging off with a visible line, and the connect carries on.</summary>
+    private void StartAutoLog(string characterName, string gameName)
+    {
+        GameText.AddSystemLine("[autolog] session logging on → Logs folder. Turn off with File ▸ Auto Log or #config autolog false.");
+        if (!AutoLogger.Start(GameText, characterName, gameName))
+            GameText.AddSystemLine($"[autolog] could not open the session log ({AutoLogger.LastError}) — logging is off for this session.");
     }
 
     /// <summary>
@@ -4522,17 +4531,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         UserHighlights.Metrics = _core!.Metrics;   // time the render-path highlight pass
         Perf.Attach(_core.Metrics);
 
-        // AutoLog (Genie 4): begin the rendered-text session log if enabled. The
-        // notice is emitted BEFORE Start subscribes, so it isn't itself logged.
+        // AutoLog (Genie 4): begin the rendered-text session log if enabled.
         // The identity is remembered so a mid-session File ▸ Auto Log enable
         // (SyncAutoLogFromConfig) names the file for THIS session.
         _autoLogCharacter = cfg.CharacterName;
         _autoLogGame      = cfg.GameCode;
         if (_core.Config.AutoLog)
-        {
-            GameText.AddSystemLine("[autolog] session logging on → Logs folder. Turn off with File ▸ Auto Log or #config autolog false.");
-            AutoLogger.Start(GameText, cfg.CharacterName, cfg.GameCode);
-        }
+            StartAutoLog(cfg.CharacterName, cfg.GameCode);
 
         // Honour ShowLinks + conndebug for this connect (both can change between
         // sessions via #config).
