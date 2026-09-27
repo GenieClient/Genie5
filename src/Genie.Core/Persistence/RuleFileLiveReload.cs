@@ -140,12 +140,15 @@ public static class RuleFileLiveReload
                 if (shunts is null) return 0;
                 var character = Character<ShuntPersistenceModel>();
                 var global    = Global<ShuntPersistenceModel>();
+                static ShuntRule Add(ShuntEngine e, ShuntPersistenceModel m) =>
+                    e.AddRule(m.Pattern, m.Window, m.Copy, m.CaseSensitive, m.IsEnabled, m.ClassName);
                 shunts.Clear();
                 var layered = ScopedRuleLoader.Layer(character, global, x => x.Pattern);
-                foreach (var (m, scope) in layered)
-                    shunts.AddRule(m.Pattern, m.Window, m.Copy, m.CaseSensitive, m.IsEnabled, m.ClassName).Scope = scope;
+                foreach (var (m, scope) in layered) Add(shunts, m).Scope = scope;
                 SyncScopedCfg(single, profileDir, globalDir, "shunts.cfg",
-                    sc => CfgFormat.ShuntLines(shunts.Rules.Where(r => sc is null || r.Scope == sc)));
+                    () => CfgFormat.ShuntLines(shunts.Rules),
+                    () => CfgFormat.ShuntLines(shunts.Rules.Where(r => r.Scope == RuleScope.Character)),
+                    () => { var g = new ShuntEngine(); foreach (var m in global) Add(g, m); return CfgFormat.ShuntLines(g.Rules); });
                 return layered.Count;
             }
             case "aliases.json":

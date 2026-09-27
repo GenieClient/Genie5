@@ -44,6 +44,7 @@ public partial class ShuntsPanel : UserControl
         var twoLayers = scopeContext?.TwoLayers == true;
         ScopeGroup.IsVisible = twoLayers;
         ScopeEditing.SetColumnVisible(ItemsList, "Scope", twoLayers);
+        ScopeEditing.InitFilter(ScopeFilterBox, twoLayers, Refresh);
         ClearForm();
         ResetFilter();
         Refresh();
@@ -56,6 +57,7 @@ public partial class ShuntsPanel : UserControl
         if (_engine is null) return;
         var keep = (ItemsList.SelectedItem as ShuntRow)?.Pattern;
         ItemsList.ItemsSource = _engine.Rules
+            .Where(r => ScopeEditing.PassesFilter(ScopeFilterBox.SelectedIndex, r.Scope))
             .Select(r => new ShuntRow(r.IsEnabled ? "✓" : "✗", ScopeEditing.RowLabel(r.Scope),
                                       r.Pattern, r.Window, ModeLabel(r), r.ClassName))
             .Where(r => PanelFilterHelpers.Matches(_filter, r.Pattern, r.Window, r.ClassName))
@@ -142,10 +144,12 @@ public partial class ShuntsPanel : UserControl
         }
 
         _engine.RemoveRule(row.Pattern);
+        // A deleted per-character override un-shadows its shared twin now (public #315).
+        var restored = ScopeEditing.RestoreTwinAfterDelete(_scopeCtx, rule.Scope, row.Pattern);
         ClearForm();
         Refresh();
         _onChanged?.Invoke();
-        StatusText.Text = "Deleted.";
+        StatusText.Text = restored ? ScopeEditing.DeletedStatus(row.Pattern, true) : "Deleted.";
     }
 
     private void OnToggle(object? sender, RoutedEventArgs e)

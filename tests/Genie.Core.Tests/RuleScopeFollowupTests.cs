@@ -140,11 +140,27 @@ public sealed class RuleScopeFollowupTests : IDisposable
     }
 
     [Fact]
+    public void RestoreGlobalTwin_Shunts()
+    {
+        var g = new LayeredRuleLoad.EffectiveScope(new(), new(), new(), new(), new(), new(), new(), new(), new());
+        g.Shunts.AddRule("^A kitten", "Pets", copy: true);
+
+        var live = new Genie.Core.Shunts.ShuntEngine();
+        Assert.True(LayeredRuleLoad.RestoreGlobalTwin(g, "shunts.json", "^a KITTEN", shunts: live));
+
+        var back = Assert.Single(live.Rules);
+        Assert.Equal("Pets", back.Window);
+        Assert.True(back.Copy);
+        Assert.Equal(RuleScope.Global, back.Scope);
+        Assert.False(LayeredRuleLoad.RestoreGlobalTwin(g, "shunts.json", "^A kitten", shunts: live));
+    }
+
+    [Fact]
     public void RestoreGlobalTwin_NoTwinOrKeyStillPresent_ReturnsFalse()
     {
         var hi = new HighlightEngine();
         hi.AddRule("kill shot", "Red").Scope = RuleScope.Global;
-        var g = new LayeredRuleLoad.EffectiveScope(hi, new(), new(), new(), new(), new(), new(), new());
+        var g = new LayeredRuleLoad.EffectiveScope(hi, new(), new(), new(), new(), new(), new(), new(), new());
 
         var live = new HighlightEngine();
         Assert.False(LayeredRuleLoad.RestoreGlobalTwin(g, "highlights.json", "no such rule", highlights: live));

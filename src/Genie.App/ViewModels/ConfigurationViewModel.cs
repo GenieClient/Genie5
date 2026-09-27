@@ -559,7 +559,8 @@ public class ConfigurationViewModel : ReactiveObject
                         aliases:     AliasEngine,
                         macros:      MacroEngine,
                         classes:     ClassEngine,
-                        variables:   VariableStore);
+                        variables:   VariableStore,
+                        shunts:      ShuntEngine);
             }
         }
         catch { return false; }   // unreadable shared file: the twin returns at the next connect

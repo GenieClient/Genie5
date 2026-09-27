@@ -265,7 +265,8 @@ public static class LayeredRuleLoad
         AliasEngine?        aliases     = null,
         MacroEngine?        macros      = null,
         ClassEngine?        classes     = null,
-        VariableStore?      variables   = null)
+        VariableStore?      variables   = null,
+        ShuntEngine?        shunts      = null)
     {
         bool Same(string? a) => string.Equals(a, key, StringComparison.OrdinalIgnoreCase);
 
@@ -305,6 +306,15 @@ public static class LayeredRuleLoad
                 var r = global.Gags.Rules.FirstOrDefault(x => Same(x.Pattern));
                 if (r is null) return false;
                 gags.AddRule(r.Pattern, r.CaseSensitive, r.IsEnabled, r.ClassName).Scope = RuleScope.Global;
+                return true;
+            }
+            case "shunts.json":
+            {
+                if (shunts is null || shunts.Rules.Any(r => Same(r.Pattern))) return false;
+                var r = global.Shunts.Rules.FirstOrDefault(x => Same(x.Pattern));
+                if (r is null) return false;
+                shunts.AddRule(r.Pattern, r.Window, r.Copy, r.CaseSensitive, r.IsEnabled,
+                               r.ClassName).Scope = RuleScope.Global;
                 return true;
             }
             case "aliases.json":
