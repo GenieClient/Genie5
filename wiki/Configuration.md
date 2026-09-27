@@ -2,7 +2,7 @@
 
 Genie 5 ships all of Genie 4's **rule engines** — the pattern-driven helpers that color text, expand shortcuts, react to the game, and bind keys. You manage them two ways:
 
-- **The Configuration dialog** — **Edit → Configuration…** opens a tabbed, form-based editor. The tabs are **Layout** (with Windows and Settings sub-tabs), **Highlights**, **Triggers**, **Substitutes**, **Gags**, **Aliases**, **Scripts**, **Text-to-Speech**, **Macros**, **Variables**, and **Classes** — so it covers script settings and [Text-to-Speech](Text-to-Speech) alongside the rule engines. The list-based rule tabs each have a **type-to-filter box**, so a several-hundred-line trigger list stays navigable.
+- **The Configuration dialog** — **Edit → Configuration…** opens a tabbed, form-based editor. The tabs are **Layout** (with Windows and Settings sub-tabs), **Highlights**, **Triggers**, **Substitutes**, **Gags**, **Shunts**, **Aliases**, **Scripts**, **Text-to-Speech**, **Macros**, **Variables**, and **Classes** — so it covers script settings and [Text-to-Speech](Text-to-Speech) alongside the rule engines. The list-based rule tabs each have a **type-to-filter box**, so a several-hundred-line trigger list stays navigable.
 - **The command bar** — `#`-prefixed commands add and remove rules on the fly, exactly as in Genie 4.
 
 Either way, rules are saved to disk automatically — a `.json` file per rule type, with a Genie 4-style `.cfg` twin kept in sync (see [Where rules are stored](#where-rules-are-stored)). Command syntax follows the **Genie 4 dialect**; when in doubt about a specific option, the Configuration dialog is the reliable surface.
@@ -18,6 +18,7 @@ Either way, rules are saved to disk automatically — a `.json` file per rule ty
 | **Highlights** | Color lines (or substrings) that match a pattern. | `#highlight` |
 | **Substitutes** | Rewrite matching text before it's displayed. | `#substitute`, `#sub`, `#subs` |
 | **Gags** | Hide matching lines from the output entirely. | `#gag`, `#ungag` |
+| **Shunts** | Send matching lines to a named window instead of (or as well as) the main window. New in Genie 5. | `#shunt`, `#unshunt` |
 | **Macros** | Bind a keystroke (F-keys, Ctrl/Alt/Shift+key) to command(s). | `#macro` |
 | **Variables** | Store reusable values, readable in scripts as `$name`. | `#var`, `#tvar` |
 | **Classes** | Named groups that turn sets of rules on/off together. | `#class` |
@@ -91,6 +92,25 @@ Suppress lines you never want to see:
 
 Remove with `#ungag`.
 
+### Shunts — sending lines to another window
+
+A shunt routes game lines that match a pattern into a named window, so chatter you still want to read stops scrolling the main window. It's new in Genie 5 (asked for back in Genie 4, never built there).
+
+```
+#shunt {^A kitten} {Atmospherics}
+#shunt {kitten} {Pets} copy
+```
+
+- **Move or copy.** By default the line **moves**: it shows in the target window and not in the main one. Add `copy` at the end to show it in **both**.
+- **The window** is any name `#echo >Window` accepts: a stream window (`Talk`, `Thoughts`, `Log`, `Atmospherics`, …) or a new name, which becomes its own window the first time a line is sent to it. `main`/`game` isn't accepted (lines are already there). A non-text panel (`Mapper`, `Vitals`, …) can't hold lines, so they stay in the main window.
+- **A moved line never disappears.** If the target window is closed, the line stays in the main window. For a stream window, it goes wherever that window's own **If closed** setting (Layout tab) sends it; if that setting throws text away, a shunted line still comes back to the main window.
+- **Ordering:** substitutes run first, then gags, then shunts. The pattern matches the text as you'd have read it (after substitutes), and a gagged line is gone, so it's never shunted. The first shunt that matches wins. Shunts apply to main-window game text only, not to lines already on their own stream (talk, combat, …) or to echoes and script output.
+- `#shunt add {pattern} {window} [{class}] [copy]` is the long form; an optional class works as it does for every other rule.
+- `#shunt` or `#shunt list` lists them (`#shunt kitten` filters by pattern or window). `#unshunt {pattern}` or `#shunt remove {pattern}` removes one. `#shunt clear`, `#shunt save`, and `#shunt load` work like the other rule types.
+- The **Shunts** tab in the Configuration dialog edits the same rules, with an **Also keep in main window** box for copy.
+
+There's no File-menu master switch for shunts yet. To pause a set of them, give them a class and turn the class off.
+
 ### Macros — key bindings
 
 Bind a keystroke to one or more commands:
@@ -116,7 +136,7 @@ Genie also exposes ~40 live **game-state** variables (`$health`, `$stance`, `$ri
 
 ### Classes — grouping rules
 
-A **class** is an on/off switch that gates a group of rules. Tag highlights, triggers, substitutes, gags, aliases, or macros with a class name, then flip them all at once:
+A **class** is an on/off switch that gates a group of rules. Tag highlights, triggers, substitutes, gags, shunts, aliases, or macros with a class name, then flip them all at once:
 
 ```
 #class {combat} {on}
@@ -172,14 +192,14 @@ The whole client is themeable from the **Edit → Theme** submenu. Seven themes 
 
 ## Where rules are stored
 
-Each rule type saves to its own **`.json` file** — `highlights.json`, `triggers.json`, `substitutes.json`, `gags.json`, `aliases.json`, `variables.json`, `classes.json` (plus `macros.json`) — with a Genie 4-format **`.cfg` twin** (one entry per line, the commands that recreate the rule) written alongside it so your rules still round-trip with the Genie 4 ecosystem. Rules live in **two layers**:
+Each rule type saves to its own **`.json` file** — `highlights.json`, `triggers.json`, `substitutes.json`, `gags.json`, `shunts.json`, `aliases.json`, `variables.json`, `classes.json` (plus `macros.json`) — with a Genie 4-format **`.cfg` twin** (one entry per line, the commands that recreate the rule) written alongside it so your rules still round-trip with the Genie 4 ecosystem. Rules live in **two layers**:
 
 - **All characters** — the shared set in `Config/`.
 - **This character** — that character's own rules in `Profiles/<Character>-<Account>/`, which **layer over** the shared set: the character's rules apply first, and every shared rule the character hasn't overridden (same rule key) shows through underneath.
 
 Every rule editor has a **Scope** field ("This character" / "All characters" — new rules default to this character) and a Scope column, and each edit saves back to the file the rule actually lives in. Shared rules get per-character safeguards: deleting a shared rule while connected asks whether to **disable it just for this character** (a reversible local opt-out) or remove it for everyone, and the Toggle button on a shared rule quietly writes the same local opt-out. See [Application Folders](Application-Folders) for the full layout.
 
-**Hand-editing is supported — even live.** External edits to the seven rule `.json` files — in either layer — apply to the running client **without a reconnect**: Genie watches them, reloads the engines, and prints a `[config] … reloaded` line in the game window. (A file with a syntax error is left alone — nothing is cleared until it parses.) Other config files — display settings, themes, layouts, macro keybindings — still load at startup/connect.
+**Hand-editing is supported — even live.** External edits to the eight rule `.json` files (all of the above except `macros.json`) — in either layer — apply to the running client **without a reconnect**: Genie watches them, reloads the engines, and prints a `[config] … reloaded` line in the game window. (A file with a syntax error is left alone — nothing is cleared until it parses.) Other config files — display settings, themes, layouts, macro keybindings — still load at startup/connect.
 
 ## Importing from Genie 4
 
