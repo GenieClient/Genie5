@@ -100,6 +100,23 @@ If the store is redesigned, a check will say it couldn't read the page rather th
 
 This is a rebuild of Thires's Genie 4 **SimuCoins** plugin, with his blessing.
 
+## SpellInfo
+
+`/spellinfo` is a spell reference in the command bar: every DragonRealms spell's guild, mana type, spellbook, difficulty, skill, effect, prep range, and contest, looked up without leaving the game.
+
+- `/spellinfo name <spell>` — the full details for one spell. Case doesn't matter, and part of a name works too (`/spellinfo name lightning`); if several spells match, you get a list to pick from.
+- `/spellinfo abbr <abbreviation>` — the same, by abbreviation (`/spellinfo abbr gz`).
+- `/spellinfo guild <guild>` and `/spellinfo mana <mana type>` — every spell in a guild, or of a mana type.
+- `/spellinfo query …` — stack filters to narrow a list: `/guild`, `/mana`, `/difficulty`, and `/skill`, in any order. For example `/spellinfo query /mana elemental /difficulty intro /skill targeted`. The start of a value is enough as long as only one value fits it (`/guild moon`, `/mana life`, `/skill aug`); if it doesn't, the reply lists the choices. `/spellinfo query help` shows examples.
+- `/spellinfo refresh` — download the spell list again.
+- `/spellinfo help` — the list of commands.
+
+**Every spell in a list is clickable**: click one to see its details. The details end with a link to the spell's Elanthipedia page.
+
+**Where the data comes from.** The spell list is a feed built nightly from [Elanthipedia](https://elanthipedia.play.net/), so it follows the wiki rather than going out of date the way the Genie 4 plugin's bundled list did. Genie downloads it the first time you use a `/spellinfo` command and saves it as `SpellInfo.spells.json` in your data folder (one copy for all your characters). After that, lookups come from that saved copy, and Genie checks for a new list at most once a day, when you next use a command. If the feed can't be reached, the saved copy is used and `/spellinfo refresh` tells you so. Nothing is downloaded while you play unless you type a `/spellinfo` command.
+
+This is a port of Etherian's Genie 4 **SpellInfo** plugin, from source he provided. The plugin's other feature, adding spell details to other characters' cast messages, isn't in Genie 5 yet.
+
 ## The bottom strips
 
 ![The bottom strips — vitals bars, hands strip with a prepared spell and cast bar, roundtime counter, and the command bar](images/interface-bottom-strips.png)

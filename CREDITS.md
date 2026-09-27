@@ -86,6 +86,11 @@ The original authors, with thanks:
   the store conversation and the `/sc` / `/sct` / `/sca` command spellings; the
   plugin's own account file is not carried over, because the credentials are
   already in your profile.
+- **SpellInfo** — *Etherian* (Genie 4 SpellInfo v1.1), source provided by the
+  author for this purpose. Genie 5's built-in keeps the `/spellinfo` lookups,
+  the stacking `query` filters, and the clickable result rows. Its spell data
+  comes from Etherian's nightly Elanthipedia-derived spell feed rather than the
+  plugin's bundled list.
 
 Plugins that remain plugins are credited in their own `Plugin_*V5` repositories.
 
