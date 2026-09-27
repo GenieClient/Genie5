@@ -35,6 +35,13 @@
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- ReadyToRun precompiles the managed code so launch skips most of the
+         JIT work. Measured on win-x64 (public #288): the main window appears
+         in ~0.88 s instead of ~1.45 s (median of 14 warm launches each), for
+         +26 MB on the exe and the installer. The tiered JIT still recompiles
+         hot paths, so steady-state speed is unchanged. Applies to every RID
+         because all four release lanes publish through this project. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
     <!-- DebugType=embedded keeps PDB symbols inside the exe so stack traces
          from the field stay readable when testers report crashes. -->
     <DebugType>embedded</DebugType>
