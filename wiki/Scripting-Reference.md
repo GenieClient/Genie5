@@ -114,11 +114,23 @@ The Genie 4 **menu-script toolkit** — the commands classic scripts like `mm_tr
 | `#window add\|open\|show\|close\|hide\|remove\|clear "Name"` | Create, show, hide, or destroy a named dock window. `add`/`open`/`show` bring it up (creating it if needed); `clear` wipes its text in place. |
 | `#link [>window] {text} {command}` | Print a clickable line — clicking it runs `command` through the normal input pipeline (it does **not** run at `#link` time). |
 | `#echo [>window] [color] text` | Directed echo. Targets **Main**/**Game**, any built-in stream window (`>Combat`, `>Talk`, `>Thoughts`, …), or a named window; colours are honoured. Non-text panels (`>Mapper`, `>Vitals`, …) fall back to Main. |
+| `#img [>window] <file> [w:N] [h:N]` | Show a picture (`#image` is a synonym). `file` is relative to your **Art** folder (`#config artdir`) unless it's a full path; Genie 4's `icons\sword.png` backslash style works on every platform. png, jpg, gif (first frame) and bmp only, up to 16 MB. `w:`/`h:` (or `width:`/`height:`) set the size in pixels — give both to stretch, one to scale keeping the shape — and nothing draws larger than 1024 px on a side. With no `>window` the picture goes to the **Portrait** panel when it's open (replacing its art, Genie 4 style) and otherwise inline in the Game window; `>Name` puts it in a named window. A missing or unreadable file prints the reason instead. See [Image lines](#image-lines) below. |
 | `#clear [window]` | Wipe a window's scrollback in place. The name works with or without the `>` prefix (`#clear "Moonmage Training Menu"`, Genie 4 style); a bare `#clear` wipes the main Game window. |
 | `#script abort\|pause\|resume [name\|all]` | Script lifecycle control, Genie 4 style. Acts on the named script, or every script for `all` (or no name). `#script` never *starts* a script — use `.name` for that; bare `#script` lists what's running, like `#scripts`. |
 | `#log [>file] text` | Append to a log file under your Logs folder. The `>filename` form writes verbatim; the bare form appends to the per-character daily log (with the Genie 4 `LOG CREATED` banner). Writes are serialized across scripts. |
 
 Windows created this way render full text lines — clickable links and your highlight rules both apply.
+
+#### Image lines
+
+An `#img` picture occupies one line and behaves like text everywhere except on screen. Behind the picture the line holds the text `[image: sword.png]`, and that's what you get from:
+
+- **Scrollback.** It counts as one line against the scrollback limit.
+- **Timestamps.** With the window's Time Stamp toggle on, the time appears before the picture.
+- **Session log / Auto Log.** The log records `[image: sword.png]`.
+- **Copy, Copy All and Find.** Selecting across the picture copies `[image: sword.png]`, and Find matches it.
+
+Stream windows (`>Talk`, `>Combat`, …) and the other built-in panels can't show pictures, so an image aimed at one of them goes to the Game window. The optional AvaloniaEdit game window (`#config useeditorgamewindow`) shows the text form for now. Pictures can't be clicked yet.
 
 ## Variables and scope
 
