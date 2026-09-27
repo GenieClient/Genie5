@@ -723,7 +723,7 @@ Genie now shows a live **type-ahead counter** in the command bar, and that limit
 
 **Scripting**
 
-- **Editor selection that works** — `#edit` and the ✏ Script Bar icon open your editor in a clear order: Display Settings → Editor Path, then `#config editor`, then your OS default. The Genie 4 `#config editor` setting is now honoured instead of silently ignored. See [Scripting](Scripting#choosing-an-editor).
+- **Editor selection that works** — `#edit` and the ✏ Script Bar icon open your editor in a clear order: Display Settings → Editor Path, then `#config editor`, then your OS default. The Genie 4 `#config editor` setting is now honoured instead of silently ignored. See [Scripting](Scripting#using-an-external-editor-instead).
 - **Create-on-edit** — `#edit <name>` on a script that doesn't exist creates it (Genie 4 parity). An explicit extension (`#edit foo.js`) is used directly; otherwise a small dialog asks which supported type to create (`.cmd` / `.inc` / `.js`). See [Scripting](Scripting#creating-a-new-script).
 
 [Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.6.2)

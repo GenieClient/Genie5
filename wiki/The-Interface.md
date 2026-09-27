@@ -33,7 +33,7 @@ Out of the box you get a three-column arrangement:
 | **Active Spells** | Your running spell effects with time remaining. |
 | **Time Tracker** | Elanthian date, moon/sun rise-set countdowns, and the observed sky, tracked by the built-in Time Tracker (`/tt help`). |
 | **Analytics** | Charts over your experience history — session gain bars, a long-horizon rank curve per skill, and session-vs-session comparison. See [the Analytics panel](#the-analytics-panel) below. |
-| **Script Manager** | Your script library, the running-script list with pause/abort controls, and a separate scrollback for script output (`[script]` lines, `#echo`, debug traces) — so a busy hunt script doesn't clutter the main window. Toggled from the top-level **Scripts** menu (not Window), which also has List / Pause All / Resume All / Abort All and external-editor entries. |
+| **Script Manager** | Your script library, the running-script list with pause/abort controls, and a separate scrollback for script output (`[script]` lines, `#echo`, debug traces) — so a busy hunt script doesn't clutter the main window. Toggled from the top-level **Scripts** menu (not Window), which also has List / Pause All / Resume All / Abort All and external-editor entries. **Edit** opens the selected script in the built-in [script editor](Scripting#the-script-editor). |
 | **Injuries** | A body silhouette showing per-region wounds and scars from the game's injury data, colour-coded by severity, with a text list alongside. Typing `health` refines the nervous-system reading (wound vs scar) and clears any region the report no longer names. |
 | **Healing** | An Empath healing console: each patient's `perceive health` or `touch` reading as a body diagram coloured on DragonRealms' full 13-step wound scale, with click-to-heal, **Take All**, and spell buttons. See [the Healing window](#the-healing-window) below. |
 | **Portrait** | DragonRealms room/scene artwork for the current area (`#config showimages`) — the panel Genie 4 called Portrait. |
@@ -202,7 +202,7 @@ Genie ships **seven built-in themes** under **Edit → Theme** — **Dark** (the
 
 ## Display settings
 
-**Edit → Display Settings…** controls fonts, game-text and echo colors, theme selection, and the external editor used by `#edit`. (The roundtime indicator's position and the hands-strip position are set from the **Layout** menu.) The theme editor shows the same Game text and Echoes colors. They're one setting each, not two copies; see [Themes](Configuration#themes). Panel and category colors, such as the creature color used by the Mobs panel, are on the **Configuration → Presets** tab.
+**Edit → Display Settings…** controls fonts, game-text and echo colors, theme selection, and the external editor `#edit` uses when `#config externaleditor` is on. (The roundtime indicator's position and the hands-strip position are set from the **Layout** menu.) The theme editor shows the same Game text and Echoes colors. They're one setting each, not two copies; see [Themes](Configuration#themes). Panel and category colors, such as the creature color used by the Mobs panel, are on the **Configuration → Presets** tab.
 
 A few more odds and ends:
 

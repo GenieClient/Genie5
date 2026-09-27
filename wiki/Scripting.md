@@ -90,7 +90,7 @@ Type `#var` at the command bar to see the full live list. The complete table is 
 #scripts              # list running scripts
 #stop myscript        # stop one script
 #stopall              # stop everything
-#edit myscript        # open it in your editor (creates it if new — see below)
+#edit myscript        # open it in the script editor (creates it if new — see below)
 ```
 
 ### Creating a new script
@@ -106,18 +106,48 @@ an empty file and opens it (matching Genie 4). How the type is chosen:
 Names are bare file names under the `Scripts` folder; path separators and `..`
 are rejected.
 
-### Choosing an editor
+### The script editor
 
-`#edit` (and the ✏ icon on the Script Bar) opens the script in an external
-editor. Genie resolves which editor to use in this order, falling back to the
-next rung if one isn't set or fails to launch:
+`#edit`, **Edit** in the Script Manager, and the ✏ icon on the Script Bar open
+the script in Genie's built-in editor, a window of its own beside the game:
 
-1. **Display Settings → Editor Path** — *Edit → Display Settings*. A full
-   path, e.g. `C:\Program Files\Notepad++\notepad++.exe`.
-2. **`#config editor <path>`** — the Genie 4-parity command, stored in
-   `settings.cfg`. Accepts a full path or a bare executable on your `PATH`
-   (e.g. `code`, `notepad++.exe`).
-3. **OS default** — Notepad on Windows, the default text editor via `open -t`
+- **Line numbers and colours.** Syntax colouring for `.cmd` / `.inc` scripts
+  (comments, labels, commands, `$` / `%` variables, strings, `#commands` inside
+  a `put`) and for `.js` scripts. The colours follow your theme, light or dark.
+  As in the script engine, a line is a comment only when it *starts* with `#`.
+- **Ctrl+S saves** (Cmd+S on macOS). The file keeps its encoding (UTF-8 with or
+  without a byte-order mark, UTF-16, or an older single-byte encoding) and its
+  line endings (CRLF or LF). Saving writes a temporary file first and then swaps
+  it in, so a crash mid-save can't leave half a script behind.
+- **Ctrl+F** opens a search bar for finding text in the script.
+- An `*` in the title means there are unsaved changes. Closing the window then
+  asks whether to save; closing Genie asks about every unsaved script.
+- If another program changes the file while it's open, a bar across the top
+  offers **Reload** (take the new version) or **Keep mine** (your next save
+  overwrites it).
+- Editing a script that's already open brings its window to the front instead
+  of opening a second copy.
+
+`#edit name` opens the same file `.name` would run: the Scripts folder first,
+then the repo-scripts folder, trying `.cmd`, `.inc`, then `.js`. Only files inside
+those folders open this way. Saving doesn't restart a running script: stop and
+start it again to pick up the change.
+
+### Using an external editor instead
+
+To keep editing in your own program, type `#config externaleditor on` (and
+`#config externaleditor off` to come back). The Script Manager's right-click
+**Edit in external editor** opens one file there whatever the setting says.
+Genie picks the external program in this order, falling back to the next rung
+if one isn't set or fails to launch:
+
+1. **Display Settings → Editor Path** (*Edit → Display Settings*), or
+   **Scripts → External Editor → Change…**. A full path, e.g.
+   `C:\Program Files\Notepad++\notepad++.exe`.
+2. **`#config editor <path>`**, the Genie 4 command, stored in `settings.cfg`.
+   Accepts a full path or a bare program name on your `PATH` (e.g. `code`,
+   `notepad++.exe`).
+3. **OS default**: Notepad on Windows, the default text editor via `open -t`
    on macOS, or `xdg-open` on Linux.
 
 A **Script Bar** above the command bar shows what's running, with stop/edit controls; it hides itself when nothing is running.
