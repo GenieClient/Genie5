@@ -3673,6 +3673,36 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 GameText.AddLink(text, command);
             });
 
+        // #img [>window] <file> (public #361). Genie 4's un-redirected #img went to
+        // the Portrait window, replacing its picture, and fell back to Main when
+        // Portrait was closed (FormMain.AddImage + FindIfClosed) — Portrait is
+        // hidden by default, so a plain #img normally lands inline in Main.
+        // >portrait / >scene name that panel explicitly, same fallback. A custom
+        // >window gets an inline picture line (created hidden, like #echo);
+        // main/game and the other reserved panels — stream windows included,
+        // whose buffers can't draw pictures — fall back to Main, as #link does.
+        core.EchoImageLine += request =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                var w = request.Window?.Trim();
+                var portrait = string.IsNullOrEmpty(w) ||
+                               w.Equals("portrait", StringComparison.OrdinalIgnoreCase) ||
+                               w.Equals("scene", StringComparison.OrdinalIgnoreCase);
+                var f = DockFactory as GenieDockFactory;
+                if (portrait)
+                {
+                    if (f?.IsToolVisible("scene") == true) { Scene.ShowScriptImage(request.Path); return; }
+                }
+                else if (!w!.Equals("main", StringComparison.OrdinalIgnoreCase) &&
+                         !w.Equals("game", StringComparison.OrdinalIgnoreCase) &&
+                         !IsReservedWindow(w) && f is not null)
+                {
+                    f.GetOrCreatePluginWindow(w, show: false).AppendImage(request);
+                    return;
+                }
+                GameText.AddImage(request);
+            });
+
         // #clear [>window] → empty a window. No target clears Main; a custom
         // >window clears that plugin/menu window (mm_train redraws its menu with
         // "#clear >Menu" before rebuilding). Reserved built-in panels are left

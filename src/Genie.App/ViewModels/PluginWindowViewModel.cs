@@ -82,6 +82,16 @@ public class PluginWindowViewModel : ReactiveObject, Controls.IScrollHoldSink
         Trim();
     }
 
+    /// <summary>Append a Genie 4 <c>#img &gt;Name</c> picture line (public #361) —
+    /// same placeholder-text model as the game window's
+    /// <see cref="GameTextViewModel.AddImage"/>.</summary>
+    public void AppendImage(Genie.Core.Commanding.ImageRequest request)
+    {
+        Lines.Add(new TextLine(request.Placeholder, StreamColor.Main, Window: Title,
+                               Image: new InlineImage(request, AppendLine)));
+        Trim();
+    }
+
     /// <summary>A panel line after the #362 <c>{display:command}</c> inline-link
     /// pass — script menus are the main users of it.</summary>
     private TextLine Line(string text, IReadOnlyList<LinkSpan>? links = null)

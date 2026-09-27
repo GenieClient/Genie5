@@ -400,14 +400,25 @@ internal sealed class LineSelectionBehavior
         return sb.ToString();
     }
 
-    // ── Layout ↔ plain-text mapping (links are one object-char in layout) ─────
+    // ── Layout ↔ plain-text mapping (links and #img pictures are one object-char
+    //    in layout; selecting one copies its text / placeholder) ─────────────
+
+    private static List<(int Start, int Length)>? ObjectSpans(TextLine line)
+    {
+        List<(int Start, int Length)>? spans = null;
+        if (line.Links is { Count: > 0 } links)
+            spans = links.Select(l => (l.Start, l.Length)).ToList();
+        if (line.ImageSpan is { } img)
+            (spans ??= new()).Add(img);
+        return spans?.OrderBy(sp => sp.Start).ToList();
+    }
 
     private static int LayoutLen(TextLine? line)
     {
         if (line is null) return 0;
         int len = line.Text.Length;
-        if (line.Links is { Count: > 0 })
-            foreach (var l in line.Links) len -= Math.Max(0, l.Length - 1);
+        if (ObjectSpans(line) is { } spans)
+            foreach (var sp in spans) len -= Math.Max(0, sp.Length - 1);
         return Math.Max(0, len);
     }
 
@@ -415,10 +426,9 @@ internal sealed class LineSelectionBehavior
     {
         if (loStart >= loEnd) return "";
         var text = line.Text;
-        if (line.Links is not { Count: > 0 } links)
+        if (ObjectSpans(line) is not { } ordered)
             return text[Math.Clamp(loStart, 0, text.Length)..Math.Clamp(loEnd, 0, text.Length)];
 
-        var ordered = links.OrderBy(l => l.Start).ToList();
         var sb = new StringBuilder();
         int plain = 0, layout = 0, li = 0;
         while (plain < text.Length)

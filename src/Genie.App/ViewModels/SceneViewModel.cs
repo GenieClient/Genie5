@@ -111,6 +111,28 @@ public sealed class SceneViewModel : ReactiveObject
         }
     }
 
+    /// <summary>
+    /// Show a script's <c>#img</c> picture in the Portrait panel (public #361) —
+    /// Genie 4 sent an un-redirected <c>#img</c> here, clearing whatever was
+    /// shown. The next room picture replaces it again, as in Genie 4 (the dedup is
+    /// reset so even the same room's art comes back). Decoded privately, not from
+    /// the shared line cache, because <see cref="SetImage"/> disposes the bitmap
+    /// it replaces. Best-effort: a failed decode just leaves the panel as it was.
+    /// </summary>
+    public async void ShowScriptImage(string path)
+    {
+        _lastPictureId = "";
+        try
+        {
+            var bmp = await Task.Run(() => new Bitmap(path)).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() => SetImage(bmp));
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.ErrorLog.Log("SceneViewModel.ShowScriptImage", ex);
+        }
+    }
+
     private void SetImage(Bitmap? bmp)
     {
         var old  = Image;

@@ -469,6 +469,23 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
         => AddLine(text, StreamColor.Main,
                    links: new[] { new LinkSpan(0, text.Length, command) });
 
+    /// <summary>
+    /// Add a Genie 4 <c>#img</c> picture line to the main window (public #361).
+    /// The line's text is the <c>[image: name.png]</c> placeholder, so it behaves
+    /// like any other line: it counts as one line against the scrollback cap, is
+    /// timestamp-prefixed like text when the window's Time Stamp toggle is on, is
+    /// written to the session log / Auto Log as the placeholder, and copies as the
+    /// placeholder. A file that fails to decode reports on a system line.
+    /// </summary>
+    public void AddImage(Genie.Core.Commanding.ImageRequest request)
+    {
+        var text = request.Placeholder;
+        if (Settings?.Timestamp == true) text = WindowTimestamp.Prefix() + text;
+        Lines.Add(new TextLine(text, StreamColor.System, Image: new InlineImage(request, AddSystemLine)));
+        TrimScrollback();
+        _lastLineWasPrompt = false;
+    }
+
     /// <summary>Empty the main game window (Genie 4 <c>#clear</c>).</summary>
     public void Clear() => Lines.Clear();
 
@@ -502,9 +519,26 @@ public record TextLine(string Text, StreamColor Color,
                        IReadOnlyList<PresetSpan>? PresetSpans = null,
                        string? EchoColor = null,
                        bool Mono = false,
-                       string Window = "main")
+                       string Window = "main",
+                       InlineImage? Image = null)
 {
     public bool IsEcho => Color == StreamColor.System;
+
+    /// <summary>Where the <c>#img</c> placeholder sits in <see cref="Text"/> — it is
+    /// always the tail, after any timestamp prefix — or null for a text line. The
+    /// renderer draws the picture there as ONE inline object, so cross-line
+    /// selection counts it as one character and copies the placeholder text.</summary>
+    internal (int Start, int Length)? ImageSpan
+    {
+        get
+        {
+            if (Image is null) return null;
+            var len = Image.Request.Placeholder.Length;
+            return Text.Length >= len && Text.EndsWith(Image.Request.Placeholder, StringComparison.Ordinal)
+                ? (Text.Length - len, len)
+                : null;
+        }
+    }
 
     /// <summary>Monospaced font for <c>#echo mono</c> lines — falls back through
     /// the chain if the first family is unavailable. Internal (not private) so the
@@ -525,6 +559,20 @@ public record TextLine(string Text, StreamColor Color,
     {
         get
         {
+            // #361: an #img line is its timestamp prefix (if any) plus the picture.
+            // No highlighting — the placeholder is a stand-in, not game text.
+            if (ImageSpan is { } img)
+            {
+                var parts = new List<Inline>(2);
+                if (img.Start > 0) parts.Add(new Run(Text[..img.Start]));
+                parts.Add(new InlineUIContainer
+                {
+                    Child             = Image!.CreateControl(),
+                    BaselineAlignment = BaselineAlignment.TextBottom,
+                });
+                return parts;
+            }
+
             // Echo lines (#echo / script output) render as one run, optionally
             // styled with a colour and/or the monospace font (EchoColor implies
             // an echo line, so this branch owns both #echo cases).
