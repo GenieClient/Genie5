@@ -281,8 +281,9 @@ public class StreamTabsViewModel : ReactiveObject
 
     /// <summary>Map a registered window id to its <see cref="StreamBuffer"/>, or
     /// null if the id is the main window / a non-stream dockable. Mirrors the
-    /// inbound stream→buffer switch in <see cref="Attach"/>.</summary>
-    private StreamBuffer? TryGetBuffer(string id) => id switch
+    /// inbound stream→buffer switch in <see cref="Attach"/>. Public for the
+    /// <c>#shunt</c> delivery (public #248), which targets the same buffers.</summary>
+    public StreamBuffer? TryGetBuffer(string id) => id switch
     {
         "logons"               => Logons,
         "talk"                 => Talk,

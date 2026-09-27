@@ -16,6 +16,7 @@ using Genie.Core.Persistence;
 using Genie.Core.Presets;
 using Genie.Core.Profiles;
 using Genie.Core.Runtime;
+using Genie.Core.Shunts;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
 using Genie.Core.Variables;
@@ -167,6 +168,7 @@ public class ConfigurationViewModel : ReactiveObject
     public TriggerEngineFinal?  TriggerEngine       => EditingConnected ? _core?.Triggers       : GetDraftTriggers();
     public SubstituteEngine?    SubstituteEngine    => EditingConnected ? _core?.Substitutes    : GetDraftSubstitutes();
     public GagEngine?           GagEngine           => EditingConnected ? _core?.Gags           : GetDraftGags();
+    public ShuntEngine?         ShuntEngine         => EditingConnected ? _core?.Shunts         : GetDraftShunts();
     public AliasEngine?         AliasEngine         => EditingConnected ? _core?.Aliases        : GetDraftAliases();
     public MacroEngine?         MacroEngine         => EditingConnected ? _core?.Macros         : GetDraftMacros();
     public ClassEngine?         ClassEngine         => EditingConnected ? _core?.Classes        : GetDraftClasses();
@@ -323,6 +325,16 @@ public class ConfigurationViewModel : ReactiveObject
             r => r.Scope, r => r.Pattern, DiskGlobal().Gags.Rules,
             (path, subset) => _persistence.SaveGags(path, subset));
         SyncCfgSplit("gags.cfg", engine.Rules, r => r.Scope, mergedGlobal, CfgFormat.GagLines);
+    }
+
+    public void OnShuntsChanged()
+    {
+        var engine = ShuntEngine;
+        if (engine is null) return;
+        var mergedGlobal = SaveRuleJsonSplit("shunts.json", engine.Rules,
+            r => r.Scope, r => r.Pattern, DiskGlobal().Shunts.Rules,
+            (path, subset) => _persistence.SaveShunts(path, subset));
+        SyncCfgSplit("shunts.cfg", engine.Rules, r => r.Scope, mergedGlobal, CfgFormat.ShuntLines);
     }
 
     public void OnAliasesChanged()
@@ -611,6 +623,7 @@ public class ConfigurationViewModel : ReactiveObject
     private TriggerEngineFinal?  _draftTriggers;
     private SubstituteEngine?    _draftSubstitutes;
     private GagEngine?           _draftGags;
+    private ShuntEngine?         _draftShunts;
     private AliasEngine?         _draftAliases;
     private MacroEngine?         _draftMacros;
     private ClassEngine?         _draftClasses;
@@ -625,6 +638,7 @@ public class ConfigurationViewModel : ReactiveObject
         _draftTriggers    = null;
         _draftSubstitutes = null;
         _draftGags        = null;
+        _draftShunts      = null;
         _draftAliases     = null;
         _draftMacros      = null;
         _draftClasses     = null;
@@ -640,6 +654,7 @@ public class ConfigurationViewModel : ReactiveObject
         this.RaisePropertyChanged(nameof(TriggerEngine));
         this.RaisePropertyChanged(nameof(SubstituteEngine));
         this.RaisePropertyChanged(nameof(GagEngine));
+        this.RaisePropertyChanged(nameof(ShuntEngine));
         this.RaisePropertyChanged(nameof(AliasEngine));
         this.RaisePropertyChanged(nameof(MacroEngine));
         this.RaisePropertyChanged(nameof(ClassEngine));
@@ -684,6 +699,15 @@ public class ConfigurationViewModel : ReactiveObject
         try { var (g, c) = DraftScopes(); LayeredRuleLoad.ApplyLayered(g, c, gags: _draftGags); }
         catch { }
         return _draftGags;
+    }
+
+    private ShuntEngine GetDraftShunts()
+    {
+        if (_draftShunts is not null) return _draftShunts;
+        _draftShunts = new ShuntEngine();
+        try { var (g, c) = DraftScopes(); LayeredRuleLoad.ApplyLayered(g, c, shunts: _draftShunts); }
+        catch { }
+        return _draftShunts;
     }
 
     private AliasEngine GetDraftAliases()

@@ -54,6 +54,7 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
         if (vm.TriggerEngine    is { } triggers)    TriggersPanelCtrl   .Initialize(triggers,    vm.OnTriggersChanged,    vm.ScopeContextFor("triggers.json"));
         if (vm.SubstituteEngine is { } substitutes) SubstitutesPanelCtrl.Initialize(substitutes, vm.OnSubstitutesChanged, vm.ScopeContextFor("substitutes.json"));
         if (vm.GagEngine        is { } gags)        GagsPanelCtrl       .Initialize(gags,        vm.OnGagsChanged,        vm.ScopeContextFor("gags.json"));
+        if (vm.ShuntEngine      is { } shunts)      ShuntsPanelCtrl     .Initialize(shunts,      vm.OnShuntsChanged,      vm.ScopeContextFor("shunts.json"));
         if (vm.AliasEngine      is { } aliases)     AliasesPanelCtrl    .Initialize(aliases,     vm.OnAliasesChanged,     vm.ScopeContextFor("aliases.json"));
         if (vm.MacroEngine      is { } macros)      MacrosPanelCtrl     .Initialize(macros,      vm.OnMacrosChanged,      vm.ScopeContextFor("macros.json"));
         if (vm.VariableStore    is { } variables)   VariablesPanelCtrl  .Initialize(variables,   vm.OnVariablesChanged,   vm.LiveGlobals);

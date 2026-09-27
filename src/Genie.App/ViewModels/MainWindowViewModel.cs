@@ -23,6 +23,7 @@ using Genie.Core.Macros;
 using Genie.Core.Persistence;
 using Genie.Core.Profiles;
 using Genie.Core.Runtime;
+using Genie.Core.Shunts;
 using Genie.Core.Substitutes;
 using Genie.Core.Triggers;
 using Genie.Core.Variables;
@@ -3385,6 +3386,47 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private static bool IsReservedWindow(string? name)
         => string.IsNullOrWhiteSpace(name) || ReservedWindowNames.Contains(name.Trim());
 
+    /// <summary>
+    /// Deliver a <c>#shunt</c>-matched main-window line (public #248) to its
+    /// target, through the same names <c>#echo &gt;Window</c> resolves: a stream
+    /// window's buffer, or a named window created on first use. Where the line
+    /// goes when the target is closed is decided by <see cref="ShuntRouter"/>
+    /// (a closed stream follows its IfClosed chain; anything else, and a Drop,
+    /// stays in Main). Returns false when the line was NOT delivered elsewhere,
+    /// which keeps a moved line in the main window. Runs on the UI thread (the
+    /// GameText subscription observes on it), so it touches the dock directly.
+    /// </summary>
+    private bool DeliverShunt(string window, ShuntedLine line)
+    {
+        var f = DockFactory as GenieDockFactory;
+        var decision = ShuntRouter.Resolve(
+            window,
+            isStream:   id => StreamTabs.TryGetBuffer(id) is not null,
+            isReserved: IsReservedWindow,
+            // No dock yet (startup) → streams count as open (their buffers exist
+            // and fill regardless); a named window can't be created without one.
+            isOpen:     name => StreamTabs.TryGetBuffer(name) is not null
+                ? f is null || f.IsToolVisible(name)
+                : f is not null && (f.TryGetPluginWindow(name) is null ||
+                                    f.IsToolVisible(GenieDockFactory.PluginWindowId(name))),
+            store:      WindowSettings);
+
+        switch (decision.Kind)
+        {
+            case ShuntSinkKind.Stream when StreamTabs.TryGetBuffer(decision.Target!) is { } buf:
+                buf.Add(line.Text, line.Bolds, line.Links, line.Presets);
+                return true;
+            case ShuntSinkKind.Window when f is not null:
+                // show:false — like a directed #echo, a shunted line creates
+                // (and on first sight shows) the window, but never re-opens one
+                // the user closed; the router already sent those to Main.
+                f.GetOrCreatePluginWindow(decision.Target!, show: false).AppendLine(line.Text);
+                return true;
+            default:
+                return false;
+        }
+    }
+
     /// <summary>Wire the host's plugin-window seam to the dock factory. Both
     /// callbacks marshal to the UI thread — they fire from parser/plugin threads
     /// <summary>
@@ -4052,7 +4094,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             aliases:     core.Aliases,
             macros:      core.Macros,
             classes:     core.Classes,
-            variables:   core.Variables.Store);
+            variables:   core.Variables.Store,
+            shunts:      core.Shunts);
 
         LoadLayeredNames(core, p, profileDir, globalDir, single);
         LoadLayeredPresets(core, p, profileDir, globalDir, single);
@@ -4174,7 +4217,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     // ── Live reload of externally edited rule .json files ────────────────────
 
     /// <summary>Watches the effective config dirs for hand edits to the rule
-    /// .json files (highlights/triggers/substitutes/gags/aliases/variables/
+    /// .json files (highlights/triggers/substitutes/gags/shunts/aliases/variables/
     /// classes) and reloads them into the live engines. Created on first use,
     /// re-scoped on every connect (the profile dir changes with the character).
     /// Lives for the process, like the engines it feeds.</summary>
@@ -4220,7 +4263,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 gags:        core.Gags,
                 aliases:     core.Aliases,
                 variables:   core.Variables.Store,
-                classes:     core.Classes);
+                classes:     core.Classes,
+                shunts:      core.Shunts);
         }
         catch (ArgumentException)
         {
@@ -5540,6 +5584,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // toggles (Window → Game Window) — supply Display so it can read
         // ShowGameText / ShowEchoText / ShowScriptText at subscription time.
         GameText.DisplaySettings = Display;
+        GameText.DeliverShunt    = DeliverShunt;   // #shunt targets (public #248)
         GameText.Attach(_core);
 
         // Analytics panel — reads the skill-history store; re-hooks to the

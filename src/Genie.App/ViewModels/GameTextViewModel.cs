@@ -15,6 +15,15 @@ using ReactiveUI;
 
 namespace Genie.App.ViewModels;
 
+/// <summary>A main-window game line on its way to a <c>#shunt</c> target
+/// (public #248): the displayed (post-substitute) text plus the spans that
+/// still apply to it (null when a substitute rewrote the line).</summary>
+public readonly record struct ShuntedLine(
+    string                      Text,
+    IReadOnlyList<LinkSpan>?    Links,
+    IReadOnlyList<BoldSpan>?    Bolds,
+    IReadOnlyList<PresetSpan>?  Presets);
+
 public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
 {
     // Scrollback cap — how many rendered lines to keep before trimming the
@@ -98,6 +107,33 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
     /// </summary>
     public DisplaySettings? DisplaySettings { get; set; }
 
+    /// <summary>
+    /// Delivers a <c>#shunt</c>-matched line (public #248) to the rule's target
+    /// window. Arguments: target window name, the line. Returns true when the
+    /// line landed somewhere other than the main window — false means "not
+    /// delivered" (a closed target, a non-text panel), and the line stays in
+    /// Main so a move can never make it vanish. Set by
+    /// <see cref="MainWindowViewModel"/>, which owns the windows; null (tests,
+    /// designer) disables shunting.
+    /// </summary>
+    public Func<string, ShuntedLine, bool>? DeliverShunt { get; set; }
+
+    /// <summary>Run the shunt pass for one main-stream line. True = a MOVE was
+    /// delivered elsewhere, so the caller must not add it to Main.</summary>
+    private bool TryShunt(GenieCore core, string text,
+                          IReadOnlyList<LinkSpan>? links,
+                          IReadOnlyList<BoldSpan>? bolds,
+                          IReadOnlyList<PresetSpan>? presets)
+    {
+        // Common case: no rules. Skip the metrics wrapper entirely.
+        if (DeliverShunt is not { } deliver || core.Shunts.Rules.Count == 0) return false;
+        var rule = core.Metrics.Time(Genie.Core.Diagnostics.PipelineStage.Shunts,
+                                     () => core.Shunts.Match(text));
+        if (rule is null) return false;
+        var delivered = deliver(rule.Window, new ShuntedLine(text, links, bolds, presets));
+        return delivered && !rule.Copy;
+    }
+
     public void Attach(GenieCore core)
     {
         // Scrollback cap read live from config — see MaxLines.
@@ -109,7 +145,8 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
         // ── Main-stream game text ──────────────────────────────────────────
         // Genie 4 applies the substitute pass first, then the gag check —
         // so a substitute can rewrite a line to one that a gag matches
-        // (rare, but the canonical ordering).
+        // (rare, but the canonical ordering). #shunt (public #248, new in
+        // Genie 5) runs third: substitute → gag → shunt.
         //
         // Link spans (from <d cmd="..."> in the XML) are carried through
         // unchanged ONLY when no substitute fired — substituting would
@@ -122,28 +159,17 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(e =>
             {
-                if (DisplaySettings?.ShowGameText == false) return;
                 // DR's bare re-send of a talk/whispers line already shown via
                 // its own stream (DrXmlParser.TextEvent.DuplicateEcho) — Core
                 // consumers (triggers/scripts) still need the event, but a
                 // display sink would just be showing the same line twice.
                 if (e.DuplicateEcho) return;
-                // Name List Only: drop game lines that don't mention a tracked
-                // name. Guarded on a non-empty Names list so the toggle never
-                // blanks the window when no names are configured (see StreamBuffer).
-                if (NameListOnly && Names is { Rules.Count: > 0 } && Names.Match(e.Text) is null)
-                    return;
                 // Timed into their own stages for the perf overlay (zero overhead
                 // when disabled). Substitute pass first, then the gag check.
                 var text = core.Metrics.Time(Genie.Core.Diagnostics.PipelineStage.Substitutes,
                                              () => core.Substitutes.Apply(e.Text));
                 if (core.Metrics.Time(Genie.Core.Diagnostics.PipelineStage.Gags,
                                       () => core.Gags.ShouldGag(text))) return;
-                // Condensed mode (Genie 4): drop blank / whitespace-only lines
-                // from the main window so output reads compact. Read live so a
-                // #config condensed change applies immediately. Room text is on
-                // its own stream, so it's naturally exempt (Genie 4 kept it).
-                if (core.Config?.Condensed == true && string.IsNullOrWhiteSpace(text)) return;
                 // Substituting shifts offsets, so drop spans if a sub fired —
                 // they refer to positions in the original text. Same rule for
                 // link and bold spans.
@@ -151,6 +177,25 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
                 var links     = unchanged ? e.Links       : null;
                 var bolds     = unchanged ? e.BoldSpans   : null;
                 var presets   = unchanged ? e.PresetSpans : null;
+                // #shunt (public #248): after substitutes (the pattern sees the
+                // text you would have read) and after gags (a gagged line is
+                // gone, so it is never shunted). A MOVE that was delivered
+                // elsewhere ends here; a COPY, or a move whose target is closed
+                // (DeliverShunt returns false), carries on into Main. Runs
+                // before the main-window-only view filters below, so hiding
+                // game text or Name List Only never starves a shunt window.
+                if (TryShunt(core, text, links, bolds, presets)) return;
+                if (DisplaySettings?.ShowGameText == false) return;
+                // Name List Only: drop game lines that don't mention a tracked
+                // name. Guarded on a non-empty Names list so the toggle never
+                // blanks the window when no names are configured (see StreamBuffer).
+                if (NameListOnly && Names is { Rules.Count: > 0 } && Names.Match(e.Text) is null)
+                    return;
+                // Condensed mode (Genie 4): drop blank / whitespace-only lines
+                // from the main window so output reads compact. Read live so a
+                // #config condensed change applies immediately. Room text is on
+                // its own stream, so it's naturally exempt (Genie 4 kept it).
+                if (core.Config?.Condensed == true && string.IsNullOrWhiteSpace(text)) return;
                 AddLine(text, StreamColor.Main, links, bolds, presets, mono: e.Mono);
             });
 

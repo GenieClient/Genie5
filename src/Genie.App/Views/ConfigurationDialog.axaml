@@ -124,6 +124,9 @@
       <TabItem Header="Gags">
         <views:GagsPanel        Name="GagsPanelCtrl"/>
       </TabItem>
+      <TabItem Header="Shunts">
+        <views:ShuntsPanel      Name="ShuntsPanelCtrl"/>
+      </TabItem>
       <TabItem Header="Aliases">
         <views:AliasesPanel     Name="AliasesPanelCtrl"/>
       </TabItem>
