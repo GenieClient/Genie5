@@ -98,6 +98,36 @@ many-core machines. This is an interactive client whose whole quality bar is
 that the game window never stutters; workstation GC is the right default and
 measurably so.
 
+## Publish knob adopted: ReadyToRun
+
+`PublishReadyToRun` (public #288) is **on** for all four RIDs, set once in
+`src/Genie.App/Genie.App.csproj` beside the single-file settings. It
+precompiles the managed code, so launch skips most JIT work; the tiered JIT
+still recompiles hot paths, so steady-state speed is unchanged.
+
+Measured 2026-09-27 on win-x64 with the exact release publish command
+(self-contained, single-file, compressed), a 32-thread desktop at 0–10% CPU.
+Startup is time from `Start-Process` until the main window has a handle and a
+title, launched in portable mode from a scratch folder. Runs alternated
+between the two builds.
+
+| | Without | With ReadyToRun | Change |
+|---|---|---|---|
+| `Genie5.exe` (win-x64) | 62.7 MB | 89.1 MB | +26.5 MB (+42%) |
+| Velopack full `.nupkg` | 60.2 MB | 86.4 MB | +26.2 MB |
+| `Portable.zip` | 60.0 MB | 86.3 MB | +26.2 MB |
+| `Setup.exe` | 64.8 MB | 91.0 MB | +26.2 MB |
+| `Genie5` (osx-arm64, size only) | 76.4 MB | 100.7 MB | +24.2 MB |
+| First launch after publish | 1654 ms | 1282 ms | −372 ms (−22%) |
+| Warm launch, median of 14 | 1447 ms | 880 ms | −567 ms (−39%) |
+| Warm launch, range | 1381–1859 ms | 860–1383 ms | |
+
+ReadyToRun was faster in every one of the 14 alternating pairs. "First launch"
+is one run each and is not truly cold: the file cache still held the
+freshly-written exe, and flushing it needs admin tooling. The size cost lands on
+full downloads only; routine updates ship as Velopack deltas. The CI size guard
+in `build.yml` was restated to the new 86 MB baseline (as `du -m` reports it), with the warning at 110 MB.
+
 ## Supported OS floors
 
 See the **Supported platforms** table in the README — Windows 10 1809+ / 11
