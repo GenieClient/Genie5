@@ -532,6 +532,13 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     public event Action<string, string, string?>? EchoLinkLine;
 
     /// <summary>
+    /// Raised by <c>#img</c> / <c>#image</c> (public #361) with a parsed,
+    /// file-validated request. The App decodes and draws the picture (Core stays
+    /// UI-free); console / headless builds have no subscriber and drop it.
+    /// </summary>
+    public event Action<ImageRequest>? EchoImageLine;
+
+    /// <summary>
     /// Raised by <c>#clear [&gt;window]</c>. Arg is the target window name, or
     /// null for the main game window. The App empties the matching panel.
     /// </summary>
@@ -1319,6 +1326,9 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     void ICommandHost.EchoLink(string text, string command, string? window)
         => EchoLinkLine?.Invoke(text, command, IsPhantomVarWindow(window, "#link") ? null : window);
+
+    void ICommandHost.EchoImage(ImageRequest request)
+        => EchoImageLine?.Invoke(IsPhantomVarWindow(request.Window, "#img") ? request with { Window = null } : request);
 
     void ICommandHost.EchoClear(string? window)
     {

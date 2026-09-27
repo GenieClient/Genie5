@@ -27,6 +27,16 @@ public interface ICommandHost
     void EchoLink(string text, string command, string? window);
 
     /// <summary>
+    /// Render a Genie 4 <c>#img</c> / <c>#image</c> picture (public #361). The
+    /// request is already parsed and its file validated (<see cref="ImageCommand"/>);
+    /// the App decodes and draws it — inline in the game window or a named
+    /// window, or in the Portrait panel for Genie 4's default target.
+    /// <para>Default no-op, same reason as <see cref="SetWindowComment"/>: the
+    /// many test / headless hosts have nowhere to draw and lose nothing.</para>
+    /// </summary>
+    void EchoImage(ImageRequest request) { }
+
+    /// <summary>
     /// Clear a window's contents (Genie 4 <c>#clear [&gt;window]</c>).
     /// <paramref name="window"/> null = the main game window; a name clears that
     /// side / plugin / menu window. Console / headless builds with no UI drop it.

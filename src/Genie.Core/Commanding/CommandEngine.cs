@@ -371,6 +371,18 @@ public sealed class CommandEngine
                     _host.EchoLink(linkText, linkCommand, linkWindow);
                 break;
             }
+            case "img":
+            case "image":
+            {
+                // Genie 4 #img [>window] <file> [w:N] [h:N] (Core/Command.cs:397,
+                // public #361). ImageCommand parses + validates (art-dir relative
+                // path, png/jpg/gif/bmp, size cap); a bad request echoes its
+                // reason rather than Genie 4's silent nothing. The App draws it.
+                var request = ImageCommand.Parse(parts, _config.ArtDir, _host.Echo, out var imgError);
+                if (request is null) _host.Echo(imgError!);
+                else                 _host.EchoImage(request);
+                break;
+            }
             case "clear":
             {
                 // #clear [window] — wipe a window's contents. Genie 4
