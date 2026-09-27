@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Threading;
 using Genie.App.Diagnostics;
-using SherpaOnnx;
 
 namespace Genie.App.Services;
 
@@ -14,8 +11,10 @@ namespace Genie.App.Services;
 public enum TtsPriority { Low = 0, Normal = 1, High = 2 }
 
 /// <summary>
-/// Offline neural text-to-speech backend (Piper VITS via sherpa-onnx) with a
-/// bounded priority queue and a single synthesis/playback worker.
+/// Text-to-speech front end: a bounded priority queue and a single speaking
+/// worker over interchangeable <see cref="ITextToSpeech"/> backends (public
+/// #368) — the bundled Piper voices (default + fallback) and the OS's own
+/// installed voices.
 ///
 /// <list type="bullet">
 ///   <item>Synthesis + playback run on one background worker — the UI / game
@@ -23,27 +22,24 @@ public enum TtsPriority { Low = 0, Normal = 1, High = 2 }
 ///   <item><b>Bounded queue</b> (cap 24, drop lowest-priority-oldest on overflow)
 ///         so a busy combat stream can't build an unbounded backlog.</item>
 ///   <item><b>Priority + barge-in</b>: a higher-priority line interrupts a
-///         lower-priority one mid-utterance (via <see cref="TtsPlayer"/>) and
-///         jumps the queue.</item>
-///   <item>Engine + voice are created lazily and read live, so
-///         <c>#config ttsvoicedir</c> / <c>#tts use</c> apply without a
-///         reconnect (the engine rebuilds when dir or selection changes).</item>
+///         lower-priority one mid-utterance and jumps the queue. Every backend
+///         polls the same stop predicate, so <c>#tts stop</c> and barge-in work
+///         whichever engine is speaking.</item>
+///   <item>The selected voice (<c>ttsvoice</c>) is resolved per utterance, so
+///         <c>#tts use</c> / <c>#config ttsvoicedir</c> apply without a
+///         reconnect. A saved system voice that is no longer installed falls
+///         back to Piper, and says so once.</item>
 /// </list>
 /// </summary>
 public sealed class TtsService : IDisposable
 {
-    private readonly Func<string> _voiceDirProvider;
+    private readonly ITextToSpeech _piper;
+    private readonly ITextToSpeech? _system;
     private readonly Func<string?>? _selectedVoiceProvider;
     private readonly Func<float>? _rateProvider;     // speed multiplier, 1 = natural
     private readonly Func<float>? _volumeProvider;   // linear gain 0..1
     private readonly Action<string>? _notify;
-    private readonly TtsPlayer _player = new();
-
-    // ── Engine (lazy, rebuilt on dir/voice change) ───────────────────────────
-    private readonly System.Threading.Lock _engineGate = new();
-    private OfflineTts? _engine;
-    private string? _attemptedKey;   // dir|selected the engine / failure latch is for
-    private bool _initFailed;
+    private volatile string? _fallbackAnnouncedFor;  // saved value the fallback notice was given for
 
     // ── Queue + worker ───────────────────────────────────────────────────────
     private const int MaxQueue = 24;
@@ -58,14 +54,31 @@ public sealed class TtsService : IDisposable
 
     private readonly record struct Request(string Text, int Priority, long Seq);
 
+    /// <summary>The shipping wiring: Piper over <paramref name="voiceDirProvider"/>
+    /// plus this OS's system-voice backend.</summary>
     public TtsService(
         Func<string> voiceDirProvider,
         Func<string?>? selectedVoiceProvider = null,
         Action<string>? notify = null,
         Func<float>? rateProvider = null,
         Func<float>? volumeProvider = null)
+        : this(new PiperTextToSpeech(voiceDirProvider, notify), SystemTextToSpeech.Create(),
+               selectedVoiceProvider, notify, rateProvider, volumeProvider)
     {
-        _voiceDirProvider = voiceDirProvider;
+    }
+
+    /// <summary>Explicit backends — used by the shipping constructor and by tests
+    /// (fake backends). <paramref name="system"/> may be null (no system voices).</summary>
+    public TtsService(
+        ITextToSpeech piper,
+        ITextToSpeech? system,
+        Func<string?>? selectedVoiceProvider = null,
+        Action<string>? notify = null,
+        Func<float>? rateProvider = null,
+        Func<float>? volumeProvider = null)
+    {
+        _piper = piper;
+        _system = system;
         _selectedVoiceProvider = selectedVoiceProvider;
         _rateProvider = rateProvider;
         _volumeProvider = volumeProvider;
@@ -73,6 +86,16 @@ public sealed class TtsService : IDisposable
         _worker = new Thread(WorkerLoop) { IsBackground = true, Name = "TTS" };
         _worker.Start();
     }
+
+    /// <summary>The backends, Piper first.</summary>
+    public IReadOnlyList<ITextToSpeech> Backends =>
+        _system is null ? new[] { _piper } : new[] { _piper, _system };
+
+    /// <summary>Every voice from every backend, in one list (Piper first).</summary>
+    public IReadOnlyList<TtsVoiceOption> ListVoices() => TtsVoiceList.Merge(Backends);
+
+    /// <summary>"Amy (Piper)" / "Microsoft Zira Desktop (system)".</summary>
+    public string Label(TtsVoiceOption voice) => TtsVoiceList.Label(voice, Backends);
 
     /// <summary>Queue <paramref name="text"/> to be spoken. Returns immediately.
     /// A higher <paramref name="priority"/> interrupts a lower one in flight.</summary>
@@ -107,17 +130,13 @@ public sealed class TtsService : IDisposable
         _interruptCurrent = true;
     }
 
-    /// <summary>Drop the engine + failure latch so the next utterance re-scans the
-    /// voice dir. Call after installing or switching a voice.</summary>
+    /// <summary>Drop cached engines, voice lists and the fallback notice so the
+    /// next utterance re-scans. Call after installing or switching a voice.</summary>
     public void Reset()
     {
-        lock (_engineGate)
-        {
-            _engine?.Dispose();
-            _engine = null;
-            _initFailed = false;
-            _attemptedKey = null;
-        }
+        _piper.Reset();
+        _system?.Reset();
+        _fallbackAnnouncedFor = null;
     }
 
     private void WorkerLoop()
@@ -140,29 +159,19 @@ public sealed class TtsService : IDisposable
                 _queue.RemoveAt(best);
             }
 
-            var engine = EnsureEngine();
-            if (engine is null) continue;
-
             _currentPriority = req.Priority;
             _interruptCurrent = false;
             try
             {
+                var target = ResolveBackend();
+
                 // Rate + volume are read live per utterance so #tts rate/volume
                 // apply from the very next spoken line, no engine rebuild needed.
                 float rate = _rateProvider?.Invoke() ?? 1.0f;
-                var gen = new OfflineTtsGenerationConfig { Sid = 0, Speed = rate > 0 ? rate : 1.0f };
-                var audio = engine.GenerateWithConfig(req.Text, gen, null);
-
                 float gain = Math.Clamp(_volumeProvider?.Invoke() ?? 1.0f, 0f, 1f);
-                if (gain > 0f)
-                {
-                    if (gain < 1f)
-                    {
-                        var s = audio.Samples;
-                        for (int i = 0; i < s.Length; i++) s[i] *= gain;
-                    }
-                    _player.Play(audio.Samples, audio.SampleRate, () => _interruptCurrent || !_running);
-                }
+                target.Backend.Speak(req.Text, target.Voice,
+                    new TtsSpeechParams(rate > 0 ? rate : 1.0f, gain),
+                    () => _interruptCurrent || !_running);
             }
             catch (Exception ex)
             {
@@ -175,91 +184,25 @@ public sealed class TtsService : IDisposable
         }
     }
 
-    /// <summary>Build the engine for the current voice dir + selection. Rebuilds
-    /// when either changes; latches per-config when no usable voice exists.</summary>
-    private OfflineTts? EnsureEngine()
+    /// <summary>The backend + voice for the saved selection, announcing a
+    /// system-voice fallback to Piper once per saved value.</summary>
+    private TtsResolution ResolveBackend()
     {
-        lock (_engineGate)
+        string saved = _selectedVoiceProvider?.Invoke() ?? "";
+        var r = TtsBackendSelector.Resolve(saved, _piper, _system);
+        if (r.FellBack)
         {
-            string dir = _voiceDirProvider() ?? "";
-            string selected = _selectedVoiceProvider?.Invoke() ?? "";
-            string key = dir + "|" + selected;
-
-            if (!string.Equals(key, _attemptedKey, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(saved, _fallbackAnnouncedFor, StringComparison.OrdinalIgnoreCase))
             {
-                _engine?.Dispose();
-                _engine = null;
-                _initFailed = false;
-                _attemptedKey = key;
-            }
-
-            if (_engine is not null) return _engine;
-            if (_initFailed) return null;
-
-            try
-            {
-                if (!Directory.Exists(dir) || LocateVoice(dir, selected) is not { } voice)
-                {
-                    _initFailed = true;
-                    _notify?.Invoke(
-                        $"[tts] no voice installed in '{dir}'. Run #tts install to download " +
-                        "one, or #config ttsvoicedir <path> to point at an existing voice folder.");
-                    return null;
-                }
-
-                var config = new OfflineTtsConfig();
-                config.Model.Vits.Model = voice.Onnx;
-                config.Model.Vits.Tokens = voice.Tokens;
-                config.Model.Vits.DataDir = voice.DataDir;
-                config.Model.NumThreads = 1;
-                config.Model.Debug = 0;   // int, not bool, in this API
-
-                _engine = new OfflineTts(config);
-                _notify?.Invoke($"[tts] voice loaded: {Path.GetFileName(voice.Onnx)}");
-                return _engine;
-            }
-            catch (Exception ex)
-            {
-                _initFailed = true;
-                ErrorLog.Log("TtsService.EnsureEngine", ex);
-                _notify?.Invoke($"[tts] failed to load voice: {ex.Message}");
-                return null;
+                _fallbackAnnouncedFor = saved;
+                _notify?.Invoke(
+                    $"[tts] system voice '{TtsVoiceSetting.Parse(saved).Name}' isn't available on this " +
+                    "computer — speaking with the Piper voice instead. See #tts voices to pick another.");
             }
         }
-    }
-
-    private readonly record struct Voice(string Onnx, string Tokens, string DataDir);
-
-    /// <summary>Find the voice to load: <paramref name="selected"/> if it names an
-    /// installed folder, else the first installed voice (the dir itself or its
-    /// first valid subfolder).</summary>
-    private static Voice? LocateVoice(string dir, string selected)
-    {
-        if (!string.IsNullOrWhiteSpace(selected) &&
-            TryVoice(Path.Combine(dir, selected)) is { } chosen)
-            return chosen;
-
-        foreach (var candidate in Prepend(dir, Directory.EnumerateDirectories(dir)))
-            if (TryVoice(candidate) is { } v)
-                return v;
-        return null;
-    }
-
-    private static Voice? TryVoice(string candidate)
-    {
-        if (!Directory.Exists(candidate)) return null;
-        string? onnx = Directory.EnumerateFiles(candidate, "*.onnx").FirstOrDefault();
-        string tokens = Path.Combine(candidate, "tokens.txt");
-        string data = Path.Combine(candidate, "espeak-ng-data");
-        if (onnx is not null && File.Exists(tokens) && Directory.Exists(data))
-            return new Voice(onnx, tokens, data);
-        return null;
-    }
-
-    private static IEnumerable<string> Prepend(string first, IEnumerable<string> rest)
-    {
-        yield return first;
-        foreach (var r in rest) yield return r;
+        else
+            _fallbackAnnouncedFor = null;   // voice is back: losing it again is news again
+        return r;
     }
 
     public void Dispose()
@@ -268,7 +211,7 @@ public sealed class TtsService : IDisposable
         _interruptCurrent = true;
         try { _signal.Release(); } catch { /* disposed */ }
         try { _worker.Join(750); } catch { /* best-effort */ }
-        _player.Dispose();
-        lock (_engineGate) { _engine?.Dispose(); _engine = null; }
+        _piper.Dispose();
+        _system?.Dispose();
     }
 }

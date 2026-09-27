@@ -114,6 +114,13 @@
          read-aloud stream interrupt mid-utterance (barge-in) — which the v1
          temp-WAV/winmm path could not. Same author/runtime family as sherpa. -->
     <PackageReference Include="PortAudioSharp2" Version="1.0.4" />
+    <!-- Windows SAPI5 system voices for TTS (public #368: Microsoft David/Zira,
+         Ivona 2 …). MIT, part of the .NET runtime family. Referenced for every
+         RID: the managed assembly compiles everywhere and only works on Windows,
+         so SapiTextToSpeech is [SupportedOSPlatform("windows")] and is only
+         constructed behind OperatingSystem.IsWindows(). macOS / Linux system
+         voices use the say / spd-say / espeak-ng CLIs instead. -->
+    <PackageReference Include="System.Speech" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
