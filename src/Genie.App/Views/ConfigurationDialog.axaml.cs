@@ -36,20 +36,23 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
     private void InitializePanels(ConfigurationViewModel vm)
     {
         if (vm.HighlightEngine     is { } highlights
-         && vm.NameHighlightEngine is { } names
-         && vm.PresetEngine        is { } presets)
+         && vm.NameHighlightEngine is { } names)
         {
             HighlightsPanelCtrl.Initialize(
-                highlights, names, presets,
+                highlights, names,
                 onHighlightsChanged: vm.OnHighlightsChanged,
                 onNamesChanged:      vm.OnNamesChanged,
-                onPresetsChanged:    vm.OnPresetsChanged,
-                config:              vm.ScriptConfig,          // #131 MonsterBold toggle
-                onConfigChanged:     vm.OnScriptSettingsChanged,
                 highlightsScope:     vm.ScopeContextFor("highlights.json"),
-                namesScope:          vm.ScopeContextFor("names.json"),
-                presetsScope:        vm.ScopeContextFor("presets.json"));
+                namesScope:          vm.ScopeContextFor("names.json"));
         }
+
+        // Presets are their own tab (public #304): they drive panel colours
+        // (the Mobs window's creatures colour) as well as highlight styles.
+        if (vm.PresetEngine is { } presets)
+            PresetsPanelCtrl.Initialize(presets, vm.OnPresetsChanged,
+                                        vm.ScriptConfig,               // #131 MonsterBold toggle
+                                        vm.OnScriptSettingsChanged,
+                                        vm.ScopeContextFor("presets.json"));
 
         if (vm.TriggerEngine    is { } triggers)    TriggersPanelCtrl   .Initialize(triggers,    vm.OnTriggersChanged,    vm.ScopeContextFor("triggers.json"));
         if (vm.SubstituteEngine is { } substitutes) SubstitutesPanelCtrl.Initialize(substitutes, vm.OnSubstitutesChanged, vm.ScopeContextFor("substitutes.json"));
@@ -57,8 +60,8 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
         if (vm.ShuntEngine      is { } shunts)      ShuntsPanelCtrl     .Initialize(shunts,      vm.OnShuntsChanged,      vm.ScopeContextFor("shunts.json"));
         if (vm.AliasEngine      is { } aliases)     AliasesPanelCtrl    .Initialize(aliases,     vm.OnAliasesChanged,     vm.ScopeContextFor("aliases.json"));
         if (vm.MacroEngine      is { } macros)      MacrosPanelCtrl     .Initialize(macros,      vm.OnMacrosChanged,      vm.ScopeContextFor("macros.json"));
-        if (vm.VariableStore    is { } variables)   VariablesPanelCtrl  .Initialize(variables,   vm.OnVariablesChanged,   vm.LiveGlobals);
-        if (vm.ClassEngine      is { } classes)     ClassesPanelCtrl    .Initialize(classes,     vm.OnClassesChanged);
+        if (vm.VariableStore    is { } variables)   VariablesPanelCtrl  .Initialize(variables,   vm.OnVariablesChanged,   vm.LiveGlobals, vm.ScopeContextFor("variables.json"));
+        if (vm.ClassEngine      is { } classes)     ClassesPanelCtrl    .Initialize(classes,     vm.OnClassesChanged,     vm.ScopeContextFor("classes.json"));
 
         // Server dialog mappings (#156) — per profile, plus the global
         // serverdialogs master switch (settings.cfg, so null pre-connect).
@@ -67,8 +70,10 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
                                           vm.DialogTargetWindows);
 
         // WindowSettingsStore is always present — it's app-level state, not
-        // per-profile, so no nullability check.
-        LayoutPanelCtrl.Initialize(vm.WindowSettings, vm.OnWindowSettingsChanged);
+        // per-profile, so no nullability check. Its rows still save back to
+        // the layer they came from (#315).
+        LayoutPanelCtrl.Initialize(vm.WindowSettings, vm.OnWindowSettingsChanged,
+                                   vm.ScopeContextFor("windows.json"));
 
         // App-wide window-behaviour toggles (Always on Top). Also profile-
         // independent — binds the same DisplaySettings the main window uses.

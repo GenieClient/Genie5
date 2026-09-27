@@ -3,6 +3,10 @@
              xmlns:views="using:Genie.App.Views"
              x:Class="Genie.App.Views.HighlightsPanel">
 
+  <!-- Presets used to be a third sub-tab here (the Genie 4 layout). They
+       moved to their own top-level Configuration tab (public #304): presets
+       now drive panel colours too (the Mobs window's creatures colour), and
+       people looking for them never thought to open Highlights. -->
   <TabControl>
 
     <TabItem Header="Strings">
@@ -11,10 +15,6 @@
 
     <TabItem Header="Names">
       <views:NamesPanel Name="NamesPanelCtrl"/>
-    </TabItem>
-
-    <TabItem Header="Presets">
-      <views:PresetsPanel Name="PresetsPanelCtrl"/>
     </TabItem>
 
   </TabControl>

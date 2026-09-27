@@ -1,14 +1,12 @@
 using Avalonia.Controls;
-using Genie.Core.Config;
 using Genie.Core.Highlights;
-using Genie.Core.Presets;
 
 namespace Genie.App.Views;
 
 /// <summary>
-/// Parent control for the Highlights tab — hosts Strings / Names / Presets
-/// as nested TabItems. Each sub-panel is wired up by the owning dialog via
-/// <see cref="Initialize"/>.
+/// Parent control for the Highlights tab — hosts Strings / Names as nested
+/// TabItems. Presets are a top-level tab of their own (public #304). Each
+/// sub-panel is wired up by the owning dialog via <see cref="Initialize"/>.
 /// </summary>
 public partial class HighlightsPanel : UserControl
 {
@@ -17,18 +15,12 @@ public partial class HighlightsPanel : UserControl
     public void Initialize(
         HighlightEngine      highlights,
         NameHighlightEngine  names,
-        PresetEngine         presets,
         Action?              onHighlightsChanged = null,
         Action?              onNamesChanged      = null,
-        Action?              onPresetsChanged    = null,
-        GenieConfig?         config              = null,
-        Action?              onConfigChanged     = null,
         ScopeEditingContext? highlightsScope     = null,
-        ScopeEditingContext? namesScope          = null,
-        ScopeEditingContext? presetsScope        = null)
+        ScopeEditingContext? namesScope          = null)
     {
         StringsPanelCtrl.Initialize(highlights, onHighlightsChanged, highlightsScope);
         NamesPanelCtrl  .Initialize(names,      onNamesChanged,      namesScope);
-        PresetsPanelCtrl.Initialize(presets,    onPresetsChanged,    config, onConfigChanged, presetsScope);
     }
 }

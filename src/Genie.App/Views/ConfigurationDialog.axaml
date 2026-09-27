@@ -106,7 +106,17 @@
       </TabItem>
 
       <!-- ════════════════════════════════════════════════════════════════
-           Highlights — three nested sub-tabs: Strings / Names / Presets
+           Presets — the game's own text categories + the creatures colour
+           the Mobs window uses. Its own tab, ahead of Highlights (public
+           #304): it used to be a Highlights sub-tab, where nobody looking
+           for a panel colour thought to look.
+           ════════════════════════════════════════════════════════════════ -->
+      <TabItem Header="Presets">
+        <views:PresetsPanel Name="PresetsPanelCtrl"/>
+      </TabItem>
+
+      <!-- ════════════════════════════════════════════════════════════════
+           Highlights — two nested sub-tabs: Strings / Names
            ════════════════════════════════════════════════════════════════ -->
       <TabItem Header="Highlights">
         <views:HighlightsPanel Name="HighlightsPanelCtrl"/>
