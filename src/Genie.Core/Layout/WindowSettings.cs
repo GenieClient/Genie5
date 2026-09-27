@@ -105,6 +105,23 @@ public sealed class WindowSettings
     public bool    HideTitleBarWhenAlone { get; set; } = false;
 
     public string? IfClosed     { get; set; }
+
+    /// <summary>
+    /// Which <c>windows.json</c> this window's row saves back to (public
+    /// #257/#315): the shared global file or this character's. A window with
+    /// no saved row anywhere is Character, so a first edit stays per-character
+    /// exactly as before the split. Never serialized: the file a row lives in
+    /// IS its layer.
+    /// </summary>
+    public Persistence.RuleScope Scope { get; set; } = Persistence.RuleScope.Character;
+
+    /// <summary>The font this window registered with, which a Reset returns
+    /// to (server dialogs register a proportional font, streams a mono one).</summary>
+    public string RegisteredFontFamily { get; init; } = "Cascadia Mono,Consolas,Courier New,monospace";
+
+    /// <inheritdoc cref="RegisteredFontFamily"/>
+    public double RegisteredFontSize   { get; init; } = 13;
+
     public event Action? Changed;
     public void NotifyChanged() => Changed?.Invoke();
 }

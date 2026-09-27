@@ -19,8 +19,44 @@ public sealed class WindowSettingsStore
     /// </summary>
     private readonly Dictionary<string, WindowSettingsPersistenceModel> _held = new();
 
+    /// <summary>Config layer of each held row (#315), so a dynamic window
+    /// that opens late still saves back to the file its row came from.</summary>
+    private readonly Dictionary<string, RuleScope> _heldScope = new();
+
     /// <summary>Rows held for not-yet-registered ids, for the save path.</summary>
     public IReadOnlyCollection<WindowSettingsPersistenceModel> Held => _held.Values;
+
+    /// <summary>
+    /// Every row the save path writes — registered windows plus held rows for
+    /// ids that have not registered — each with the config layer it saves back
+    /// to (public #257/#315). A split save sends Character rows to the
+    /// profile's <c>windows.json</c> and Global rows to the shared one.
+    /// </summary>
+    public IEnumerable<(WindowSettingsPersistenceModel Row, RuleScope Scope)> ScopedRows() =>
+        _settings.Values.Select(s => (ToModel(s), s.Scope))
+            .Concat(_held.Values
+                .Where(h => !_settings.ContainsKey(h.Id))
+                .Select(h => (h, _heldScope.TryGetValue(h.Id, out var sc) ? sc : RuleScope.Character)));
+
+    /// <summary>The persisted shape of one window's settings.</summary>
+    public static WindowSettingsPersistenceModel ToModel(WindowSettings s) => new()
+    {
+        Id           = s.Id,
+        DisplayTitle = s.DisplayTitle,
+        FontFamily   = s.FontFamily,
+        FontSize     = s.FontSize,
+        Foreground   = s.Foreground,
+        Background   = s.Background,
+        Timestamp    = s.Timestamp,
+        NameListOnly = s.NameListOnly,
+        EchoToMain   = s.EchoToMain,
+        WordWrap     = s.WordWrap,
+        FlashOnActivity = s.FlashOnActivity,
+        HideTitleBarWhenAlone = s.HideTitleBarWhenAlone,
+        IfClosed     = s.IfClosed,
+        HasIfClosed  = true,    // value above is authoritative
+        IfClosedRevision = IfClosedRevision,   // public #260 rewrite done
+    };
 
     public WindowSettings Get(string id) => _settings.TryGetValue(id, out var s) ? s : Fallback;
 
@@ -112,18 +148,44 @@ public sealed class WindowSettingsStore
     public WindowSettings Register(string id, string defaultTitle,
                                    string defaultFontFamily, double defaultFontSize)
     {
+        var s = Build(id, defaultTitle, defaultFontFamily, defaultFontSize);
+        _settings[id] = s;
+        if (_held.Remove(id, out var held))
+        {
+            RuleScope? heldScope = _heldScope.Remove(id, out var hs) ? hs : null;
+            Apply(held, heldScope);
+        }
+        return s;
+    }
+
+    /// <summary>
+    /// The registration-time defaults for <paramref name="id"/> as a detached
+    /// instance, for a Reset. Unlike <see cref="Register"/> this leaves the
+    /// store alone: re-registering replaced the live instance, so the open
+    /// window (subscribed to the old one) stopped seeing later edits.
+    /// </summary>
+    public WindowSettings DefaultsFor(string id, string defaultTitle)
+    {
+        var live = Get(id);
+        return Build(id, defaultTitle,
+            string.IsNullOrEmpty(live.Id) ? Fallback.FontFamily : live.RegisteredFontFamily,
+            string.IsNullOrEmpty(live.Id) ? Fallback.FontSize   : live.RegisteredFontSize);
+    }
+
+    private static WindowSettings Build(string id, string defaultTitle,
+                                        string defaultFontFamily, double defaultFontSize)
+    {
         DefaultIfClosed.TryGetValue(id, out var defIfClosed);
-        var s = new WindowSettings
+        return new WindowSettings
         {
             Id = id, DefaultTitle = defaultTitle, DisplayTitle = defaultTitle,
             FontFamily = defaultFontFamily,
             FontSize = defaultFontSize, Foreground = "Default", Background = "",
             Timestamp = false, IfClosed = defIfClosed,
             EchoToMain = !DefaultNoEchoToMain.Contains(id),
+            RegisteredFontFamily = defaultFontFamily,
+            RegisteredFontSize   = defaultFontSize,
         };
-        _settings[id] = s;
-        if (_held.Remove(id, out var held)) Apply(held);
-        return s;
     }
 
     /// <summary>
@@ -140,7 +202,13 @@ public sealed class WindowSettingsStore
             ["scripts"]  = "Scripts",    // → "Script Manager" (public #197)
         };
 
-    public void Apply(WindowSettingsPersistenceModel m)
+    /// <summary>Apply a persisted row without changing the window's config
+    /// layer (a held row defaults to Character).</summary>
+    public void Apply(WindowSettingsPersistenceModel m) => Apply(m, null);
+
+    /// <summary>Apply a persisted row loaded from the <paramref name="scope"/>
+    /// layer (#257/#315): the window then saves back to that file.</summary>
+    public void Apply(WindowSettingsPersistenceModel m, RuleScope? scope)
     {
         if (string.IsNullOrEmpty(m.Id)) return;
         if (!_settings.TryGetValue(m.Id, out var s))
@@ -149,8 +217,11 @@ public sealed class WindowSettingsStore
             // load layer (profile over global) replaces an earlier held row,
             // the same precedence a registered window gets.
             _held[m.Id] = m;
+            if (scope is { } hs) _heldScope[m.Id] = hs;
+            else                 _heldScope.Remove(m.Id);
             return;
         }
+        if (scope is { } sc) s.Scope = sc;
 
         // Rename migration: if the saved title is still the old shipped
         // default for a since-renamed window, drop it so the new DefaultTitle

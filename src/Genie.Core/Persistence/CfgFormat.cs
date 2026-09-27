@@ -25,7 +25,7 @@ public static class CfgFormat
 {
     // Empty names are skipped — a nameless class entry emits "#class on",
     // which the loader reads as a list command, not an add.
-    public static IEnumerable<string> ClassLines(IReadOnlyDictionary<string, bool> classes) =>
+    public static IEnumerable<string> ClassLines(IEnumerable<KeyValuePair<string, bool>> classes) =>
         classes
             .Where(kvp => kvp.Key.Length > 0 &&
                           !kvp.Key.Equals("default", StringComparison.OrdinalIgnoreCase))
@@ -36,9 +36,13 @@ public static class CfgFormat
             $"#alias add {ConfigPersistence.FormatArg(a.Name)} {ConfigPersistence.FormatArg(a.Expansion)}");
 
     public static IEnumerable<string> VariableLines(VariableStore store) =>
-        store.GetAll()
-            .Where(kvp => kvp.Value.Scope == VariableScope.User)
-            .Select(kvp => $"#var {ConfigPersistence.FormatArg(kvp.Key)} {ConfigPersistence.FormatArg(kvp.Value.Value)}");
+        VariableLines(store.GetAll().Values);
+
+    /// <summary>A subset of a store's variables (the #315 per-layer sync).</summary>
+    public static IEnumerable<string> VariableLines(IEnumerable<VariableValue> variables) =>
+        variables
+            .Where(v => v.Scope == VariableScope.User)
+            .Select(v => $"#var {ConfigPersistence.FormatArg(v.Name)} {ConfigPersistence.FormatArg(v.Value)}");
 
     public static IEnumerable<string> HighlightLines(IEnumerable<HighlightRule> rules) =>
         rules.Select(r =>

@@ -62,8 +62,13 @@ public sealed class PersistenceService
     }
 
     public void SaveVariables(string path, VariableStore store)
+        => SaveVariables(path, store.GetAll().Values);
+
+    /// <summary>Write a subset of a store's variables — the #315 split save
+    /// sends each config layer's rows to its own file.</summary>
+    public void SaveVariables(string path, IEnumerable<VariableValue> variables)
     {
-        var data = store.GetAll().Values.Select(v => new VariablePersistenceModel
+        var data = variables.Select(v => new VariablePersistenceModel
         {
             Name = v.Name,
             Value = v.Value,
@@ -97,9 +102,13 @@ public sealed class PersistenceService
         File.WriteAllText(path, JsonSerializer.Serialize(data, _options));
     }
 
-    public void SaveClasses(string path, ClassEngine engine)
+    public void SaveClasses(string path, ClassEngine engine) => SaveClasses(path, engine.GetAll());
+
+    /// <summary>Write a subset of class states (the #315 split save). The
+    /// built-in <c>default</c> class is never written.</summary>
+    public void SaveClasses(string path, IEnumerable<KeyValuePair<string, bool>> classes)
     {
-        var data = engine.GetAll()
+        var data = classes
             .Where(kv => !kv.Key.Equals("default", StringComparison.OrdinalIgnoreCase))
             .Select(kv => new ClassPersistenceModel { Name = kv.Key, IsActive = kv.Value });
         File.WriteAllText(path, JsonSerializer.Serialize(data, _options));
@@ -249,29 +258,40 @@ public sealed class PersistenceService
     }
 
     public void SaveWindowSettings(string path, WindowSettingsStore store)
+        // Rows for dynamic windows that have not opened this session (#156)
+        // ride along verbatim (ScopedRows includes them) so a save cannot drop them.
+        => SaveWindowSettings(path, store.ScopedRows().Select(r => r.Row));
+
+    public void SaveWindowSettings(string path, IEnumerable<WindowSettingsPersistenceModel> rows)
+        => File.WriteAllText(path, JsonSerializer.Serialize(rows, _options));
+
+    /// <summary>
+    /// The #315 split save for <c>windows.json</c>: Character rows to the
+    /// profile file, Global rows to the shared one. The global side is the
+    /// store's Global rows merged with every on-disk global row the store no
+    /// longer carries at Global scope — a per-character override replaces its
+    /// global twin in the store, so writing the store alone would drop the
+    /// shared row. A scope's file is only created when it has rows (an
+    /// existing file always rewrites). <paramref name="profileDir"/> equal to
+    /// <paramref name="globalDir"/> = one layer, everything to the one file.
+    /// </summary>
+    public void SaveWindowSettingsSplit(WindowSettingsStore store, string profileDir, string globalDir)
     {
-        var data = store.All.Values.Select(s => new WindowSettingsPersistenceModel
+        var rows = store.ScopedRows().ToList();
+        if (ScopedRuleLoader.SameDirectory(profileDir, globalDir))
         {
-            Id           = s.Id,
-            DisplayTitle = s.DisplayTitle,
-            FontFamily   = s.FontFamily,
-            FontSize     = s.FontSize,
-            Foreground   = s.Foreground,
-            Background   = s.Background,
-            Timestamp    = s.Timestamp,
-            NameListOnly = s.NameListOnly,
-            EchoToMain   = s.EchoToMain,
-            WordWrap     = s.WordWrap,
-            FlashOnActivity = s.FlashOnActivity,
-            HideTitleBarWhenAlone = s.HideTitleBarWhenAlone,
-            IfClosed    = s.IfClosed,
-            HasIfClosed  = true,    // value above is authoritative
-            IfClosedRevision = WindowSettingsStore.IfClosedRevision,   // #260 rewrite done
-        })
-        // Rows for dynamic windows that have not opened this session (#156):
-        // written back verbatim so a save cannot drop them.
-        .Concat(store.Held.Where(h => !store.All.ContainsKey(h.Id)));
-        File.WriteAllText(path, JsonSerializer.Serialize(data, _options));
+            SaveWindowSettings(Path.Combine(globalDir, "windows.json"), rows.Select(r => r.Row));
+            return;
+        }
+        var profilePath = Path.Combine(profileDir, "windows.json");
+        var globalPath  = Path.Combine(globalDir,  "windows.json");
+        var character   = rows.Where(r => r.Scope == RuleScope.Character).Select(r => r.Row).ToList();
+        var global      = ScopedRuleLoader.MergeGlobalForSave(
+            rows.Where(r => r.Scope == RuleScope.Global).Select(r => r.Row),
+            LoadWindowSettings(globalPath), r => r.Id, Array.Empty<string>());
+        // A character row shadows (not deletes) its global twin: keep the twin.
+        if (character.Count > 0 || File.Exists(profilePath)) SaveWindowSettings(profilePath, character);
+        if (global.Count    > 0 || File.Exists(globalPath))  SaveWindowSettings(globalPath,  global);
     }
 
     public List<WindowSettingsPersistenceModel> LoadWindowSettings(string path)

@@ -24,7 +24,16 @@ public sealed class VariableStore
     {
         if (ReservedConnectionVars.Contains(name)) return false;
         if (_variables.TryGetValue(name, out var existing))
+        {
+            // A runtime change to a shared variable (#var, a script, the
+            // panel) becomes this character's override (#315): the outcome
+            // the pre-split save produced, and it keeps one character's
+            // session state out of every other character's shared file.
+            // Loaders re-tag the layer explicitly after Set.
+            if (!string.Equals(existing.Value, value, StringComparison.Ordinal))
+                existing.ConfigScope = Persistence.RuleScope.Character;
             existing.Value = value;
+        }
         else
             _variables[name] = new VariableValue(name, value, scope);
         return true;
@@ -32,6 +41,13 @@ public sealed class VariableStore
 
     public string? Get(string name)
         => _variables.TryGetValue(name, out var v) ? v.Value : null;
+
+    /// <summary>Tag an existing variable with its config layer (#257/#315);
+    /// a no-op for an unknown name.</summary>
+    public void SetConfigScope(string name, Persistence.RuleScope scope)
+    {
+        if (_variables.TryGetValue(name, out var v)) v.ConfigScope = scope;
+    }
 
     public bool Remove(string name) => _variables.TryRemove(name, out _);
 

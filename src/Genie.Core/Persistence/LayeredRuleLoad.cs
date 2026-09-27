@@ -147,11 +147,21 @@ public static class LayeredRuleLoad
         VariableStore?      variables   = null,
         ShuntEngine?        shunts      = null)
     {
+        // Upsert stores tag each key with the layer that last wrote it (#315),
+        // so a profile value overriding a global one saves back to the profile.
         if (classes is not null)
         {
-            foreach (var kv in global.Classes.GetAll()) classes.Set(kv.Key, kv.Value);
+            foreach (var kv in global.Classes.GetAll())
+            {
+                classes.Set(kv.Key, kv.Value);
+                classes.SetScope(kv.Key, RuleScope.Global);
+            }
             if (character is not null)
-                foreach (var kv in character.Classes.GetAll()) classes.Set(kv.Key, kv.Value);
+                foreach (var kv in character.Classes.GetAll())
+                {
+                    classes.Set(kv.Key, kv.Value);
+                    classes.SetScope(kv.Key, RuleScope.Character);
+                }
         }
 
         if (highlights is not null)
@@ -224,9 +234,115 @@ public static class LayeredRuleLoad
 
         if (variables is not null)
         {
-            foreach (var kv in global.Variables.GetAll()) variables.Set(kv.Key, kv.Value.Value);
+            foreach (var kv in global.Variables.GetAll())
+                if (variables.Set(kv.Key, kv.Value.Value)) variables.SetConfigScope(kv.Key, RuleScope.Global);
             if (character is not null)
-                foreach (var kv in character.Variables.GetAll()) variables.Set(kv.Key, kv.Value.Value);
+                foreach (var kv in character.Variables.GetAll())
+                    if (variables.Set(kv.Key, kv.Value.Value)) variables.SetConfigScope(kv.Key, RuleScope.Character);
+        }
+    }
+
+    /// <summary>
+    /// Put a shared rule back into a live (or draft) engine after its
+    /// this-character override was deleted (public #315). The override had
+    /// shadowed the twin OUT of the engine, so without this the shared rule
+    /// only reappeared at the next connect. The twin comes from the on-disk
+    /// <paramref name="global"/> scope and is tagged Global; it is appended
+    /// (the pattern engines keep Character rules first, so it lands among the
+    /// shared ones — the exact file order returns at the next connect).
+    /// Returns false when there is no twin, or the engine already carries
+    /// <paramref name="key"/> (nothing to restore). Only the target engine
+    /// for <paramref name="fileName"/> is consulted; null targets are skipped.
+    /// </summary>
+    public static bool RestoreGlobalTwin(
+        EffectiveScope      global,
+        string              fileName,
+        string              key,
+        HighlightEngine?    highlights  = null,
+        TriggerEngineFinal? triggers    = null,
+        SubstituteEngine?   substitutes = null,
+        GagEngine?          gags        = null,
+        AliasEngine?        aliases     = null,
+        MacroEngine?        macros      = null,
+        ClassEngine?        classes     = null,
+        VariableStore?      variables   = null)
+    {
+        bool Same(string? a) => string.Equals(a, key, StringComparison.OrdinalIgnoreCase);
+
+        switch (fileName.ToLowerInvariant())
+        {
+            case "highlights.json":
+            {
+                if (highlights is null || highlights.Rules.Any(r => Same(r.Pattern))) return false;
+                var r = global.Highlights.Rules.FirstOrDefault(x => Same(x.Pattern));
+                if (r is null) return false;
+                highlights.AddRule(r.Pattern, r.ForegroundColor, r.BackgroundColor, r.MatchType,
+                                   r.CaseSensitive, r.IsEnabled, r.ClassName, r.SoundFile, r.Speak,
+                                   r.Windows).Scope = RuleScope.Global;
+                return true;
+            }
+            case "triggers.json":
+            {
+                if (triggers is null || triggers.Triggers.Any(r => Same(r.Pattern))) return false;
+                var r = global.Triggers.Triggers.FirstOrDefault(x => Same(x.Pattern));
+                if (r is null) return false;
+                triggers.AddTrigger(r.Pattern, r.Action, r.CaseSensitive, r.IsEnabled, r.ClassName,
+                                    r.SoundFile, r.Speak, r.Eval, r.MatchAll).Scope = RuleScope.Global;
+                return true;
+            }
+            case "substitutes.json":
+            {
+                if (substitutes is null || substitutes.Rules.Any(r => Same(r.Pattern))) return false;
+                var r = global.Substitutes.Rules.FirstOrDefault(x => Same(x.Pattern));
+                if (r is null) return false;
+                substitutes.AddRule(r.Pattern, r.Replacement, r.CaseSensitive, r.IsEnabled, r.ClassName,
+                                    r.WholeWord).Scope = RuleScope.Global;
+                return true;
+            }
+            case "gags.json":
+            {
+                if (gags is null || gags.Rules.Any(r => Same(r.Pattern))) return false;
+                var r = global.Gags.Rules.FirstOrDefault(x => Same(x.Pattern));
+                if (r is null) return false;
+                gags.AddRule(r.Pattern, r.CaseSensitive, r.IsEnabled, r.ClassName).Scope = RuleScope.Global;
+                return true;
+            }
+            case "aliases.json":
+            {
+                if (aliases is null || aliases.Aliases.Any(r => Same(r.Name))) return false;
+                var r = global.Aliases.Aliases.FirstOrDefault(x => Same(x.Name));
+                if (r is null) return false;
+                aliases.AddAlias(r.Name, r.Expansion, r.IsEnabled, r.ClassName).Scope = RuleScope.Global;
+                return true;
+            }
+            case "macros.json":
+            {
+                if (macros is null || macros.Rules.Any(r => Same(r.Key))) return false;
+                var r = global.Macros.Rules.FirstOrDefault(x => Same(x.Key));
+                if (r is null) return false;
+                macros.Add(r.Key, r.Action, r.ClassName);
+                if (macros.Rules.FirstOrDefault(x => Same(x.Key)) is { } added) added.Scope = RuleScope.Global;
+                return true;
+            }
+            case "classes.json":
+            {
+                if (classes is null || classes.GetAll().ContainsKey(key)) return false;
+                if (!global.Classes.GetAll().TryGetValue(key, out var active)
+                    || key.Equals("default", StringComparison.OrdinalIgnoreCase)) return false;
+                classes.Set(key, active);
+                classes.SetScope(key, RuleScope.Global);
+                return true;
+            }
+            case "variables.json":
+            {
+                if (variables is null || variables.Get(key) is not null) return false;
+                if (global.Variables.Get(key) is not { } value) return false;
+                if (!variables.Set(key, value)) return false;
+                variables.SetConfigScope(key, RuleScope.Global);
+                return true;
+            }
+            default:
+                return false;
         }
     }
 }
