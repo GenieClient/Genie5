@@ -992,38 +992,27 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             }
         }
 
-        // The platform Find gesture (Cmd+F on macOS, Ctrl+F elsewhere) opens
-        // whichever find UI the selected window's renderer provides: AvaloniaEdit's
-        // search panel on editor-backed windows, the in-window Find bar on the
-        // rest. Targeting is PageScroll's click-target either way, so Find follows
-        // the same "active window" the PageUp/PageDown keys scroll.
+        // #120: the Find gesture opens whichever find UI the selected window's
+        // renderer provides — AvaloniaEdit's search panel on editor-backed windows,
+        // the in-window Find bar on the rest — through the same Find.Open() the
+        // window menu uses, so every entry point lands on the same UI. Both Ctrl+F
+        // (the Genie-4-era shortcut) and the platform gesture count; on macOS
+        // those are two keystrokes (Ctrl+F, Cmd+F), elsewhere the same one.
+        // Targeting is PageScroll's click-target, so Find follows the same
+        // "active window" the PageUp/PageDown keys scroll. Checked before the
+        // generic macro dispatch but only when no macro is bound to the keys, so
+        // an existing user binding keeps winning.
         //
-        // Only reached when the game text does NOT have focus: with focus inside an
-        // editor window, AvaloniaEdit's own TextArea binding matches the same
-        // gesture further down the bubble route and opens the panel itself. Same
-        // destination, so the two paths agree — this one just extends it to the
-        // normal case where focus is sitting in the command bar.
-        if (e.Key == Key.F && e.KeyModifiers == PlatformCommandModifiers &&
-            !IsMacroBound(Key.F, e.KeyModifiers) &&
-            PageScroll.CurrentTarget?.DataContext is Docking.IFindHost platformFindHost)
-        {
-            platformFindHost.Find.Open();
-            e.Handled = true;
-            return;
-        }
-
-        // #120: Ctrl+F opens the in-window Find bar, never the renderer's own
-        // panel, on the same selected window. Only live on macOS: everywhere else
-        // Ctrl+F *is* the platform gesture handled above, and both of this block's
-        // fallthrough conditions (no macro bound, target is an IFindHost) are
-        // exactly the ones that block already required. On macOS it keeps the
-        // Genie-4-era shortcut working and is the escape hatch to the bar on a
-        // window whose renderer prefers its own panel. A ctrl+f macro still wins.
-        if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.Control &&
+        // Only reached when the game text does NOT have focus for the gestures
+        // AvaloniaEdit binds itself: with focus inside an editor window, its own
+        // TextArea binding matches further down the bubble route and opens the
+        // panel directly. Same destination, so the two paths agree.
+        if (e.Key == Key.F &&
+            (e.KeyModifiers == KeyModifiers.Control || e.KeyModifiers == PlatformCommandModifiers) &&
             !IsMacroBound(Key.F, e.KeyModifiers) &&
             PageScroll.CurrentTarget?.DataContext is Docking.IFindHost findHost)
         {
-            findHost.Find.IsOpen = true;
+            findHost.Find.Open();
             e.Handled = true;
             return;
         }

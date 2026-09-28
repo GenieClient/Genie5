@@ -67,8 +67,8 @@ public static class WindowMenuBehavior
     /// on the tool (stream) windows. MainWindow answers the platform combo — Cmd+F
     /// on macOS — and routes it to AvaloniaEdit's search panel on editor-backed
     /// windows, which is also the gesture that renderer answers by itself once the
-    /// text has focus; on the rest it opens the in-window bar. Ctrl+F still opens
-    /// the bar on macOS, but the platform gesture is the one worth labelling.
+    /// text has focus; on the rest it opens the in-window bar. Ctrl+F reaches the
+    /// same UI on macOS, but the platform gesture is the one worth labelling.
     ///
     /// <para>As with <see cref="CopySelectionGesture"/>: not used by the legacy
     /// game window, whose template stays hardcoded Ctrl+F, and resolved per read
