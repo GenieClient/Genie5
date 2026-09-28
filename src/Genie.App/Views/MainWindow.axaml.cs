@@ -1012,15 +1012,15 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             return;
         }
 
-        // #120: Ctrl+F opens the Find bar on the same selected window. On Windows
-        // and Linux this is the platform gesture, already handled above; it stays
-        // live on macOS, where Ctrl+F is a separate keystroke from Cmd+F, so the
-        // Genie-4-era shortcut keeps working and stays a way to reach the bar even
-        // on a window whose renderer prefers its own panel.
-        // Checked before the generic macro dispatch but only when no ctrl+f
-        // macro exists, so an existing user binding keeps winning.
+        // #120: Ctrl+F opens the in-window Find bar, never the renderer's own
+        // panel, on the same selected window. Only live on macOS: everywhere else
+        // Ctrl+F *is* the platform gesture handled above, and both of this block's
+        // fallthrough conditions (no macro bound, target is an IFindHost) are
+        // exactly the ones that block already required. On macOS it keeps the
+        // Genie-4-era shortcut working and is the escape hatch to the bar on a
+        // window whose renderer prefers its own panel. A ctrl+f macro still wins.
         if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.Control &&
-            ViewModel?.Core?.Commands?.Macros?.Get("ctrl+f") is null &&
+            !IsMacroBound(Key.F, e.KeyModifiers) &&
             PageScroll.CurrentTarget?.DataContext is Docking.IFindHost findHost)
         {
             findHost.Find.IsOpen = true;
