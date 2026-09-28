@@ -1,7 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Genie.Core.Commanding;
+using Genie.Core.Config;
+using Genie.Core.Queue;
+using Genie.Core.Runtime;
 using Genie.Core.Scripting;
+using Genie.Core.Variables;
 using Xunit;
 
 namespace Genie.Core.Tests;
@@ -151,12 +156,51 @@ public class ScriptG4VarParityTests
     [Fact]
     public void Bare_assignment_rewrites_to_the_right_statement()
     {
-        // Asserted at the parser, which is where the rewrite lives — and for
-        // the global form it has to be, since applying it needs the host
-        // command engine that `#var` is deliberately routed through.
+        // Asserted at the parser, which is where the rewrite lives. The global
+        // form is `put #var`, as Genie 4 writes it: a bare `#var` script line
+        // is a comment and would never run (see the execution test below).
         Assert.Equal("setvariable Failure 0", ParsedLine("%Failure = 0"));
         Assert.Equal("setvariable item rope", ParsedLine("%item rope"));
-        Assert.Equal("#var gvar world",       ParsedLine("$gvar = world"));
+        Assert.Equal("put #var gvar world",   ParsedLine("$gvar = world"));
+    }
+
+    [Theory]
+    [InlineData("$gvar = world")]
+    [InlineData("$gvar world")]
+    public void Global_bare_assignment_sets_the_variable_when_run(string line)
+    {
+        // The rewrite used to emit `#var gvar world`, which StepOne skips as a
+        // comment — the assignment did nothing and nothing said so. This runs
+        // it through the real host command engine and reads it back.
+        var dir = Path.Combine(Path.GetTempPath(), "gc_g4gvar_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "t.cmd"), line + "\necho V=$gvar\n");
+
+            var lds = new LocalDirectoryService("GenieG4GvarTest", dir);
+            lds.UseExplicitRoot(dir);
+            var echoed = new List<string>();
+            var sent   = new List<string>();
+            CommandEngine? commands = null;
+            var scripts = new ScriptEngine(dir, new TypeAheadSession(),
+                                           sendCommand: c => sent.Add(c),
+                                           echo: l => echoed.Add(l),
+                                           handleHashCmd: c => commands!.ProcessInput(c));
+            var host = new FakeCommandHost(scripts.Globals);
+            commands = new CommandEngine(new GenieConfig(lds), new CommandQueue(), new EventQueue(), host);
+            var vars = new VariableEngine(commands);
+            commands.Variables = vars;
+            scripts.UserVarLookup = n => vars.Store.Get(n);
+
+            scripts.TryStart("t", new List<string>());
+            for (int i = 0; i < 300; i++) scripts.Tick();
+
+            Assert.Equal("world", vars.Store.Get("gvar"));
+            Assert.Contains("V=world", echoed);
+            Assert.Empty(sent);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { /* best effort */ } }
     }
 
     /// <summary>The single parsed statement text for a one-line script.</summary>
@@ -210,5 +254,54 @@ public class ScriptG4VarParityTests
 
         Assert.Contains("START", o);
         Assert.Contains("END",   o);
+    }
+
+    /// <summary>ICommandHost double: records Echo lines; the globals dictionary
+    /// is injectable so a test can hand over a real ScriptEngine.Globals.</summary>
+    private sealed class FakeCommandHost : ICommandHost
+    {
+        public FakeCommandHost(IDictionary<string, string>? globals = null)
+            => Globals = globals ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        public List<string> Echoed { get; } = new();
+        public IDictionary<string, string> Globals { get; }
+
+        public IReadOnlyDictionary<string, string> GetGlobalVariables()
+            => new Dictionary<string, string>(Globals, StringComparer.OrdinalIgnoreCase);
+        public string ExpandVariables(string text) => text;
+
+        public void Echo(string text) => Echoed.Add(text);
+        public void EchoTo(string text, string? window, string? color) { }
+        public void EchoMain(string text, string? color, bool mono) { }
+        public void EchoLink(string text, string command, string? window) { }
+        public void EchoClear(string? window) { }
+        public void WindowCommand(string sub, string window) { }
+        public void SetStatusBar(string text, int index) { }
+        public void SendToGame(string text, bool userInput = false, string origin = "", string? echoOverride = null) { }
+        public void RunScript(string text) { }
+        public void InjectParsedLine(string line) { }
+        public void StopScript(string? name) { }
+        public void StopAllScripts() { }
+        public void PauseAllScripts() { }
+        public void ResumeAllScripts() { }
+        public void PauseScript(string? name) { }
+        public void ResumeScript(string? name) { }
+        public void SetTraceLevelAll(int level) { }
+        public IReadOnlyList<string> RunningScripts() => Array.Empty<string>();
+        public void SetGlobalVariable(string name, string value) => Globals[name] = value;
+        public void RemoveGlobalVariable(string name) => Globals.Remove(name);
+        public string SetLiveAudit(Genie.Core.Diagnostics.AuditMode mode) => string.Empty;
+        public void EditScript(string name) { }
+        public void LayoutCommand(string args) { }
+        public void PluginCommand(string args) { }
+        public void ConfigCommand(string args) { }
+        public void MapperGoto(string args) { }
+        public void MapperCommand(string args) { }
+        public void MapperReset() { }
+        public void PlaySound(string soundName) { }
+        public void Speak(string text, bool urgent = false) { }
+        public void TtsCommand(string args) { }
+        public void FlashWindow() { }
+        public void Connect(ConnectRequest request) { }
     }
 }

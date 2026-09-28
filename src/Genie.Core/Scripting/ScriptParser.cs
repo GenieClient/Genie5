@@ -171,7 +171,7 @@ public static class ScriptParser
             //
             //   %Failure = 0     →  setvariable Failure 0
             //   %item $0         →  setvariable item $0
-            //   $gvar = world    →  #var gvar world
+            //   $gvar = world    →  put #var gvar world
             //
             // Rewritten here, at load, for the same reason Genie 4 does it
             // here: by dispatch time the line has been %var/$var-substituted,
@@ -190,7 +190,11 @@ public static class ScriptParser
                 int eq = body.IndexOf(" = ", StringComparison.Ordinal);
                 if (eq >= 0) body = body[..eq] + " " + body[(eq + 3)..];
 
-                var stmt = trimmed[0] == '%' ? "setvariable " + body : "#var " + body;
+                // The global form must be `put #var`, as Genie 4 writes it
+                // (Script.cs, the same load-time rewrite). A bare `#var` line
+                // is a comment to StepOne, so the assignment would be silently
+                // dropped; `put` routes it to the host command engine instead.
+                var stmt = trimmed[0] == '%' ? "setvariable " + body : "put #var " + body;
                 output.Add((origin, lineNo, LeadingIndent(raw) + stmt));
                 continue;
             }
