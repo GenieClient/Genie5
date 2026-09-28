@@ -55,7 +55,8 @@ waitfor You can move again
 pause 2.5
 waitpause 0.5
 
-# Conditionals on live game state:
+# Conditionals on live game state (every operator and function is
+# listed under Expressions on the Scripting Reference page):
 if $health < 50 then put chant heal
 if def(weapon) then echo I have a weapon set
 
@@ -180,7 +181,7 @@ The community [DR-Genie-Scripts](https://github.com/Tirost/DR-Genie-Scripts) rep
 
 ## Related
 
-- [Scripting Reference](Scripting-Reference) — the complete language: every statement, variable scoping, the roundtime gate, type-ahead.
+- [Scripting Reference](Scripting-Reference) — the complete language: every statement, [expression operators and functions](Scripting-Reference#expressions), variable scoping and the full variable list, the `#` commands, the roundtime gate, type-ahead.
 - [JavaScript Scripting](JavaScript-Scripting) — `.js` scripts and Genie 4-style function libraries (`include` + `js` / `jscall`).
 - [Configuration & Rules](Configuration) — triggers and variables that scripts build on.
 - [Lich 5 Integration](Lich-5-Integration) — running Ruby scripts alongside `.cmd`.

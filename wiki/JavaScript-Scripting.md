@@ -244,6 +244,6 @@ Everything else (`split`, `join`, `slice`, `getVar`/`setVar`/`getGlobal`, `switc
 ## Related
 
 - **[Scripting](Scripting)** — the `.cmd` language guide
-- **[Scripting Reference](Scripting-Reference)** — every command, variable, and operator
+- **[Scripting Reference](Scripting-Reference)** — every statement, variable, operator and function, plus the `#` commands
 - **[Application Folders](Application-Folders)** — where scripts live
 - **[Policy & Compliance](Policy-Compliance)** — automation is fine when you stay responsive; the same rules apply to `.js`
