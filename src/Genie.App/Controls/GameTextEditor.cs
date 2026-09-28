@@ -495,6 +495,15 @@ public sealed class GameTextEditor : UserControl
     {
         if (_editor.SearchPanel is not { } panel) return false;
 
+        // Focus the text area first. The panel's close (X) button is bound to an
+        // AvaloniaEdit RoutedCommand whose CanExecute routes from the last element
+        // to take focus app-wide, and it is only asked once, as the panel attaches
+        // (the command never raises CanExecuteChanged). Opened from the command
+        // bar or a menu, that element is outside the editor, so the X would come
+        // up disabled for the panel's whole life. Reactivate below then moves
+        // focus on into the search box, as before.
+        _editor.TextArea.Focus();
+
         panel.IsReplaceMode = false;
         panel.Open();
 
