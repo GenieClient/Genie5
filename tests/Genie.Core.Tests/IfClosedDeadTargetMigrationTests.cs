@@ -57,14 +57,17 @@ public class IfClosedDeadTargetMigrationTests : IDisposable
     }
 
     [Fact]
-    public void Legacy_conversation_target_is_rewritten_to_log()
+    public void Legacy_conversation_target_keeps_what_it_did_before_main()
     {
+        // Not "log": with EchoToMain off, the dead target's Main fallback was the
+        // ONLY place a closed Talk panel's speech showed (DR's bare main re-send
+        // is display-suppressed as DuplicateEcho). Log would move it out of Game.
         WriteLegacyFile(("talk", "conversation"), ("whispers", "conversation"));
 
         var store = Load(WindowsJson);
 
-        Assert.Equal("log", store.Get("talk").IfClosed);
-        Assert.Equal("log", store.Get("whispers").IfClosed);
+        Assert.Null(store.Get("talk").IfClosed);       // null = Main
+        Assert.Null(store.Get("whispers").IfClosed);
     }
 
     [Fact]
@@ -92,8 +95,8 @@ public class IfClosedDeadTargetMigrationTests : IDisposable
     {
         WriteLegacyFile(("talk", "conversation"));
 
-        Assert.Equal("log", Load(WindowsJson).Get("talk").IfClosed);
-        Assert.Equal("log", Load(WindowsJson).Get("talk").IfClosed);
+        Assert.Null(Load(WindowsJson).Get("talk").IfClosed);
+        Assert.Null(Load(WindowsJson).Get("talk").IfClosed);
     }
 
     [Fact]
@@ -105,7 +108,10 @@ public class IfClosedDeadTargetMigrationTests : IDisposable
 
         var rows = new PersistenceService().LoadWindowSettings(WindowsJson);
         Assert.All(rows, r => Assert.Equal(WindowSettingsStore.IfClosedRevision, r.IfClosedRevision));
-        Assert.Equal("log", rows.Single(r => r.Id == "talk").IfClosed);
+        var talk = rows.Single(r => r.Id == "talk");
+        Assert.True(talk.HasIfClosed);
+        Assert.Null(talk.IfClosed);
+        Assert.Null(Load(WindowsJson).Get("talk").IfClosed);   // reload: still Main, not the default log
     }
 
     [Fact]
@@ -132,7 +138,7 @@ public class IfClosedDeadTargetMigrationTests : IDisposable
         store.Apply(new WindowSettingsPersistenceModel { Id = "talk", HasIfClosed = true, IfClosed = "conversation" });
         store.Register("talk", "Talk");
 
-        Assert.Equal("log", store.Get("talk").IfClosed);
+        Assert.Null(store.Get("talk").IfClosed);
     }
 
     [Theory]
@@ -147,15 +153,15 @@ public class IfClosedDeadTargetMigrationTests : IDisposable
     }
 
     [Fact]
-    public void Migrated_talk_resolves_to_log_not_to_the_new_window()
+    public void Migrated_talk_resolves_to_main_not_to_the_new_window()
     {
         WriteLegacyFile(("talk", "conversation"));
         var store = Load(WindowsJson);
 
-        // Talk closed, Log open, Conversation closed.
-        var d = IfClosedResolver.Resolve("talk", store, id => id == "log");
+        // Talk closed; Log and Conversation both open. Before the upgrade the
+        // dead target sent it to Main, and it must still go there.
+        var d = IfClosedResolver.Resolve("talk", store, id => id is "log" or "conversation");
 
-        Assert.Equal(IfClosedSinkKind.Stream, d.Kind);
-        Assert.Equal("log", d.StreamId);
+        Assert.Equal(IfClosedSinkKind.Main, d.Kind);
     }
 }

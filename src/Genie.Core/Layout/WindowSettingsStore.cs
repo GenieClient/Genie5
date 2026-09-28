@@ -116,11 +116,15 @@ public sealed class WindowSettingsStore
     /// dead; registering the real window would silently bring them to life and
     /// move the text into a panel the user has never opened.
     /// <list type="bullet">
-    /// <item><c>conversation</c> → <c>log</c>. DR declares talk and whispers
-    /// <c>ifClosed='conversation'</c>, and that value reaches windows.json in
-    /// the wild (Genie 4 imports, hand edits). Our Log window is the
-    /// consolidated conversation feed and <c>log</c> is the shipped talk /
-    /// whispers default, so such a row lands on the default.</item>
+    /// <item><c>conversation</c> → <c>null</c> (Main). DR declares talk and
+    /// whispers <c>ifClosed='conversation'</c>, and that value reaches
+    /// windows.json in the wild (Genie 4 imports, hand edits). While the
+    /// target was dead, such a row routed a closed Talk/Whispers panel's text
+    /// to Main, and Main is the ONLY place it showed: the parser's bare
+    /// <c>main</c> re-send is display-suppressed (<c>DuplicateEcho</c>), so
+    /// with <c>EchoToMain</c> off there is no other main-window copy. Keeping
+    /// Main keeps the speech exactly where those users saw it. <c>log</c> (the
+    /// shipped default) would have silently moved it out of the game window.</item>
     /// <item><c>group</c> → <c>null</c> (Main). DR declares nothing that
     /// redirects into Group and no profile seen carries it, but the exposure is
     /// identical; Main is exactly what such a row did before.</item>
@@ -131,7 +135,7 @@ public sealed class WindowSettingsStore
     private static readonly Dictionary<string, string?> DeadTargetMigrations =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ["conversation"] = "log",
+            ["conversation"] = null,
             ["group"]        = null,
         };
 
