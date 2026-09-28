@@ -32,10 +32,12 @@ Day-to-day playing, customizing, and automating.
 | --- | --- |
 | **[Connecting & Profiles](Connecting)** | The three connection modes (SGE, Lich, replay), the Connect dialog, and encrypted per-character profiles. |
 | **[The Interface](The-Interface)** | The dockable panels — game text, vitals, hands, room, stream tabs, mapper — plus the command bar, clickable links, themes, and saved layouts. |
+| **[Docking Windows](Docking-Windows)** | Drag panels to dock them as tabs or new sections, float them, and get lost windows back. |
 | **[Text-to-Speech](Text-to-Speech)** | Natural neural voices that read the game aloud — offline, free, and private, with per-stream read-aloud and spoken alerts. |
 | **[Configuration & Rules](Configuration)** | Aliases, triggers, highlights, substitutes, gags, macros, variables, and classes — set from the command bar or the Configuration dialog. |
 | **[Scripting](Scripting)** | Write and run `.cmd` scripts — a friendly tour from "hello world" up. |
 | **[The Mapper](Mapper)** | Room tracking, click-to-walk, Less Obvious Paths, and the attended-mode walking rules. |
+| **[Alterations](Alterations)** | Design item alterations against DragonRealms' length limits and keep a library of designs — the Genie 4 Alteration Buddy, built in. |
 | **[Updating Maps & Scripts](Updating-Maps-and-Scripts)** | Pull the latest community zone maps and keep them merged with your own progress. |
 | **[Lich 5 Integration](Lich-5-Integration)** | Run Genie behind a [Lich 5](https://github.com/elanthia-online/lich-5) proxy with your Ruby scripts intact. |
 
@@ -60,17 +62,17 @@ The deep end: the full scripting language, the mapper's internals, plugins, and 
 
 ## Three ways to connect
 
-Genie 5 reaches DragonRealms three ways — all chosen from **File → Connect…**:
+Genie 5 reaches DragonRealms three ways — the first two are chosen from **File → Connect…**:
 
 - **Simutronics SGE login** — the standard "log in with your DragonRealms account" flow. Genie 5 authenticates and finds the right game server itself — over TLS by default, with a 🔒 padlock in the title bar to show it.
 - **Lich proxy** — point Genie at a running [Lich 5](https://github.com/elanthia-online/lich-5) on `127.0.0.1:8000`; your Ruby scripts keep working.
-- **Dev replay** — replay a recorded session through the engine (development and testing).
+- **Dev replay** — replay a recorded session through the engine (development and testing; runs through the Console test harness, not the Connect dialog).
 
 See **[Connecting & Profiles](Connecting)** for the walkthrough.
 
 ## Community & links
 
-- **Discord** — [discord.gg/MtmzE2w](https://discord.gg/MtmzE2w) — the long-running Genie community server (shared with Genie 4). Alpha-tester chat, scripting help, mapper questions.
+- **Discord** — [discord.gg/MtmzE2w](https://discord.gg/MtmzE2w) — the long-running Genie community server (shared with Genie 4). Beta-tester chat, scripting help, mapper questions.
 - **Issues** — [report a bug or request a feature](https://github.com/GenieClient/Genie5/issues).
 - **Releases** — [download builds](https://github.com/GenieClient/Genie5/releases) as they ship.
 - **Contributing** — [CONTRIBUTING.md](https://github.com/GenieClient/Genie5/blob/main/CONTRIBUTING.md). PRs welcome.

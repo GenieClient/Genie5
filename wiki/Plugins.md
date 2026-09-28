@@ -8,7 +8,7 @@ Plugins extend Genie 5 with compiled .NET code — drop a plugin in your `Plugin
 
 - Place a plugin DLL in `{AppData}/Genie5/Plugins/` (see [Application Folders](Application-Folders)).
 - Manage it from the **Plugins menu** — **Open Plugins Folder**, **Reload Plugins**, **Load** (individual DLLs found in the folder), **Enable / Disable** per plugin, and **Unload**. Panels a plugin opens appear under **Window → Plugin Windows**.
-- Or from the command bar:
+- Or from the command bar (these need a live session — while disconnected, `#plugin` answers `[plugin] connect first.`):
 
 ```
 #plugin list            # show loaded plugins (also bare #plugin)
@@ -46,12 +46,16 @@ Identity (`Id`, `Name`, `Version`, `Author`, `Description`, `MinHostVersion`), a
 
 What a plugin is allowed to do:
 
-- **Output** — `Echo(text)` to the main window, `EchoToWindow(window, text)` to a **named panel** (the app surfaces unknown window names as dock panels — this is how plugins stay UI-agnostic; a new panel opens beside the Inventory panel, or floats on its own if that part of your layout is gone), and `SendCommand(command)` to the game (policy-gated).
-- **Variables** — read/write the same variable store scripts use.
-- **State** — `IGameStateView`, a **read-only** projection of game state (vitals, room, hands, skills) so plugins observe without mutating. This preserves Genie's one-way data flow.
+- **Output** — `Echo(text)` to the main window, `EchoToWindow(window, text)` to append to a **named panel** (the app surfaces unknown window names as dock panels — this is how plugins stay UI-agnostic; a new panel opens beside the Inventory panel, or floats on its own if that part of your layout is gone), `SetWindow(window, content)` to replace a panel's whole contents in one call (for snapshot-style windows like the Experience list), and `SendCommand(command)` to the game (policy-gated).
+- **Variables** — `GetVariable` / `SetVariable` on the same variable store scripts use, plus a read-only `Variables` snapshot of the session globals.
+- **State** — `IGameStateView`, a **read-only** projection of game state (character, guild and circle, vitals, room, hands, skill ranks) so plugins observe without mutating. This preserves Genie's one-way data flow.
 - **Diagnostics** — `Log(message)`.
 
 `MinHostVersion` (declared by the plugin) and the host's interface version let the host refuse a plugin built against an incompatible contract.
+
+### Slash commands (`/command`)
+
+A plugin's own commands (Genie 4 style, e.g. `/timers start BLESS`) reach it through `OnInput`, wherever the line comes from: typed input, `.cmd` scripts, alias expansions, trigger actions, the `#send` queue, JavaScript, or another plugin. Built-in extensions get first refusal, then plugins in load order. A `/…` line nobody claims **stays client-side** (the Genie 4 `mycommandchar` rule) — it is echoed but never sent to DragonRealms, and a script that sends one gets a one-time `[genie] … no extension or plugin claimed it` note, which usually means the plugin that owned the command isn't loaded. Ordinary game commands never enter this path.
 
 ## Trust model
 

@@ -67,7 +67,7 @@ Genie 5 is a **desktop game client**, not a server-side service. Our threat mode
 
 - **Passwords on disk**: AES-256-GCM, authenticated encryption, key derived from `Environment.MachineName` + fixed salt. Sufficient for local-only storage; **not portable** (this is by design — same plaintext encrypts differently on different machines, which protects against disk-image attacks but breaks naive cloud sync).
 - **SGE auth password**: encrypted with the canonical `(byte - 32) XOR keybyte) + 32` formula at the wire level, as required by the Simutronics protocol. The plaintext password is never written to disk; it lives in memory for the duration of the handshake then is overwritten.
-- **AI pipeline filtering**: `AiContextBuffer` strips other-players' speech streams before any external API call. See [docs/POLICY.md](docs/POLICY.md) for the full filter list.
+- **AI pipeline**: disabled in every build — the app never supplies an AI configuration, so `AiContextBuffer` is never created and nothing is sent. Stripping other players' speech streams before any external call is release gate G2 and must land before the feature can be enabled. See [docs/POLICY.md](docs/POLICY.md) for the required filter list.
 
 ## Coordinated disclosure
 

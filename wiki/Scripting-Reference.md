@@ -10,7 +10,7 @@ A script is a **flat list of statements** parsed from one or more `.cmd` files. 
 - **Blocked** — paused on a timer, prompt, match, evaluation, or the roundtime gate.
 - **Finished** — removed from the active list.
 
-Scripts do **not** run on their own thread. They are advanced off three game events plus a timer for pure pauses, and the engine yields between statements so a long or looping script can't freeze the app. A per-tick statement budget means even a tight `goto` loop won't monopolize the UI — it simply resumes on the next tick.
+Scripts do **not** each get their own thread. They are advanced off three game events plus a timer for pure pauses, all on Genie's **game thread** — the same thread that reads and parses the game stream, separate from the UI — so a busy or stuck script stalls only the game side while typing, menus, **Esc** and `#stopall` stay responsive (`#config gamethread off` restores the older UI-thread behaviour at the next launch). The engine yields between statements, and a per-tick statement budget means even a tight `goto` loop simply resumes on the next tick.
 
 The three driving events:
 
@@ -22,7 +22,7 @@ The three driving events:
 
 ## Parsing
 
-When a script loads, it's transformed in a few passes: `include foo` is expanded recursively (cycles detected; a missing include becomes an echo, not a crash); inline conditionals (`if X then put Y`) are normalized to block form; labels are indexed for O(1) `goto`/`gosub`; and `if`/`else`/`while` jump tables are pre-computed so conditionals don't scan for their matching brace at runtime.
+When a script loads, it's transformed in a few passes: `include foo` is expanded recursively (cycles detected; a missing include becomes an echo, not a crash); inline `<% … %>` JavaScript blocks are lifted out (see [JavaScript Scripting](JavaScript-Scripting#inline-javascript-blocks)); bare `%name = value` assignments become `var` statements; inline conditionals (`if X then put Y`) are normalized to block form; labels are indexed for O(1) `goto`/`gosub`; and `if`/`else`/`while` jump tables are pre-computed so conditionals don't scan for their matching brace at runtime.
 
 ## Statement reference
 
@@ -46,6 +46,7 @@ When a script loads, it's transformed in a few passes: `include foo` is expanded
 | `put #cmd` | A meta-command (`#var`, `#echo`, …) — handled by Genie, not sent to the server. |
 | `#send N cmd` / `#send clear` | Queue `cmd` to fire in N seconds; `clear` drops any pending queued sends. Works typed at the command bar or from a script via `put #send …`. |
 | `put .script args` | Launch `script.cmd` as a sub-script (doesn't consume type-ahead). |
+| `put /cmd` / `send /cmd` / a bare `/cmd` line | A client **/command** (`/calc`, `/sort`, a plugin's own `/timers …`). Built-in extensions get first refusal, then plugins — the same order as typed input, and the same for `move /cmd`. A `/…` line nobody claims stays local (Genie 4's `mycommandchar` rule): it's echoed with a one-time warning that no extension or plugin claimed it, and it never reaches the game. |
 | `move text` | Send `text`, then block until a new room arrives (or a movement-failure line unblocks it). |
 | `nextroom` | Block for the next room change without sending anything. |
 
@@ -67,27 +68,29 @@ When a script loads, it's transformed in a few passes: `include foo` is expanded
 | `waitfor text` / `waitforre regex` | Block until a line contains the substring / matches the regex (single-shot). |
 | `waiteval expr` | Block until an expression evaluates true; re-checked each tick, so changing state (vitals, indicators) unblocks it. |
 
-Regex captures from `matchre` / `waitforre` / actions land in the current `$0..$9` frame.
+Matching is **case-sensitive**, Genie 4 style — `match` / `waitfor` look for the exact substring, and `matchre` / `waitforre` / action patterns are case-sensitive regexes unless the pattern says otherwise (e.g. `(?i)`). Regex captures from `matchre` / `waitforre` / actions land in the current `$0..$9` frame.
 
 ### Variables and math
 
 | Statement | Notes |
 | --- | --- |
-| `var name value` | Set `%name` (value is substituted before storage). Synonyms: `setvariable`, `setvar`. |
+| `var name value` | Set `%name` (value is substituted before storage). Synonyms: `setvariable`, `setvar`. There's no `=` in this form — `var foo = bar` stores `= bar`. |
+| `%name = value` / `%name value` | Genie 4's bare assignment: a line that starts with `%name` followed by a value is the same as `var name value` (the ` = ` is optional; `$name = value` sets a global the same way, like `put #var name value`). A line that is just `%cmd` on its own is still sent as a command; to send a variable *plus* more words, use `put %cmd north` (a bare `%cmd north` line is an assignment). |
 | `unvar name` | Remove `%name`. |
 | `math var op N` | In-place `add` / `subtract` / `multiply` / `divide` / `modulus` / `set`. |
-| `eval var expr` / `evalmath var expr` | Evaluate an expression; `evalmath` coerces to numeric. |
+| `eval var expr` / `evalmath var expr` | Evaluate an expression; `evalmath` coerces to numeric. An expression that fails to evaluate leaves `%var` empty. |
 | `random low high` | Uniform random into `%r`. |
-| `timer start` / `stop` / `clear` / `reset` | Per-script stopwatch; `%timer` reads live elapsed seconds. Bare `timer` = `timer start`. |
+| `timer start` / `stop` / `clear` / `reset` / `setstart <datetime>` | Per-script stopwatch, Genie 4 semantics. `%t` (the Genie 4 name) and `%timer` read the elapsed seconds, fractional (`12.346`). `stop` keeps the elapsed value, so `timer stop` then `echo %t` shows the final time; `start` after a `stop` resumes from it. Only `clear` / `reset` zero it. `setstart` seeds the start from a date/time. Bare `timer` = `timer start`. A local you set yourself with `var t …` takes precedence over `%t`. |
 | `save text` | Store the entire rest of the line into `%s` (Genie 4 parity; there is no slot form). |
 
 ### Actions (background reactions)
 
 | Statement | Notes |
 | --- | --- |
-| `action body when pattern` / `whenre pattern` | Register a reaction; on a matching line, run `body` (captures land in a pushed `$`-frame). |
+| `action body when pattern` / `whenre pattern` | Register a reaction; on a matching line, run `body` (captures land in a pushed `$`-frame). Both forms are regexes (Genie 4 parity); variables in the pattern are filled in when the action is registered. An optional `add` or `instant` keyword after `action` is accepted for Genie 4 compatibility. |
 | `action body when eval expr` | Fires on the rising edge of `expr` becoming true. |
 | `action (label) on` / `off` / `remove`; `action on` / `off` / `clear` | Enable/disable/drop actions by label or globally. |
+| `action remove pattern` | Drop the action(s) registered with exactly that pattern. Removing one that isn't there is silently ignored, so remove-then-re-register is safe. |
 
 A `goto` run from an action body redirects the whole script, Genie 4 style — it abandons whatever the script is blocked on (`pause`, `matchwait`), clears the armed match patterns, and resumes at the target label. (A normal in-line `goto` clears nothing — the register-matches-then-goto-to-a-shared-`matchwait` idiom depends on that asymmetry.)
 
@@ -103,7 +106,8 @@ Text you **send to the game** (typed or scripted) also runs through actions and 
 | `debug N` | Per-script trace verbosity (1 = goto/gosub/return … 10 = every line). |
 | `include <file>.js` | Load a JavaScript function library for this script run — see [JavaScript Scripting](JavaScript-Scripting). |
 | `js <expr>` / `jscall <var> <expr>` | Call a JS library function; `jscall` stores the result in `%var`. |
-| `plugin …` | Parsed for Genie 4 parity; .NET plugin execution is not supported. |
+| `<% … %>` | An inline JavaScript block, Genie 4 style — see [JavaScript Scripting](JavaScript-Scripting#inline-javascript-blocks). |
+| `plugin …` | The Genie 4 `plugin` *statement* is not supported: it warns and clears its variable. Plugins are still reachable from scripts through their **/commands** — `put /cmd` (see [Sending to the game](#sending-to-the-game)). |
 
 ### Named windows, links, and logging
 
@@ -111,16 +115,26 @@ The Genie 4 **menu-script toolkit** — the commands classic scripts like `mm_tr
 
 | Command | Notes |
 | --- | --- |
-| `#window add\|open\|show\|close\|hide\|remove\|clear "Name"` | Create, show, hide, or destroy a named dock window. `add`/`open`/`show` bring it up (creating it if needed); `clear` wipes its text in place. |
+| `#window add\|open\|show\|close\|hide\|remove\|clear "Name"` | Create, show, or hide a named dock window. `add`/`open`/`show` bring it up (creating it if needed); `close`/`hide`/`remove` all hide it (the window keeps its text for next time); `clear` wipes its text in place. |
 | `#link [>window] {text} {command}` | Print a clickable line — clicking it runs `command` through the normal input pipeline (it does **not** run at `#link` time). |
 | `#echo [>window] [color] text` | Directed echo. Targets **Main**/**Game**, any built-in stream window (`>Combat`, `>Talk`, `>Thoughts`, …), or a named window; colours are honoured. Non-text panels (`>Mapper`, `>Vitals`, …) fall back to Main. |
 | `#img [>window] <file> [w:N] [h:N]` | Show a picture (`#image` is a synonym). `file` is relative to your **Art** folder (`#config artdir`) unless it's a full path; Genie 4's `icons\sword.png` backslash style works on every platform. png, jpg, gif (first frame) and bmp only, up to 16 MB. `w:`/`h:` (or `width:`/`height:`) set the size in pixels — give both to stretch, one to scale keeping the shape — and nothing draws larger than 1024 px on a side. With no `>window` the picture goes to the **Portrait** panel when it's open (replacing its art, Genie 4 style) and otherwise inline in the Game window; `>Name` puts it in a named window. A missing or unreadable file prints the reason instead. See [Image lines](#image-lines) below. |
 | `#clear [window]` | Wipe a window's scrollback in place. The name works with or without the `>` prefix (`#clear "Moonmage Training Menu"`, Genie 4 style); a bare `#clear` wipes the main Game window. |
-| `#script abort\|pause\|resume [name\|all]` | Script lifecycle control, Genie 4 style. Acts on the named script, or every script for `all` (or no name). `#script` never *starts* a script — use `.name` for that; bare `#script` lists what's running, like `#scripts`. |
+| `#script abort\|pause\|resume\|pauseorresume [name\|all] [except name]` | Script lifecycle control, Genie 4 style. Acts on the named script, or every script for `all` (or no name); a trailing `except name` leaves that one alone. The target (and the `except` side) may be a `\|`-separated list, so `#script pause $scriptlistactive` and `#script resume $scriptlistpaused` work — and a list of `none` touches nothing. `#script` never *starts* a script — use `.name` for that; bare `#script` lists what's running, like `#scripts`. |
+| `#script reload [name]` / `trace [name]` / `vars [name] [filter]` / `debug <0-10> [name]` / `explorer` | `reload` hot-reloads the script's file at its next `goto`; `trace` shows its recent jump history; `vars` lists its `%variables` (`filter` matches name or value); `debug` sets its trace level; `explorer` opens the Script Manager. |
+| `#pauseall` / `#resumeall` / `#traceall <0-10>` | Pause every running script, resume them all, or set every script's trace level (`0` turns tracing off). `#stop [name]` / `#kill [name]` stop one script (no name = the most recently started); `#stopall` / `#killall` stop them all. |
 | `#log [>file] text` | Append to a log file under your Logs folder. The `>filename` form writes verbatim; the bare form appends to the per-character daily log (with the Genie 4 `LOG CREATED` banner). Writes are serialized across scripts. |
 | `#windowlog add\|remove\|on\|off\|timestamp\|defaults …` | Per-stream log files with filename templates (`{charactername}`, `{yyyy}`, …) — the Genie 4 Window Logger. See [Configuration → Window logs](Configuration#window-logs--a-file-per-stream). |
 
 Windows created this way render full text lines — clickable links and your highlight rules both apply.
+
+**Inline click links.** Anywhere in output text — an `echo`, an `#echo`, a named window, even game text — Genie 4's `{display:command}` markup shows `display` as a link that runs `command` when clicked, as many times per line as you like. In a script:
+
+```
+echo Go {north:north} or {south:go south}
+```
+
+prints "Go north or south" with two links. Typed at the command bar, quote the text so the braces survive argument parsing: `#echo "Go {north:north} or {south:go south}"`. The display runs up to the *last* colon (`{HP: 50:look}` shows "HP: 50"), so a command can't contain a colon, and there's no escape — a literal `{a:b}` in echoed text always becomes a link.
 
 #### Image lines
 
@@ -143,7 +157,9 @@ Two namespaces, distinguished by prefix:
 | `$name` | engine-wide globals | the session | live game state and `#var` / `#tvar` |
 | `$0..$9` | the top `$`-frame | a `gosub` call or the latest regex match | `gosub args`, `matchre`, `waitforre`, action firing |
 
-`%` reads locals only. `$` reads the top frame for `$0..$9`, then falls back to globals. Name resolution, `%%name` / `$$name` double-evaluation, and `%name(N)` pipe-array indexing all follow Genie 4 rules.
+`%` reads locals only. `$` reads the top frame for `$0..$9`, then the session globals (live game state and `#tvar`), then your saved `#var` values. A `#var` whose name already exists as a session global writes both, so the new value is what `$name` reads. Name resolution, `%%name` / `$$name` double-evaluation, and `%name(N)` pipe-array indexing all follow Genie 4 rules.
+
+`%name.length` (or `$name.length`) is Genie 4's built-in count of a `|`-separated list: with `var list a|b|c`, `%list.length` is `3`. Like Genie 4 it counts separators plus one, so an empty list reads `1`. An undefined `%name.length` stays literal.
 
 A `#var` / `#tvar` **value** that is itself `#eval` or `#evalmath` stores the expression's *result*, Genie 4 style — the classic menu-script idiom `put #var selection {#eval toupper("$selection")}` stores `MAGIC`, not the literal `#eval …` text. Typed standalone, `#eval <expr>` echoes the result.
 
@@ -154,7 +170,7 @@ These live game-state globals are mirrored as events arrive (a non-exhaustive li
 | Global | Source |
 | --- | --- |
 | `$health`, `$mana`, `$spirit`, `$stamina`/`$fatigue`, `$concentration`, `$encumbrance` | progress bars |
-| `$roundtime` | seconds remaining at event time |
+| `$roundtime` / `$roundtimeremaining` | live countdown of roundtime seconds left (`0` when none), recomputed on every read |
 | `$casttime` | raw epoch of when the cast is fully prepped (Genie 4 parity — compose `$casttime - $spellstarttime`) |
 | `$spellpreptime` | full prep length in seconds (constant per spell) |
 | `$spelltime`, `$spellstarttime`, `$casttimeremaining` | computed live on every read: elapsed count-up, prep-start epoch, countdown-to-prepped |
@@ -164,8 +180,9 @@ These live game-state globals are mirrored as events arrive (a non-exhaustive li
 | `$north`, `$northeast`, … `$up`, `$down`, `$out` | compass exits (`1`/`0`) |
 | `$roomname`, `$roomdesc`, `$roomexits`, `$roomobjs`, `$roomplayers`, `$gameroomid` | room info |
 | `$charactername`, `$game`, `$connected` | session |
+| `$scriptlist`, `$scriptlistactive`, `$scriptlistpaused` | running scripts (`.cmd` and `.js`) joined with `\|` — all of them, only the unpaused ones, or only the paused ones — or `none` when the set is empty. Computed on every read; they compose with `#script` (e.g. `put #script resume $scriptlistpaused`). |
 
-Because globals are mirrored at event time (not on access), use `timer start` / `%timer` for wall-clock waits rather than diffing `$roundtime` between prompts. Type `#var` at the command bar for the live list.
+Most globals are mirrored when game events arrive. `$roundtime`, `$casttimeremaining`, `$spelltime`, `$spellstarttime` and the `$scriptlist` family are computed each time they're read instead, so they're always current. For wall-clock waits, use `timer start` / `%t`. Type `#var` at the command bar for the live list.
 
 ## The roundtime gate
 
@@ -178,13 +195,15 @@ Commands you `put` to the game contribute to an in-flight counter that's decreme
 ## Diagnostics
 
 - **Per-script tracing** — `debug 5` traces a script's reactions; `debug 10` traces every line. Output goes to the echo channel, and each running-script chip on the Script Bar shows the script's live trace level (`dbg:N`).
+- **`#scriptcheck <name>`** — parses a script exactly as a start would and reports every problem with file and line, without running it: missing `goto`/`gosub`/`match` labels, `if` without `then`, unbalanced parentheses or braces, an `action` without `when`, missing includes, duplicate labels. Variable jump targets (`goto %next`) are skipped. `#checkscript` is a synonym.
+- **`#script trace` / `#script vars`** — dump a running script's recent jumps, or its `%variables`, without stopping it; `#traceall <0-10>` sets every running script's trace level at once.
 - **Script Manager** — script output (`[script]`, `[dbg:N]`, in-script `#echo`) is forked to the Script Manager's log view (script library + running-script list + output log), toggled from the **Scripts** menu.
 
 ## Differences from Genie 4
 
 - **`gosub` for reusable routines** — jumping into a nested/indented label isn't reliable.
 
-Compatibility notes (all Genie 4 parity): a script line starting with `#` is *always* a comment — `#put north` does nothing; meta-commands run from a script only via `put #cmd`. An undefined `$var` is left **literal** in the text (never aborts the script, never expands to empty); guard explicitly with `if def(name)` when it matters. Scripts live in one shared `Scripts/` folder at the data root, used by every character (see [Application Folders](Application-Folders)).
+Compatibility notes (all Genie 4 parity): a script line starting with `#` is *always* a comment — `#put north` does nothing; meta-commands run from a script only via `put #cmd`. There are no end-of-line comments: `pause 1 # wait` hands `1 # wait` to `pause` (which then falls back to its 1-second default), so keep comments on their own lines. An undefined `$var` is left **literal** in the text (never aborts the script, never expands to empty); guard explicitly with `if def(name)` when it matters. Scripts live in one shared `Scripts/` folder at the data root, used by every character (see [Application Folders](Application-Folders)); with `#config reposcriptdir` set, that folder is searched first and the repo-scripts folder second, so a local copy always wins.
 
 ## Related
 

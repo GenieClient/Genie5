@@ -20,11 +20,13 @@ When an update finds a zone you already have, it doesn't blindly overwrite. It l
 - **Your stamped room ids survive** — the work the mapper did learning your routes isn't lost.
 - **New upstream nodes** start without a server-room id and get stamped the first time you visit them.
 
-If a zone file ever gets corrupted by bad edits, delete it from the Maps folder and re-run the update to pull a fresh copy.
+A normal update only rewrites zones whose upstream copy has changed, so it can't fix a zone that's already damaged but current upstream. For that, use **Maps ▸ Repair Maps (full re-download)…**: it re-downloads **every** zone regardless of what's installed, restoring the portal/climb exit types, hidden flags and room descriptions that builds before beta.9.5 stripped through a lossy round-trip. The same merge applies, so your own notes, colours and roundtimes are kept. If you've ever run an earlier release, run it once.
+
+If a single zone file gets corrupted by bad edits, delete it from the Maps folder and re-run the update to pull a fresh copy.
 
 ### Auto-update on launch
 
-The `updatemapperscripts` setting (see `#config` / **Configuration…**) controls whether helper map scripts are refreshed as part of updates. To point Genie at a fork or mirror, edit the subscription rows in the **Updates** dialog (stored in `update-feeds.json` in your Config folder — each row is an owner/repo pair). **Help → Update Settings…** decides whether the silent startup check covers Maps and Scripts at all, and whether found updates install by themselves.
+To point Genie at a fork or mirror, edit the subscription rows in the **Updates** dialog (stored in `update-feeds.json` in your Config folder — each row is an owner/repo pair). **Help → Update Settings** (its **Check on Startup** and **Auto-Apply** submenus) decides whether the silent startup check covers Maps and Scripts at all, and whether found updates install by themselves.
 
 ## Updating scripts from community repositories
 
@@ -36,11 +38,12 @@ The Updates dialog's **Scripts** tab (see [Keeping Up to Date](Updates#scripts))
 
 ## Importing maps from a Genie 4 install
 
-If you have a folder of Genie 4 `*.xml` zone files, import them once without going through the community repo:
+Genie 4 zone files need no conversion — the format is the same — so bringing them over is a copy:
 
-1. Use the mapper's **Import from Genie 4** path (the same migration covered for rules in [Importing Genie 4 Config](Importing-Genie4-Config), maps side).
-2. Point it at your Genie 4 `Maps` folder.
-3. Files are brought into your [Maps folder](Application-Folders).
+- **Automatically (Windows)** — the first time Genie 5 starts with an empty Maps folder (and no custom maps directory set), it copies every `*.xml` from `%APPDATA%\Genie Client 4\Maps` into your [Maps folder](Application-Folders). It copies rather than moves, so Genie 4 keeps working alongside.
+- **By hand** — copy the `*.xml` files into your Maps folder yourself, or point **Maps ▸ Change Maps Directory…** at the folder that holds them.
+
+(**File ▸ Import from Genie 4…** covers rules and settings, not maps — see [Importing Genie 4 Config](Importing-Genie4-Config).)
 
 You can still run **Maps ▸ Update from Official Repo…** afterward to pull newer community versions; the merge preserves your stamped data where it can.
 
@@ -55,5 +58,6 @@ The transit graph the [multi-zone pathfinder](Cross-Zone-Travel) uses lives in `
 | Every file shows `failed` during an update | No network, a proxy/firewall blocking the repo host, or a badly-skewed system clock (TLS handshakes fail). Local maps are never corrupted by a failed update — failed files are skipped; re-run later. |
 | Update seems to do nothing | Everything is already current — unchanged files aren't re-downloaded. |
 | A zone won't match your location | Walk through it with AutoMapper enabled so `ServerRoomId`s get stamped, or pull a fresh copy from the repo. |
+| `go` / `climb` exits show as plain paths or room descriptions look thin — and **Update** says everything is current | The zone was damaged by an earlier build and is unchanged upstream, so a normal update skips it. Run **Maps ▸ Repair Maps (full re-download)…**. |
 
 The updater uses the system's default network configuration, so OS-level proxy settings are honoured automatically.

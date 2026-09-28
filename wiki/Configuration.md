@@ -25,14 +25,14 @@ Either way, rules are saved to disk automatically — a `.json` file per rule ty
 
 ### Master toggles — whole engines on/off
 
-The **File** menu has a master switch for each engine — **Highlights**, **Triggers**, **Substitutes**, **Gags**, **Aliases**, and **Images** — so you can silence a whole rule type without touching the rules. Everything stays loaded and editable while an engine is off. Each toggle is also a `#config` key, and the menu stays in sync whichever way you flip it:
+The **File ▸ Master Toggles** submenu has a master switch for each engine — **Highlights**, **Triggers**, **Substitutes**, **Gags**, **Aliases**, and **Images** — so you can silence a whole rule type without touching the rules. Everything stays loaded and editable while an engine is off. Each toggle is also a `#config` key, and the menu stays in sync whichever way you flip it:
 
 ```
 #config triggers off
 #config highlights on
 ```
 
-(The Images toggle clears or re-fetches the room art live.) For finer-grained switching, use [classes](#classes--grouping-rules).
+(The Images toggle's key is `showimages`; it clears or re-fetches the room art live.) For finer-grained switching, use [classes](#classes--grouping-rules).
 
 ### Aliases — typing shortcuts
 
@@ -61,9 +61,11 @@ When "You stumble to the ground" appears, Genie sends `stand`. Patterns can be l
 Make important lines jump out:
 
 ```
-#highlight {red} {You are bleeding}
-#highlight {yellow} {whispers}
+#highlight {You are bleeding} {red}
+#highlight {whispers} {yellow}
 ```
+
+The pattern comes first, then the colour. (Genie 4's order, with the match type in front, works too: `#highlight {string} {red} {You are bleeding}`.)
 
 Highlights support foreground and background colors, whole-line vs. substring matching, and case sensitivity — all editable in the Highlights tab. They paint in **every window** — the game window, the stream tabs, and the Room / Mobs / Players panels.
 
@@ -75,8 +77,8 @@ A rule can also be **scoped to specific windows**: the Highlights tab's **Window
 
 Two built-in colorings live alongside your own rules:
 
-- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Config → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
-- **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it on the **Config → Presets** tab or with `#config monsterbold on|off`.
+- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
+- **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it on the **Edit → Configuration… → Presets** tab or with `#config monsterbold on|off`.
 
 ### Substitutes — rewriting text
 

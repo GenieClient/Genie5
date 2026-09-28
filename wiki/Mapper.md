@@ -1,14 +1,31 @@
 # The Mapper
 
-The mapper knows where you are, draws the zone you're in, and can walk you to any room you click. It reads the community zone maps (the same XML format Genie 4 uses) and tracks your position as you move.
+The mapper knows where you are, draws the zone you're in, and can walk you to any room you pick. It reads the community zone maps (the same XML format Genie 4 uses) and tracks your position as you move.
 
 ## The map panel
 
 ![The Mapper showing all of Riverhaven — 568 rooms with guild labels, the exit-type legend, and the current room highlighted](images/mapper-panel.png)
 
-The Mapper panel (**floating** in its own window by default; dock it by dragging, or toggle it via **Window**) shows the current zone with your room highlighted. Rooms are drawn as nodes connected by their exits, color-coded by exit type (compass directions, vertical moves, and special exits like `go gate` or `climb wall`). Scroll to zoom; drag to pan.
+The Mapper panel (**floating** in its own window by default; dock it by dragging, or toggle it via **Maps ▸ Show Mapper**) shows the current zone with your room highlighted. Rooms are drawn as nodes connected by their exits, color-coded by exit type (compass directions, vertical moves, and special exits like `go gate` or `climb wall`). Scroll to zoom; drag to pan.
 
 As you walk, Genie matches each new room to a node and re-centers on you. When you enter a room it doesn't recognize in the current zone, it can auto-switch to the zone that contains it.
+
+### Zones, floors, and the legend
+
+- **Zone picker** — the dropdown at the top lists every zone in your Maps folder; auto-detect normally picks for you as you walk. A sort control beside it orders the list by **Name**, **Recently Changed**, or **Map Number** (special event/quest maps are badged *SPECIAL* and sort to the bottom by number).
+- **Return to Current Zone** — while you're browsing a zone your character isn't in, tracking pauses and a **⌖ Return to Current Zone** button appears; click it to jump back and resume following.
+- **Floors** — **▲ / ▼** step the map up and down a level (the `L0` readout shows which). The floors directly above and below yours draw as a faint white "ghost" map under the current one, the way Genie 4 grays out other levels. The **Map overlay opacity** slider in **Maps ▸ AutoMapper Settings…** (`#config automapperalpha`, 0–255) fades them; 0 hides them for a pure single-floor view.
+- **Legend** — **Maps ▸ Show Map Legend** (on by default) draws a colour key in the map's top-left corner. It lists only what the current floor actually draws — room colours named from the community Maps colour key, cross-zone rooms, ghost floors, and each kind of path — so an entry you see always means something on screen.
+- **Labels** — the **Labels** toggle shows or hides the zone's landmark labels (the map's own text, like "East Gate").
+
+### Map spoilers
+
+Community maps record secret exits — `search` / `objsearch` arcs and hidden quick-send moves. If you'd rather discover those yourself:
+
+- `#config showmapspoilers off` hides them on the map and from the [Less Obvious Paths](#less-obvious-paths) buttons (default **on**).
+- `#config avoidmapspoilers on` keeps `#goto` and click-to-walk from routing through them, so a walk can't lead you through a secret either (default **off**).
+
+Both affect display and routing only — the map files themselves are untouched.
 
 ## Finding your room
 
@@ -56,6 +73,20 @@ handles everything as described above; `#config automapperscript false` forces
 the built-in walker even when the script is present. Cross-zone routes always
 use the built-in walker.
 
+Arcs whose move is `script <name>` can only be executed by the community
+script, so the built-in walker (and the cross-zone pathfinder) never plans a
+route through one — it finds another way, or reports no route, rather than
+sending the directive to the game as text.
+
+### Walking to a tagged room
+
+Rooms can carry free-form **tags** (`bank`, `forge`, `healer`, …), and
+`#goto @bank` walks you to the **nearest** room in the zone tagged `bank`. Tag
+the room you're standing in with `#mapper tag add bank` (`#mapper tag remove
+bank` to undo); `#mapper tag list` shows the current room's tags, and
+`#mapper tags` lists every tag in the zone with its count. Tags can also be
+edited in the Details panel (see [Editing maps](#editing-maps)).
+
 ## Less Obvious Paths
 
 DragonRealms rooms have "obvious paths," but maps also record the non-obvious connections (a trellis you can climb, an alley with no signposted exit). Genie surfaces these as clickable buttons so you can take them without memorizing the verb.
@@ -64,7 +95,18 @@ DragonRealms rooms have "obvious paths," but maps also record the non-obvious co
 
 ## Room notes
 
-With learning on, you can add notes to a room (a landmark, a warning, a shop name); notes are saved into the zone XML and render as labels on the map.
+You can add a note to a room (a landmark, a warning, a shop name) in the Mapper's **Details** panel — **Save Notes** writes it into the zone XML. Notes double as `#goto` names and show when you hover the room; they aren't drawn on the canvas. To put text on the map itself, add a **label** instead (below).
+
+## Editing maps
+
+The toolbar under the zone picker carries Genie 4's AutoMapper edit tools:
+
+- **✎ Edit** — edit mode: click a room to select it, drag to move it. Off (the default), a click does nothing and right-click offers **Go Here**.
+- **⏺ Record** — add new rooms to the active zone as you walk into them (Genie 4 Record Mode).
+- **New** starts an empty zone; **Save** writes the active zone to its XML file (a dot marks unsaved edits).
+- In edit mode: **Remove** deletes the selected room or label, **+ Label** adds a landmark label beside your room (or right-click ▸ **Add Label Here**), **Reset IDs** renumbers rooms 1..N, **Snap** snaps dragged rooms to Genie 4's 10px grid, **Lock** stops rooms being dragged, and **Dup** allows duplicate rooms while recording.
+
+The **Details** panel slides out from the map's right edge when you hover the **DETAILS** strip (or click it to keep it open); the **📌** pin holds it open until you release it. It shows the current room's server id and notes, an **Edit Room** form for the selected room (title, notes, colour, server id, tags — **Apply**, then **Save** the zone), an **Edit Label** form for a selected label, the zone's room count and last update, and the map's background and text colours.
 
 ## Where maps live
 
@@ -75,7 +117,8 @@ Because Genie 5 uses the **same Genie 4 map format**, maps move between the two 
 ## Getting and updating maps
 
 - **From the community repo** — **Maps ▸ Update from Official Repo…** pulls the latest zone XML and merges it with your local progress (upstream layout changes come down; your stamped room ids survive).
-- **From a Genie 4 install** — import your existing `*.xml` zone files once.
+- **Repairing damaged maps** — **Maps ▸ Repair Maps (full re-download)…** re-downloads every zone, including ones that haven't changed upstream, to undo the damage earlier builds did to exit types, hidden flags and room descriptions. Your own notes, colours and roundtimes are kept.
+- **From a Genie 4 install** — on Windows, the first time Genie 5 starts with an empty Maps folder it copies your Genie 4 zone files across; otherwise copy the `*.xml` files in yourself.
 
 Full details: [Updating Maps & Scripts](Updating-Maps-and-Scripts).
 

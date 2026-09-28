@@ -34,32 +34,34 @@ Genie5/
 │   │   └── …               # Config, Extensions, Plugins, Persistence, and more
 │   ├── Genie.App/          # Avalonia GUI host (Views / ViewModels / Controls)
 │   └── Genie.Plugins.Abstractions/  # Public plugin contract (IGeniePlugin, IPluginHost)
-├── tests/                  # Genie.Core.Tests + Genie.App.Tests (dotnet test)
+├── tools/
+│   └── Genie.TestHarness/  # Dev-only Console harness (live capture, replay, diff modes)
+├── tests/                  # Genie.Core.Tests, Genie.App.Tests, Genie.App.HeadlessTests (dotnet test)
 ├── docs/                   # Developer docs (architecture, protocol, scripting, mapper)
 ├── wiki/                   # This wiki's source (end-user docs)
 └── .github/workflows/      # CI / release pipelines
 ```
 
-CI builds `Genie.slnx` and runs `dotnet test` over both test projects on every platform leg — run the same locally before a PR.
+CI builds `Genie.slnx` and runs `dotnet test` over all three test projects (Genie.Core.Tests, Genie.App.Tests, Genie.App.HeadlessTests) on every platform leg — run the same locally before a PR.
 
 See [Architecture](Architecture) for why `Genie.Core` is kept UI-free.
 
 ## The dev test harness (Console)
 
-`Genie.Core` builds as an executable so a headless **Console** harness can drive the engine without the GUI — invaluable for parser work. Run modes:
+A separate Console project, `tools/Genie.TestHarness`, drives the engine without the GUI — invaluable for parser work. Run modes:
 
 ```bash
 # Live session, capturing raw XML to test_results/
-dotnet run --project src/Genie.Core -- DR <account> <password> <char>
+dotnet run --project tools/Genie.TestHarness -- DR <account> <password> <char>
 
 # Replay a recording through the parser stack (speed: 0=max, 1.0=real-time, 5.0=5x)
-dotnet run --project src/Genie.Core -- REPLAY <file> [speed]
+dotnet run --project tools/Genie.TestHarness -- REPLAY <file> [speed]
 
 # Diff parser output vs a tag-stripped baseline from the same recording
-dotnet run --project src/Genie.Core -- COMPARE <file>
+dotnet run --project tools/Genie.TestHarness -- COMPARE <file>
 
 # List characters on an account without logging in
-dotnet run --project src/Genie.Core -- LIST <account> <password>
+dotnet run --project tools/Genie.TestHarness -- LIST <account> <password>
 ```
 
 Test-harness output lands in `test_results/` (gitignored — your captures stay local).

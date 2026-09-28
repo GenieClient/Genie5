@@ -31,7 +31,7 @@ dotnet run --project src/Genie.App
 ```
 Genie5/
 ├── src/
-│   ├── Genie.Core/         # Core library — no UI deps (builds as exe for the TestHarness)
+│   ├── Genie.Core/         # Core library — no UI deps (a plain class library)
 │   │   │                   # DrXmlParser.cs, GameState.cs, GameConnection.cs,
 │   │   │                   # SgeAuthClient.cs, AiContextBuffer.cs live at the root
 │   │   ├── Scripting/      # .cmd script interpreter + Jint .js runtime
@@ -51,7 +51,8 @@ Genie5/
 │   │   ├── Controls/       # Custom Avalonia controls (MapCanvas, etc.)
 │   │   └── Diagnostics/    # Session recorder
 │   └── Genie.Plugins.Abstractions/  # Public plugin contract (IGeniePlugin, IPluginHost)
-├── tests/Genie.Core.Tests/ # Unit test suite
+├── tools/Genie.TestHarness/  # Dev-only Console harness (see below)
+├── tests/                  # Genie.Core.Tests, Genie.App.Tests, Genie.App.HeadlessTests
 ├── docs/                   # Long-form docs (ROADMAP, POLICY, etc.)
 ├── wiki/                   # End-user documentation
 └── .github/workflows/      # CI / release pipelines
@@ -59,23 +60,23 @@ Genie5/
 
 ### Running the Console
 
-The `Genie.Core` Console (the dev-only CLI harness) exposes several useful dev modes — see `src/Genie.Core/TestHarness.cs` for the full list, but quick highlights:
+The Console (the dev-only CLI harness in `tools/Genie.TestHarness`) exposes several useful dev modes — see `tools/Genie.TestHarness/TestHarness.cs` for the full list, but quick highlights:
 
 ```sh
 # Live session, capture raw XML to test_results/raw_session_*.xml
-dotnet run --project src/Genie.Core -- DR <account> <password> <char>
+dotnet run --project tools/Genie.TestHarness -- DR <account> <password> <char>
 
 # Replay a recording through the parser stack
-dotnet run --project src/Genie.Core -- REPLAY <file>
+dotnet run --project tools/Genie.TestHarness -- REPLAY <file>
 
 # Compare parser output vs tag-stripped baseline
-dotnet run --project src/Genie.Core -- COMPARE <file>
+dotnet run --project tools/Genie.TestHarness -- COMPARE <file>
 
 # Cross-FE A/B compare (FE:GENIE vs FE:STORM XML)
-dotnet run --project src/Genie.Core -- FE_DIFF <file-a> <file-b>
+dotnet run --project tools/Genie.TestHarness -- FE_DIFF <file-a> <file-b>
 
 # Verb catalog scan over recordings
-dotnet run --project src/Genie.Core -- VERBS
+dotnet run --project tools/Genie.TestHarness -- VERBS
 ```
 
 Console output lands in `test_results/`. That directory is gitignored — your captures stay local.
@@ -104,7 +105,7 @@ The wire-level protocol is documented in [docs/SGE_PROTOCOL.md](docs/SGE_PROTOCO
 ### 4. DragonRealms policy
 DR's [Scripting Policy](https://elanthipedia.play.net/Policy:Scripting_policy) is about staying **responsive to the game** — it does not require window focus, and it's the *player's* responsibility, not something the client enforces. Genie's job is to be a good frontend. That said, the client itself stays clear of unattended automation. The following are **hard nevers** — PRs that introduce them will be closed:
 
-- ❌ Auto-reconnect (silently resuming a session after a drop)
+- ❌ Unattended reconnect — reconnecting a session the player wasn't driving, or auto-resuming scripts or walks across a reconnect (attended, bounded auto-reconnect is allowed; see [docs/POLICY.md](docs/POLICY.md) §1)
 - ❌ Agentive AI mode (AI driving `Commands.ProcessInput` directly)
 - ❌ Headless mode / running without a visible UI
 - ❌ Shipping other players' speech (whisper / talk / thoughts / familiar / tells) to external AI services without per-player consent
@@ -118,7 +119,7 @@ Note: anything that constrains how a player runs the client (e.g. the optional a
 3. **Write a focused PR** — one feature, one fix. Multi-feature PRs are hard to review.
 4. **Include a test plan** in the PR description — what you did, what you verified, what regressions are possible.
 5. **Update docs** if you change user-visible behaviour. README, CONTRIBUTING, and any relevant file under `docs/` should reflect the new state.
-6. **Run the build and tests** before pushing — `dotnet build -c Release` must succeed cleanly (warnings are fine; errors aren't), and `dotnet test tests/Genie.Core.Tests` must pass for the subsystems you touched.
+6. **Run the build and tests** before pushing — `dotnet build -c Release` must succeed cleanly (warnings are fine; errors aren't), and `dotnet test` over `tests/Genie.Core.Tests`, `tests/Genie.App.Tests`, and `tests/Genie.App.HeadlessTests` must pass for the subsystems you touched (CI runs all three).
 
 PRs that touch parser / scripting / mapper subsystems may want a smoke-test against one or more real recordings; the test harness REPLAY mode is the easiest path.
 
@@ -163,8 +164,11 @@ All scripts live in a single shared folder at the data root:
 `{AppData}/Genie5/Scripts/`. On Windows that's `%APPDATA%\Genie5\Scripts\`;
 on macOS it's `~/Library/Application Support/Genie5/Scripts/`; on Linux
 it's `~/.local/share/Genie5/Scripts/`. Drop `.cmd` files there, no
-restart needed. (Scripts are deliberately *not* per-character — what's
-per-character is rule files and saved variables, under
+restart needed. If you set `#config reposcriptdir {folder}`, script updates
+pull into that folder instead, and a script name is looked up in your Scripts
+folder first, then the repo-scripts folder — so a local copy always wins.
+(Scripts are deliberately *not* per-character — what's per-character is
+rule files and saved variables, under
 `Profiles/{Character}-{Account}/`.)
 
 ### Hello world
@@ -204,6 +208,9 @@ put north
 match RoundtimeEnd You take time to focus your mind.
 matchwait
 
+RoundtimeEnd:
+  echo Matched — the script jumps to this label
+
 # Or block on a substring:
 waitfor You can move again
 
@@ -213,7 +220,7 @@ pause 2.5
 # Conditionals on live game state:
 if $health < 50 then put cast 1101
 if $stunned = 1 then echo I'm stunned, doing nothing
-if def(myAlias) then echo Have a named alias
+if def(weapon) then echo The weapon variable is set
 
 # Loops via labels + goto:
 LOOP:
@@ -247,7 +254,7 @@ Every game-state field is exposed as a `$variable`. Common ones:
 | `$kneeling`, `$prone`, `$sitting`, `$stunned`, `$webbed`, etc. | Status booleans |
 | `$charactername` | Your character's first name |
 
-Type `#vars` at the command bar to see the full list at any time.
+Type `#var` at the command bar to see the full list at any time.
 
 ### What's different from Genie 4
 

@@ -6,6 +6,16 @@ Genie 5 is in **beta**, but you no longer have to build it yourself — **pre-bu
 
 > ⚠️ **Signing status — Windows is signed; macOS & Linux aren't yet.** **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner — a GlobalSign Extended Validation certificate, signed through [SignPath.io](https://signpath.io/) with maintainer approval on every release. **macOS and Linux** builds are unsigned for now and trip a first-launch warning (Gatekeeper) — see [Platform first-launch notes](#platform-first-launch-notes). Windows builds published *before* EV signing went live are also unsigned, and because SmartScreen reputation accrues per file over time, freshly-signed builds may still show a reduced warning until downloads add up.
 
+## Supported platforms
+
+These are the floors .NET 10 imposes, not aspirations — below them the runtime itself will not start.
+
+| Platform | Minimum | Notes |
+| --- | --- | --- |
+| **Windows** | Windows 10 version 1809 (or an LTSC of that vintage) and Windows 11, x64 | Consumer Windows 10 is past its own end of life. Genie still runs there; treat it as best-effort. |
+| **macOS** | macOS 14, Apple Silicon or Intel | The Intel build keeps shipping for older Macs even though many of them cannot reach macOS 14 — that build is best-effort on anything older. |
+| **Linux** | x64, glibc 2.27+ (Ubuntu 18.04-era or newer) | The AppImage additionally needs FUSE (`libfuse2`). |
+
 ## Download a pre-built build (recommended)
 
 From the [latest release](https://github.com/GenieClient/Genie5/releases/latest), pick the download for your platform:
@@ -42,7 +52,7 @@ Releases **after v5.0.0-beta.7** bundle their own ICU, so no globalization packa
 
 ### 🍎 macOS
 
-Pick by your Mac's chip — **Apple Silicon** (M1/M2/M3 or newer) or **Intel** (pre-2020):
+Pick by your Mac's chip — **Apple Silicon** (M1/M2/M3 or newer) or **Intel** (most Macs from before late 2020). Both need **macOS 14** or newer — see [Supported platforms](#supported-platforms).
 
 | Your Mac | Download | When to pick it |
 | --- | --- | --- |
@@ -65,9 +75,10 @@ Windows release binaries are now EV-signed by **Shadow Realms LLC** (see above);
 
 ### macOS — Gatekeeper
 
-An unsigned build trips Gatekeeper ("developer cannot be verified" or "damaged"). Two ways past it:
+An unsigned build trips Gatekeeper ("developer cannot be verified" or "damaged"). Ways past it:
 
-- **Right-click the app → Open → Open** (instead of double-clicking). macOS remembers the choice and stops asking.
+- **macOS 15 and newer:** try to open the app once (it will be blocked), then open **System Settings ▸ Privacy & Security**, scroll to the note about Genie5, and click **Open Anyway**. macOS remembers the choice.
+- **macOS 14:** **right-click the app → Open → Open** (instead of double-clicking). macOS remembers the choice and stops asking.
 - Or clear the download quarantine in Terminal (substitute the real path):
   ```bash
   xattr -d com.apple.quarantine /Applications/Genie5.app
@@ -89,7 +100,7 @@ Then head to [Quick Start](Quick-Start) to connect and play.
 
 ## Staying up to date
 
-Every official download — **Setup.exe** and the **Portable `.zip`** alike on Windows, the **`.pkg`** on macOS, the **AppImage** on Linux — is updater-aware: future releases arrive through the in-app updater via **Help → Check for Updates**, which shows a badge when something's available. Full details: [Keeping Up to Date](Updates).
+Every official download — **Setup.exe** and the **Portable `.zip`** alike on Windows, the **`.pkg`**, **`.dmg`**, and **Portable `.zip`** on macOS, the **AppImage** on Linux — is updater-aware: future releases arrive through the in-app updater via **Help → Check for Updates**, which shows a badge when something's available. Full details: [Keeping Up to Date](Updates).
 
 ## Build from source
 

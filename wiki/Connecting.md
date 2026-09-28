@@ -4,15 +4,15 @@ Genie 5 reaches DragonRealms three ways. The first two are chosen from **File �
 
 | Mode | Use it when |
 | --- | --- |
-| **Simutronics SGE login** | You want Genie to log you in with your DragonRealms account — the normal case. |
-| **Lich proxy** | You run [Lich 5](https://github.com/elanthia-online/lich-5) and want Genie connected behind it. See [Lich 5 Integration](Lich-5-Integration). |
+| **Direct (SGE login)** | You want Genie to log you in with your DragonRealms account — the normal case. |
+| **Lich proxy (local)** | You run [Lich 5](https://github.com/elanthia-online/lich-5) and want Genie connected behind it. See [Lich 5 Integration](Lich-5-Integration). |
 | **Dev replay** | You're replaying a recorded session through the engine (development/testing — Console only, see below). |
 
 ## The Connect dialog
 
 1. **File → Connect…**
-2. Enter your **account name** and **password**.
-3. Choose the **game** (DragonRealms — Prime, Platinum, Fallen, or the Test instance, depending on your account).
+2. Leave **Mode** on **Direct (SGE login)** and enter your **account name** and **password**.
+3. Choose the **instance** (DragonRealms — Prime, Platinum, Fallen, or the Test instance, depending on your account).
 4. Click **Fetch** to pull your **character list** from Simutronics' login service.
 5. Select a **character** and click **Connect**.
 
@@ -23,7 +23,7 @@ Genie authenticates, receives the game host/port for your character, connects, a
 Genie performs the Simutronics **SGE** handshake itself: it exchanges an encryption key, sends your encrypted password, retrieves your characters, and selects the game server. Your password is sent **only** to Simutronics' official authentication servers (`play.net`), encrypted in transit by the SGE scheme.
 
 - **Attended-only auto-reconnect.** If an established session drops unexpectedly, Genie reconnects automatically **only if you were actually driving it** (at least one command sent since connecting). An idle session never resurrects itself, a manual disconnect or `quit` never triggers it, attempts are bounded (5 tries, then it stops and tells you), and reconnecting restores only the socket — it never launches anything on its own, and an interrupted walk stays canceled (a fresh click is required). Disable entirely with `#config reconnect off`. (See [Policy Compliance](Policy-Compliance).)
-- **Typed connects.** `#connect <profile>` logs in from the command bar, `#reconnect` redials the last session, and `#lichconnect` (alias `#lc`) attaches through Lich — see [Lich 5 Integration](Lich-5-Integration).
+- **Typed connects.** `#connect <profile>` logs in from the command bar (or `#connect <account> <password> <character> <game>` without a saved profile), `#reconnect` redials the last session, and `#lichconnect` (aliases `#lc` / `#lconnect`) attaches through Lich — see [Lich 5 Integration](Lich-5-Integration).
 - **No headless login.** Connecting always happens in the visible app.
 
 The wire-level details are documented for developers in [SGE_PROTOCOL.md](https://github.com/GenieClient/Genie5/blob/main/docs/SGE_PROTOCOL.md).
@@ -31,7 +31,9 @@ The wire-level details are documented for developers in [SGE_PROTOCOL.md](https:
 ### Secure (TLS) login — the padlock
 
 Genie logs in over an **encrypted TLS connection** by default (the same secure
-login Lich 5 uses). You can tell which transport a session used at a glance:
+login Lich 5 uses). The **Secure connection (TLS)** checkbox in the Connect
+dialog is on by default; untick it only if you deliberately want the legacy
+plaintext login. You can tell which transport a session used at a glance:
 
 ![Title bar showing the 🔒 padlock next to the connected Character-Account name](images/connect-padlock.png)
 
@@ -43,11 +45,15 @@ login Lich 5 uses). You can tell which transport a session used at a glance:
 The fallback is automatic — if the secure endpoint is blocked (by a firewall or
 network filter) Genie won't fail the login, it just drops to the older path and
 shows the 🔓 so you know. Seeing 🔓 every time usually means something on your
-network is blocking the secure port; the connection trace below can confirm it.
+network is blocking the secure port (or that the **Secure connection (TLS)** box
+is unticked); the connection trace below can confirm it. On Linux and macOS,
+builds before beta.8 always showed 🔓 because of a TLS cipher-suite gap — update
+if you are still on one. Lich-proxy sessions show no padlock, since Lich does the
+login.
 
 ## Profiles
 
-A **profile** is a saved connection so you don't retype next time. Save one from the Connect dialog; it stores the account, game, character, and (optionally) the password.
+A **profile** is a saved connection so you don't retype next time. Save one from the Connect dialog; it stores the account, game, character, and (optionally) the password. Two optional per-profile fields sit above the login details: **Data folder** keeps that character's Config, Scripts, Maps, Plugins and Logs in a folder you choose (blank = the default location), and **Layout** applies a saved layout automatically whenever that character connects.
 
 - **Passwords are encrypted.** If you save a password, it's stored with **AES-256-GCM** using a machine-bound key — never plain text. That protects against casual reading of the file, but it isn't a substitute for OS account security: anyone who can run programs as you on your machine could recover it. If you'd rather not store it, save the profile without a password and type it at connect time.
 - **Per-character settings.** Each character gets its own profile directory (`Profiles/<Character>-<Account>/`) holding the rules that belong to that character alone — they **layer over** your shared `Config/` rules, which keep applying underneath. Combat triggers saved to one character don't follow you onto a shopping alt, while shared rules work everywhere. See [Application Folders](Application-Folders) for the layout.
@@ -55,11 +61,11 @@ A **profile** is a saved connection so you don't retype next time. Save one from
 
 ## Lich proxy mode
 
-If you run Lich 5, start Lich first so it authenticates and listens locally, then in Genie's Connect dialog choose **Lich Proxy** and point it at `127.0.0.1:8000` (Lich's default). Genie sees a clean game stream and your Ruby scripts keep running underneath. Full details: [Lich 5 Integration](Lich-5-Integration).
+If you run Lich 5, start Lich first so it authenticates and listens locally, then in Genie's Connect dialog set **Mode** to **Lich proxy (local)** and point it at `127.0.0.1:8000` (Lich's default). Genie sees a clean game stream and your Ruby scripts keep running underneath. Full details: [Lich 5 Integration](Lich-5-Integration).
 
 ## Dev replay mode
 
-Replay mode feeds a previously **recorded** raw-XML session back through the engine — handy for trying things without a live login, and the backbone of parser testing. It's a **developer mode run from the Console** (`dotnet run --project src/Genie.Core -- REPLAY <file>`), not an option in the App's Connect dialog. Recording and replay terminology (App vs. Console, what "replay" means) is covered in [Building from Source](Building-from-Source). Replay **only reads** a recording; it never sends anything to a live server.
+Replay mode feeds a previously **recorded** raw-XML session back through the engine — handy for trying things without a live login, and the backbone of parser testing. It's a **developer mode run from the Console** (`dotnet run --project tools/Genie.TestHarness -- REPLAY <file>`), not an option in the App's Connect dialog. Recording and replay terminology (App vs. Console, what "replay" means) is covered in [Building from Source](Building-from-Source). Replay **only reads** a recording; it never sends anything to a live server.
 
 ## Recording a session
 

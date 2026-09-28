@@ -31,7 +31,7 @@ Every official download is updater-aware — including the portable forms. The W
 
 ![The Maps, Plugins, and Scripts tabs — subscription rows for the official maps repo, an installed plugin, and a community script repository](images/updates-dialog-tabs.png)
 
-The Maps tab (equivalently **Maps ▸ Update from Official Repo…**) pulls the latest zone XML from the community repository and **merges** it with your local data — upstream layout fixes come down while your stamped room ids survive. This has its own page: [Updating Maps & Scripts](Updating-Maps-and-Scripts).
+The Maps tab (equivalently **Maps ▸ Update from Official Repo…**) pulls the latest zone XML from the community repository and **merges** it with your local data — upstream layout fixes come down while your stamped room ids survive. A normal update only rewrites zones whose upstream copy changed; to restore zones damaged by builds before beta.9.5 (`go` / `climb` exits showing as `none`, thinned descriptions), run **Maps ▸ Repair Maps (full re-download)…** once — it re-downloads every zone and keeps your own edits. This has its own page: [Updating Maps & Scripts](Updating-Maps-and-Scripts).
 
 ## Plugins
 
@@ -39,11 +39,11 @@ The Plugins tab checks each installed plugin against its configured release feed
 
 ## Scripts
 
-The Scripts tab lets you subscribe to GitHub script repositories and pull new and changed `.cmd` / `.js` files into your Scripts folder — like a `git pull`, subfolders included. Files that exist only locally are never touched, so your own scripts are safe. The community [DR-Genie-Scripts](https://github.com/Tirost/DR-Genie-Scripts) repository ships as a ready-to-enable row; add more repositories (or a fork) as rows of your own. See [Updating Maps & Scripts](Updating-Maps-and-Scripts) for details.
+The Scripts tab lets you subscribe to GitHub script repositories and pull new and changed `.cmd` / `.js` files into your Scripts folder — like a `git pull`, subfolders included. Files that exist only locally are never touched. **There is no merge, though:** a local edit to a file that also exists in the repo **is overwritten** on Update. To protect your edits, set a separate **Repo scripts directory** (**Configuration ▸ Scripts**) — updates then land there, and your own copy in the script directory always wins. The community [DR-Genie-Scripts](https://github.com/Tirost/DR-Genie-Scripts) repository ships as a ready-to-enable row; add more repositories (or a fork) as rows of your own. See [Updating Maps & Scripts](Updating-Maps-and-Scripts) for details.
 
 ## Update Settings — what runs by itself
 
-**Help → Update Settings…** controls the silent check that runs at startup: choose which kinds it covers (**Core / Maps / Plugins / Scripts**) and, per kind, whether Genie may install what it finds by itself or just tell you.
+The **Help → Update Settings** submenu controls the silent check that runs at startup: **Check on Startup** chooses which kinds it covers (**Genie (Core App) / Maps / Plugins / Scripts**), and **Auto-Apply** chooses, per kind, whether Genie may install what it finds by itself or just tell you.
 
 - Auto-applied **client** updates install when you **close** Genie — never a mid-session restart.
 - A quiet notice above the status bar reports **"Updates available"** / **"Auto-updated"**; click it to open the Updates dialog.

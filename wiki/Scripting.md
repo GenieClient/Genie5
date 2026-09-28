@@ -8,6 +8,8 @@ Genie 5 runs Genie 4 `.cmd` scripts. The engine is a **faithful port** of Genie 
 
 Drop `.cmd` files into your **Scripts** folder — one shared `Scripts/` folder at the data root, used by every character. See [Application Folders](Application-Folders) for the exact path on your OS. No restart needed — Genie picks up new files immediately.
 
+If you set `#config reposcriptdir` (where **Update Scripts** pulls community script repos), Genie looks in your own Scripts folder first and the repo folder second — so a script you've edited locally always wins over the updater's copy.
+
 ## Hello world
 
 Create `Scripts/hello.cmd`:
@@ -30,11 +32,14 @@ Output: `Hello, world!` — `%1` was filled in by the argument you passed.
 # A comment is any script line whose first non-whitespace character is #.
 # That includes lines like "#echo foo" — meta-commands never run as bare
 # script lines; a script runs one by sending it, e.g.:  put #echo done
+# There are no end-of-line comments: "pause 1 # wait" hands "1 # wait"
+# to pause, so keep every comment on its own line.
 
 # Variables:
 #   $name  reads a global / live game-state value
 #   %1, %2 are the arguments passed to the script (%0 is all of them)
 #   var foo bar     sets a local variable (name, then value — no equals sign); read it back as %foo
+#   %foo = bar      is the same assignment, Genie 4's bare form (the "=" is optional)
 
 # Send a command to the game:
 put look
@@ -46,9 +51,9 @@ matchwait
 # Or block until a substring appears:
 waitfor You can move again
 
-# Pause for seconds:
+# Pause for seconds (waitpause is an alias of pause — a plain N-second timer):
 pause 2.5
-waitpause 0.5        # alias of pause — a plain N-second timer
+waitpause 0.5
 
 # Conditionals on live game state:
 if $health < 50 then put chant heal
@@ -79,19 +84,25 @@ Every live game-state field is exposed as a `$variable`, so scripts can read you
 | `$preparedspell` | Prepared spell (or empty). |
 | `$stance` | `offensive` / `advance` / `forward` / `neutral` / `guarded` / `defensive` (full lowercase words). |
 | `$kneeling`, `$prone`, `$sitting`, `$stunned`, `$hidden`, `$webbed`, … | Status booleans. |
-| `$roundtime` | Seconds of roundtime remaining. |
+| `$roundtime` | Seconds of roundtime remaining — recomputed every time it's read, so it counts down. |
 
 Type `#var` at the command bar to see the full live list. The complete table is on [Scripting Reference](Scripting-Reference#engine-set-globals).
 
 ## Running and stopping scripts
 
-```
-.myscript arg1 arg2   # run Scripts/myscript.cmd with %1=arg1 %2=arg2
-#scripts              # list running scripts
-#stop myscript        # stop one script
-#stopall              # stop everything
-#edit myscript        # open it in the script editor (creates it if new — see below)
-```
+| Type at the command bar | Does |
+| --- | --- |
+| `.myscript arg1 arg2` | Run `Scripts/myscript.cmd` with `%1`=arg1, `%2`=arg2. |
+| `#scripts` | List running scripts. |
+| `#stop myscript` | Stop one script (`#kill` is a synonym; a bare `#stop` stops the most recently started one). |
+| `#stopall` | Stop everything (`#killall` is a synonym). |
+| `#pauseall` / `#resumeall` | Pause every running script / resume them all. |
+| `#scriptcheck myscript` | Check a script for problems without running it — see below. |
+| `#edit myscript` | Open it in the script editor (creates it if new — see below). |
+
+### Checking a script before you run it
+
+`#scriptcheck <name>` (synonym `#checkscript`) parses a script exactly as starting it would and lists every problem with its file and line number, without running anything: a `goto`/`gosub` or `match` to a label that doesn't exist, `if` without `then`, unbalanced parentheses or `{ }` blocks, an `action` with no `when`, a missing include, and duplicate labels. Jumps whose target is a variable (`goto %next`) are only known at run time and are skipped. It's a quick way to vet an old Genie 4 script before taking it into the game.
 
 ### Creating a new script
 

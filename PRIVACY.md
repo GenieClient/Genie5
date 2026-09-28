@@ -1,6 +1,6 @@
 # Genie 5 — Privacy Policy
 
-_Last updated: 2026-08-03_
+_Last updated: 2026-09-28_
 
 Genie 5 is an open-source desktop game client for [DragonRealms](https://www.play.net/dr).
 This policy describes what data the software handles and where it goes.
@@ -21,20 +21,28 @@ Genie 5 makes network connections **only** to:
   `*.simutronics.net`) — for account authentication and live gameplay. This is the
   same destination the official client uses.
 - **A local [Lich 5](https://github.com/elanthia-online/lich-5) proxy** (`127.0.0.1`)
-  — only if you explicitly select Lich Proxy connection mode.
+  — only if you explicitly select the **Lich proxy (local)** connection mode.
 - **GitHub** (`api.github.com`, `raw.githubusercontent.com`,
-  `github.com/GenieClient/*` release assets) — for the built-in updater: checking
-  for new app releases and downloading map / plugin / script updates, and for
-  fetching TTS voice packs you choose to install. These are **retrieval-only**
+  `github.com/GenieClient/*` release assets, and `github.com/k2-fsa/sherpa-onnx`
+  release assets for voices) — for the built-in updater: checking for new app
+  releases and downloading map / plugin / script updates, and for fetching
+  text-to-speech voice packs you choose to install. These are **retrieval-only**
   requests: nothing about you, your account, or your session is sent beyond the
   standard HTTP request itself. Startup update checks can be turned off in
   **Help ▸ Update Settings**. (The "report a parser gap" helper also opens a
   pre-filled GitHub issue page in your browser — visible to you before anything
   is posted.)
+- **Community data sources** (`drservice.info`, `elanthipedia.play.net`) — only
+  when you use Inventory View's player-shop search or item-info lookups. These are
+  **retrieval-only**: the shop search downloads DR Service's public listing export
+  and searches it on your machine, item lookups send only the item name, and both
+  are cached locally. SimuCoins balance checks and reward claims go to
+  Simutronics' own store (`store.play.net`) with your profile's credentials, only
+  when you ask for them.
 - **An AI vendor API** — only if you explicitly opt in to AI advisor features (a
-  roadmap item, off by default). When enabled, the outgoing context is filtered to
-  remove other players' speech (whisper / talk / thoughts / familiar / tells) before
-  any request is made.
+  roadmap item, not enabled in any current build). Before it can ship, the outgoing
+  context must be filtered to remove other players' speech (whisper / talk /
+  thoughts / familiar / tells) before any request is made.
 
 Genie 5 does not "phone home" to maintainer-operated servers (none exist) and does
 not send usage analytics anywhere.

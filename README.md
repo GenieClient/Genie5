@@ -31,15 +31,17 @@ The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern
 
 | Layer | State |
 |---|---|
-| SGE authentication (StormFront + Wizard modes; optional TLS login) | ✅ Working |
+| SGE authentication (StormFront mode, TLS login by default; Wizard plain-text mode via the Console harness) | ✅ Working |
 | DragonRealms XML parser (`<component>`, `<d>`, `<a href>`, `<container>`, `<roundTime>`, etc.) | ✅ Working |
 | Live game session — connect (Direct SGE / Lich proxy picker), play, type commands | ✅ Working |
-| Genie 4 `.cmd` script engine (labels, `MATCH`, `GOSUB`, `$variables`, `WAITFOR`, etc.) | ✅ Working |
+| Genie 4 `.cmd` script engine (labels, `MATCH`, `GOSUB`, `$variables`, `WAITFOR`, embedded `<% %>` JavaScript blocks, etc.) + `#scriptcheck <name>` to find problems without running a script | ✅ Working |
+| Game pipeline on its own thread — a busy or stuck script can't freeze the window (`#config gamethread`) | ✅ Working |
 | Rules engines (`#alias`, `#trigger`, `#highlight`, `#substitute`, `#gag`, `#macro`, `#class`, `#var`) + per-engine master toggles (File menu / `#config`) | ✅ Working — JSON persistence with Genie 4 `.cfg` twins; hand-edits to rule files hot-reload live |
-| Per-character profile storage with AES-GCM password encryption | ✅ Working |
-| Dockable UI panels (vitals, icon bar, room, mobs/players, inventory, Inventory View, mapper, experience, analytics, active spells, injuries, stream tabs incl. OOC) — named save/load layouts + MDI windowed mode | ✅ Working |
+| Per-character profile storage with AES-GCM password encryption; per-character rules layer over the shared set (each rule editor has a Scope field) | ✅ Working |
+| Dockable UI panels (vitals, icon bar, room, mobs/players, objects, inventory, Inventory View, mapper, experience, analytics, active spells, injuries, time tracker, portrait, raw XML, stream tabs incl. OOC) — named save/load layouts, built-in Strongbox / Shadowveil / Heirloom layouts, Genie 4 `.layout` import, MDI windowed mode | ✅ Working |
+| Server dialog windows — DragonRealms' structured dialogs open as dockable panels, placed by the game's hint or your choice (**Configuration ▸ Layout ▸ Server Dialogs**, **Window ▸ Server Dialogs**, `#config serverdialogs`, `#dialogs`) | ✅ Working |
 | Named script windows (`#window`, `#link`, `#log`, `#clear`, directed `#echo >window`) — Genie 4 menu scripts (`mm_train` et al.) run as-is | ✅ Working |
-| Mapper — click-to-walk, `#goto`/`#go2`, room/zone tags + `#goto @tag`, `$roomid`/`$zoneid`/`$zonename` script vars, zone fingerprinting, Less Obvious Paths, weighted cross-zone travel | ✅ Working |
+| Mapper — click-to-walk, `#goto`/`#go2`, room/zone tags + `#goto @tag`, `$roomid`/`$zoneid`/`$zonename` script vars, zone fingerprinting, Less Obvious Paths, weighted cross-zone travel, map spoiler settings (`#config showmapspoilers` / `avoidmapspoilers`), **Maps ▸ Repair Maps (full re-download)…** | ✅ Working |
 | Session Recorder for raw-XML capture | ✅ Working |
 | Lich 5 proxy mode (`ConnectionMode.LichProxy`) | ✅ Working |
 | Dev-replay mode (replay recorded sessions through the engine) | ✅ Working (via Console) |
@@ -50,7 +52,8 @@ The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern
 | `#connect` / `#reconnect` / `#lichconnect` — typed/scripted login (Genie 4 parity; saved-profile, explicit, and reconnect forms; password-masked) | ✅ Working |
 | Analyst Capture — redacted, recipe-driven session capture for parser/analysis (other-player speech stripped by default) | ✅ Working |
 | Report parser gap — when the game sends an element Genie doesn't recognize, a one-click prompt opens a **pre-filled, pre-redacted** GitHub issue in your browser (nothing sent until you submit) | ✅ Working |
-| Performance overlay — live per-stage pipeline timing + running-`.js` list, behind the Performance menu | ✅ Working |
+| Performance overlay — live per-stage pipeline timing + running-`.js` list, under **Help ▸ Performance** | ✅ Working |
+| SimuCoins — check your balance and claim the monthly reward in-client (`/sc`) | ✅ Working |
 | Game prompt in the window — `prompt` string + `promptbreak` (own-line) / `promptforce` (reconstructed status letters) | ✅ Working |
 | Portrait panel — DR room/scene artwork (`#config showimages`), fetched from the play.net art CDN | ✅ Working |
 | Preset colouring — room descriptions / whispers / speech render in their palette colours (Configuration → Presets), plus MonsterBold creature highlighting | ✅ Working |
@@ -58,7 +61,7 @@ The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern
 | Text-to-speech — `#speak` / `#tts`, per-stream auto-read with priorities, downloadable voices, TTS Configuration tab | ✅ Working |
 | Alterations designer — plan and track item alteration designs (the ported Alteration Buddy), top-level Alterations menu, CSV import/export | ✅ Working |
 | Themes — seven built-ins (Dark, Light, Genie 4 Classic, High Contrast, Solarized Dark/Light, Wrayth-style) + a theme editor; custom themes as shareable JSON | ✅ Working |
-| `#config` settings system (`settings.cfg`, 80+ settings across a dozen categories + Scripts tab); reserved/live `$variables` exposed and listed by `#var` | ✅ Working |
+| `#config` settings system (`settings.cfg`, 100+ settings across 13 categories + Scripts tab); reserved/live `$variables` exposed and listed by `#var` | ✅ Working |
 | Visual trigger / flow designer | 🚧 Roadmap |
 | AI-assisted automation (advisor-only mode) | 🚧 Roadmap |
 
@@ -84,8 +87,8 @@ Grab the [latest release](https://github.com/GenieClient/Genie5/releases/latest)
 | Platform | Installer | Portable |
 |---|---|---|
 | **Windows** | `01-Windows-Genie5-Setup.exe` | `01-Windows-Genie5-Portable.zip` |
-| **macOS (Apple Silicon)** | `02-macOS-Apple-Silicon-Genie5.dmg` (or `.pkg`) | `02-macOS-Apple-Silicon-Genie5-Portable.zip` |
-| **macOS (Intel)** | `03-macOS-Intel-Genie5.dmg` (or `.pkg`) | `03-macOS-Intel-Genie5-Portable.zip` |
+| **macOS (Apple Silicon)** | `02-macOS-Apple-Silicon-Genie5-Setup.pkg` (or `02-macOS-Apple-Silicon-Genie5.dmg`) | `02-macOS-Apple-Silicon-Genie5-Portable.zip` |
+| **macOS (Intel)** | `03-macOS-Intel-Genie5-Setup.pkg` (or `03-macOS-Intel-Genie5.dmg`) | `03-macOS-Intel-Genie5-Portable.zip` |
 | **Linux (x64)** | `04-Linux-Genie5.AppImage` | — |
 
 All of these register for **in-app updates** — including the Windows **Portable** `.zip`, which is a Velopack bundle just like Setup.exe. Windows release binaries are EV code-signed (see [Code signing policy](#code-signing-policy)); macOS and Linux builds are unsigned for now, so those platforms show a first-launch warning — the [Installation guide](https://github.com/GenieClient/Genie5/wiki/Installation) has the per-platform "unknown publisher" / Gatekeeper steps.
@@ -116,7 +119,7 @@ On first launch Genie 5 asks where to keep your data — **Portable** (next to t
 
 ### Running your first script
 
-Genie 4 `.cmd` scripts go in `{AppData}/Genie5/Scripts/`. From the game window:
+Genie 4 `.cmd` scripts go in your `Scripts/` folder — next to the app if you chose **Portable** at first launch (the default), otherwise in your user folder (`{AppData}/Genie5/Scripts/`). **File ▸ Open Directory ▸ Scripts** jumps straight to it. From the game window:
 
 ```
 .myscript           # runs Scripts/myscript.cmd
@@ -131,7 +134,7 @@ The script engine is a faithful port of Genie 4's Wizard-derived dialect — lab
 
 Genie 5 plays nicely with [Lich 5](https://github.com/elanthia-online/lich-5). Two integration paths:
 
-- **Lich proxy mode** — Lich runs as your auth front-end and forwards a clean DR stream to Genie on `127.0.0.1:8000`. Pick `Lich Proxy` in the Connect dialog. Your Lich Ruby scripts continue to work; Genie sees them as ordinary game output.
+- **Lich proxy mode** — Lich runs as your auth front-end and forwards a clean DR stream to Genie on `127.0.0.1:8000`. Pick **Lich proxy (local)** in the Connect dialog. Your Lich Ruby scripts continue to work; Genie sees them as ordinary game output.
 - **Direct SGE + Lich passive** — Genie handles auth itself (no Lich required), and you can run any Lich-managed automation in parallel using Lich's own command channel.
 
 ## DragonRealms policy compliance
@@ -141,7 +144,7 @@ Genie 5 aims to be a good DragonRealms frontend. DR's [Scripting Policy](https:/
 - **Auto-reconnect is attendance-gated.** After a drop, Genie retries the connection a bounded number of times — but only if you were actively playing (it's skipped, with a message, when no commands were sent that session), and reconnecting restores only the socket: it never launches anything on its own. `#config reconnect off` disables it entirely.
 - **No agentive AI mode.** AI features (when they ship) are **advisor-only** — they surface suggestions in a panel you read, never drive game commands directly.
 - **No headless mode.** Genie is a UI client, not a background service.
-- **No shipping other players' speech to external services.** The AI context buffer filters out whisper / talk / thoughts / familiar / tells before any external API call.
+- **No shipping other players' speech to external services.** No game text goes to any AI service today — the AI pipeline is off in release builds. Before it ships, other players' speech (whisper / talk / thoughts / familiar) will be stripped before anything leaves your machine.
 
 There's also an **optional** idle backstop for click-to-walk / `#goto` travel that can pause a walk after the window has been unfocused for a while. It's **off by default** and fully configurable — purely for users who want it.
 
@@ -200,7 +203,7 @@ For a solo-maintainer beta-stage project, all three roles consolidate on the mai
 
 ## Privacy policy
 
-This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Genie 5 connects only to: Simutronics' official DragonRealms authentication and game servers (`play.net` / `simutronics.net`); a local [Lich 5](https://github.com/elanthia-online/lich-5) proxy when the user configures it; and GitHub (`api.github.com` / `raw.githubusercontent.com`) for update checks and map/plugin/script downloads — retrieval only, nothing about you or your session is sent, and update checks can be disabled in **Help ▸ Update Settings**. Account credentials are stored locally, encrypted with AES-256-GCM, and are transmitted only to the official authentication servers. No data is collected by the Genie 5 maintainers. Full details: [PRIVACY.md](PRIVACY.md).
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Genie 5 connects only to: Simutronics' official DragonRealms authentication and game servers (`play.net` / `simutronics.net`); a local [Lich 5](https://github.com/elanthia-online/lich-5) proxy when the user configures it; and GitHub (`github.com` / `api.github.com` / `raw.githubusercontent.com`) for update checks, map/plugin/script downloads, and text-to-speech voice downloads — retrieval only, nothing about you or your session is sent, and update checks can be disabled in **Help ▸ Update Settings**. Account credentials are stored locally, encrypted with AES-256-GCM, and are transmitted only to the official authentication servers. No data is collected by the Genie 5 maintainers. Full details: [PRIVACY.md](PRIVACY.md).
 
 ## Credits
 

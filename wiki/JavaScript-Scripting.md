@@ -15,8 +15,10 @@ Drop a `.js` file in your [scripts folder](Application-Folders) and run it by na
 
 ```
 .myscript
-.myscript Kragh 3        # %0 = "Kragh 3", args are genie.getVar("1") = "Kragh", "2" = "3"
+.myscript Kragh 3
 ```
+
+With arguments, `genie.getVar("0")` is `"Kragh 3"`, `genie.getVar("1")` is `"Kragh"` and `genie.getVar("2")` is `"3"`; `genie.getVar("scriptname")` is the script's name.
 
 The script gets a `genie` object (aliased `game`) with the API below. Each `.js` runs on its own thread, so blocking calls really block — write straight-line procedural code.
 
@@ -25,13 +27,19 @@ The script gets a `genie` object (aliased `game`) with the API below. Each `.js`
 ```javascript
 genie.put("stance defensive");   // send a command to the game
 genie.send("forage for herbs");  // send() is an alias for put()
+genie.put("#var lasthunt $roomid");  // a # command runs in Genie, like a .cmd `put #…`
 ```
+
+`genie.put` routes exactly like a `.cmd` `put`: a `#…` line runs as a Genie command (`#var`, `#goto`, `#class`, …), `.name args` starts another script, and a `/…` line is offered to Genie's built-in /commands and then to plugins (one nobody claims stays local instead of reaching the game). Everything else goes to the game.
+
+**Game commands are sent immediately.** Unlike a `.cmd` `put`, `genie.put` is not held for roundtime or the type-ahead limit, so wait out roundtime yourself before a game command — see [Pausing & roundtime](#pausing--roundtime).
 
 ### Output
 
 ```javascript
 genie.echo("ready to hunt");                    // a line to the main window
 genie.echoTo("Spotter", "target sighted", "red"); // to a named window, in colour
+genie.log("checkpoint reached");                // same as genie.echo
 ```
 
 ### Waiting on game text
@@ -46,7 +54,19 @@ if (m.length > 1) genie.echo("Silver: " + m[1]);
 var hit = genie.matchWait(["You hit", "You miss", "is parried"]); // first of several
 genie.echo("result: " + hit);
 
+var how = genie.matchWaitRe(["^You (hit|miss)", "is parried"]); // regex form of matchWait
+genie.echo("pattern: " + how);
+
 genie.waitForPrompt();   // block until the next game prompt
+```
+
+All four text waits (`waitFor`, `waitForRe`, `matchWait`, `matchWaitRe`) match case-insensitively — unlike `.cmd` matching, which is case-sensitive. `matchWait` / `matchWaitRe` return the *pattern* that matched, not the line — for capture groups, use `waitForRe`.
+
+Every wait takes an optional timeout in seconds as its last argument (omitted or `0` = wait forever). On a timeout, `waitFor`, `matchWait` and `matchWaitRe` return `""`, `waitForRe` returns an empty array, and `waitForPrompt` returns `false`:
+
+```javascript
+if (genie.waitFor("You stride through", 10) === "")
+    genie.echo("no gate after 10s");
 ```
 
 ### Pausing & roundtime
@@ -59,7 +79,7 @@ while (genie.roundtime() > 0)         // seconds of roundtime left
 
 ### Variables (standalone)
 
-In a standalone `.js`, `getVar`/`setVar` are the **script's own** locals/arguments; `get`/`set` read and write **`$globals`** — the place to share data with `.cmd` scripts and live game state.
+In a standalone `.js`, `getVar`/`setVar` are the **script's own** locals/arguments; `get`/`set` read and write the **session `$globals`** (live game state and `#tvar` values) — the place to share data with `.cmd` scripts. A value saved only with `#var` isn't visible to `genie.get`; set it with `#tvar`, or read it from a `.cmd` or a library's `getGlobal`.
 
 ```javascript
 var who = genie.getVar("1");     // first argument (%1)
@@ -80,7 +100,7 @@ if (genie.get("health") < 20) genie.stop();   // end this script
 
 ### Safety guards
 
-Standalone `.js` scripts may run for hours, so there's **no wall-clock limit** — but a memory cap (128 MB) and a runaway-loop guard (a tight loop with *no* `genie.*` call is aborted) keep a buggy script from pegging a core or exhausting memory. If you hit the runaway guard, add a `genie.pause` / `genie.waitFor` inside the loop.
+Standalone `.js` scripts may run for hours, so there's **no wall-clock limit** and no lifetime memory cap. Instead a runaway guard aborts a script that runs about 200 million statements, or allocates 128 MB, **without a single `genie.*` call** — every `genie.*` call resets both budgets, so a normal script that puts, waits and pauses never trips them. If you hit the guard, add a `genie.pause` / `genie.waitFor` inside the loop.
 
 ---
 
@@ -91,15 +111,19 @@ Keep reusable functions in a `.js`, pull them into a `.cmd`, and call them. The 
 ### `include` a library
 
 ```
-# in your .cmd
-include arrays.js          # loads the function definitions for this script run
+# in your .cmd — loads the function definitions for this script run
+include arrays.js
 ```
+
+Keep comments on their own lines: `.cmd` has no end-of-line comments, so anything after the file name becomes part of the name.
 
 ### `js` and `jscall`
 
 ```
-js doSort("loot", 0)                 # run a function, ignore the result
-jscall count routeLength("route")    # run a function, store its return in %count
+# run a function, ignore the result
+js pushStep("route", "go gate")
+# run a function, store its return in %count
+jscall count routeLength("route")
 echo There are %count steps.
 ```
 
@@ -114,9 +138,9 @@ Inside an included library, use the **bare** functions — they map to the calli
 | Function | Reads / writes |
 |---|---|
 | `getVar(name)` / `setVar(name, value)` | the `.cmd`'s **`%`variables** |
-| `getGlobal(name)` / `setGlobal(name, value)` | **`$`globals** (shared, live game-state) |
+| `getGlobal(name)` / `setGlobal(name, value)` (also `get` / `set`) | **`$`globals** (shared, live game-state); `getGlobal` also falls back to your saved `#var` values |
 | `echo(text)` | a line to the game window |
-| `put(cmd)` / `send(cmd)` | send a command to the game |
+| `put(cmd)` / `send(cmd)` | same routing as `genie.put` above — `#…` commands, `.script` launches, `/…` commands, else the game (not held for roundtime) |
 
 ```javascript
 // arrays.js — a tiny library
@@ -135,8 +159,10 @@ include arrays.js
 var route n|n|e
 js pushStep("route", "go gate")
 jscall len routeLength("route")
-echo route=%route  len=%len           # route=n|n|e|go gate  len=4
+echo route=%route  len=%len
 ```
+
+It prints `route=n|n|e|go gate  len=4`.
 
 ### Division of labour (recommended pattern)
 
@@ -163,16 +189,34 @@ walk:
   jscall dir nextStep("route", "i")
   if "%dir" = "" then goto done
   put %dir
-  pause 1                # or: waitfor the room prompt; honours roundtime
+  # or: waitfor the room prompt; either way the .cmd honours roundtime
+  pause 1
   goto walk
 done:
   echo Arrived.
 ```
 
+### Inline JavaScript blocks
+
+Genie 4's embedded `<% … %>` blocks work too: JavaScript written straight into the `.cmd`, sharing the same per-script context as `include` / `js` / `jscall`. A block opens on a line that **starts** with `<%` and closes on the first line that **ends** with `%>`; a one-line `<% … %>` is fine. The block's statements run when the script reaches them, and a variable it sets is readable on the very next line:
+
+```
+var loot gem|coin|scroll
+<%
+  var items = getVar("loot").split("|");
+  items.sort();
+  setVar("sorted", items.join("|"));
+  setVar("first", items[0]);
+%>
+echo sorted=%sorted first=%first
+```
+
+It prints `sorted=coin|gem|scroll first=coin`. Inside a block, `getVar` on a variable that was never set returns the string `"undefined"` (Genie 4's behaviour, which block code tests against); in `js` / `jscall` it returns `""`.
+
 ### Limits
 
-- A library's JavaScript context lives **within one running `.cmd`** — `include`/`js`/`jscall` share state only inside that script, not across separate command-bar lines.
-- `js` / `jscall` run **synchronously and time-bounded** on the script thread (they're for quick logic, not hunt loops). Blocking waits (`waitFor`) belong in a **standalone `.js`**, not a `js`/`jscall` call.
+- A library's JavaScript context lives **within one running `.cmd`** — `include`/`js`/`jscall`/`<% %>` share state only inside that script, not across separate command-bar lines.
+- `js` / `jscall` run **synchronously and time-bounded** on the script thread (250 ms per call, 1 second for an `include` — they're for quick logic, not hunt loops). An inline `<% %>` block has no time limit, but a runaway loop inside it is still aborted. Blocking waits (`waitFor`) belong in a **standalone `.js`**, not a `js`/`jscall` call.
 - No host / filesystem access by default.
 
 ---
@@ -181,7 +225,7 @@ done:
 
 Genie 4 ran a much older Jint (0.8.8); Genie 5 runs a current, spec-compliant Jint. Two idioms differ — both are easy:
 
-1. **`array.length()` → `array.length`.** In modern JavaScript `length` is a *property*, not a method. **Genie 5 auto-converts `.length()` to `.length` when you `include` a library**, so existing Genie 4 array libraries load and run unchanged. For *new* code, write `array.length` (no parentheses).
+1. **`array.length()` → `array.length`.** In modern JavaScript `length` is a *property*, not a method. **Genie 5 auto-converts `.length()` to `.length` when you `include` a library** (and in `js` / `jscall` expressions and `<% %>` blocks), so existing Genie 4 array libraries load and run unchanged. For *new* code, write `array.length` (no parentheses).
 
 2. **`localeCompare(...) == 1` / `== -1` → `> 0` / `< 0`** (optional). The spec only guarantees the *sign* of the result; comparing by sign is robust on any engine. (Genie 5's engine does return ±1, so existing comparisons still work — this is just future-proofing.)
 

@@ -115,7 +115,7 @@ capture groups).
 ```
 
 The empty `{}` slots are the arguments you're skipping (action/class/sound for
-triggers; background, match type, class, and sound for highlights). Spoken
+triggers; background, class, and sound for highlights). Spoken
 alerts jump the queue and interrupt ordinary read-aloud chatter, and they save
 and load with the rest of your triggers and highlights.
 

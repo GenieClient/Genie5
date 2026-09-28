@@ -8,7 +8,7 @@ Common problems and quick fixes. If none of these help, drop into [Discord](http
 Pre-built builds ship for all three platforms — see the [Installation](Installation#download-a-pre-built-build-recommended) tables. Short version: Windows → `01-Windows-Genie5-Setup.exe`; Linux → `04-Linux-Genie5.AppImage`; macOS → `02-macOS-Apple-Silicon-Genie5-Setup.pkg` (Apple Silicon, M1+) or `03-macOS-Intel-Genie5-Setup.pkg` (Intel, pre-2020). Check  → **About This Mac** if you're unsure which Mac you have.
 
 **macOS won't open the app ("developer cannot be verified" / "damaged").**
-Beta builds aren't notarized. Right-click the app → **Open** → **Open** (macOS remembers it). If it reports "damaged," clear the download quarantine: `xattr -d com.apple.quarantine /Applications/Genie5.app` (or `xattr -cr <path>`). Running from source with `dotnet run` avoids this entirely.
+Beta builds aren't notarized. On **macOS 15 and newer**, try to open the app once, then click **Open Anyway** in **System Settings ▸ Privacy & Security**. On **macOS 14**, right-click the app → **Open** → **Open**. Either way macOS remembers it. If it reports "damaged," clear the download quarantine: `xattr -d com.apple.quarantine /Applications/Genie5.app` (or `xattr -cr <path>`). Running from source with `dotnet run` avoids this entirely.
 
 **Windows SmartScreen blocks the exe.**
 Builds from before v5.0.0-alpha.10 are unsigned and always trigger the blue panel: **More info → Run anyway**. Since alpha.10, `Genie5.exe` is EV-signed by Shadow Realms LLC (the project's support partner); a brand-new signed build may still show the panel briefly while SmartScreen reputation accrues per file. See [Installation](Installation).
@@ -42,14 +42,14 @@ A firewall/proxy is blocking `play.net`, or the game is down for maintenance. Ge
 🔒 means your login was encrypted (TLS); 🔓 means Genie couldn't reach the secure login port and fell back to the legacy plaintext path — it still connects, but the password is only obfuscated, not encrypted. If it happens every time, something on your network (firewall/filter) is blocking the secure port. Confirm with `#config conndebug true` and reconnect — the trace shows the TLS attempt and why it fell back. See [Connecting](Connecting#secure-tls-login--the-padlock).
 
 **Connecting through Lich.**
-Start Lich first so it's listening (default `127.0.0.1:8000`), then choose **Lich Proxy** in the Connect dialog. See [Lich 5 Integration](Lich-5-Integration).
+Start Lich first so it's listening (default `127.0.0.1:8000`), then choose **Lich proxy (local)** in the Connect dialog. See [Lich 5 Integration](Lich-5-Integration).
 
 More on connection messages: [Connecting & Profiles](Connecting#connection-troubleshooting).
 
 ## Files & profiles
 
 **Where are my scripts/maps/settings?**
-In your per-user Genie 5 folder — `%APPDATA%\Genie5` (Windows), `~/Library/Application Support/Genie5` (macOS), `~/.local/share/Genie5` (Linux). Full map: [Application Folders](Application-Folders).
+Next to the app if you chose **Portable** at first launch (the default), otherwise in your per-user Genie 5 folder — `%APPDATA%\Genie5` (Windows), `~/Library/Application Support/Genie5` (macOS), `~/.local/share/Genie5` (Linux). **File → Open Directory** jumps straight to either. Full map: [Application Folders](Application-Folders).
 
 **I saved a profile but it didn't keep my password.**
 Saving the password is optional. If you saved without it, you'll be prompted at connect. When saved, it's encrypted with AES-256-GCM — never plain text.
@@ -67,10 +67,13 @@ Script-compat regressions are treated as bugs — please [file an issue](https:/
 
 **`#scripts`, `#stop`, `#stopall`** list and stop running scripts; the Script Bar shows them with controls.
 
+**A script won't start, or stops with an error.**
+`#scriptcheck <name>` parses the script exactly as a start would and reports every problem with its file and line — without running it.
+
 ## Mapper
 
 **The map doesn't match where I am.**
-Turn on the AutoMapper (learning) toggle and walk through the area so rooms get stamped, or pull a fresh copy of the zone via **Maps ▸ Update from Official Repo…**. Dense cities with duplicate room titles can briefly fail to lock on — Genie declines rather than guessing wrong. See [The Mapper](Mapper).
+Turn on the AutoMapper (learning) toggle and walk through the area so rooms get stamped, or pull a fresh copy of the zone via **Maps ▸ Update from Official Repo…**. If exits show as `none` or room descriptions look thin — damage builds before beta.9.5 did to downloaded maps — run **Maps ▸ Repair Maps (full re-download)…** once; a normal update skips zones whose upstream copy hasn't changed, so it won't fix them. Your own edits are kept. Dense cities with duplicate room titles can briefly fail to lock on — Genie declines rather than guessing wrong. See [The Mapper](Mapper).
 
 **Click-to-walk stopped partway.**
 Expected if you typed a command, pressed Esc, or you got knocked off the route — the walker cancels rather than firing the wrong command. Click again to restart. (Separately, the **opt-in, off-by-default** idle backstop can *pause* a walk after the window has been unfocused a while — that one shows a **Resume** button rather than canceling.) See [Policy Compliance](Policy-Compliance).
@@ -102,7 +105,7 @@ Details: [Application Folders](Application-Folders#resetting-to-defaults).
 1. **File → Record Session** (toggle on — title bar shows 🔴 REC).
 2. Reproduce the problem.
 3. Disconnect (recording auto-stops); find the file in your `Logs/` folder.
-4. [Open an issue](https://github.com/GenieClient/Genie5/issues/new) describing what you did, what you expected, and what happened — attach the relevant snippet. Include your OS and `dotnet --version`.
+4. [Open an issue](https://github.com/GenieClient/Genie5/issues/new) describing what you did, what you expected, and what happened — attach the relevant snippet. Include your OS and your Genie version (**Help → About Genie 5…**).
 
 Recordings stay on your machine until you choose to share a snippet.
 

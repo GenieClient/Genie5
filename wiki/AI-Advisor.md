@@ -31,7 +31,7 @@ raw game stream
 Before any external send is enabled by default, the design requires all of these:
 
 - **Default OFF, opt-in.** A checkbox in Settings, behind a plain-language privacy disclosure.
-- **Other players' words are stripped first.** Before anything is sent to an external service, the context buffer removes other players' utterances — whispers, speech, thoughts, familiar/group chatter, and tells. Those are content other players never consented to have forwarded.
+- **Other players' words are stripped first.** Before anything is sent to an external service, the context buffer must remove other players' utterances — whispers, speech, thoughts, familiar/group chatter, and tells. Those are content other players never consented to have forwarded. This filter is not built yet, which is one reason the feature stays off.
 - **In-character mode stays off** entirely until there's an explicit read of the relevant terms around player-generated content.
 
 Your local **session recordings** (from **File → Record Session**) are a separate thing: they're written only to your machine and never leave it.

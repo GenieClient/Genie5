@@ -9,7 +9,7 @@ Your first five minutes with Genie 5 — from launching the client to playing Dr
 If you installed a pre-built build, launch it the normal way for your OS:
 
 - **Windows** — from the Start menu (Setup install) or run `Genie5.exe` from the portable folder.
-- **macOS** — open **Genie5** from Applications (first time: **right-click → Open** to clear Gatekeeper).
+- **macOS** — open **Genie5** from Applications. The first time, Gatekeeper blocks it: on macOS 14, **right-click → Open**; on macOS 15 and newer, try to open it once, then click **Open Anyway** in **System Settings ▸ Privacy & Security** ([details](Installation#macos--gatekeeper)).
 - **Linux** — `./04-Linux-Genie5.AppImage` (make it executable first with `chmod +x`).
 
 Building from source instead? Run `dotnet run --project src/Genie.App` from the repo root.

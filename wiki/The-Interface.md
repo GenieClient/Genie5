@@ -28,7 +28,7 @@ Out of the box you get a three-column arrangement:
 | **Inventory** | What you're carrying. |
 | **Vitals** | Health / mana / spirit / fatigue / concentration bars as a dockable panel (the same numbers as the bottom vitals strip). |
 | **Inventory View** | A searchable catalog of everything your characters own — person, vault, deed register, home, and Trader storage — with item weight/size columns and a player-shop price search. See [the Inventory View window](#the-inventory-view-window) below. |
-| **Mapper** | The zone map with your current room highlighted; click a room to walk there. Starts **floating** in its own window; dock it by dragging. A top-level **Maps** menu collects the mapper actions — show/float the Mapper, AutoMapper settings, map updates, and the cross-zone connection editor. See [The Mapper](Mapper). |
+| **Mapper** | The zone map with your current room highlighted; right-click a room ▸ **Go Here** (or Ctrl+click it) to walk there. Starts **floating** in its own window; dock it by dragging. A top-level **Maps** menu collects the mapper actions — show/float the Mapper, AutoMapper settings, map updates, and the cross-zone connection editor. See [The Mapper](Mapper). |
 | **Experience** | Live skill learning states. A **Density** slider on the panel condenses each skill line to taste (**Full → No count → Numbers only → Short names → Brief**); the same setting is scriptable as `#config experiencedensity`. A **Sort** dropdown picks the classic EXPTracker orders — A to Z, Left to Right (Armor / Weapons / Magic / Survival / Lore, reorderable via `#config experiencesortorder`), or by learning rate in either direction (`#config experiencesort`). **Echo** flushes each pulse to the game window as `Learned: Skill(+2)` / `Pulsed: Skill(-1)` lines (`#config experienceecho` — display-only; to also feed those lines to your triggers/actions, opt in with `#config experienceechoparse`), and **Rested** shows stored / usable / cycle-refresh rested EXP under the summary (`#config experiencerested` — the `$RestedEXP.*` globals populate either way). |
 | **Active Spells** | Your running spell effects with time remaining. |
 | **Time Tracker** | Elanthian date, moon/sun rise-set countdowns, and the observed sky, tracked by the built-in Time Tracker (`/tt help`). |
@@ -50,7 +50,7 @@ Toggle panels from the **Window** menu (two exceptions: the Mapper toggle lives 
 
 *The Active Spells panel — each effect with its time remaining.*
 
-Every stream window also has an **"Also show this stream in the Main window"** toggle (Configuration → **Layout** tab, per window) that additionally echoes its lines into the main game window, Genie 4-style. The Layout tab is also where each window's font is set. Highlight rules can likewise be **scoped to specific windows** — see [Configuration & Rules](Configuration#highlights--coloring-text).
+Every stream window also has an **"Also show this stream in the Main window"** toggle (Configuration → **Layout** → **Windows**, per window — or right-click the window ▸ **Show in Main Window**) that additionally echoes its lines into the main game window, Genie 4-style. The Layout → Windows tab is also where each window's font is set. Highlight rules can likewise be **scoped to specific windows** — see [Configuration & Rules](Configuration#highlights--coloring-text).
 
 Scripts can create their **own named windows** too — the Genie 4 menu-script commands (`#window`, `#link`, `#echo >window`) build clickable menu panels that dock like any other. See the [Scripting Reference](Scripting-Reference#named-windows-links-and-logging).
 
@@ -177,7 +177,7 @@ The **Window → Game Window** submenu lets you independently show or hide three
 - **Echo** — Genie's own confirmations.
 - **Script lines** — output from running scripts.
 
-Turn off script lines, for example, to keep a busy hunt script from cluttering the main window (its output still appears in the Scripts panel).
+Turn off script lines, for example, to keep a busy hunt script from cluttering the main window (its output still appears in the **Script Manager**).
 
 ## Layouts
 
@@ -191,7 +191,7 @@ Rearrange the panels however you like, then keep the arrangement — the **Layou
 - **Layout → Align Input to Game Window** makes the command bar track the Game window's width instead of spanning the full frame.
 - **Layout → Magic Panels** hides the mana bar, cast bar, and spell labels — tidy on a non-caster.
 - **Layout → Icon Bar** shows or hides the status-chip strip.
-- The Layout menu also holds the rest of the window chrome: **Hands Strip** / **Enhanced Hands Strip** / **Hands Strip Position**, **Roundtime Position**, **Status Bar**, **Zone / Room ID** (with **Zone as Number**), **Guild in Title Bar**, **Disconnect Popup**, and **Reset Layout** (restores all windows to visible).
+- The Layout menu also holds the rest of the window chrome: **Hands Strip** / **Enhanced Hands Strip** / **Hands Strip Position**, **Roundtime Position**, **Status Bar**, **Zone / Room ID** (with **Zone as Number**), **Guild in Title Bar**, **Disconnect Popup**, and **Reset Layout** (currently the same as Reset to Default Layout).
 - The **Connect dialog** has a per-profile **startup layout** picker, so a character can load its saved layout automatically on connect.
 - Floating the Mapper, hiding panels you don't use, and moving the hands strip are all remembered.
 - **A saved layout carries every bar**, as Genie 4's did: the hands strip, the Icon Bar, the Health bar and the Script Bar (each one's position and whether it shows) and **Magic Panels**. Loading a layout, or connecting with a character's startup layout, puts them all back. A layout saved before beta.9.6 leaves your current bars alone.
@@ -206,8 +206,8 @@ Genie ships **seven built-in themes** under **Edit → Theme** — **Dark** (the
 
 A few more odds and ends:
 
-- **File → Open Log In Editor** opens the current (or most recent) Auto Log text file in your editor — Genie 4 parity, new in beta.4.
-- An opt-in **AvaloniaEdit-based game window renderer** is available behind `#config useeditorgamewindow on` (default off), also new in beta.4.
+- **File → Open Log In Editor** opens the current (or most recent) Auto Log text file in your editor — Genie 4 parity.
+- An opt-in **AvaloniaEdit-based game window renderer** is available behind `#config useeditorgamewindow on` (default off).
 - **Help → Performance → Show Performance Overlay** shows live per-stage pipeline timing (parse, scripts, triggers, highlights, substitutes, gags, plugins).
 
 ## Related

@@ -1,6 +1,6 @@
 # Credits
 
-Genie 5 is built by the Genie 5 Team and contributors. This file tracks
+Genie 5 is built by the Genie community and open-source contributors. This file tracks
 non-code contributions (artwork, sounds, original designs) that ship as
 part of the project's redistributable assets.
 

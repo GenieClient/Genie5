@@ -1,6 +1,6 @@
 # Application Folders
 
-Genie 5 keeps all of your personal data — scripts, maps, logs, settings, per-character profiles — in a single per-user folder. Knowing where it lives is useful for backing up before an upgrade, editing scripts in your own editor, pointing the import dialog at a Genie 4 install, and syncing across machines.
+Genie 5 keeps all of your personal data — scripts, maps, logs, settings, per-character profiles — in a single data folder: next to the app in **Portable** mode (the default first-launch choice), or in your per-user folder. Knowing where it lives is useful for backing up before an upgrade, editing scripts in your own editor, pointing the import dialog at a Genie 4 install, and syncing across machines.
 
 ## Where Genie 5 lives
 
@@ -39,6 +39,10 @@ Genie 5 resolves its data root **portable-first**: a `Config` folder (or a `geni
 
 On a brand-new install — when Genie finds **no** data beside the app **and none** in the per-user folder — it asks where to set up: **Portable (this folder)** or your **User folder**. The default action is Portable. Whatever you pick is created on the spot, so the prompt only appears once; later launches just find the existing data and skip straight to it.
 
+### Per-profile data folder
+
+A connection profile can also point at its own data folder: the **Data folder** field in the Connect dialog (**File → Connect…**) keeps that character's Config, Scripts, Maps, Plugins, and Logs somewhere else — a synced drive or a USB stick, say. Leave it blank to use the location above.
+
 ## What's inside
 
 ```
@@ -47,21 +51,22 @@ Genie5/
 ├── Profiles/    ← per-character config: Profiles/<Char>-<Account>/*.cfg
 ├── Scripts/     ← your .cmd files
 ├── Maps/        ← zone files (Map##_*.xml) + ZoneConnections.xml
-├── Logs/        ← AutoLog output, one file per character per session
+├── Logs/        ← AutoLog output, one file per character per day
 ├── Sounds/      ← sound files for #play / triggers
 ├── Voices/      ← TTS voice models
 ├── Layouts/     ← saved window layouts
 ├── Plugins/     ← plugin DLLs — see the Plugins page
-└── Art/         ← image assets
+├── Art/         ← image assets
+└── Analytics/   ← per-character analytics history
 ```
 
 | Folder | What's in it | When to touch |
 | --- | --- | --- |
-| `Config/` | `settings.cfg` (app settings) and the shared rule files: a `.json` file per rule type (`aliases.json`, `triggers.json`, `highlights.json`, `substitutes.json`, `gags.json`, `shunts.json`, `macros.json`, `variables.json`, `classes.json`) plus a Genie 4-style `.cfg` twin of each (a plain-text list of the commands that recreate the rules), kept in sync. | Mostly managed via **Edit → Configuration…**. Hand-editable — external edits to the eight rule `.json` files (every one except `macros.json`) apply **live, without a reconnect** (you'll see a `[config] … reloaded` line); other files load on next launch/connect. |
+| `Config/` | `settings.cfg` (app settings), `profiles.json` (saved connection profiles — passwords encrypted with AES-256-GCM), and the shared rule files: a `.json` file per rule type (`aliases.json`, `triggers.json`, `highlights.json`, `substitutes.json`, `gags.json`, `shunts.json`, `macros.json`, `variables.json`, `classes.json`) plus a Genie 4-style `.cfg` twin of each (a plain-text list of the commands that recreate the rules), kept in sync. | Mostly managed via **Edit → Configuration…**. Hand-editable — external edits to the seven rule `.json` files apply **live, without a reconnect** (you'll see a `[config] … reloaded` line); other files load on next launch/connect. |
 | `Profiles/` | One subfolder per character (`<Char>-<Account>/`) holding the rules that belong to **that character only**. They **layer over** the shared `Config/` set — the character's rules apply first, and shared rules show through unless the character has overridden them. | Created automatically. Edit the per-character files here (rule `.json` edits hot-reload too), or via the GUI while that character is connected. |
 | `Scripts/` | Your `.cmd` script files, plus any helper scripts you pull from the community repo. | Drop any script here to run it as `.scriptname` (or `put .scriptname`). |
-| `Maps/` | Zone files in Genie 4's XML format (`Map1_Crossing.xml`, …) and `ZoneConnections.xml` (the cross-zone transit graph). | Populated via **File → Import from Genie 4…** or **Maps ▸ Update from Official Repo…**. Jump there via **Maps ▸ Open Maps Folder**. |
-| `Logs/` | When AutoLog is on, each session writes a `<character>_<timestamp>` log of plain in/out text. Toggle it live with the **File → Auto Log** checkbox — it applies mid-session. Per-stream window logs (`#windowlog`, see [Configuration](Configuration#window-logs--a-file-per-stream)) also write here, in whatever sub-folders their file templates name. | Read-only from the app's view. Safe to delete or archive. |
+| `Maps/` | Zone files in Genie 4's XML format (`Map1_Crossing.xml`, …) and `ZoneConnections.xml` (the cross-zone transit graph). | Populated via **Maps ▸ Update from Official Repo…** (or copy your Genie 4 `Map*.xml` files in). **Maps ▸ Repair Maps (full re-download)…** restores damaged zones. Jump there via **Maps ▸ Open Maps Folder**. |
+| `Logs/` | When AutoLog is on, sessions append plain in/out text to a `<Character><Game>_<yyyy-MM-dd>.log` file (for example `RenucciDR_2026-09-27.log`) — one file per character per day, so same-day sessions share it. Toggle it live with the **File → Auto Log** checkbox — it applies mid-session. Per-stream window logs (`#windowlog`, see [Configuration](Configuration#window-logs--a-file-per-stream)) also write here, in whatever sub-folders their file templates name. | Read-only from the app's view. Safe to delete or archive. |
 
 > **Jumping to any of these:** **File → Open Directory** opens the folder of your choice — Data root, Config (profile-aware), Logs, Maps, Scripts, or Plugins — in your system file manager.
 

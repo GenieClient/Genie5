@@ -4,21 +4,21 @@
 
 > Genie 5 and Lich 5 are both **GPL-3.0**, deliberately aligning Genie with the broader DragonRealms tooling ecosystem.
 
-## Two ways to combine them
+## Connection modes with Lich
 
 ### 1. Lich proxy mode
 
 Lich authenticates and connects to DragonRealms, then exposes a local game stream that Genie connects to.
 
 1. **Start Lich 5** the way you normally do, so it logs in and listens locally (its default is `127.0.0.1:8000`).
-2. In Genie, **File → Connect…** and choose **Lich Proxy**.
-3. Point it at Lich's host/port (`127.0.0.1:8000` by default) and connect.
+2. In Genie, **File → Connect…** and set **Mode** to **Lich proxy (local)**.
+3. Point it at Lich's host/port (`127.0.0.1:8000` by default), pick the **Instance** Lich is logged into, and connect. The instance is what scripts read as `$game`; once connected, the server's own identity tag corrects `$game` automatically if the pick was wrong.
 
 Genie receives a clean DragonRealms stream and renders it normally. Your **Lich Ruby scripts keep running** underneath — Genie simply sees their output as ordinary game text. You get Lich's automation plus Genie's UI, mapper, highlights, and `.cmd` scripts at the same time.
 
-### 2. Direct login with Lich alongside
+### 2. Direct login (no Lich in the stream)
 
-Genie can handle authentication itself (no Lich required) while you still run Lich-managed automation in parallel through Lich's own command channel. Use this when you want Genie to own the connection but still lean on specific Lich scripts.
+If Genie logs in itself with **Direct (SGE login)**, Lich isn't part of that session's stream, so Lich scripts can't act on it. To run Lich scripts and Genie together, use proxy mode above.
 
 ## Three script ecosystems, side by side
 
@@ -34,7 +34,7 @@ You can mix them: a Lich script can be doing one thing while a Genie `.cmd` scri
 
 ## Notes & current limits
 
-- **Lich launch: manual by default, auto-launch opt-in.** Out of the box, start Lich first, then connect Genie to it. If you'd rather Genie start Lich for you, turn on auto-launch: set `#config lichpath {path-to-lich.rbw}` and `#config lichautolaunch on`, and Genie will launch Lich before a Lich-proxy connect (it's idempotent — if Lich is already up, Genie just connects). Genie 4's `#lc` / `#lconnect` shortcuts work too, and `#ls` dumps the current Lich settings.
+- **Lich launch: manual by default, auto-launch opt-in.** Out of the box, start Lich first, then connect Genie to it. If you'd rather Genie start Lich for you, turn on auto-launch: set `#config lichpath {path-to-lich.rbw}` and `#config lichautolaunch on`, and Genie will launch Lich before a Lich-proxy connect (it's idempotent — if Lich is already up, Genie just connects). Genie 4's `#lc` / `#lconnect` shortcuts work too, and `#ls` dumps the current Lich settings. If `ruby` isn't on your PATH, point Genie at it with `#config lichruby {path-to-ruby}`; `#config lichstartpause N` sets how many seconds (default 8, 1–120) Genie waits for Lich's port to open before giving up.
 - **Dynamic `lichargs`.** Auto-launch expands `{character}` and `{port}` in `#config lichargs` from the Lich-proxy profile's Character field and proxy port at connect time. Nested braces are fine (Genie’s `{…}` config grouping allows them):
 
   ```text

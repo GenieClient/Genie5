@@ -72,8 +72,9 @@ finally remembering where you left every panel.
 - **Repair Maps** — a full re-download that undoes the damage earlier builds
   did through the lossy map round-trip. An ordinary Update Maps skips any
   zone whose upstream copy is unchanged, so it could never revisit a damaged
-  file that was already current. **Mapper ▸ Repair Maps** re-fetches every
-  zone and keeps your own edits — exits, notes, colours, server ids (#352).
+  file that was already current. **Maps ▸ Repair Maps (full re-download)…**
+  re-fetches every zone and keeps your own edits — exits, notes, colours,
+  server ids (#352).
 
 - **Genie 4 saved `.layout` files import** — the importer handled the rule
   files and settings but walked past Config/Layout, so a long-time user's
@@ -540,7 +541,7 @@ longer lock you out.
   to fix it (#329).
 - **Window banners can be hidden** — the accent bar above a dock group,
   showing the active panel's name, repeats what the tab strip right below it
-  already says. **View ▸ Window Banners** collapses it and gives the height
+  already says. **Layout ▸ Window Banners** collapses it and gives the height
   to your text. It applies to all docked groups rather than one panel at a
   time, because the banner belongs to the group, not the window — the stream
   dock alone sits ten panels behind one bar, and a per-panel setting would
