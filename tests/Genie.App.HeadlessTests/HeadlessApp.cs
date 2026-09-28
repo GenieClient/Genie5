@@ -49,6 +49,13 @@ public class HeadlessApp : Application
         {
             Source = new Uri("avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml")
         });
+        // AvaloniaEdit's control theme, as App.axaml loads it. Without it the
+        // editor renderer's TextEditor never templates, so it has no SearchPanel
+        // and the editor-window Find path can't be exercised at all.
+        Styles.Add(new StyleInclude(new Uri("avares://Genie.App"))
+        {
+            Source = new Uri("avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml")
+        });
         // The app's own dock-chrome rules. Without these the headless tree renders
         // with stock Dock styling only, so anything App.axaml styles into place
         // (#302 / #320's banner marker) would silently not apply here and a test
