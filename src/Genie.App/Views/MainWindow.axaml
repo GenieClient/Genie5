@@ -146,7 +146,7 @@
         <Separator/>
         <MenuItem Header="_Reset to Default Layout"
                   Command="{Binding ResetLayoutCommand}"
-                  ToolTip.Tip="Restore the factory-default 3-column arrangement (Room+Streams / Game+Mapper / Inventory)."/>
+                  ToolTip.Tip="Restore the factory-default 3-column arrangement (Room+Streams / Game / Inventory, with the Mapper floating)."/>
 
         <Separator/>
         <!-- ════════════════════════════════════════════════════════════════
@@ -317,11 +317,11 @@
 
         <Separator/>
 
-        <!-- Layout reset (moved from the Window menu; dedupe with
-             "Reset to Default Layout" above in the cleanup pass). -->
+        <!-- Layout reset (moved from the Window menu). Runs the same full reset
+             as "Reset to Default Layout" above; dedupe in a cleanup pass. -->
         <MenuItem Header="Reset _Layout"
                   Command="{Binding ResetLayoutCommand}"
-                  ToolTip.Tip="Restore all windows to visible (does not move them back to default positions)"/>
+                  ToolTip.Tip="Same as Reset to Default Layout: every window goes back to its default position, with the Mapper floating."/>
 
       </MenuItem>
       <MenuItem Header="_Window" SubmenuOpened="OnWindowMenuOpened">
