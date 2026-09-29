@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.ReactiveUI;
@@ -55,6 +56,48 @@ internal static class Program
     private static string CrashLogPath { get; } = ComputeCrashLogPath();
 
     private static string ComputeCrashLogPath()
+    {
+        try
+        {
+            // Follow the same portable-first data root AppPaths.Discover uses,
+            // so a portable copy logs beside itself instead of into the user's
+            // installed Genie's %APPDATA% Config. Any failure here (including
+            // Genie.Core failing to load) drops to the plain user-folder path.
+            return ComputeCrashLogPath(AppContext.BaseDirectory, ResolveUserDataDirectory());
+        }
+        catch
+        {
+            return ComputeLegacyCrashLogPath();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static string ResolveUserDataDirectory()
+        => Genie.Core.Runtime.AppPaths.GetUserDataDirectory("Genie5");
+
+    /// <summary>
+    /// Crash-log location for an exe in <paramref name="exeDirectory"/>: the
+    /// portable root's <c>Config</c> when that root already holds Genie data
+    /// (a portable marker or a <c>Config</c> folder) and is writable — the
+    /// same test <c>AppPaths.Discover</c> applies first — else the per-user
+    /// <paramref name="userDataDirectory"/>. Deliberately does NOT take
+    /// Discover's fresh-install "local if writable" branch: creating a local
+    /// <c>Config</c> here would pre-empt the first-run location prompt.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    internal static string ComputeCrashLogPath(string exeDirectory, string userDataDirectory)
+    {
+        var localDir = Genie.Core.Runtime.AppPaths.ResolvePortableRoot(exeDirectory);
+        var root = Genie.Core.Runtime.AppPaths.HasData(localDir)
+                   && Genie.Core.Runtime.AppPaths.IsDirectoryWritable(localDir)
+            ? localDir
+            : userDataDirectory;
+
+        Directory.CreateDirectory(Path.Combine(root, "Config"));
+        return Path.Combine(root, "Config", "genie_crash.log");
+    }
+
+    private static string ComputeLegacyCrashLogPath()
     {
         // Resolve a writable user-data dir without depending on any of our
         // own classes (those might be the thing that's failing).
