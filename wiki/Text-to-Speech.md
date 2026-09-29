@@ -121,7 +121,7 @@ and load with the rest of your triggers and highlights.
 
 ## Settings
 
-These persist with your profile (see [Configuration & Rules](Configuration)):
+These are saved in `settings.cfg` with your other `#config` settings (see [Configuration & Rules](Configuration)):
 
 | Setting | Meaning |
 |---|---|
@@ -133,8 +133,25 @@ These persist with your profile (see [Configuration & Rules](Configuration)):
 | `ttsrate` | Speaking speed multiplier, 0.5–3 (default 1) |
 | `ttsvolume` | Volume percent, 0–100 (default 100) |
 
+## The Text-to-Speech tab
+
 The same settings are also editable in the GUI — the Configuration dialog
-(**Edit → Configuration…**) has a **Text-to-Speech** tab.
+(**Edit → Configuration…**) has a **Text-to-Speech** tab. Connect first; the
+settings load with the session.
+
+- **Read game streams aloud** — the master switch (`#tts read on|off`).
+  `#speak` and trigger/highlight speech work either way.
+- **Streams** — one row per stream: whether it's read, and its priority
+  (High barges in mid-sentence; Low yields to everything else). **Other
+  streams** takes custom or plugin stream ids, comma-separated.
+- **Voice** — pick any installed voice, downloaded or system. **Test** speaks a
+  sample line with it; **Install voice…** downloads the default voice, the same
+  as `#tts install`, with progress in the game window.
+- **Voice folder** — where downloaded voices live (`ttsvoicedir`). **Browse…**
+  points it at another folder of Piper voices; **Default** goes back to
+  `Voices`.
+- **Rate** and **Volume** sliders — the same 0.5–3 and 0–100% as `#tts rate`
+  and `#tts volume`.
 
 ## Coming next
 

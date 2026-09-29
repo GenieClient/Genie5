@@ -84,6 +84,9 @@ Two built-in colorings live alongside your own rules:
 
 Replace matched text with your own before it's shown (useful for shortening noisy messages). Managed with `#sub` / `#substitute`; list them with `#subs`.
 
+- **Whole words only** — a per-rule box on the Substitutes tab (or a trailing `wholeword` on `#substitute add {pattern} {replacement} [{class}] wholeword`) matches only at word boundaries, so a substitute for "take" doesn't rewrite the inside of "mistake".
+- **`$globals` in the replacement** — `$charactername`, `$roomid` and the other globals in the replacement text are filled in when the line matches, so a rule can swap in your own name or tag a line with the room it came from. A replacement with no `$` stays literal.
+
 ### Gags — hiding lines
 
 Suppress lines you never want to see:
@@ -187,6 +190,26 @@ The date comes from each line, so a `{yyyy}` file moves on to next year's file a
 **What gets logged** is what the window shows. A Game-window (`main`) log applies your substitutes and leaves out gagged lines. Stream windows show their text unsubstituted, and their logs do too. Lines are buffered and written about once a second, so logging never slows the game down. If a file can't be opened (another copy of Genie has it, or the folder is read-only), you get one line saying so and Genie tries again later. The session carries on either way.
 
 Rules are saved in `windowlog.json`. While you're connected, that's the character's own copy in `Profiles/<Character>-<Account>/`. Rules you set up before logging in go to the shared copy in `Config/`, which applies to every character that has no rules of its own. Changes apply to the next line.
+
+## Server dialogs — windows the game sends
+
+DragonRealms describes some windows itself — the bank, stores, spell choice, feats, your profile, TDP, and more. Genie builds each one from the controls the server sends and shows it as an ordinary panel you can dock, float, or leave in its own window. The first time a dialog Genie hasn't seen arrives, Genie asks where it should go, and remembers the answer **per character profile**.
+
+**Configuration → Layout → Server Dialogs** lists every answer you've given, with its **Where** and **Auto-open** settings. Select a dialog to change it:
+
+| Where | What it does |
+| --- | --- |
+| **Its own window** | A panel of its own, docked in the right-hand column (the default). |
+| **Where DR suggests** | Follows the placement hint the game sends: `right` or `left` docks it on that side, `center` (and `detach`) floats it centred over the main window, and `force-center` re-centres the float every time it opens (confirmation-style dialogs). No hint docks it on the right. |
+| **Beside another window** | Opens it as a tab in the same group as a window you pick, docked or floating. |
+| **Never show it** | Never render it, and stop asking. |
+
+- **Your placement wins.** Once you've moved a dialog — floated it, or docked it somewhere else — it comes back where you left it rather than where the hint says (`force-center` excepted).
+- **Open it automatically when DragonRealms sends it** — untick it and the window still fills in, but stays closed until you open it from **Window → Server Dialogs**, which lists every dialog seen this session.
+- **Forget** drops the answer, so Genie asks again the next time the dialog appears.
+- **Show server dialog windows** at the top is the master switch, `#config serverdialogs on|off` (default on). Off, no dialog window opens and nothing asks; the contents keep updating in the background, and your answers are kept.
+
+From the command bar, `#dialogs` (or `#dialogs list`) lists the dialogs seen this session, `#dialogs forget <id>` is the same as **Forget**, and `#dialogs report <id>` opens a pre-filled, redacted GitHub issue draft for a dialog that doesn't render right — nothing is posted until you submit it.
 
 ## Themes
 

@@ -44,6 +44,8 @@ A window doesn't have to live in the dock at all:
 
 To re-dock by hand, drag the floating window back over the main window and use the same dock targets as always.
 
+**Floats remember where they were.** Close a floating window and reopen it from the Window menu, and it comes back floating at the same position and size rather than docked. Re-dock one and float it again later, and it returns to the spot it floated at last. This holds for every panel, server dialog windows included, and survives a restart (it's kept in `float-memory.json` in your Config folder). A saved layout you load still wins over the remembered spot.
+
 ## Hiding the title bar of a window docked on its own
 
 When a docked window is the **only** tab in its section, the title bar above it just repeats its name. Right-click inside the window and choose **Hide Title Bar** to give that row back to the content. For the Game window, alone in its group, the same item hides the group's tab strip.
@@ -51,7 +53,7 @@ When a docked window is the **only** tab in its section, the title bar above it 
 - The choice is remembered **per window**, between sessions.
 - It only applies while the window is alone. Drop a second tab into the section and the title bar comes back, since the tabs are how you switch between them. Take the tab out again and the bar hides again.
 - To undo it, right-click the window and choose **Show Title Bar**. Float and Close stay in the same right-click menu, so hiding the bar doesn't take them away.
-- **View ▸ Window Banners** still hides every docked title bar at once. This item is the per-window version.
+- **Layout ▸ Window Banners** still hides every docked group's name bar at once. This item is the per-window version.
 
 ## Closing and getting windows back
 
