@@ -132,6 +132,12 @@ public sealed class SavedLayout
     /// <c>DisplaySettings.ShowMagicPanels</c>, Genie 4's <c>HealthBar Magic</c>.</summary>
     public bool?  MagicPanels          { get; set; }
 
+    /// <summary>RT badge stays on screen between roundtimes —
+    /// <c>DisplaySettings.KeepRoundTimeVisible</c>. Rides alongside
+    /// <see cref="RoundTimeOnHandsStrip"/> so a layout that moves the badge also
+    /// says whether it collapses. Same null rule as the bars above.</summary>
+    public bool?  KeepRoundTimeVisible { get; set; }
+
     /// <summary>Per-tag visibility filters (Window → Game Window).</summary>
     public bool   ShowGameText         { get; set; } = true;
     public bool   ShowEchoText         { get; set; } = true;

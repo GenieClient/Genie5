@@ -6250,6 +6250,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             HealthBarAtBottom     = Display.StatusBarAtBottom,
             ScriptBarVisible      = Display.ShowScriptBar,
             MagicPanels           = Display.ShowMagicPanels,
+            KeepRoundTimeVisible  = Display.KeepRoundTimeVisible,
             ShowGameText          = Display.ShowGameText,
             ShowEchoText          = Display.ShowEchoText,
             ShowScriptText        = Display.ShowScriptText,
@@ -6325,6 +6326,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         if (layout.HealthBarAtBottom is { } hpBottom)   Display.StatusBarAtBottom = hpBottom;
         if (layout.ScriptBarVisible  is { } barShown)   Display.ShowScriptBar     = barShown;
         if (layout.MagicPanels       is { } magic)      Display.ShowMagicPanels   = magic;
+        if (layout.KeepRoundTimeVisible is { } keepRt)  Display.KeepRoundTimeVisible = keepRt;
         Display.ShowGameText           = layout.ShowGameText;
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;

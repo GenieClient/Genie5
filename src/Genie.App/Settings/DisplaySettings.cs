@@ -262,6 +262,7 @@ public sealed class DisplaySettings : ReactiveObject
     /// position <see cref="RoundTimeOnHandsStrip"/> picks, dimmed and
     /// reading 0.0s when idle, so the input row never jumps sideways as RT
     /// starts and ends. Toggle via Layout → Roundtime Position → Keep Visible.
+    /// Also rides on saved layouts (<c>SavedLayout.KeepRoundTimeVisible</c>).
     /// </summary>
     [Reactive] public bool   KeepRoundTimeVisible { get; set; }
 

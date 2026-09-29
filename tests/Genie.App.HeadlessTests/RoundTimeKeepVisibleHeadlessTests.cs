@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Reactive.Linq;
 using Avalonia.Headless.XUnit;
 using Genie.App.Settings;
@@ -74,5 +75,60 @@ public class RoundTimeKeepVisibleHeadlessTests : IDisposable
         settings.Save(path);
 
         Assert.True(DisplaySettings.Load(path).KeepRoundTimeVisible);
+    }
+
+    // ── Rides on saved layouts, next to the RT position ───────────────────────
+
+    [AvaloniaFact]
+    public void A_saved_layout_captures_keep_visible_and_loading_restores_it()
+    {
+        var vm = NewVm();
+        Run(vm.ToggleKeepRoundTimeVisibleCommand);
+        var saved = SavedLayout.FromJson(vm.CaptureCurrentLayout().ToJson());   // through disk form
+        Assert.True(saved!.KeepRoundTimeVisible);
+
+        Run(vm.ToggleKeepRoundTimeVisibleCommand);   // off, as another layout would leave it
+        Assert.False(vm.ShowRtInCommandBar);
+
+        vm.ApplyLayout(saved);
+
+        Assert.True(vm.Display.KeepRoundTimeVisible);
+        Assert.True(vm.ShowRtInCommandBar);
+    }
+
+    [AvaloniaFact]
+    public void Loading_a_layout_persists_keep_visible_so_a_restart_keeps_it()
+    {
+        var vm = NewVm();
+        vm.ApplyLayout(new SavedLayout { KeepRoundTimeVisible = true });
+
+        var path = Directory.EnumerateFiles(_dir, "display.json", SearchOption.AllDirectories).Single();
+        Assert.True(DisplaySettings.Load(path).KeepRoundTimeVisible);
+    }
+
+    /// <summary>Every layout on disk predates the key; loading one must not
+    /// switch the user's choice off.</summary>
+    [AvaloniaFact]
+    public void A_layout_saved_before_keep_visible_existed_leaves_it_alone()
+    {
+        var vm = NewVm();
+        Run(vm.ToggleKeepRoundTimeVisibleCommand);
+
+        var legacy = SavedLayout.FromJson("{\"Name\":\"Legacy\"}");
+        Assert.Null(legacy!.KeepRoundTimeVisible);
+        vm.ApplyLayout(legacy);
+
+        Assert.True(vm.Display.KeepRoundTimeVisible);
+    }
+
+    [AvaloniaFact]
+    public void Reset_layout_leaves_keep_visible_alone_like_the_other_bars()
+    {
+        var vm = NewVm();
+        Run(vm.ToggleKeepRoundTimeVisibleCommand);
+
+        Run(vm.ResetLayoutCommand);
+
+        Assert.True(vm.Display.KeepRoundTimeVisible);
     }
 }
