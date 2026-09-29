@@ -1901,9 +1901,14 @@
       <Panel TextElement.FontFamily="{Binding DialogFontFamily}"
              TextElement.FontSize="{Binding DialogFontSize}">
         <!-- A dialog with a bespoke view (#156 Phase 2) renders that instead
-             of the generic grid; see ServerDialogOverrides. -->
-        <views:ServerDialogPanel DataContext="{Binding ViewModel}"
-                                 IsVisible="{Binding ViewModel.IsGeneric}"/>
+             of the generic grid; see ServerDialogOverrides. IsVisible sits on
+             a wrapper, not on the panel: a binding on the element that sets
+             DataContext="{Binding ViewModel}" resolves against the ViewModel,
+             so ViewModel.IsGeneric failed there, IsVisible stayed true, and
+             the generic grid drew under every bespoke view (public #374). -->
+        <Panel IsVisible="{Binding ViewModel.IsGeneric}">
+          <views:ServerDialogPanel DataContext="{Binding ViewModel}"/>
+        </Panel>
         <ContentControl Content="{Binding ViewModel.Bespoke}"
                         IsVisible="{Binding !ViewModel.IsGeneric}"/>
       </Panel>

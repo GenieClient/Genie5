@@ -15,4 +15,10 @@ public partial class OtherInjuriesPanel : UserControl
             && (sender as Control)?.Tag is OtherInjuriesViewModel.Part part)
             vm.Transfer(part);
     }
+
+    private void OnExtraClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OtherInjuriesViewModel vm && (sender as Control)?.Tag is string id)
+            vm.ActivateExtra(id);
+    }
 }

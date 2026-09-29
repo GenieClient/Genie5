@@ -80,6 +80,15 @@ public sealed partial class OtherInjuriesViewModel : ReactiveObject, IServerDial
     /// transferred.</summary>
     public ObservableCollection<string> Injured { get; } = new();
 
+    /// <summary>
+    /// The dialog's own non-sprite controls: the vitality bar, Transfer Vit,
+    /// Re-Link and any label or link DR adds. The generic grid used to show
+    /// these (drawn underneath this view by mistake, public #374); with the grid
+    /// hidden they have to be carried here, or the empath loses the buttons.
+    /// The same VM instances as the host's, so values update in place.
+    /// </summary>
+    public ObservableCollection<DialogControlViewModel> Extras { get; } = new();
+
     [Reactive] public bool IsEmpty     { get; private set; } = true;
     [Reactive] public bool AnyTransfer { get; private set; }
 
@@ -103,6 +112,10 @@ public sealed partial class OtherInjuriesViewModel : ReactiveObject, IServerDial
                 : part.Cell.Tip;
         }
 
+        Extras.Clear();
+        foreach (var c in _host.Controls.Concat(_host.BottomControls))
+            if (c is not DialogImageViewModel) Extras.Add(c);
+
         Injured.Clear();
         foreach (var p in Parts.Where(p => p.Cell.Kind != InjuryKind.None))
             Injured.Add($"{p.Cell.FullName} — {InjuriesViewModel.InjuryCell.KindWord(p.Cell.Kind)} ({p.Cell.Severity})"
@@ -117,4 +130,8 @@ public sealed partial class OtherInjuriesViewModel : ReactiveObject, IServerDial
     {
         if (part.CanTransfer) _host.Activate(part.RegionId);
     }
+
+    /// <summary>One of <see cref="Extras"/> was clicked (Transfer Vit, Re-Link):
+    /// the same host path every generic dialog control uses.</summary>
+    public void ActivateExtra(string controlId) => _host.Activate(controlId);
 }

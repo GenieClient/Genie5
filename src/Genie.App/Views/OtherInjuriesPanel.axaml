@@ -25,7 +25,38 @@
     <Style Selector="Button.part:pointerover /template/ ContentPresenter">
       <Setter Property="BorderBrush" Value="{DynamicResource Theme.Accent}"/>
     </Style>
+    <Style Selector="Button.extra">
+      <Setter Property="MinWidth" Value="64"/>
+      <Setter Property="Padding"  Value="10,3"/>
+    </Style>
   </UserControl.Styles>
+
+  <!-- The dialog's own non-sprite controls (public #374). Only the kinds DR
+       sends in this window are templated; anything else shows as nothing
+       rather than as a type name. -->
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="vm:DialogProgressViewModel">
+      <Grid MinWidth="160">
+        <ProgressBar Minimum="0" Maximum="100" Value="{Binding Value}" Height="16"/>
+        <TextBlock Text="{Binding Caption}" FontSize="11"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      </Grid>
+    </DataTemplate>
+    <DataTemplate DataType="vm:DialogButtonViewModel">
+      <Button Classes="extra" Content="{Binding Caption}" IsEnabled="{Binding IsEnabled}"
+              Tag="{Binding Id}" Click="OnExtraClicked"/>
+    </DataTemplate>
+    <DataTemplate DataType="vm:DialogLinkViewModel">
+      <Button Content="{Binding Caption}" IsEnabled="{Binding IsEnabled}"
+              ToolTip.Tip="{Binding Tooltip}" Tag="{Binding Id}" Click="OnExtraClicked"/>
+    </DataTemplate>
+    <DataTemplate DataType="vm:DialogLabelViewModel">
+      <TextBlock Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+    </DataTemplate>
+    <DataTemplate DataType="vm:DialogControlViewModel">
+      <Panel/>
+    </DataTemplate>
+  </UserControl.DataTemplates>
 
   <ScrollViewer>
     <StackPanel Spacing="6" Margin="8">
@@ -33,6 +64,17 @@
       <TextBlock FontSize="11" Opacity="0.8" TextWrapping="Wrap"
                  IsVisible="{Binding AnyTransfer}"
                  Text="Click an injured part to transfer it."/>
+
+      <ItemsControl ItemsSource="{Binding Extras}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <ContentControl Content="{Binding}" Margin="0,0,6,4" VerticalAlignment="Center"/>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
 
       <ItemsControl ItemsSource="{Binding Parts}" MaxWidth="260" HorizontalAlignment="Left">
         <ItemsControl.ItemsPanel>

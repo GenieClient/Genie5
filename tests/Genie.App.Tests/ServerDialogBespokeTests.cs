@@ -99,6 +99,45 @@ public class ServerDialogBespokeTests
         Assert.False(o.IsEmpty);
     }
 
+    // The window as seen live on 2026-09-28 (public #374): the sprites plus DR's
+    // own vitality bar and two buttons. Shapes follow the journal's other
+    // progressBar / cmdButton entries.
+    private const string OtherInjuriesWithButtonsXml =
+        "<openDialog type=\"dynamic\" id=\"injuries-1\" title=\"Renucci's Injuries\" location=\"center\" height=\"200\" width=\"190\">\n" +
+        "<dialogData id=\"injuries-1\"><progressBar id=\"health2\" value=\"100\" text=\"HEALTH 100%\" customText=\"t\" top=\"0\" left=\"0\" width=\"140\" height=\"15\"/>" +
+        "<cmdButton id=\"xferVit\" value=\"Transfer Vit\" cmd=\"transfer Renucci vitality\" top=\"20\" left=\"150\"/>" +
+        "<cmdButton id=\"relink\" value=\"Re-Link\" cmd=\"touch Renucci\" top=\"20\" left=\"240\"/>" +
+        "<image id=\"chest\" name=\"Injury1\" cmd=\"transfer Renucci internal chest\" tooltip=\"transfer internal chest\" height=\"0\" width=\"0\"/>" +
+        "<image id=\"head\" name=\"head\" height=\"0\" width=\"0\"/></dialogData>\n";
+
+    /// <summary>Public #374: with the generic grid no longer drawn under the
+    /// bespoke view, DR's non-sprite controls must be carried by it, or the
+    /// empath loses Transfer Vit and Re-Link. Sprites stay out; they ARE the grid.</summary>
+    [Fact]
+    public void The_dialogs_own_bar_and_buttons_ride_on_the_bespoke_view()
+    {
+        var (vm, _) = Build(Feed(OtherInjuriesWithButtonsXml, "injuries-1"));
+        var o = (OtherInjuriesViewModel)vm.Bespoke!;
+
+        Assert.DoesNotContain(o.Extras, c => c is DialogImageViewModel);
+        Assert.Contains(o.Extras, c => c is DialogProgressViewModel);
+        var captions = o.Extras.OfType<DialogButtonViewModel>().Select(b => b.Caption).ToList();
+        Assert.Contains("Transfer Vit", captions);
+        Assert.Contains("Re-Link", captions);
+    }
+
+    [Fact]
+    public void Clicking_a_carried_button_sends_its_command_through_the_host()
+    {
+        var (vm, sent) = Build(Feed(OtherInjuriesWithButtonsXml, "injuries-1"));
+        var o = (OtherInjuriesViewModel)vm.Bespoke!;
+
+        o.ActivateExtra("xferVit");
+
+        var action = Assert.Single(sent);
+        Assert.Equal("transfer Renucci vitality", action.Value);
+    }
+
     [Fact]
     public void Clicking_a_part_sends_its_transfer_through_the_host()
     {
