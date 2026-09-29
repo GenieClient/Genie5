@@ -115,6 +115,63 @@ public class PerceiveHealthPipelineTests
         Assert.Single(f.Charts);
     }
 
+    /// <summary>
+    /// <c>touch &lt;patient&gt;</c>, captured live 2026-09-28: no roundtime, no
+    /// vitality line, so the only end of the block is the prompt, which arrives
+    /// as a PromptEvent rather than text. The block used to stay open forever,
+    /// so the Healing panel never got a reading.
+    /// </summary>
+    [Fact]
+    public void A_touch_block_closes_on_the_prompt()
+    {
+        var f = new Fixture();
+
+        f.Say("You lay your hand on Renucci's arm.",
+              "You sense a successful empathic link has been forged between you and Renucci.",
+              "Renucci's injuries include...",
+              "Wounds to the LEFT ARM:",
+              "  Fresh External:  light scratches -- negligible",
+              "  Fresh Internal:  slightly tender -- negligible",
+              "Wounds to the LEFT LEG:",
+              "  Fresh External:  light scratches -- insignificant");
+        Assert.Empty(f.Charts);
+
+        f.Feed.Push(new PromptEvent(DateTimeOffset.UtcNow, "R"));
+
+        var ev = Assert.Single(f.Charts);
+        Assert.Equal("Renucci", ev.Health.Patient);
+        Assert.Equal(WoundSeverity.Negligible,    ev.Health.Regions["leftArm"][InjuryAxis.FreshExternal]);
+        Assert.Equal(WoundSeverity.Negligible,    ev.Health.Regions["leftArm"][InjuryAxis.FreshInternal]);
+        Assert.Equal(WoundSeverity.Insignificant, ev.Health.Regions["leftLeg"][InjuryAxis.FreshExternal]);
+        Assert.True(f.State.PatientHealth.ContainsKey("Renucci"));
+    }
+
+    /// <summary>After the prompt closes it, later game text is ordinary text
+    /// again: a poison mention can no longer land on the patient's chart.</summary>
+    [Fact]
+    public void Text_after_the_prompt_does_not_join_the_closed_block()
+    {
+        var f = new Fixture();
+
+        f.Say("Renucci's injuries include...",
+              "Wounds to the HEAD:",
+              "  Fresh External:  a cut -- harmful");
+        f.Feed.Push(new PromptEvent(DateTimeOffset.UtcNow));
+        f.Say("A merchant cries, \"Antidote for poison, cheap!\"");
+        f.Feed.Push(new PromptEvent(DateTimeOffset.UtcNow));
+
+        var ev = Assert.Single(f.Charts);
+        Assert.False(ev.Health.IsPoisoned);
+    }
+
+    [Fact]
+    public void A_prompt_with_no_open_block_publishes_nothing()
+    {
+        var f = new Fixture();
+        f.Feed.Push(new PromptEvent(DateTimeOffset.UtcNow));
+        Assert.Empty(f.Charts);
+    }
+
     /// <summary>Two patients coexist — the map is keyed by name, which is the
     /// point of the shape being different from GameState.Injuries.</summary>
     [Fact]

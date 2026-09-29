@@ -283,6 +283,10 @@ public sealed partial class GameStateEngine : IDisposable
                 // to anyway. $gametime stays the RAW server epoch.
                 if (prompt.ServerTime >= MinPlausiblePrompt)
                     _serverClockOffset = prompt.ServerTime - _utcNow();
+                // A perceive / touch block ends with the response; some forms
+                // (touch) carry no text terminator at all (public #263).
+                _perceive.EndOfResponse();
+                PublishPerceive();
                 break;
 
             // ── Main-window text (e.g. the `exp all` skill table) ─────────
@@ -437,6 +441,16 @@ public sealed partial class GameStateEngine : IDisposable
     [System.Text.RegularExpressions.GeneratedRegex(@"(?<name>[A-Z][A-Za-z]*(?: [A-Z][A-Za-z]*)*):\s+(?<rank>\d+)\s+\d+%", System.Text.RegularExpressions.RegexOptions.None)]
     private static partial System.Text.RegularExpressions.Regex ExpTableRowPattern();
 
+    /// <summary>Publish a perceive reading the parser has just completed, if any.</summary>
+    private void PublishPerceive()
+    {
+        if (_perceive.TakeCompleted() is { } chart)
+        {
+            _state.PatientHealth[chart.Patient] = chart;
+            Emit?.Invoke(new PatientHealthEvent(chart));
+        }
+    }
+
     private void ApplyText(TextEvent te)
     {
         // Assess stream → structured rows (public #313). Nothing further down
@@ -463,11 +477,7 @@ public sealed partial class GameStateEngine : IDisposable
             // the block and still has to reach its own consumers. Gating on it
             // would drop exactly the readings that ended the normal way.
             _perceive.Feed(text);
-            if (_perceive.TakeCompleted() is { } chart)
-            {
-                _state.PatientHealth[chart.Patient] = chart;
-                Emit?.Invoke(new PatientHealthEvent(chart));
-            }
+            PublishPerceive();
         }
 
         if (text.Contains("Showing all skills", StringComparison.Ordinal))

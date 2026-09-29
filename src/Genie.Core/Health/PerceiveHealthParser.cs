@@ -152,6 +152,19 @@ public sealed partial class PerceiveHealthParser
         return done;
     }
 
+    /// <summary>
+    /// The server's prompt arrived: the response is over, so an open block is
+    /// complete. <c>touch &lt;patient&gt;</c> ends with no roundtime and no
+    /// vitality line, and the prompt reaches the engine as its own event, not
+    /// as a text line, so without this the block stayed open forever. Nothing
+    /// was published, and every later line was swallowed as block body. Found
+    /// on the 2026-09-28 live walk. No-op outside a block.
+    /// </summary>
+    public void EndOfResponse()
+    {
+        if (_inBlock) Close();
+    }
+
     /// <summary>Abandon any open block — a disconnect or room change means the
     /// half-read chart is no longer about anybody.</summary>
     public void Reset()
