@@ -35,6 +35,10 @@ public class App : Application
             // data path. The choice is materialized here so the deterministic
             // AppPaths.Discover (in the VM and every GenieCore) lands on it.
             await EnsureStorageLocationChosenAsync();
+            // On a fresh machine the crash logger started in a temp holding
+            // location (it must not create Config before the prompt); move it
+            // to the data root that was just chosen.
+            Program.RefreshCrashLogPath();
 
             var window = new MainWindow { DataContext = new MainWindowViewModel(startup) };
             desktop.MainWindow = window;

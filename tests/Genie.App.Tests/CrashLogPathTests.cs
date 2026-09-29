@@ -16,11 +16,13 @@ public class CrashLogPathTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "genie_crashlog_" + Guid.NewGuid().ToString("N"));
     private readonly string _exeDir;
     private readonly string _userDir;
+    private readonly string _freshDir;
 
     public CrashLogPathTests()
     {
         _exeDir = Path.Combine(_root, "exe");
         _userDir = Path.Combine(_root, "user");
+        _freshDir = Path.Combine(_root, "fresh");
         Directory.CreateDirectory(_exeDir);
     }
 
@@ -34,21 +36,33 @@ public class CrashLogPathTests : IDisposable
     {
         File.WriteAllText(Path.Combine(_exeDir, AppPaths.PortableMarkerFileName), string.Empty);
 
-        var path = Program.ComputeCrashLogPath(_exeDir, _userDir);
+        var path = Program.ComputeCrashLogPath(_exeDir, _userDir, _freshDir);
 
         Assert.Equal(Path.Combine(Path.GetFullPath(_exeDir), "Config", "genie_crash.log"), path);
         Assert.False(Directory.Exists(_userDir));
     }
 
     [Fact]
-    public void Without_a_marker_the_crash_log_goes_to_the_user_folder()
+    public void Without_a_marker_an_existing_user_folder_gets_the_crash_log()
     {
-        var path = Program.ComputeCrashLogPath(_exeDir, _userDir);
+        Directory.CreateDirectory(Path.Combine(_userDir, "Config"));
+
+        var path = Program.ComputeCrashLogPath(_exeDir, _userDir, _freshDir);
 
         Assert.Equal(Path.Combine(_userDir, "Config", "genie_crash.log"), path);
-        // Must not materialize a local Config — that would pre-empt the
-        // first-run location prompt and flip the install to portable.
         Assert.False(Directory.Exists(Path.Combine(_exeDir, "Config")));
+    }
+
+    [Fact]
+    public void Fresh_machine_logs_to_the_holding_folder_and_creates_no_Config()
+    {
+        var path = Program.ComputeCrashLogPath(_exeDir, _userDir, _freshDir);
+
+        Assert.Equal(Path.Combine(_freshDir, "genie_crash.log"), path);
+        // A Config folder in either location is what AppPaths.HasData reads as
+        // "already set up" — creating one would suppress the first-run prompt.
+        Assert.False(AppPaths.HasData(_exeDir));
+        Assert.False(AppPaths.HasData(_userDir));
     }
 
     [Fact]
@@ -58,7 +72,7 @@ public class CrashLogPathTests : IDisposable
         Directory.CreateDirectory(current);
         File.WriteAllText(Path.Combine(_exeDir, AppPaths.VelopackPortableMarkerFileName), string.Empty);
 
-        var path = Program.ComputeCrashLogPath(current, _userDir);
+        var path = Program.ComputeCrashLogPath(current, _userDir, _freshDir);
 
         Assert.Equal(Path.Combine(Path.GetFullPath(_exeDir), "Config", "genie_crash.log"), path);
     }
