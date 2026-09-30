@@ -3631,6 +3631,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     {
         if (!_hookedServerDialogs.Add(vm.DialogId)) return;
 
+        // Another character's injuries: merge the empath's own touch/perceive
+        // readings, since DR's dialog filters by the viewer's display mode.
+        if (vm.Bespoke is OtherInjuriesViewModel other)
+            other.AttachReadings(
+                patient => core.State.PatientHealth.TryGetValue(patient, out var h) ? h : null,
+                core.GameEvents.OfType<Genie.Core.Events.PatientHealthEvent>()
+                    .Select(e => e.Health)
+                    .ObserveOn(RxApp.MainThreadScheduler));
+
         vm.ActionRequested += action =>
         {
             switch (action.Kind)

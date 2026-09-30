@@ -138,6 +138,122 @@ public class ServerDialogBespokeTests
         Assert.Equal("transfer Renucci vitality", action.Value);
     }
 
+    // The 2026-09-28 live walk, verbatim from the recording: DR drew Renucci's
+    // window with every part healthy (the viewer's display mode was "I Both"
+    // and Renucci's wounds were all external), directly under a touch that
+    // listed wounds on the left arm, left leg and chest.
+    private const string AllHealthyInjuriesXml =
+        "<openDialog type=\"dynamic\" id=\"injuries-10224090\" title=\"Renucci's Injuries\" location=\"center\" height=\"200\" width=\"190\">\n" +
+        "<dialogData id=\"injuries-10224090\"><image id=\"head\" name=\"head\" height=\"0\" width=\"0\"/><image id=\"neck\" name=\"neck\" height=\"0\" width=\"0\"/><image id=\"rightArm\" name=\"rightArm\" height=\"0\" width=\"0\"/><image id=\"leftArm\" name=\"leftArm\" height=\"0\" width=\"0\"/><image id=\"rightLeg\" name=\"rightLeg\" height=\"0\" width=\"0\"/><image id=\"leftLeg\" name=\"leftLeg\" height=\"0\" width=\"0\"/><image id=\"rightHand\" name=\"rightHand\" height=\"0\" width=\"0\"/><image id=\"leftHand\" name=\"leftHand\" height=\"0\" width=\"0\"/><image id=\"chest\" name=\"chest\" height=\"0\" width=\"0\"/><image id=\"abdomen\" name=\"abdomen\" height=\"0\" width=\"0\"/><image id=\"back\" name=\"back\" height=\"0\" width=\"0\"/><image id=\"rightEye\" name=\"rightEye\" height=\"0\" width=\"0\"/><image id=\"leftEye\" name=\"leftEye\" height=\"0\" width=\"0\"/><image id=\"rightFoot\" name=\"rightFoot\" height=\"0\" width=\"0\"/><image id=\"nsys\" name=\"nsys\" height=\"0\" width=\"0\"/></dialogData>\n";
+
+    private static Genie.Core.Health.PatientHealth Touch(string patient, params (string Region, Genie.Core.Health.InjuryAxis Axis, Genie.Core.Health.WoundSeverity Sev)[] wounds)
+    {
+        var regions = new Dictionary<string, Genie.Core.Health.RegionInjuries>(StringComparer.OrdinalIgnoreCase);
+        foreach (var g in wounds.GroupBy(w => w.Region))
+            regions[g.Key] = new Genie.Core.Health.RegionInjuries
+            {
+                Region = g.Key,
+                Axes   = g.ToDictionary(w => w.Axis, w => w.Sev),
+            };
+        return new Genie.Core.Health.PatientHealth { Patient = patient, Regions = regions, CapturedAt = DateTimeOffset.UtcNow };
+    }
+
+    private static readonly Genie.Core.Health.PatientHealth RenucciTouch = Touch("Renucci",
+        ("leftArm", Genie.Core.Health.InjuryAxis.FreshExternal, Genie.Core.Health.WoundSeverity.Negligible),
+        ("leftLeg", Genie.Core.Health.InjuryAxis.FreshExternal, Genie.Core.Health.WoundSeverity.Insignificant),
+        ("chest",   Genie.Core.Health.InjuryAxis.FreshExternal, Genie.Core.Health.WoundSeverity.Insignificant));
+
+    /// <summary>The walk's bug: the window said "No injuries." under a touch
+    /// listing three. A touch reading for the same patient fills in the parts
+    /// DR left blank, shown as wounds but not clickable (DR sent no cmd).</summary>
+    [Fact]
+    public void A_touch_reading_fills_the_parts_the_dialog_left_blank()
+    {
+        var (vm, sent) = Build(Feed(AllHealthyInjuriesXml, "injuries-10224090"));
+        var o = (OtherInjuriesViewModel)vm.Bespoke!;
+        Assert.True(o.IsEmpty);                       // DR's dialog alone: nothing
+
+        o.ApplyReading(RenucciTouch);
+
+        Assert.Equal("Renucci", o.Patient);
+        Assert.False(o.IsEmpty);
+        foreach (var id in new[] { "leftArm", "leftLeg", "chest" })
+        {
+            var part = o.Parts.Single(p => p.RegionId == id);
+            Assert.Equal(InjuryKind.Wound, part.Cell.Kind);
+            Assert.True(part.FromReading);
+            Assert.False(part.CanTransfer);
+        }
+        Assert.Equal(InjuryKind.None, o.Parts.Single(p => p.RegionId == "head").Cell.Kind);
+        Assert.Equal(3, o.Injured.Count);
+        Assert.All(o.Injured, line => Assert.Contains("from your touch", line));
+
+        o.Transfer(o.Parts.Single(p => p.RegionId == "chest"));   // no cmd from DR: nothing sent
+        Assert.Empty(sent);
+        Assert.False(o.AnyTransfer);
+    }
+
+    /// <summary>The reading usually lands AFTER the dialog (DR sends the
+    /// dialogData first); a reading already on hand is used on the first render.</summary>
+    [Fact]
+    public void A_reading_already_on_hand_is_used_when_the_dialog_arrives()
+    {
+        var vm = new ServerDialogViewModel("injuries-10224090");
+        var o  = (OtherInjuriesViewModel)vm.Bespoke!;
+        o.AttachReadings(p => p == "Renucci" ? RenucciTouch : null,
+                         System.Reactive.Linq.Observable.Empty<Genie.Core.Health.PatientHealth>());
+
+        vm.Apply(Feed(AllHealthyInjuriesXml, "injuries-10224090"));
+
+        Assert.Equal(InjuryKind.Wound, o.Parts.Single(p => p.RegionId == "leftArm").Cell.Kind);
+    }
+
+    [Fact]
+    public void A_reading_for_someone_else_is_ignored()
+    {
+        var (vm, _) = Build(Feed(AllHealthyInjuriesXml, "injuries-10224090"));
+        var o = (OtherInjuriesViewModel)vm.Bespoke!;
+
+        o.ApplyReading(Touch("Naper", ("leftArm", Genie.Core.Health.InjuryAxis.FreshExternal, Genie.Core.Health.WoundSeverity.Severe)));
+
+        Assert.True(o.IsEmpty);
+    }
+
+    /// <summary>DR's own marking wins: a part DR marked transferable keeps its
+    /// cmd and its severity even when a touch says something else.</summary>
+    [Fact]
+    public void The_dialogs_own_marking_wins_over_the_reading()
+    {
+        var (vm, sent) = Build(Feed(OtherInjuriesXml, "injuries-10224090"));
+        var o = (OtherInjuriesViewModel)vm.Bespoke!;
+
+        o.ApplyReading(Touch("Renucci",
+            ("abdomen", Genie.Core.Health.InjuryAxis.FreshExternal, Genie.Core.Health.WoundSeverity.Useless),
+            ("head",    Genie.Core.Health.InjuryAxis.ScarExternal,  Genie.Core.Health.WoundSeverity.Minor)));
+
+        var abdomen = o.Parts.Single(p => p.RegionId == "abdomen");
+        Assert.Equal(1, abdomen.Cell.Severity);       // DR's Injury1, not the touch's "useless"
+        Assert.True(abdomen.CanTransfer);
+        Assert.False(abdomen.FromReading);
+
+        var head = o.Parts.Single(p => p.RegionId == "head");
+        Assert.Equal(InjuryKind.Scar, head.Cell.Kind); // DR left it blank: the touch fills it
+        Assert.True(head.FromReading);
+
+        o.Transfer(abdomen);
+        Assert.Equal("transfer Renucci internal abdomen", Assert.Single(sent).Value);
+    }
+
+    [Theory]
+    [InlineData(Genie.Core.Health.WoundSeverity.Insignificant, 1)]
+    [InlineData(Genie.Core.Health.WoundSeverity.MoreThanMinor, 1)]
+    [InlineData(Genie.Core.Health.WoundSeverity.Harmful, 2)]
+    [InlineData(Genie.Core.Health.WoundSeverity.VeryDamaging, 2)]
+    [InlineData(Genie.Core.Health.WoundSeverity.Severe, 3)]
+    [InlineData(Genie.Core.Health.WoundSeverity.Useless, 3)]
+    public void The_thirteen_rungs_fold_onto_three_sprite_levels(Genie.Core.Health.WoundSeverity s, int level)
+        => Assert.Equal(level, OtherInjuriesViewModel.SpriteLevel(s));
+
     [Fact]
     public void Clicking_a_part_sends_its_transfer_through_the_host()
     {

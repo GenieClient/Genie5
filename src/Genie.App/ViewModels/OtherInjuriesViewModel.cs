@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using Genie.Core.Dialogs;
 using Genie.Core.Events;
+using Genie.Core.Health;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
 
@@ -52,6 +53,9 @@ public sealed partial class OtherInjuriesViewModel : ReactiveObject, IServerDial
         /// transferred right now; everything else is display-only.</summary>
         [Reactive] public bool   CanTransfer { get; internal set; }
         [Reactive] public string Tip         { get; internal set; } = "";
+        /// <summary>Shown from the empath's own touch/perceive reading, not
+        /// from DR's dialog (which filters by display mode).</summary>
+        [Reactive] public bool   FromReading { get; internal set; }
     }
 
     private readonly ServerDialogViewModel _host;
@@ -92,36 +96,137 @@ public sealed partial class OtherInjuriesViewModel : ReactiveObject, IServerDial
     [Reactive] public bool IsEmpty     { get; private set; } = true;
     [Reactive] public bool AnyTransfer { get; private set; }
 
+    // What DR's dialog last said about each part, kept apart from the display
+    // so a touch/perceive reading can be merged without losing it.
+    private readonly Dictionary<string, (InjuryKind Kind, int Severity, string? Cmd, string? Tooltip)> _dialog =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private Func<string, PatientHealth?>? _readingFor;
+    private PatientHealth? _reading;
+    private IDisposable?   _readingSub;
+
+    /// <summary>"Renucci" from DR's "Renucci's Injuries" title: the patient a
+    /// touch/perceive reading must name to be merged here.</summary>
+    public string Patient { get; private set; } = "";
+
+    /// <summary>
+    /// Feed this window the empath's own touch/perceive readings (public #263).
+    /// DR draws <c>injuries-&lt;charnum&gt;</c> through the VIEWER's injury
+    /// display mode (the E/I Wound/Scar/Both radios), so a patient with only
+    /// external wounds reads as "No injuries." under an internal mode, directly
+    /// under a touch that lists them (2026-09-28 walk). A reading for the same
+    /// patient fills in the parts DR left blank; DR's own markings still win,
+    /// and only DR-marked parts carry a transfer command.
+    /// </summary>
+    public void AttachReadings(Func<string, PatientHealth?> readingFor, IObservable<PatientHealth> readings)
+    {
+        _readingFor = readingFor;
+        _readingSub?.Dispose();
+        _readingSub = readings.Subscribe(ApplyReading);
+    }
+
+    /// <summary>A touch/perceive reading landed; merge it if it is this patient's.</summary>
+    public void ApplyReading(PatientHealth chart)
+    {
+        if (Patient.Length == 0 || !string.Equals(chart.Patient, Patient, StringComparison.OrdinalIgnoreCase)) return;
+        _reading = chart;
+        Render();
+    }
+
     public void Apply(ServerDialogState state)
     {
         Subject = string.IsNullOrWhiteSpace(state.Title) ? "Injuries" : state.Title!;
+        Patient = PatientFrom(Subject);
 
         foreach (var c in state.Controls)
         {
             if (c.Type != DialogControlType.Image) continue;
-            if (!_parts.TryGetValue(c.Id, out var part)) continue;   // unknown region
+            if (!_parts.ContainsKey(c.Id)) continue;   // unknown region
 
             c.Attributes.TryGetValue("name", out var name);
-            var (kind, severity) = InjuryImageName.Decode(name);
-            part.Cell.Set(kind, severity);
-
-            part.CanTransfer = !string.IsNullOrWhiteSpace(c.Cmd);
             c.Attributes.TryGetValue("tooltip", out var tooltip);
-            part.Tip = part.CanTransfer
-                ? $"{part.Cell.Tip} — click to {(string.IsNullOrWhiteSpace(tooltip) ? c.Cmd : tooltip)}"
-                : part.Cell.Tip;
+            var (kind, severity) = InjuryImageName.Decode(name);
+            _dialog[c.Id] = (kind, severity, string.IsNullOrWhiteSpace(c.Cmd) ? null : c.Cmd, tooltip);
         }
 
         Extras.Clear();
         foreach (var c in _host.Controls.Concat(_host.BottomControls))
             if (c is not DialogImageViewModel) Extras.Add(c);
 
+        if (_reading is null && _readingFor is not null && Patient.Length > 0)
+            _reading = _readingFor(Patient);
+        Render();
+    }
+
+    private void Render()
+    {
+        foreach (var part in Parts)
+        {
+            _dialog.TryGetValue(part.RegionId, out var d);
+            var fromReading = false;
+            var (kind, severity) = (d.Kind, d.Severity);
+            if (kind == InjuryKind.None && FromReading(part.RegionId) is { } r)
+            {
+                (kind, severity) = r;
+                fromReading = true;
+            }
+            part.Cell.Set(kind, severity);
+
+            part.CanTransfer = d.Cmd is not null;
+            part.FromReading = fromReading;
+            part.Tip = part.CanTransfer
+                ? $"{part.Cell.Tip} — click to {(string.IsNullOrWhiteSpace(d.Tooltip) ? d.Cmd : d.Tooltip)}"
+                : fromReading
+                    ? $"{part.Cell.Tip} — from your last touch; not transferable in this view"
+                    : part.Cell.Tip;
+        }
+
         Injured.Clear();
         foreach (var p in Parts.Where(p => p.Cell.Kind != InjuryKind.None))
             Injured.Add($"{p.Cell.FullName} — {InjuriesViewModel.InjuryCell.KindWord(p.Cell.Kind)} ({p.Cell.Severity})"
-                        + (p.CanTransfer ? "  ·  transferable" : ""));
+                        + (p.CanTransfer ? "  ·  transferable" : p.FromReading ? "  ·  from your touch" : ""));
         IsEmpty     = Injured.Count == 0;
         AnyTransfer = Parts.Any(p => p.CanTransfer);
+    }
+
+    /// <summary>The reading's worst wound for a region, on the dialog's sprite
+    /// scale: kind from the axes present (fresh beats scar; nerves are always
+    /// "damage"), severity folded from DR's 13 rungs onto the sprite's three.</summary>
+    private (InjuryKind Kind, int Severity)? FromReading(string regionId)
+    {
+        if (_reading is null || !_reading.Regions.TryGetValue(regionId, out var region)) return null;
+        var fresh = Worst(region, InjuryAxis.FreshExternal, InjuryAxis.FreshInternal);
+        var scar  = Worst(region, InjuryAxis.ScarExternal,  InjuryAxis.ScarInternal);
+        var worst = (WoundSeverity)Math.Max((int)fresh, (int)scar);
+        if (worst == WoundSeverity.None) return null;
+        var kind = regionId.Equals("nsys", StringComparison.OrdinalIgnoreCase) ? InjuryKind.Damage
+                 : fresh != WoundSeverity.None ? InjuryKind.Wound : InjuryKind.Scar;
+        return (kind, SpriteLevel(worst));
+    }
+
+    private static WoundSeverity Worst(RegionInjuries r, InjuryAxis a, InjuryAxis b)
+    {
+        r.Axes.TryGetValue(a, out var x);
+        r.Axes.TryGetValue(b, out var y);
+        return (WoundSeverity)Math.Max((int)x, (int)y);
+    }
+
+    /// <summary>1-4 -> 1, 5-8 -> 2, 9-13 -> 3: the 13-rung ladder onto the
+    /// dialog's three sprite levels.</summary>
+    internal static int SpriteLevel(WoundSeverity s) => (int)s switch
+    {
+        <= 0 => 0,
+        <= 4 => 1,
+        <= 8 => 2,
+        _    => 3,
+    };
+
+    private static string PatientFrom(string subject)
+    {
+        const string suffix = "'s Injuries";
+        return subject.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+            ? subject[..^suffix.Length].Trim()
+            : "";
     }
 
     /// <summary>A part was clicked: send its transfer through the host, which
