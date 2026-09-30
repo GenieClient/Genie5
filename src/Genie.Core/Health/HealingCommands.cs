@@ -159,6 +159,31 @@ public sealed class HealingCommandBuilder
     }
 
     /// <summary>
+    /// Transfer one wound DR's dialog did not mark (public #375): the
+    /// <c>transfer</c> verb, with DR's own word order
+    /// (<c>transfer &lt;patient&gt; internal &lt;part&gt; [scar]</c>, as DR's
+    /// injuries dialog writes it and as typed in the 2026-09-28 session).
+    ///
+    /// <para>Internal axes only. No external <c>transfer</c> line has been seen
+    /// from DR or a community script yet, so an external axis returns nothing
+    /// rather than a guessed wording (left-click <c>take</c> covers it). Nothing
+    /// for the player's own body.</para>
+    /// </summary>
+    public HealingAction Transfer(string? patient, string regionId, InjuryAxis axis)
+    {
+        if (IsSelf(patient) || !CanTransfer(axis)) return HealingAction.None;
+        var part = PartWords(regionId);
+        var p    = CleanPatient(patient);
+        if (part.Length == 0 || p.Length == 0) return HealingAction.None;
+        return HealingAction.Of($"transfer {p} internal {part}{(IsScar(axis) ? " scar" : "")}");
+    }
+
+    /// <summary>True for the axes <see cref="Transfer"/> has a confirmed
+    /// wording for: the two internal ones.</summary>
+    public static bool CanTransfer(InjuryAxis axis)
+        => axis is InjuryAxis.FreshInternal or InjuryAxis.ScarInternal;
+
+    /// <summary>
     /// Take every wound on <paramref name="chart"/>, one queued <c>take</c> per
     /// wounded region and axis: fresh wounds first, then scars, each worst
     /// first — the order an empath heals in. Nothing for the player's own
