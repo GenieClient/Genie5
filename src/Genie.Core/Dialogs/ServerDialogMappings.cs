@@ -39,11 +39,16 @@ public sealed class ServerDialogMapping
 }
 
 /// <summary>What to do with a dialog right now, mapping and session state combined.</summary>
+/// <param name="CreateHidden">A built-in default nobody chose (see
+/// <see cref="ServerDialogMappings.OpensQuietlyByDefault"/>): fill the window
+/// in the background and never show it on its own, not even the first time.
+/// A stored mapping never sets this.</param>
 public sealed record ServerDialogDisposition(
     ServerDialogMode Mode,
     string? Target,
     bool AutoOpen,
-    bool NeedsPrompt)
+    bool NeedsPrompt,
+    bool CreateHidden = false)
 {
     /// <summary>Whether a renderer should draw this dialog at all.</summary>
     public bool ShouldRender =>
@@ -80,6 +85,21 @@ public sealed class ServerDialogMappings
     /// those are not a closed set.
     /// </summary>
     public const string QuickBarLocation = "quickBar";
+
+    /// <summary>
+    /// Dialogs that fill in quietly unless the user maps them: another
+    /// character's injuries (<c>injuries-&lt;charnum&gt;</c>, e.g.
+    /// <c>injuries-10224090</c>, "Renucci's Injuries"). DR sends one every time
+    /// an empath touches a patient, and the Healing window now carries what it
+    /// holds (the health bar, Transfer Vit, Re-Link and the parts DR marks
+    /// transferable, public #263), so a window popping up on every touch
+    /// would only repeat it. No first-seen prompt either: it still exists and is
+    /// opened from Window ▸ Server Dialogs, and a stored mapping still wins.
+    /// </summary>
+    public static bool OpensQuietlyByDefault(string? dialogId)
+        => dialogId is { Length: > 9 } id
+           && id.StartsWith("injuries-", StringComparison.OrdinalIgnoreCase)
+           && id.AsSpan(9).IndexOfAnyExceptInRange('0', '9') < 0;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -137,6 +157,12 @@ public sealed class ServerDialogMappings
 
             if (string.Equals(location, QuickBarLocation, StringComparison.OrdinalIgnoreCase))
                 return new(ServerDialogMode.Ignore, null, false, NeedsPrompt: false);
+
+            // Rendered (so its content reaches the Healing window) but never
+            // shown on its own.
+            if (OpensQuietlyByDefault(dialogId))
+                return new(ServerDialogMode.NewWindow, null, AutoOpen: false,
+                           NeedsPrompt: false, CreateHidden: true);
 
             // Unmapped: buffer it and ask, but only if we have not already.
             return new(ServerDialogMode.AskLater, null, false,

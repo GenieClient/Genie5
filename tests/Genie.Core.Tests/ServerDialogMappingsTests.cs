@@ -110,6 +110,55 @@ public class ServerDialogMappingsTests
         Assert.True(m.Resolve("befriend",  location: "right").NeedsPrompt);
     }
 
+    // ── Another character's injuries (public #263) ───────────────────────────
+
+    /// <summary>The Healing window carries this dialog now, so it fills in
+    /// hidden by default: rendered (its content reaches the Healing window),
+    /// never auto-opened, never shown on first sight, and never asked about.</summary>
+    [Theory]
+    [InlineData("injuries-123")]
+    [InlineData("injuries-10224090")]
+    [InlineData("INJURIES-1")]
+    public void Other_character_injuries_fill_in_quietly_without_asking(string id)
+    {
+        var m = new ServerDialogMappings();
+
+        var d = m.Resolve(id, location: "center");
+
+        Assert.False(d.NeedsPrompt);
+        Assert.True(d.ShouldRender);
+        Assert.False(d.AutoOpen);
+        Assert.True(d.CreateHidden);
+        Assert.False(m.Resolve(id).NeedsPrompt);      // still no prompt on the next delta
+    }
+
+    [Fact]
+    public void A_stored_injuries_mapping_still_wins()
+    {
+        var m = new ServerDialogMappings();
+        m.Set(new ServerDialogMapping { Id = "injuries-123", Mode = ServerDialogMode.WhereDrProposes, AutoOpen = true });
+
+        var d = m.Resolve("injuries-123", location: "center");
+
+        Assert.Equal(ServerDialogMode.WhereDrProposes, d.Mode);
+        Assert.True(d.AutoOpen);
+        Assert.False(d.CreateHidden);
+    }
+
+    /// <summary>The quiet default is only the numbered form: the player's own
+    /// <c>injuries</c> (the Injuries panel's feed) and look-alike ids are
+    /// untouched.</summary>
+    [Theory]
+    [InlineData("injuries")]
+    [InlineData("injuries-")]
+    [InlineData("injuries-abc")]
+    [InlineData("injuries-12x")]
+    public void Only_the_numbered_injuries_dialog_is_quiet(string id)
+    {
+        Assert.False(ServerDialogMappings.OpensQuietlyByDefault(id));
+        Assert.False(new ServerDialogMappings().Resolve(id).CreateHidden);
+    }
+
     // ── The first-seen prompt ────────────────────────────────────────────────
 
     [Fact]
