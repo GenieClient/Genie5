@@ -2754,16 +2754,22 @@ public class GenieDockFactory : Factory
     /// per-dialog AutoOpen toggle off. A newly created window is always shown
     /// on first sight, because a window nobody has ever seen cannot be found in
     /// the Window menu.</para>
+    ///
+    /// <para><paramref name="revealOnCreate"/> false skips that first showing,
+    /// for a built-in quiet default (<c>injuries-&lt;charnum&gt;</c>, public
+    /// #263): the window is still created, so Window ▸ Server Dialogs lists it,
+    /// the same way DR's container windows are (public #336).</para>
     /// </summary>
     public ServerDialogViewModel GetOrCreateServerDialog(
         string dialogId, string? title = null, bool show = true,
-        Genie.Core.Dialogs.ServerDialogPlacement? placement = null)
+        Genie.Core.Dialogs.ServerDialogPlacement? placement = null,
+        bool revealOnCreate = true)
     {
         var id = ServerDialogId(dialogId);
         if (!_serverDialogTools.TryGetValue(id, out var tool))
         {
             tool = CreateServerDialogTool(dialogId, title);
-            show = true;
+            show |= revealOnCreate;
         }
         else if (!string.IsNullOrWhiteSpace(title))
         {

@@ -176,6 +176,53 @@ public class ServerDialogPlacementHeadlessTests
         Assert.Equal("backpack-dock", h.DockedParentOf(Id("rightfirst")));
     }
 
+    // ── The quiet default: another character's injuries (public #263) ─────────
+
+    private static ServerDialogState InjuriesState(string id)
+    {
+        var engine = new ServerDialogEngine();
+        engine.Observe(new Genie.Core.Events.OpenDialogEvent(
+            id, "Renucci's Injuries", "center", "190", "200",
+            Resident: false, DialogType: "dynamic", RawXml: ""));
+        return engine.Get(id)!;
+    }
+
+    /// <summary>No mapping: the window is created (so it fills in and Window ▸
+    /// Server Dialogs lists it) but NOT shown, not even on first sight.</summary>
+    [AvaloniaFact]
+    public void An_unmapped_injuries_dialog_is_created_hidden_and_still_listed()
+    {
+        using var h = new Harness();
+        var state = InjuriesState("injuries-123");
+        var how   = new ServerDialogMappings().Resolve(state.Id, state.Location);
+
+        var vm = MainWindowViewModel.ServerDialogWindowFor(h.Factory, state, how);
+        Harness.Pump(h.Main);
+
+        Assert.IsType<OtherInjuriesViewModel>(vm.Bespoke);
+        Assert.False(h.Factory.IsToolVisible(Id("injuries-123")));
+        Assert.Contains(h.Factory.ServerDialogWindows(), w => w.Id == Id("injuries-123") && !w.Visible);
+
+        // The menu toggle opens it.
+        h.Factory.SetToolVisibility(Id("injuries-123"), true);
+        Harness.Pump(h.Main);
+        Assert.True(h.Factory.IsToolVisible(Id("injuries-123")));
+    }
+
+    [AvaloniaFact]
+    public void A_stored_injuries_mapping_still_opens_it()
+    {
+        using var h = new Harness();
+        var state = InjuriesState("injuries-123");
+        var m = new ServerDialogMappings();
+        m.Set(new ServerDialogMapping { Id = "injuries-123", Mode = ServerDialogMode.NewWindow, AutoOpen = true });
+
+        MainWindowViewModel.ServerDialogWindowFor(h.Factory, state, m.Resolve(state.Id, state.Location));
+        Harness.Pump(h.Main);
+
+        Assert.True(h.Factory.IsToolVisible(Id("injuries-123")));
+    }
+
     // ── "Existing window": a tab beside the chosen window ────────────────────
 
     [AvaloniaFact]

@@ -27,6 +27,13 @@ namespace Genie.App.ViewModels;
 /// <para>Deliberately NOT routed into the player's own Injuries panel: that is
 /// the player's body, and this window describes someone else's (see the
 /// exact-id note on <c>ServerDialogEngine</c>'s exclusions).</para>
+///
+/// <para>It IS carried into the Healing window (public #263): that window
+/// subscribes to <see cref="Rendered"/> and shows this patient's bar, buttons
+/// and DR-marked transfers, every click still coming back through
+/// <see cref="ActivateExtra"/> / <see cref="TransferRegion"/> and so through the
+/// host. By default this window itself fills in hidden
+/// (<c>ServerDialogMappings.OpensQuietlyByDefault</c>).</para>
 /// </summary>
 public sealed partial class OtherInjuriesViewModel : ReactiveObject, IServerDialogBespoke
 {
@@ -187,6 +194,29 @@ public sealed partial class OtherInjuriesViewModel : ReactiveObject, IServerDial
                         + (p.CanTransfer ? "  ·  transferable" : p.FromReading ? "  ·  from your touch" : ""));
         IsEmpty     = Injured.Count == 0;
         AnyTransfer = Parts.Any(p => p.CanTransfer);
+        Rendered?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Raised after every render (a dialog delta or a merged
+    /// reading), so the Healing window can follow this patient's dialog
+    /// without the window being open (public #263).</summary>
+    public event EventHandler? Rendered;
+
+    /// <summary>DR's own words for the transfer it attached to
+    /// <paramref name="regionId"/> (its tooltip, else the cmd), or null when DR
+    /// marked nothing there.</summary>
+    public string? TransferHint(string regionId)
+        => _dialog.TryGetValue(regionId, out var d) && d.Cmd is not null
+            ? (string.IsNullOrWhiteSpace(d.Tooltip) ? d.Cmd : d.Tooltip)
+            : null;
+
+    /// <summary>Send DR's transfer for <paramref name="regionId"/> through the
+    /// host. False (and nothing sent) when DR marked nothing there.</summary>
+    public bool TransferRegion(string regionId)
+    {
+        if (TransferHint(regionId) is null) return false;
+        _host.Activate(regionId);
+        return true;
     }
 
     /// <summary>The reading's worst wound for a region, on the dialog's sprite

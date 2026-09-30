@@ -26,13 +26,24 @@ namespace Genie.App.ViewModels;
 /// vitality, poison and disease. The words list under the grid spells out
 /// every axis, so severity never rides on colour alone.</para>
 ///
+/// <para><b>DR's injuries dialog.</b> When DR sends
+/// <c>injuries-&lt;charnum&gt;</c> for the acting-on patient
+/// (<see cref="DrDialog"/>), the header shows its health bar and its Transfer
+/// Vit / Re-Link buttons, and every part DR marked transferable carries a ⇄
+/// marker: left-click still takes, right-click sends DR's transfer. That
+/// dialog's own window fills in hidden by default.</para>
+///
 /// <para><b>Send policy.</b> Every command this panel sends goes through
 /// <see cref="Dispatch"/>, and <see cref="Dispatch"/> is reached only from the
 /// public click entry points (<see cref="Perceive"/>, <see cref="Touch"/>,
-/// <see cref="HealRegion"/>, <see cref="TakeAll"/>, <see cref="TakeCondition"/>,
+/// <see cref="HealRegion"/>, <see cref="TransferRegion"/>, <see cref="TakeAll"/>, <see cref="TakeCondition"/>,
 /// <see cref="CastSpell"/>, <see cref="CastPending"/>, <see cref="Stop"/>).
-/// A reading arriving, a selection changing, or a setting being edited never
-/// sends. There is no timer. Queued sequences (Take All, prepare-then-cast)
+/// The two DR-dialog entry points (<see cref="TransferRegion"/> on a part DR
+/// marked, <see cref="ActivateDialogControl"/>) send DR's own command through
+/// that dialog's host instead, so it is resolved and separator-escaped like a
+/// click in DR's window.
+/// A reading arriving, a dialog arriving, a selection changing, or a setting
+/// being edited never sends. There is no timer. Queued sequences (Take All, prepare-then-cast)
 /// ride the player's own roundtime-gated <c>#send</c> queue — see
 /// <see cref="HealingCommandBuilder"/>.</para>
 ///
@@ -52,8 +63,12 @@ public sealed class HealingViewModel : ReactiveObject
             FullName = fullName;
             Row      = row;
             Column   = column;
-            Tip      = $"{fullName} — healthy";
+            _baseTip = $"{fullName} — healthy";
+            Tip      = _baseTip;
         }
+
+        private string  _baseTip;
+        private string? _rightClick;
 
         /// <summary>Region id as the parser reports it (<c>leftArm</c>, <c>nsys</c>).</summary>
         public string RegionId { get; }
@@ -72,6 +87,9 @@ public sealed class HealingViewModel : ReactiveObject
         /// <summary>True when the selected axis has a wound here — the cell is
         /// then a live heal button.</summary>
         [Reactive] public bool          IsWounded  { get; private set; }
+        /// <summary>DR's own injuries dialog for this patient marked this part
+        /// transferable (the ⇄ marker); a right-click sends DR's transfer.</summary>
+        [Reactive] public bool          DrTransfer { get; private set; }
 
         internal void Set(RegionInjuries? region, InjuryAxis axis)
         {
@@ -81,11 +99,24 @@ public sealed class HealingViewModel : ReactiveObject
             Rung       = IsWounded ? ((int)s).ToString() : "";
             Fill       = FillFor(s);
             Foreground = ForegroundFor(s);
-            Tip        = region is null || region.Worst == WoundSeverity.None
+            _baseTip   = region is null || region.Worst == WoundSeverity.None
                 ? $"{FullName} — healthy"
                 : FullName + "\n" + string.Join("\n",
                     AxisOptions.Select(o => $"{o.Label}: {Word(region[o.Axis])}"));
+            ComposeTip();
         }
+
+        /// <summary>What a right-click on this tile would send, if anything,
+        /// and whether that is DR's own marked transfer.</summary>
+        internal void SetTransfer(bool drMarked, string? rightClick)
+        {
+            DrTransfer  = drMarked;
+            _rightClick = rightClick;
+            ComposeTip();
+        }
+
+        private void ComposeTip()
+            => Tip = _rightClick is null ? _baseTip : $"{_baseTip}\nright-click: {_rightClick}";
     }
 
     /// <summary>One patient's latest reading.</summary>
@@ -311,6 +342,7 @@ public sealed class HealingViewModel : ReactiveObject
             this.RaiseAndSetIfChanged(ref _patientName, value ?? "");
             this.RaisePropertyChanged(nameof(IsSelf));
             this.RaisePropertyChanged(nameof(TargetLabel));
+            RefreshDialog();
         }
     }
 
@@ -431,6 +463,82 @@ public sealed class HealingViewModel : ReactiveObject
         _save?.Invoke();
     }
 
+    // ── DR's own injuries dialog (never sends) ───────────────────────────────
+
+    // Every other-character injuries dialog seen this session, most recently
+    // updated last. The one for the acting-on patient is DrDialog.
+    private readonly List<OtherInjuriesViewModel> _dialogs = new();
+
+    /// <summary>
+    /// DR's <c>injuries-&lt;charnum&gt;</c> dialog for the patient the buttons
+    /// act on, or null (yourself, nobody, or DR hasn't sent one). Its
+    /// <see cref="OtherInjuriesViewModel.Extras"/> are the health bar and DR's
+    /// own buttons (Transfer Vit, Re-Link) the header shows.
+    /// </summary>
+    [Reactive] public OtherInjuriesViewModel? DrDialog    { get; private set; }
+    [Reactive] public bool                    HasDrDialog { get; private set; }
+
+    /// <summary>
+    /// Follow one of DR's other-character injuries dialogs (public #263). The
+    /// host calls this once per dialog; the header and the tiles then track
+    /// whichever one names the acting-on patient.
+    /// </summary>
+    public void AttachDialog(OtherInjuriesViewModel dialog)
+    {
+        ArgumentNullException.ThrowIfNull(dialog);
+        if (_dialogs.Contains(dialog)) return;
+        _dialogs.Add(dialog);
+        dialog.Rendered += OnDialogChanged;
+        RefreshDialog();
+    }
+
+    /// <summary>A new connection: drop every dialog from the last one.</summary>
+    public void ClearDialogs()
+    {
+        foreach (var d in _dialogs) d.Rendered -= OnDialogChanged;
+        _dialogs.Clear();
+        RefreshDialog();
+    }
+
+    private void OnDialogChanged(object? sender, EventArgs e)
+    {
+        if (sender is OtherInjuriesViewModel d && _dialogs.Remove(d)) _dialogs.Add(d);
+        RefreshDialog();
+    }
+
+    private void RefreshDialog()
+    {
+        var name = IsSelf ? "" : HealingCommandBuilder.CleanPatient(PatientName);
+        DrDialog = name.Length == 0 ? null : _dialogs.LastOrDefault(
+            d => string.Equals(d.Patient, name, StringComparison.OrdinalIgnoreCase));
+        HasDrDialog = DrDialog is not null;
+        RenderTransfers();
+    }
+
+    /// <summary>
+    /// What a right-click on each tile would send: DR's own transfer where its
+    /// dialog marked the part, else (for another patient, on a wounded tile)
+    /// the internal-axis <c>transfer</c> the builder has a confirmed wording
+    /// for (public #375). Nothing on yourself.
+    /// </summary>
+    private void RenderTransfers()
+    {
+        var builder = Builder();
+        foreach (var cell in Cells)
+        {
+            if (IsSelf) { cell.SetTransfer(false, null); continue; }
+            if (DrDialog?.TransferHint(cell.RegionId) is { } hint)
+            {
+                cell.SetTransfer(true, hint);
+                continue;
+            }
+            var fallback = cell.IsWounded
+                ? builder.Transfer(PatientName, cell.RegionId, _selectedAxis.Axis)
+                : HealingAction.None;
+            cell.SetTransfer(false, fallback.Lines.Count > 0 ? fallback.Lines[0] : null);
+        }
+    }
+
     // ── Readings in (never sends) ────────────────────────────────────────────
 
     /// <summary>
@@ -476,6 +584,7 @@ public sealed class HealingViewModel : ReactiveObject
         foreach (var cell in Cells)
             cell.Set(chart is not null && chart.Regions.TryGetValue(cell.RegionId, out var r) ? r : null,
                      _selectedAxis.Axis);
+        RenderTransfers();
 
         Wounds.Clear();
         if (chart is null)
@@ -517,6 +626,32 @@ public sealed class HealingViewModel : ReactiveObject
     {
         if (cell is null || !cell.IsWounded) return;
         Dispatch(Builder().HealRegion(PatientName, cell.RegionId, _selectedAxis.Axis));
+    }
+
+    /// <summary>
+    /// A body region was right-clicked: transfer it. Where DR's dialog marked
+    /// the part, DR's own command goes through the dialog host (resolved and
+    /// separator-escaped like any dialog click). Otherwise a wounded tile on
+    /// another patient sends the builder's <c>transfer</c> for the selected
+    /// axis (internal axes only, public #375). Nothing on yourself.
+    /// </summary>
+    public void TransferRegion(RegionCell cell)
+    {
+        if (cell is null || IsSelf) return;
+        if (DrDialog is { } dialog && dialog.TransferRegion(cell.RegionId)) return;
+        if (!cell.IsWounded) return;
+        Dispatch(Builder().Transfer(PatientName, cell.RegionId, _selectedAxis.Axis));
+    }
+
+    /// <summary>One of DR's own header buttons (Transfer Vit, Re-Link) was
+    /// clicked: through the dialog host, like the button in DR's window.</summary>
+    public void ActivateDialogControl(string controlId)
+    {
+        if (DrDialog is not { } dialog) return;
+        if (!dialog.Extras.Any(c => (c is DialogButtonViewModel or DialogLinkViewModel) &&
+                                    string.Equals(c.Id, controlId, StringComparison.OrdinalIgnoreCase)))
+            return;
+        dialog.ActivateExtra(controlId);
     }
 
     /// <summary>Take All: one click, one queued take per wound on the chart.</summary>

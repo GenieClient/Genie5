@@ -3567,6 +3567,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             if (change.Kind == ServerDialogChangeKind.Reset)
             {
                 _hookedServerDialogs.Clear();
+                Healing.ClearDialogs();
                 return;
             }
             if (change.State is null || DockFactory is not GenieDockFactory factory) return;
@@ -3592,27 +3593,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 return;
             }
 
-            // AutoOpen off means populate silently and let the Window menu open
-            // it; DR having closed the dialog likewise shouldn't re-surface it.
-            // "Where DR suggests" reads the server's placement hints, "Existing
-            // window" goes beside the chosen window; "Its own window" keeps the
-            // right-column default.
-            var show      = how.AutoOpen && state.IsOpen;
-            var placement = how.Mode switch
-            {
-                ServerDialogMode.WhereDrProposes =>
-                    ServerDialogPlacement.From(state.Location, state.Width, state.Height),
-                ServerDialogMode.ExistingWindow  => ServerDialogPlacement.With(how.Target),
-                _                                => ServerDialogPlacement.Default,
-            };
-            var vm = factory.GetOrCreateServerDialog(state.Id, state.Title, show, placement);
+            var vm = ServerDialogWindowFor(factory, state, how);
             _serverDialogPlacementKeys[state.Id] = PlacementKey(how);
 
             vm.SeparatorChar = core.Config.SeparatorChar;
             HookServerDialog(core, factory, vm);
             vm.Apply(state);
 
-            if (change.Kind == ServerDialogChangeKind.Exposed)
+            if (change.Kind == ServerDialogChangeKind.Exposed && !how.CreateHidden)
                 factory.ExposeServerDialog(state.Id);
         }
         catch (Exception ex)
@@ -3621,6 +3609,31 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             GameText.AddSystemLine(
                 $"[dialogs] could not render '{change.DialogId}': {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Get (creating on first sight) a dialog's window under its resolved
+    /// disposition, showing it only when that says to. AutoOpen off means
+    /// populate silently and let the Window menu open it; DR having closed the
+    /// dialog likewise shouldn't re-surface it. "Where DR suggests" reads the
+    /// server's placement hints, "Existing window" goes beside the chosen
+    /// window; "Its own window" keeps the right-column default. A quiet default
+    /// (another character's injuries, public #263) is created hidden, not even
+    /// shown the first time: the Healing window carries what it holds.
+    /// </summary>
+    internal static ServerDialogViewModel ServerDialogWindowFor(
+        GenieDockFactory factory, ServerDialogState state, ServerDialogDisposition how)
+    {
+        var show      = how.AutoOpen && state.IsOpen;
+        var placement = how.Mode switch
+        {
+            ServerDialogMode.WhereDrProposes =>
+                ServerDialogPlacement.From(state.Location, state.Width, state.Height),
+            ServerDialogMode.ExistingWindow  => ServerDialogPlacement.With(how.Target),
+            _                                => ServerDialogPlacement.Default,
+        };
+        return factory.GetOrCreateServerDialog(state.Id, state.Title, show, placement,
+                                               revealOnCreate: !how.CreateHidden);
     }
 
     /// <summary>Wire one dialog VM's outputs once: a resolved command goes
@@ -3634,11 +3647,16 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // Another character's injuries: merge the empath's own touch/perceive
         // readings, since DR's dialog filters by the viewer's display mode.
         if (vm.Bespoke is OtherInjuriesViewModel other)
+        {
             other.AttachReadings(
                 patient => core.State.PatientHealth.TryGetValue(patient, out var h) ? h : null,
                 core.GameEvents.OfType<Genie.Core.Events.PatientHealthEvent>()
                     .Select(e => e.Health)
                     .ObserveOn(RxApp.MainThreadScheduler));
+            // ...and hand it to the Healing window, which shows its bar and
+            // buttons and right-click transfers for the same patient (public #263).
+            Healing.AttachDialog(other);
+        }
 
         vm.ActionRequested += action =>
         {

@@ -1,5 +1,6 @@
 using System;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Genie.App.ViewModels;
 using Genie.Core.Health;
@@ -27,6 +28,22 @@ public partial class HealingPanel : UserControl
     private void OnRegionClicked(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.Tag is HealingViewModel.RegionCell cell) Vm?.HealRegion(cell);
+    }
+
+    /// <summary>A right-click on a region: transfer it. Button's own handler
+    /// only acts on the left button, so the right release reaches here; no
+    /// context menu is attached, so nothing else opens.</summary>
+    private void OnRegionPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (e.InitialPressMouseButton != MouseButton.Right) return;
+        if ((sender as Control)?.Tag is not HealingViewModel.RegionCell cell) return;
+        e.Handled = true;
+        Vm?.TransferRegion(cell);
+    }
+
+    private void OnDrControl(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.Tag is string id) Vm?.ActivateDialogControl(id);
     }
 
     private void OnCondition(object? sender, RoutedEventArgs e)
