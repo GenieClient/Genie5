@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Controls.Presenters;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
@@ -75,6 +78,29 @@ public sealed class HealingPanelHeadlessTests
                                 .First(p => p.GetVisualParent() is Grid);
             Assert.Equal(0, Grid.GetRow(presenter));
             Assert.Equal(1, Grid.GetColumn(presenter));
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>A REAL pointer click (press + release over the tile), not a
+    /// raised Click event: the 2026-09-30 walk found tiles that showed the
+    /// reading but sent nothing when clicked.</summary>
+    [AvaloniaFact]
+    public void A_pointer_click_on_a_wounded_tile_sends_the_take()
+    {
+        var (panel, window, vm, sent) = Host();
+        try
+        {
+            vm.Apply(Naper());
+            Pump(window);
+
+            var arm = Regions(panel).Single(b => ((HealingViewModel.RegionCell)b.Tag!).RegionId == "leftArm");
+            var centre = arm.TranslatePoint(new Point(arm.Bounds.Width / 2, arm.Bounds.Height / 2), window)!.Value;
+            window.MouseDown(centre, MouseButton.Left);
+            window.MouseUp(centre, MouseButton.Left);
+            Pump(window);
+
+            Assert.Equal(new[] { "take Naper left arm" }, sent);
         }
         finally { window.Close(); }
     }
