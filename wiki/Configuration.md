@@ -207,6 +207,7 @@ DragonRealms describes some windows itself — the bank, stores, spell choice, f
 - **Your placement wins.** Once you've moved a dialog — floated it, or docked it somewhere else — it comes back where you left it rather than where the hint says (`force-center` excepted).
 - **Open it automatically when DragonRealms sends it** — untick it and the window still fills in, but stays closed until you open it from **Window → Server Dialogs**, which lists every dialog seen this session.
 - **Forget** drops the answer, so Genie asks again the next time the dialog appears.
+- **Some dialogs are never asked about.** DragonRealms' quick-bar launcher entries are left hidden. Another character's injuries window (`injuries-` and a number, titled "*Name*'s Injuries", sent when an empath touches a patient) fills in without opening, because the [Healing window](The-Interface#the-healing-window) shows its health bar, its buttons and its transferable parts. Open it from **Window → Server Dialogs**, or give it an answer here to change that.
 - **Show server dialog windows** at the top is the master switch, `#config serverdialogs on|off` (default on). Off, no dialog window opens and nothing asks; the contents keep updating in the background, and your answers are kept.
 
 From the command bar, `#dialogs` (or `#dialogs list`) lists the dialogs seen this session, `#dialogs forget <id>` is the same as **Forget**, and `#dialogs report <id>` opens a pre-filled, redacted GitHub issue draft for a dialog that doesn't render right — nothing is posted until you submit it.
