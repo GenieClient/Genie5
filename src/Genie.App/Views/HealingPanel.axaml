@@ -133,20 +133,22 @@
                       Tag="{Binding}"
                       Click="OnRegionClicked"
                       PointerReleased="OnRegionPointerReleased">
-                <Panel>
-                  <StackPanel Spacing="0">
-                    <TextBlock Text="{Binding Label}" FontSize="10" HorizontalAlignment="Center"
+                <StackPanel Spacing="0">
+                  <!-- The ⇄ sits inline after the label, not in a corner overlay:
+                       on a narrow tile the label fills the width and an
+                       overlay printed over its last letters (2026-09-30 walk). -->
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="2">
+                    <TextBlock Text="{Binding Label}" FontSize="10"
                                Foreground="{Binding Foreground}"/>
-                    <TextBlock Text="{Binding Rung}" FontSize="11" FontWeight="SemiBold"
-                               HorizontalAlignment="Center" Foreground="{Binding Foreground}"
-                               IsVisible="{Binding IsWounded}"/>
+                    <!-- DR marked this part transferable: right-click sends it. -->
+                    <TextBlock Classes="xfer" Text="⇄" FontSize="10"
+                               Foreground="{Binding Foreground}"
+                               IsVisible="{Binding DrTransfer}"/>
                   </StackPanel>
-                  <!-- DR marked this part transferable: right-click sends it. -->
-                  <TextBlock Classes="xfer" Text="⇄" FontSize="9" Margin="0,-2,0,0"
-                             HorizontalAlignment="Right" VerticalAlignment="Top"
-                             Foreground="{Binding Foreground}"
-                             IsVisible="{Binding DrTransfer}"/>
-                </Panel>
+                  <TextBlock Text="{Binding Rung}" FontSize="11" FontWeight="SemiBold"
+                             HorizontalAlignment="Center" Foreground="{Binding Foreground}"
+                             IsVisible="{Binding IsWounded}"/>
+                </StackPanel>
               </Button>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

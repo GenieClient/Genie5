@@ -208,6 +208,14 @@ public sealed class HealingPanelHeadlessTests
             Assert.Equal("⇄", Marker(leg).Text);
             Assert.False(Marker(Tile("head")).IsEffectivelyVisible);
 
+            // The ⇄ must not print over the label (the 2026-09-30 walk read
+            // "R Ar~m"): compare their rectangles in the tile's own space.
+            var label  = leg.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "L Leg");
+            var marker = Marker(leg);
+            var labelRect  = new Rect(label.TranslatePoint(default, leg)!.Value, label.Bounds.Size);
+            var markerRect = new Rect(marker.TranslatePoint(default, leg)!.Value, marker.Bounds.Size);
+            Assert.False(labelRect.Intersects(markerRect), $"marker {markerRect} overlaps label {labelRect}");
+
             var centre = leg.TranslatePoint(new Point(leg.Bounds.Width / 2, leg.Bounds.Height / 2), window)!.Value;
             window.MouseDown(centre, MouseButton.Right);
             window.MouseUp(centre, MouseButton.Right);
