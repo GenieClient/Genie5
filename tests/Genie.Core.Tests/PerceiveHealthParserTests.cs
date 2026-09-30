@@ -357,4 +357,52 @@ public class PerceiveHealthParserTests
         Assert.False(p.InBlock);
         Assert.False(p.Feed("  Fresh External:  -- minor"));
     }
+
+    // ── Vitality, as captured live on 2026-09-30 ────────────────────────────
+
+    /// <summary>A dead patient, verbatim from the walk: the loss is negative
+    /// and the remaining figure is past 100, and together they confirm
+    /// remaining = 100 - loss. Both used to fall through the 0-100 guard, so
+    /// the Healing panel showed "Vitality —".</summary>
+    [Fact]
+    public void A_dead_patients_loss_and_remaining_are_both_read()
+    {
+        var chart = Run(
+            "Renucci's injuries include...",
+            "Wounds to the BACK:",
+            "  Fresh External:  light scratches -- insignificant",
+            "",
+            "Renucci is suffering from a deadly loss of vitality (-115%).",
+            "(Renucci has 215% vitality remaining.)");
+
+        Assert.Equal(215,  chart.VitalityPercent);
+        Assert.Equal(-115, chart.VitalityRawPercent);
+    }
+
+    [Fact]
+    public void The_remaining_figure_alone_is_enough()
+    {
+        var chart = Run(
+            "Renucci's injuries include...",
+            "(Renucci has 62% vitality remaining.)");
+
+        Assert.Equal(62, chart.VitalityPercent);
+        Assert.Equal(38, chart.VitalityRawPercent);
+    }
+
+    /// <summary>"Renucci has normal vitality." carries no number; the word is
+    /// kept so the panel can say "normal" instead of a dash.</summary>
+    [Fact]
+    public void A_worded_vitality_keeps_its_word()
+    {
+        var chart = Run(
+            "Renucci's injuries include...",
+            "Wounds to the LEFT ARM:",
+            "  Fresh External:  light scratches -- negligible",
+            "",
+            "Renucci has normal vitality.");
+
+        Assert.Null(chart.VitalityPercent);
+        Assert.Equal("normal", chart.VitalityWord);
+    }
 }

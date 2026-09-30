@@ -61,10 +61,24 @@ public sealed partial class PerceiveHealthParser
     [System.Text.RegularExpressions.GeneratedRegex(@"^\s*(?<kind>Fresh|Scars)\s+(?<depth>External|Internal):.*?--\s*(?<severity>[a-z ]+?)\s*(?:\(\d+/\d+\))?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
     private static partial System.Text.RegularExpressions.Regex AxisRegex();
 
-    /// <summary>Vitality line — the percentage DR prints in parentheses.</summary>
+    /// <summary>The vitality LOSS DR prints in parentheses. It can be negative
+    /// and past 100 on a dead patient: "a deadly loss of vitality (-115%)" on
+    /// the 2026-09-30 walk.</summary>
     private static readonly Regex VitalityRe = VitalityRegex();
-    [System.Text.RegularExpressions.GeneratedRegex(@"\((?<pct>\d{1,3})%\)", System.Text.RegularExpressions.RegexOptions.None)]
+    [System.Text.RegularExpressions.GeneratedRegex(@"\((?<pct>-?\d{1,4})%\)", System.Text.RegularExpressions.RegexOptions.None)]
     private static partial System.Text.RegularExpressions.Regex VitalityRegex();
+
+    /// <summary>The vitality REMAINING, when DR states it outright: "(Renucci
+    /// has 215% vitality remaining.)". Captured live 2026-09-30 beside a loss
+    /// of -115%, which confirms remaining = 100 - loss.</summary>
+    private static readonly Regex VitalityRemainingRe = VitalityRemainingRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\b(?:has|have)\s+(?<pct>-?\d{1,4})%\s+vitality\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex VitalityRemainingRegex();
+
+    /// <summary>A vitality stated in words: "Renucci has normal vitality."</summary>
+    private static readonly Regex VitalityWordRe = VitalityWordRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"\b(?:has|have)\s+(?<word>[a-z][a-z ]*?)\s+vitality\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex VitalityWordRegex();
 
     /// <summary>Block terminators. "has/have … vitality" is the one the
     /// community script waits on (<c>waitforre ^You .+ vitality</c>).</summary>
@@ -116,6 +130,8 @@ public sealed partial class PerceiveHealthParser
     private string? _pendingName;              // from "The presence of X."
     private string  _currentRegion = "";
     private int?    _rawVitality;
+    private int?    _remainingVitality;
+    private string? _vitalityWord;
     private bool    _poisoned;
     private bool    _diseased;
 
@@ -293,8 +309,9 @@ public sealed partial class PerceiveHealthParser
         {
             Patient            = _patient,
             Regions            = regions,
-            VitalityRawPercent = _rawVitality,
-            VitalityPercent    = _rawVitality is { } raw ? 100 - raw : null,
+            VitalityRawPercent = _rawVitality ?? (_remainingVitality is { } left ? 100 - left : null),
+            VitalityPercent    = _remainingVitality ?? (_rawVitality is { } raw ? 100 - raw : null),
+            VitalityWord       = _vitalityWord,
             IsPoisoned         = _poisoned,
             IsDiseased         = _diseased,
             CapturedAt         = _now(),
@@ -310,6 +327,8 @@ public sealed partial class PerceiveHealthParser
         _patient       = "";
         _currentRegion = "";
         _rawVitality   = null;
+        _remainingVitality = null;
+        _vitalityWord  = null;
         _poisoned      = false;
         _diseased      = false;
     }
@@ -323,9 +342,17 @@ public sealed partial class PerceiveHealthParser
 
     private void ReadVitality(string line)
     {
-        var m = VitalityRe.Match(line);
-        if (m.Success && int.TryParse(m.Groups["pct"].Value, out var pct) && pct is >= 0 and <= 100)
+        var left = VitalityRemainingRe.Match(line);
+        if (left.Success && int.TryParse(left.Groups["pct"].Value, out var remaining))
+        {
+            _remainingVitality = remaining;
+            return;
+        }
+        var loss = VitalityRe.Match(line);
+        if (loss.Success && int.TryParse(loss.Groups["pct"].Value, out var pct))
             _rawVitality = pct;
+        var word = VitalityWordRe.Match(line);
+        if (word.Success) _vitalityWord = word.Groups["word"].Value.Trim();
     }
 
     private static bool IsTerminator(string line) =>

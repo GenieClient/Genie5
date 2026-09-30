@@ -597,7 +597,9 @@ public sealed class HealingViewModel : ReactiveObject
 
         var who = chart.IsSelf ? "Yourself" : chart.Patient;
         ReadingTitle = $"{who} — read {chart.CapturedAt.ToLocalTime():HH:mm:ss}";
-        VitalityText = chart.VitalityPercent is { } v ? $"Vitality {v}%" : "Vitality —";
+        VitalityText = chart.VitalityPercent is { } v ? $"Vitality {v}%"
+                     : chart.VitalityWord is { Length: > 0 } w ? $"Vitality: {w}"
+                     : "Vitality —";
         IsPoisoned   = chart.IsPoisoned;
         IsDiseased   = chart.IsDiseased;
 

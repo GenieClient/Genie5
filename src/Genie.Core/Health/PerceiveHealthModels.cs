@@ -120,18 +120,20 @@ public sealed class PatientHealth
     /// not report one.
     /// </summary>
     /// <remarks>
-    /// Derived as <c>100 - N</c> from the <c>(NN%)</c> DR prints, per the
-    /// grammar in #277. <b>Unverified against a real capture</b> — #277 records
-    /// that no recording of a perceive on another player exists yet, and this
-    /// inversion is the one part of the grammar a capture would settle. The raw
-    /// number is kept in <see cref="VitalityRawPercent"/> so a wrong inversion
-    /// is a one-line fix rather than a re-parse.
+    /// Taken from DR's "has N% vitality remaining" when it says so, otherwise
+    /// derived as <c>100 - N</c> from the <c>(N%)</c> loss it prints (#277).
+    /// Confirmed live 2026-09-30: a loss of -115% came with "215% vitality
+    /// remaining". It can exceed 100 or go negative on a dead patient.
     /// </remarks>
     public int? VitalityPercent { get; init; }
 
     /// <summary>The number DR actually printed inside the parentheses, before
     /// the <c>100 - N</c> inversion. See <see cref="VitalityPercent"/>.</summary>
     public int? VitalityRawPercent { get; init; }
+
+    /// <summary>Vitality as DR words it when it gives no number ("normal" from
+    /// "Renucci has normal vitality."), or null.</summary>
+    public string? VitalityWord { get; init; }
 
     /// <summary>True when the block reported poison.</summary>
     public bool IsPoisoned { get; init; }
