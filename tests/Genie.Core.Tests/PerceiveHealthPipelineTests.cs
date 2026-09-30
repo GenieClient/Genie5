@@ -215,6 +215,72 @@ public class PerceiveHealthPipelineTests
 
     /// <summary>A thought or whisper quoting these lines must not open a block
     /// or contribute a wound to anybody's chart.</summary>
+    /// <summary>
+    /// An empath's <c>touch</c>: DR sends the whole block inside
+    /// <c>&lt;pushStream id="familiar"&gt;</c>, twice nested. Verbatim from the
+    /// 2026-09-30 live recording. Scoping the parser to <c>main</c> alone meant
+    /// no touch ever produced a reading, so the Healing panel and the patient's
+    /// injuries window stayed empty under a chart listing three wounds.
+    /// </summary>
+    [Fact]
+    public void A_touch_block_on_the_familiar_stream_is_read_end_to_end()
+    {
+        var f = new Fixture();
+        var parser = new Genie.Core.Parser.DrXmlParser(NullLogger<Genie.Core.Parser.DrXmlParser>.Instance);
+        using var _ = parser.GameEvents.Subscribe(e => f.Feed.Push(e));
+
+        parser.Feed(
+            "You sense a successful empathic link has been forged between you and Renucci.\n" +
+            "<pushStream id=\"familiar\" /><pushStream id=\"familiar\" ifClosedStyle=\"watching\"/>\n" +
+            "Renucci's injuries include...\n" +
+            "Wounds to the LEFT ARM:\n" +
+            "  Fresh External:  light scratches -- negligible\n" +
+            "Wounds to the LEFT LEG:\n" +
+            "  Fresh External:  light scratches -- insignificant\n" +
+            "Wounds to the CHEST:\n" +
+            "  Fresh External:  light scratches -- insignificant\n" +
+            "\n" +
+            "Renucci has normal vitality.\n" +
+            "<popStream/><popStream/><prompt time=\"1790789789\">&gt;</prompt>\n");
+
+        var ev = Assert.Single(f.Charts);
+        Assert.Equal("Renucci", ev.Health.Patient);
+        Assert.Equal(WoundSeverity.Negligible,    ev.Health.Regions["leftArm"][InjuryAxis.FreshExternal]);
+        Assert.Equal(WoundSeverity.Insignificant, ev.Health.Regions["leftLeg"][InjuryAxis.FreshExternal]);
+        Assert.Equal(WoundSeverity.Insignificant, ev.Health.Regions["chest"][InjuryAxis.FreshExternal]);
+    }
+
+    [Fact]
+    public void A_block_on_the_familiar_stream_lands_in_game_state()
+    {
+        var f = new Fixture();
+
+        f.SayOn("familiar",
+                "Renucci's injuries include...",
+                "Wounds to the LEFT ARM:",
+                "  Fresh External:  light scratches -- negligible",
+                "Renucci has normal vitality.");
+
+        Assert.True(f.State.PatientHealth.ContainsKey("Renucci"));
+    }
+
+    [Theory]
+    [InlineData("talk")]
+    [InlineData("whispers")]
+    [InlineData("thoughts")]
+    public void A_block_quoted_on_a_speech_stream_is_still_ignored(string stream)
+    {
+        var f = new Fixture();
+
+        f.SayOn(stream,
+                "Renucci's injuries include...",
+                "Wounds to the HEAD:",
+                "  Fresh External:  -- useless",
+                "Renucci has some vitality.");
+
+        Assert.Empty(f.Charts);
+    }
+
     [Fact]
     public void A_block_on_another_stream_is_ignored()
     {

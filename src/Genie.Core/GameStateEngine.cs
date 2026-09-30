@@ -441,6 +441,10 @@ public sealed partial class GameStateEngine : IDisposable
     [System.Text.RegularExpressions.GeneratedRegex(@"(?<name>[A-Z][A-Za-z]*(?: [A-Z][A-Za-z]*)*):\s+(?<rank>\d+)\s+\d+%", System.Text.RegularExpressions.RegexOptions.None)]
     private static partial System.Text.RegularExpressions.Regex ExpTableRowPattern();
 
+    /// <summary>Streams a perceive / touch block can arrive on (see ApplyText).</summary>
+    private static readonly HashSet<string> PerceiveStreams =
+        new(StringComparer.OrdinalIgnoreCase) { "main", "familiar" };
+
     /// <summary>Publish a perceive reading the parser has just completed, if any.</summary>
     private void PublishPerceive()
     {
@@ -466,11 +470,13 @@ public sealed partial class GameStateEngine : IDisposable
         if (string.IsNullOrEmpty(text)) return;
 
         // perceive health / "<patient>'s injuries include" (public #277). The
-        // block has no stream of its own — it arrives as ordinary main-stream
-        // game text — so it is fed from here. Scoped to `main` deliberately: a
-        // thought or a whisper quoting one of these lines must not open a block
-        // or contribute a wound to somebody's chart.
-        if (string.Equals(te.Stream, "main", StringComparison.OrdinalIgnoreCase))
+        // block has no stream of its own, so it is fed from here. `perceive
+        // health` arrives as main-stream text; an empath's `touch <patient>`
+        // arrives inside <pushStream id="familiar"> (live recording 2026-09-30,
+        // public #263), so both are read. Every stream that carries player
+        // speech stays out deliberately: a thought or a whisper quoting one of
+        // these lines must not open a block or add a wound to anybody's chart.
+        if (PerceiveStreams.Contains(te.Stream))
         {
             // NOT gated on Feed's return value: a terminator both closes the
             // block and reports false, because the terminator is not part of
