@@ -233,6 +233,51 @@ public sealed class HealingPanelHeadlessTests
         finally { window.Close(); }
     }
 
+    /// <summary>
+    /// Live 2026-10-01: a right-click on a marked tile opened the panel's own
+    /// window menu (Flash on Activity / Float / Close Window) and sent nothing.
+    /// The dock hangs that ContextMenu on an ancestor of the panel, so the
+    /// tile has to claim the context request itself. Reproduced here by
+    /// wrapping the panel in a parent that owns a real ContextMenu.
+    /// </summary>
+    [AvaloniaFact]
+    public void A_right_click_on_a_marked_tile_beats_the_window_menu()
+    {
+        var sent = new List<string>();
+        var vm = new HealingViewModel();
+        vm.AttachForTest(sent.Add);
+        var panel = new HealingPanel { DataContext = vm };
+        var menu = new ContextMenu { ItemsSource = new[] { "Flash on Activity", "Float", "Close Window" } };
+        var owner = new Border { Child = panel, ContextMenu = menu };
+        var window = new Window { Width = 420, Height = 900, Content = owner };
+        window.Show();
+        Pump(window);
+        try
+        {
+            var hostSent = AttachRenucciDialog(vm);
+            vm.Apply(RenucciTouch());
+            Pump(window);
+
+            var leg = Regions(panel).Single(b => ((HealingViewModel.RegionCell)b.Tag!).RegionId == "leftLeg");
+            var centre = leg.TranslatePoint(new Point(leg.Bounds.Width / 2, leg.Bounds.Height / 2), window)!.Value;
+            window.MouseDown(centre, MouseButton.Right);
+            window.MouseUp(centre, MouseButton.Right);
+            Pump(window);
+
+            Assert.False(menu.IsOpen, "the window menu opened over a transferable tile");
+            Assert.Equal(new[] { "transfer Renucci internal left leg" }, hostSent.Select(a => a.Value));
+            Assert.Empty(sent);
+
+            // Off the tiles, the window menu still opens as before.
+            window.MouseDown(new Point(4, 4), MouseButton.Right);
+            window.MouseUp(new Point(4, 4), MouseButton.Right);
+            Pump(window);
+            Assert.True(menu.IsOpen, "the window menu must still open off the tiles");
+            menu.Close();
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public void Clicking_a_wounded_region_takes_it_and_a_healthy_one_sends_nothing()
     {

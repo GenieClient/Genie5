@@ -132,7 +132,7 @@
                       ToolTip.Tip="{Binding Tip}"
                       Tag="{Binding}"
                       Click="OnRegionClicked"
-                      PointerReleased="OnRegionPointerReleased">
+                      ContextRequested="OnRegionContextRequested">
                 <StackPanel Spacing="0">
                   <!-- The ⇄ sits inline after the label, not in a corner overlay:
                        on a narrow tile the label fills the width and an

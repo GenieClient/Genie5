@@ -33,9 +33,16 @@ public partial class HealingPanel : UserControl
     /// <summary>A right-click on a region: transfer it. Button's own handler
     /// only acts on the left button, so the right release reaches here; no
     /// context menu is attached, so nothing else opens.</summary>
-    private void OnRegionPointerReleased(object? sender, PointerReleasedEventArgs e)
+    /// <summary>
+    /// Right-click on a tile = transfer. Claimed on ContextRequested, not on the
+    /// pointer release: the dock hangs the window menu (Flash on Activity /
+    /// Float / Close Window) on an ancestor, and that menu opens on the same
+    /// context request, so a release handler lost the race and the menu
+    /// opened instead (2026-10-01 walk). Marking it handled keeps the window
+    /// menu shut over a tile; off the tiles it still opens as before.
+    /// </summary>
+    private void OnRegionContextRequested(object? sender, ContextRequestedEventArgs e)
     {
-        if (e.InitialPressMouseButton != MouseButton.Right) return;
         if ((sender as Control)?.Tag is not HealingViewModel.RegionCell cell) return;
         e.Handled = true;
         Vm?.TransferRegion(cell);
