@@ -3665,8 +3665,15 @@ public sealed class ScriptEngine
                 {
                     var parts = value.Split('|');
                     value = arrIdx >= 0 && arrIdx < parts.Length ? parts[arrIdx] : string.Empty;
+                    // Genie 4 parity (Script.cs ParseVariable:2421): the
+                    // parentheses belong to the variable ONLY when the index
+                    // is an integer. A non-numeric group — uber.cmd's regex
+                    // `\b%IgnoreAdjectives(%MYWEAPONS)\b` — is pattern text and
+                    // must survive; consuming it turned the weapon-on-floor
+                    // check into a match-anything and fired `gosub GET $1`
+                    // with an empty $1.
+                    nameEnd = close + 1;
                 }
-                nameEnd = close + 1;
             }
         }
         return (value, nameEnd);
