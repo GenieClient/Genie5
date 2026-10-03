@@ -422,6 +422,12 @@ internal sealed class ScriptExpression
                 {
                     SkipWs();
                     if (_pos < _src.Length && _src[_pos] == ',') { _pos++; args.Add(ParseOr()); }
+                    // Genie 4 parity (Eval.cs BuildArgs): arguments are every
+                    // string/number section inside the parens — commas are
+                    // optional. uber.cmd relies on `replacere("%x", "\|+" "|")`
+                    // and `matchre("%a" "(?i)b")`; without this the second
+                    // literal is dropped and the call returns "".
+                    else if (_pos < _src.Length && _src[_pos] == '"') args.Add(ParseOr());
                     else break;
                 }
             }

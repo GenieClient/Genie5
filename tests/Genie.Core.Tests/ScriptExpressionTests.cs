@@ -68,6 +68,11 @@ public class ScriptExpressionTests
     // `if $selection = DIVINATION TOOL`, and Menu.Build's `!($5 = "")` where
     // $5 substitutes to "Moonmage Training Menu". Before the fix these threw
     // (bad condition ⇒ silently false).
+    // Genie 4 BuildArgs parity: commas between function args are optional
+    // (uber.cmd: `replacere("%x", "\|+" "|")`, `matchre("%a" "(?i)b")`).
+    [InlineData("replacere(\"a||b\", \"\\|+\" \"|\") = \"a|b\"",   true)]
+    [InlineData("replace(\"a||b\", \"||\" \"|\") = \"a|b\"",      true)]
+    [InlineData("matchre(\"Hello\" \"(?i)hello\")",              true)]
     [InlineData("Moon Mage = Moon Mage",                     true)]
     [InlineData("(Moonmage Training Menu = \"\")",           false)]
     [InlineData("!(Moonmage Training Menu = \"\")",          true)]
