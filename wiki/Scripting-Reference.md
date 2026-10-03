@@ -334,7 +334,9 @@ Function names are case-insensitive. Text arguments compare **case-sensitively**
 | `min(a, b)` / `max(a, b)` | the smaller / larger of two numbers | `max(3, 7)` → `7` |
 | `floor(n)` / `ceil(n)` — also `ceiling` | round down / up to a whole number | `ceil(2.1)` → `3` |
 | `round(n[, digits])` | round to `digits` decimal places (default 0). Halves go to the even neighbour: `round(2.5)` → `2`, `round(3.5)` → `4`. | `round(2.567, 1)` → `2.6` |
-| `sqrt(n)`, `log(n)` — also `ln` — and `log10(n)` | square root, natural logarithm, base-10 logarithm. Genie 4's `log` was base 10, so write `log10` or `ln` to be unambiguous. Out-of-range input (a negative square root, the log of `0`) gives a non-number rather than an error. | `log10(1000)` → `3` |
+| `sqrt(n)`, `log(n)` — also `log10` — and `ln(n)` | square root, base-10 logarithm, natural logarithm (as in Genie 4). Out-of-range input (a negative square root, the log of `0`) gives a non-number rather than an error. | `log(1000)` → `3` |
+| `sin(n)` / `cos(n)` / `tan(n)` | sine, cosine, tangent of an angle in **radians** | `cos(0)` → `1` |
+| `arcsin(n)` / `arccos(n)` / `arctan(n)` | inverse sine, cosine, tangent, giving **radians**; outside `-1`…`1`, `arcsin`/`arccos` give a non-number | `arctan(1)` → `0.785…` |
 
 ## The roundtime gate
 
@@ -354,7 +356,6 @@ Commands you `put` to the game contribute to an in-flight counter that's decreme
 ## Differences from Genie 4
 
 - **`gosub` for reusable routines** — jumping into a nested/indented label isn't reliable.
-- **`log(n)` is the natural logarithm** here; in Genie 4 it was base 10. Genie 4's trigonometry functions (`sin`, `cos`, `tan`, `arcsin`, `arccos`, `arctan`) aren't available yet.
 
 Compatibility notes (all Genie 4 parity): a script line starting with `#` is *always* a comment — `#put north` does nothing; meta-commands run from a script only via `put #cmd`. There are no end-of-line comments: `pause 1 # wait` hands `1 # wait` to `pause` (which then falls back to its 1-second default), so keep comments on their own lines. An undefined `$var` is left **literal** in the text (never aborts the script, never expands to empty); guard explicitly with `if def(name)` when it matters. Scripts live in one shared `Scripts/` folder at the data root, used by every character (see [Application Folders](Application-Folders)); with `#config reposcriptdir` set, that folder is searched first and the repo-scripts folder second, so a local copy always wins.
 

@@ -498,11 +498,17 @@ internal sealed class ScriptExpression
                 {
                     frame = new string[10];
                     _inst.DollarStack.Push(frame);
+                    _inst.DollarCounts.Push(0);
                 }
                 for (int i = 0; i < 10; i++) frame[i] = string.Empty;
                 frame[0] = m.Value;
                 for (int i = 1; i < m.Groups.Count && i <= 9; i++)
                     frame[i] = m.Groups[i].Value;
+                // Same bookkeeping as ScriptEngine.TryMatch: the frame was
+                // overwritten in place, so its $argcount follows suit and the
+                // two stacks stay in lockstep.
+                if (_inst.DollarCounts.Count > 0) _inst.DollarCounts.Pop();
+                _inst.DollarCounts.Push(Math.Min(9, m.Groups.Count - 1));
                 return true;
             }
             // Genie4 parity: the string predicates are case-SENSITIVE (Eval.cs
@@ -627,9 +633,18 @@ internal sealed class ScriptExpression
                                 ? Math.Round(N(0), (int)N(1))
                                 : Math.Round(N(0));
             case "sqrt":    return Math.Sqrt(N(0));
+            // Genie4 parity (MathEval.cs): `log` is base-10 like `log10`;
+            // `ln` is the natural log.
             case "log":
-            case "ln":      return Math.Log(N(0));
             case "log10":   return Math.Log10(N(0));
+            case "ln":      return Math.Log(N(0));
+            // Genie4 trig (MathEval.cs) works in RADIANS — straight Math calls.
+            case "sin":     return Math.Sin(N(0));
+            case "cos":     return Math.Cos(N(0));
+            case "tan":     return Math.Tan(N(0));
+            case "arcsin":  return Math.Asin(N(0));
+            case "arccos":  return Math.Acos(N(0));
+            case "arctan":  return Math.Atan(N(0));
             case "neg":     return -Math.Abs(N(0));
             case "pos":     return Math.Abs(N(0));
         }

@@ -29,10 +29,9 @@ namespace Genie.Core.Scripting;
 /// Genie 4 parity. Variable names + value formats verified against the
 /// canonical Genie 4 source in <c>Core/Game.cs</c>. Status flags use
 /// <c>"1"</c>/<c>"0"</c>; per-exit booleans use the same convention. Hand
-/// state surfaces the noun (which is the closest thing our parser
-/// currently captures from the <c>&lt;left&gt;</c>/<c>&lt;right&gt;</c>
-/// element's attributes — full display names would require parser changes
-/// to keep the body text, a separate enhancement).
+/// state (#172) surfaces the full display name from the
+/// <c>&lt;left&gt;</c>/<c>&lt;right&gt;</c> body text as <c>$righthand</c>
+/// ("whiskey jug"), with the noun attribute in <c>$righthandnoun</c>.
 /// </para>
 /// </summary>
 public sealed class ScriptGlobalsSync : IDisposable
@@ -341,9 +340,10 @@ public sealed class ScriptGlobalsSync : IDisposable
     private void OnCompass(CompassEvent comp)
     {
         // CompassEvent.RawXml is the space-separated direction tokens from
-        // <compass><dir value="nw"/>...</compass>. Surface as $roomexits (a
-        // compass-only synonym) AND set each per-exit boolean ($north etc.)
-        // so scripts can do `if ($north) then put north` cleanly.
+        // <compass><dir value="nw"/>...</compass>. Set each per-exit boolean
+        // ($north etc.) so scripts can do `if ($north) then put north`
+        // cleanly. $roomexits is NOT set here — it comes from the
+        // "room exits" component (OnComponent).
         var raw = comp.RawXml ?? "";
 
         // First clear all direction flags so previously-set ones from the

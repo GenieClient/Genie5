@@ -140,4 +140,22 @@ public class ScriptEngineArgTests
         }
         finally { try { Directory.Delete(dir, true); } catch { /* best effort */ } }
     }
+
+    [Fact]
+    public void Matchre_function_updates_argcount()
+    {
+        // The matchre() expression function rewrites $0..$9, so $argcount must
+        // follow — like a MATCHRE line does (ScriptEngine.TryMatch). Read on
+        // the NEXT line: substitution runs before the if evaluates.
+        const string body =
+            "if matchre(\"ab cd ef\", \"([a-z]+) ([a-z]+) ([a-z]+)\") then echo HIT\n" +
+            "echo MAC=$argcount\n" +
+            "echo M3=$3\n";
+
+        var o = RunFixture(body, new List<string> { "only" });   // frame starts at 1
+
+        Assert.Contains("HIT",   o);
+        Assert.Contains("MAC=3", o);   // was stale at 1
+        Assert.Contains("M3=ef", o);
+    }
 }

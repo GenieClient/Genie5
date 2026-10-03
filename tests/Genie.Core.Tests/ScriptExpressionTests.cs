@@ -1,3 +1,4 @@
+using System;
 using Genie.Core.Scripting;
 using Xunit;
 
@@ -153,4 +154,55 @@ public class ScriptExpressionTests
     [InlineData("element(\"(a|b)\",0,\"|\")",     "a")]   // explicit '|' still strips
     public void Eval_element_clamps_like_Genie4(string expr, string expected)
         => Assert.Equal(expected, ScriptExpression.Eval(expr, NewInst())?.ToString());
+    [Theory]
+    // Genie 4 MathEval.cs: `log` is base-10 (same as `log10`); `ln` is natural.
+    [InlineData("log(100)",   2.0)]
+    [InlineData("log10(1000)", 3.0)]
+    [InlineData("ln(1)",      0.0)]
+    // Trig works in radians, straight Math calls (MathEval.cs sin/cos/tan/arc*).
+    [InlineData("sin(0)",     0.0)]
+    [InlineData("cos(0)",     1.0)]
+    [InlineData("tan(0)",     0.0)]
+    [InlineData("arcsin(1)",  Math.PI / 2)]
+    [InlineData("arccos(1)",  0.0)]
+    [InlineData("arctan(1)",  Math.PI / 4)]
+    public void Eval_math_functions_match_Genie4(string expr, double expected)
+        => Assert.Equal(expected, ScriptExpression.ToNum(ScriptExpression.Eval(expr, NewInst())), 10);
+
+    [Fact]
+    public void Ln_is_natural_log_and_log_is_not()
+    {
+        Assert.Equal(1.0, ScriptExpression.ToNum(ScriptExpression.Eval("ln(2.718281828459045)", NewInst())), 10);
+        Assert.Equal(Math.Log10(Math.E),
+                     ScriptExpression.ToNum(ScriptExpression.Eval("log(2.718281828459045)", NewInst())), 10);
+    }
+
+    [Fact]
+    public void Matchre_updates_argcount_on_the_existing_frame()
+    {
+        // TryMatch parity: overwriting $0..$9 in place also rewrites the frame's
+        // DollarCounts entry, so $argcount describes the captures.
+        var inst = new ScriptInstance();
+        inst.DollarStack.Push(new string[10]);
+        inst.DollarCounts.Push(0);
+
+        Assert.True(ScriptExpression.EvalBool("matchre(\"ab cd\", \"([a-z]+) ([a-z]+)\")", inst));
+
+        Assert.Single(inst.DollarStack);
+        Assert.Single(inst.DollarCounts);
+        Assert.Equal(2, inst.DollarCounts.Peek());
+        Assert.Equal("cd", inst.DollarStack.Peek()[2]);
+    }
+
+    [Fact]
+    public void Matchre_pushing_a_fresh_frame_keeps_the_stacks_in_lockstep()
+    {
+        var inst = new ScriptInstance();   // no frame at all
+
+        Assert.True(ScriptExpression.EvalBool("matchre(\"xyz\", \"(y)\")", inst));
+
+        Assert.Equal(inst.DollarStack.Count, inst.DollarCounts.Count);
+        Assert.Equal(1, inst.DollarCounts.Peek());
+        Assert.Equal("y", inst.DollarStack.Peek()[1]);
+    }
 }

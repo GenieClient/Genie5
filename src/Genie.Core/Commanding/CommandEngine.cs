@@ -506,12 +506,16 @@ public sealed class CommandEngine
                     }
                 }
                 break;
+            // Delays parse invariant (like ParseSendDelay for #send): a script's
+            // `#wait 0.5 look` must not misread on a comma-decimal locale.
             case "wait":
-                if (parts.Count > 2 && double.TryParse(parts[1], out var delay))
+                if (parts.Count > 2 && double.TryParse(parts[1], System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var delay))
                     _commandQueue.AddToQueue(delay, string.Join(" ", parts.Skip(2)), false, false, false);
                 break;
             case "event":
-                if (parts.Count > 2 && double.TryParse(parts[1], out var evDelay))
+                if (parts.Count > 2 && double.TryParse(parts[1], System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var evDelay))
                     _eventQueue.Add(evDelay, string.Join(" ", parts.Skip(2)));
                 break;
             case "script":
