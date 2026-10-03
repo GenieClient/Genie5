@@ -180,6 +180,15 @@ public sealed class AutoMapperEngine
     /// </summary>
     public event Action<string, string, IReadOnlyCollection<string>>? RoomNotFoundInZone;
 
+    /// <summary>
+    /// Host-supplied: (serverRoomId, title, exits) → true when ANOTHER local zone
+    /// already contains this room. Lets record mode tell a teleport that rides a
+    /// movement verb (<c>go moongate</c>, <c>enter portal</c>) from walking into
+    /// virgin territory: the former must switch zones, not seed an orphan node
+    /// into the zone the character just left. Null → no cross-zone knowledge.
+    /// </summary>
+    public Func<string, string, IReadOnlyCollection<string>, bool>? ForeignRoomProbe { get; set; }
+
     public AutoMapperEngine(MapZone zone)
     {
         _zone = zone;
@@ -903,7 +912,13 @@ public sealed class AutoMapperEngine
         }
         else if (_zone.Nodes.Count > 0 &&
                  usedDir == Direction.None && usedVerbDir == Direction.None &&
-                 !MoveVerb.IsMovementCommand(usedMoveCommand))
+                 (!MoveVerb.IsMovementCommand(usedMoveCommand) ||
+                  // A non-compass movement verb ("go moongate") that lands in a
+                  // room another zone already owns is a teleport/zone hop, not
+                  // exploration — live 2026-10-03, a Throne City moongate into
+                  // Crossing recorded an orphan in Throne City and left the
+                  // mapper on the wrong map.
+                  ForeignRoomProbe?.Invoke(serverRoomId, title, exits) == true))
         {
             // Auto-create is on and the zone is a real map, but this arrival
             // carries NO walk evidence — no compass direction, no movement

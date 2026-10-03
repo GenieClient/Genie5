@@ -1137,6 +1137,7 @@ public partial class MapperViewModel : ReactiveObject
         // #251: the engine fires this on the game thread; the handler mutates
         // VM state (BrowsingZone, LoadStatus) and drives zone loads, so marshal
         // the whole body to the UI thread — same as MapChanged above.
+        _engine.ForeignRoomProbe = IsRoomInAnotherZone;
         _engine.RoomNotFoundInZone += (serverId, title, exits) =>
             Dispatcher.UIThread.Post(() => OnRoomNotFoundInZone(serverId, title, exits));
         // Record mode ⇄ the `automapper` config key. The SAVED preference picks
@@ -1196,6 +1197,20 @@ public partial class MapperViewModel : ReactiveObject
         // and JSON-parsing every zone file is non-trivial, so don't block
         // the UI thread — auto-detect will simply skip until the index lands.
         _ = RebuildServerIdIndexAsync();
+    }
+
+    /// <summary>True when the zone index says a zone OTHER than the loaded one
+    /// contains this room (server id first, then title+exits fingerprint) —
+    /// the engine's record-mode teleport gate (<c>go moongate</c>).</summary>
+    private bool IsRoomInAnotherZone(string serverRoomId, string title, IReadOnlyCollection<string> exits)
+    {
+        string? file = null;
+        if (!string.IsNullOrEmpty(serverRoomId) && _serverIdToZoneFile.TryGetValue(serverRoomId, out var idHit))
+            file = idHit;
+        else if (_fingerprintToZoneFile.TryGetValue(MapFingerprint.Compute(title, exits), out var fpHit))
+            file = fpHit;
+        return file is not null
+            && !string.Equals(file, SelectedZoneFile, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Engine can't place the current room in the loaded zone — decide
