@@ -353,6 +353,31 @@ public class InjuriesParsingTests
     }
 
     [Fact]
+    public void HealthReport_ScarsOnlySummary_KeepsScarsAndClearsStaleNsys()
+    {
+        // Verbatim from a live session: the scar summary comes FIRST and the
+        // "no significant injuries" line after it. The scar line names regions,
+        // so it is the summary; nsys is unnamed → healthy, even though the
+        // panel was last told nerve damage.
+        var state = FeedToState(
+            "<dialogData id=\"injuries\">" +
+            "<image id=\"leftHand\" name=\"Scar1\" height=\"0\" width=\"0\"/>" +
+            "<image id=\"chest\" name=\"Scar1\" height=\"0\" width=\"0\"/>" +
+            "<image id=\"back\" name=\"Scar1\" height=\"0\" width=\"0\"/>" +
+            "<image id=\"nsys\" name=\"Nsys1\" height=\"0\" width=\"0\"/></dialogData>",
+            "Your body feels at full strength.\n" +
+            "Your spirit feels full of life.\n" +
+            "You have a few nearly invisible scars along the left hand, a few nearly " +
+            "invisible scars along the chest, a few nearly invisible scars along the back.\n" +
+            "You have no significant injuries.\n");
+
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.Scar, 1), state.Injuries["leftHand"]);
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.Scar, 1), state.Injuries["chest"]);
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.Scar, 1), state.Injuries["back"]);
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.None, 0), state.Injuries["nsys"]);
+    }
+
+    [Fact]
     public void HealthReport_AllClearLine_StillDisplays()
     {
         // The clear is a side effect — a user-typed `health` still prints.
