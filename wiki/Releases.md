@@ -4,11 +4,26 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` or `v5.0.0-beta.N.M` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.9.6 — Well Placed
+## Latest: v5.0.0-beta.9.7 — Healing Hands
+
+An Empath can now work from one window, and the built-in script editor, `#shunt`, per-window logs and system voices for text to speech arrive with a run of Genie 4 script-engine parity fixes.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.7** as a delta from beta.9.6.
+
+- **Healing window for Empaths** — per-patient body diagrams on the full 13-step scale, click-to-heal, Take All and spell buttons, with the patient's HEALTH bar, **Transfer Vit** and **Re-Link** in the header. A right-click on a part DragonRealms marks sends the transfer. Genie 4's Crutch `GCTextBox*` variables carry over, and a reading from your own `touch` fills in any part DragonRealms left blank (#263, #375).
+- **Built-in script editor** — `#edit`, Script Manager ▸ Edit and the Script Bar ✏ open an in-app editor with `.cmd` / `.js` colouring, Ctrl+S and Ctrl+F, and prompts for unsaved and outside-changed files. `#config externaleditor on` keeps your own editor (#243).
+- **`#shunt`** sends matching lines to a named window, moving or copying them, with a Shunts tab and live reload (#248). **`#windowlog`** gives per-window logs with filename templates; `#windowlog defaults` rebuilds the Genie 4 Window Logger layout (#270).
+- **`/spellinfo`** looks spells up by name, abbreviation, guild or mana from a nightly Elanthipedia feed (#267). **`#img` / `#image`** brings Genie 4's inline images (#361).
+- **System voices for text to speech** — SAPI5, macOS `say` and Linux speech-dispatcher / espeak-ng alongside Piper (#368).
+- **Faster startup** — builds are precompiled (ReadyToRun); the window opens about 40% sooner and downloads are about 26 MB larger (#288).
+- **Script engine parity** — function arguments may omit their commas as in Genie 4, `%name(...)` is array indexing only for an integer, `$gvar = value` sets the global again, `log()` is base-10 with the trig functions added, `matchre()` updates `$argcount`, and `#wait` / `#event` read decimals on any locale. A script that used `log()` as the natural log needs `ln()`.
+- Also: **Conversation and Group windows** (#260), **Hide Title Bar** for a window docked alone (#299), a **Presets tab** (#304), a per-character **scope split** for Variables, Classes and Windows (#315), a **Type-Ahead Counter** toggle, **Keep Visible** for the roundtime badge saved with layouts, windowed mode that keeps your layout (#363, #364), the mapper no longer filing a teleport into the zone you just left, a fresh install asking where to keep its data, and the empath injuries window no longer drawing the generic grid underneath (#374).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.7)
+
+## v5.0.0-beta.9.6 — Well Placed
 
 The windows DragonRealms sends you learn where they belong, and a large community-issue sweep lands on the script engine, the mapper and the dock.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.6** as a delta from beta.9.5.
 
 - **Server dialogs: a settings page, placement hints and "Beside another window"** — **Configuration ▸ Layout ▸ Server Dialogs** lists every answer you have given a dialog: change where it goes, toggle auto-open, or Forget it. "Where DR suggests" now reads the hint the game sends (`right`, `left`, `center`, `force-center`), a new mode opens a dialog as a tab beside any window you pick, and once you move a dialog your placement wins. `#config serverdialogs on|off` is the master switch; **Window ▸ Server Dialogs** reopens any dialog seen this session (#156).
 - **Dialogs that showed sprite names now show their content** — Friends & Enemies lists names and demeanors instead of the word "crossFace"; another character's injuries draws the Injuries sprite grid with transfer buttons; `<image>`, `<skin>` and `<link>` controls render instead of blank rows (#341, #342, #345).

@@ -1,3 +1,118 @@
+# Genie 5 — v5.0.0-beta.9.7
+
+**"Healing Hands"** — the release where an Empath can finally work from one
+window. The Healing panel shows each patient's wounds, takes and transfers on
+a click, and folds in the injuries dialog DragonRealms sends. Around it: the
+built-in script editor, `#shunt`, per-window logs, system voices for text to
+speech, faster startup, and a long run of Genie 4 script-engine parity fixes
+that stop community scripts quietly doing the wrong thing.
+
+## ✨ New
+- **Healing window for Empaths** — per-patient body diagrams on the full
+  13-step scale, click-to-heal, Take All and spell buttons. Genie 4's Crutch
+  `GCTextBox*` variables carry over. The patient's HEALTH bar, **Transfer Vit**
+  and **Re-Link** now live in the window's header, parts DragonRealms marks as
+  transferable carry a small marker, and a right-click sends the transfer
+  (a wounded part of another patient transfers the internal wound too). Left
+  click still takes; right-click on yourself does nothing, and off the tiles
+  the window menu still opens (#263, #375).
+- **Another character's injuries fill in without asking** — the empath's
+  patient window no longer prompts the first time it is seen; the Healing
+  window shows its content, and the dialog stays listed under **Window ▸ Server
+  Dialogs**. A reading from your own `touch` fills in any part DragonRealms
+  left blank, so a patient with only external wounds no longer reads "No
+  injuries" under a touch that listed three.
+- **Built-in script editor** — `#edit`, Script Manager ▸ Edit and the Script
+  Bar ✏ open an in-app editor with `.cmd` / `.js` colouring, Ctrl+S and
+  Ctrl+F, and prompts for unsaved changes and edits made outside Genie.
+  `#config externaleditor on` keeps your own editor (#243).
+- **`#shunt`** — send matching lines to a named window, moving or copying them.
+  Classes, a **Shunts** tab and live reload are included (#248).
+- **Per-window logs** — `#windowlog` with filename templates and per-rule
+  timestamps. `#windowlog defaults` rebuilds the Genie 4 Window Logger layout
+  (#270).
+- **`/spellinfo`** — spell lookup by name, abbreviation, guild, mana or a
+  stacked query, from a nightly Elanthipedia feed (#267).
+- **System voices for text to speech** — SAPI5 (David, Zira, Ivona 2), macOS
+  `say` and Linux speech-dispatcher / espeak-ng, alongside Piper, in one voice
+  list (#368).
+- **`#img` / `#image`** — Genie 4's image output, inline in the game window,
+  in a named window or in Portrait (#361).
+- **Conversation and Group windows** — hidden by default. Streams Genie does
+  not know now show in the main window as `[id] …` instead of vanishing (#260).
+- **Faster startup** — builds are precompiled (ReadyToRun). The window opens
+  about 40% sooner, and downloads are about 26 MB larger (#288).
+- **Hide Title Bar** for a window docked alone in its frame (#299), a **Presets
+  tab** of its own in Configuration (#304), and a **scope split** for
+  Variables, Classes and Windows — a per-character layer over the shared set,
+  with instant restore of the shared twin (#315).
+- **Layout ▸ Type-Ahead Counter** hides the pips on the command bar. Type-ahead
+  tracking keeps running while they are hidden.
+- **Keep Visible for the roundtime badge now rides on saved layouts**, next to
+  the badge's position. A layout saved before this leaves your current choice
+  alone.
+
+## 🐛 Fixes
+- **Script functions take Genie 4's adjacent arguments** — Genie 4 lets the
+  commas between a function's arguments be left out, and community scripts
+  rely on it: `replacere("%x", "\|+" "|")`, `matchre("%v" "(?i)left")`. Genie 5
+  dropped the second literal and returned an empty string, which wiped lists
+  (critter lists, wait lists, player lists) and sent the gem seller round in
+  circles on an emptied variable.
+- **`%name(...)` is array indexing only for an integer index** — a regex group
+  straight after a variable, as in `\b%IgnoreAdjectives(%MYWEAPONS)\b`, was
+  swallowed, turning the pattern into match-anything and the script's `gosub
+  GET $1` into a bare `get`. The parentheses are now consumed only for a number.
+- **`$gvar = value` sets the global again** — the load-time rewrite emitted a
+  line the script engine treats as a comment, so the assignment vanished
+  (a regression in the #247 rewrite).
+- **Script math** — `log()` is base-10, as in Genie 4 (use `ln()` for the
+  natural log), and `sin` `cos` `tan` `arcsin` `arccos` `arctan` exist
+  (radians). `matchre()` now updates `$argcount`, and `#wait` / `#event` read
+  `0.5` the same way on comma-decimal locales instead of as `5`.
+- **Record mode no longer files a teleport into the zone you just left** — a
+  `go moongate` counted as a walk, so the mapper created an orphan room in the
+  old zone rather than switching zones.
+- **A fresh install now asks where to keep its data** — the crash logger
+  created a `Config` folder before anything else ran, which the first-run
+  check read as "already set up", so every new install silently took the
+  user folder. A portable copy's crash log now stays beside the portable data
+  instead of in the installed Genie's folder.
+- **A bespoke server dialog no longer draws the generic grid underneath** — the
+  empath injuries window printed each body-part label and transfer link across
+  its sprites (#374).
+- **Healing reads what DragonRealms actually sends** — a patient's `touch`
+  arrives on the familiar stream and was never read, a touch block that ended
+  on a prompt stayed open and swallowed later lines (so a stray "poison" could
+  mark the patient poisoned), and a dead patient's vitality, printed as a
+  negative loss with a "215% remaining" line, left the panel at "Vitality —".
+  All three are read now.
+- **Right-click on a Healing tile transfers** instead of opening the window
+  menu with nothing sent.
+- **Speech stays in the game window after the Conversation rewrite** — a saved
+  `IfClosed='conversation'` on Talk or Whispers becomes Main, not Log, which is
+  where that speech showed before. A saved layout from before the upgrade no
+  longer loses "You say" from the game window.
+- **Windowed mode keeps your layout both ways**, and child windows stay inside
+  the frame (#363, #364). New plugin windows no longer land beside
+  Atmospherics (#305), and an Auto Log file that cannot open no longer aborts
+  the connect.
+- **Reset Layout's tooltips** now describe the reset the command really runs.
+
+## 🔧 Under the hood
+- **The parser stops re-copying its buffer for every tag** — each fed chunk is
+  scanned with a cursor, and the last fixed regexes and locks are converted
+  (#285, #286). Behaviour is byte-identical on a 17 MB recording.
+- **Every build ships ReadyToRun**, and the CI size guard is restated for it
+  (#288).
+- ⚠ **Behaviour changes:** a saved `IfClosed='conversation'` becomes Main once
+  (what it did before the upgrade, so no visible change); Global-only window
+  settings save to the shared file; the display filters run after
+  substitutes and gags; Piper labels are shorter and `#tts use` takes the
+  whole name; and a script that used `log()` as the natural log needs `ln()`.
+
+---
+
 # Genie 5 — v5.0.0-beta.9.6
 
 **"Well Placed"** — the release where the windows DragonRealms sends you

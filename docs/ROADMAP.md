@@ -21,7 +21,7 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.9.6 "Well Placed"
+## Where we are — v5.0.0-beta.9.7 "Healing Hands"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
@@ -70,7 +70,14 @@ links (#362) and `@` / `\x` directives (#348), `#scriptcheck` (#239), Genie 4
 (#359), bars that dock top or bottom and ride on saved layouts (#349, #357),
 and a script-engine parity and durability batch — `%list.length`, bare sigil
 assignment, `genie.put("#…")`, container contents in their own window (#336)
-and charged spells keeping their time left (#301).
+and charged spells keeping their time left (#301); and **beta.9.7** gives
+Empaths a Healing window — per-patient body diagrams, click-to-heal, and
+DragonRealms' injuries dialog folded in with right-click transfer (#263, #375)
+— and ships the built-in script editor (#243), `#shunt` (#248), per-window logs
+(#270), `/spellinfo` (#267), system voices for text to speech (#368), `#img`
+(#361) and precompiled, faster-starting builds (#288), with a further run of
+Genie 4 script-engine parity fixes (adjacent function arguments, `%name(...)`
+indexing, base-10 `log()`).
 Self-update is now **verified end-to-end on all three platforms** (#27 —
 thanks @dylb0t for the macOS validation).
 
@@ -132,14 +139,15 @@ where the next commit does the most good:
    tail. (The P1 script-correctness bugs that used to lead this list — rule
    layering #257 and eval composition #300 — shipped in beta.8; roundtime on
    the server clock and script-engine thread safety shipped in beta.6.)
-2. **The in-app editor (Track E)** now that its cheaper half has shipped: the
+2. **Track E is done** — the in-app editor shipped in beta.9.7, after the
    script validator landed in beta.9.6 as `#scriptcheck`
    ([#239](https://github.com/GenieClient/Genie5/issues/239)), which reports
    every problem in a script without running it and doubles as a whole-corpus
-   regression signal for the script engine.
-3. **Track B** (server-driven dialogs) and **Track E** (editor) — the two
-   multi-week builds. Track B's capture groundwork shipped in beta.8; player
-   `#dialogs` reports during the soak feed the renderer design directly.
+   regression signal for the script engine. Breakpoints and a live debugger
+   stay post-1.0.
+3. **Track B** (server-driven dialogs) — the remaining multi-week build. The
+   renderer shipped in beta.9; player `#dialogs` reports during the soak feed
+   what is left.
 4. **Track C is done** — self-update verified end-to-end on all three
    platforms (#27).
 
@@ -220,18 +228,14 @@ in beta.8):
   the built-in walker never routes through `script X` arcs it can't execute
   ([#253](https://github.com/GenieClient/Genie5/issues/253)).
 
-### Track E — In-app script editor
+### Track E — In-app script editor ✅ *shipped in beta.9.7*
 
-Editing is still delegated to an external editor (`#edit` opens the OS default;
-the App's editor-host seam — `ICommandHost.EditScript` /
-`GenieCore.EditScriptRequested` — is otherwise unwired). An in-app editor with
-`.cmd` / `.js` syntax highlighting, wired into the existing Script Manager
-panel, brings editing inside the client so users aren't round-tripping to
-Notepad to touch a script. The pieces are already in place: AvaloniaEdit is a
-dependency (it backs the opt-in editor Game window), the `#edit` command and
-edit-request seam exist, and the Script Manager panel is shipped. Scope for 1.0
-is the **editor**; breakpoints and the live `$variable` / script-state
-**debugger** stay a post-1.0 differentiator (Horizon 3).
+`#edit`, Script Manager ▸ Edit and the Script Bar open an in-app editor with
+`.cmd` / `.js` syntax colouring, Ctrl+S / Ctrl+F, and prompts for unsaved and
+outside-changed files ([#243](https://github.com/GenieClient/Genie5/issues/243)).
+`#config externaleditor on` keeps a user's own editor. Breakpoints and the live
+`$variable` / script-state **debugger** stay a post-1.0 differentiator
+(Horizon 3).
 
 ---
 
@@ -283,13 +287,15 @@ An audit of all 21 Genie 4 plugins, tracking for each one whether it's already
 built into Genie 5, worth porting, or safe to retire. The umbrella and its
 disposition table live in
 [#271](https://github.com/GenieClient/Genie5/issues/271); the individual ports
-are filed beneath it — Crutch
-([#263](https://github.com/GenieClient/Genie5/issues/263), the Empath healing
-console, and the largest of them), Bank Tracker
-([#266](https://github.com/GenieClient/Genie5/issues/266)), SpellInfo
-([#267](https://github.com/GenieClient/Genie5/issues/267)), BestiaryQuery
-([#269](https://github.com/GenieClient/Genie5/issues/269)), and per-window
-logging ([#270](https://github.com/GenieClient/Genie5/issues/270)).
+are filed beneath it. Three have shipped in beta.9.7 — Crutch
+([#263](https://github.com/GenieClient/Genie5/issues/263), as the Healing
+window, and the largest of them), SpellInfo
+([#267](https://github.com/GenieClient/Genie5/issues/267), as `/spellinfo`) and
+per-window logging
+([#270](https://github.com/GenieClient/Genie5/issues/270), as `#windowlog`).
+Still open are Bank Tracker
+([#266](https://github.com/GenieClient/Genie5/issues/266)) and BestiaryQuery
+([#269](https://github.com/GenieClient/Genie5/issues/269)).
 
 Two are retired rather than pending. ExpEcho's behaviour shipped built-in with
 the beta.7 Experience window. Combat Tracker
@@ -432,7 +438,7 @@ the ecosystem.
 
 ### Script debugger — breakpoints + live state inspector
 
-The in-app **editor** graduated to a 1.0 item (Horizon 1, Track E). The step
+The in-app **editor** shipped in beta.9.7 (Horizon 1, Track E). The step
 beyond Genie 4 that stays post-1.0 is the **debugger** layered on top of it:
 breakpoints and a live `$variable` / script-state inspector for both `.cmd` and
 `.js`. Much of the runtime introspection already exists.
