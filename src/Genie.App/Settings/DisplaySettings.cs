@@ -90,6 +90,9 @@ public sealed class DisplaySettings : ReactiveObject
     /// </summary>
     [Reactive] public bool   ShowIconBar { get; set; } = true;
 
+    /// <summary>Show the type-ahead pip counter beside the command input. Default on; Layout menu → "Type-Ahead Counter" hides it (pure UI — type-ahead tracking itself keeps running).</summary>
+    [Reactive] public bool   ShowTypeAheadCounter { get; set; } = true;
+
     /// <summary>
     /// Whether docked panel groups show their banner — the accent bar above the
     /// content carrying the active panel's name (public #302 / #320).

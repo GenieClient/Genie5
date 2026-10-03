@@ -269,6 +269,11 @@
                   IsChecked="{Binding Display.ShowIconBar, Mode=OneWay}"
                   Command="{Binding ToggleIconBarCommand}"
                   ToolTip.Tip="Show/hide the character status chips below the vitals bar — posture plus stunned / bleeding / hidden / invisible / webbed / joined / poisoned / diseased (Genie 4's Icon Bar)."/>
+        <MenuItem Header="Type-_Ahead Counter"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.ShowTypeAheadCounter, Mode=OneWay}"
+                  Command="{Binding ToggleTypeAheadCounterCommand}"
+                  ToolTip.Tip="Show/hide the type-ahead pip counter beside the command input."/>
         <MenuItem Header="Window _Banners"
                   ToggleType="CheckBox"
                   IsChecked="{Binding Display.ShowWindowBanners, Mode=OneWay}"
@@ -1704,6 +1709,7 @@
            2 premium / 3 +LTB, auto-calibrated from the server). Dim when idle,
            amber at the cap. -->
       <Border Grid.Column="1"
+              IsVisible="{Binding Display.ShowTypeAheadCounter}"
               Background="#2a2a2a" BorderBrush="#444" BorderThickness="1"
               CornerRadius="3" Padding="6,2" Margin="0,0,4,0"
               VerticalAlignment="Stretch"

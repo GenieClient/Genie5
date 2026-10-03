@@ -423,6 +423,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public Interaction<LayoutSavePrompt, LayoutSaveResult?> ShowLayoutSavePrompt   { get; } = new();
     public ReactiveCommand<Unit, Unit>                    ToggleStatusBarCommand   { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleIconBarCommand     { get; }
+    /// <summary>Layout → Type-Ahead Counter. Shows/hides the pip counter beside the command input.</summary>
+    public ReactiveCommand<Unit, Unit>                    ToggleTypeAheadCounterCommand { get; }
 
     /// <summary>View ▸ Window Banners (#302 / #320) — show or hide the accent bar
     /// above each docked panel group. Global rather than per-panel because the
@@ -1945,6 +1947,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleStatusBarCommand = ReactiveCommand.Create(() =>
         {
             Display.ShowStatusBar = !Display.ShowStatusBar;
+            Display.Save(_displayPath);
+        });
+
+        ToggleTypeAheadCounterCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ShowTypeAheadCounter = !Display.ShowTypeAheadCounter;
             Display.Save(_displayPath);
         });
 
