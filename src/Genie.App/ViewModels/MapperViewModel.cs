@@ -340,6 +340,16 @@ public partial class MapperViewModel : ReactiveObject
     [Reactive] public string MapsDirectory    { get; set; } = "";
 
     /// <summary>
+    /// True once <see cref="Attach"/> has supplied the zone repository. Reactive
+    /// so Update/Repair Maps re-evaluate their CanExecute when it flips: the
+    /// Maps directory is set at startup, BEFORE the core attaches, and a plain
+    /// <c>_zoneRepo is not null</c> check inside the predicate is only sampled
+    /// when IsUpdating/MapsDirectory change — it left both commands greyed out
+    /// for the whole session.
+    /// </summary>
+    [Reactive] public bool HasZoneRepo { get; private set; }
+
+    /// <summary>
     /// True when <see cref="MapsDirectory"/> contains a <c>.git</c> subfolder —
     /// signals the user is pointing Genie at a git working copy of the Maps
     /// repo. Purely informational; the app never runs git commands itself.
@@ -703,7 +713,8 @@ public partial class MapperViewModel : ReactiveObject
         var canRun = this.WhenAnyValue(
             x => x.IsUpdating,
             x => x.MapsDirectory,
-            (busy, dir) => !busy && !string.IsNullOrWhiteSpace(dir) && _zoneRepo is not null);
+            x => x.HasZoneRepo,
+            (busy, dir, hasRepo) => !busy && !string.IsNullOrWhiteSpace(dir) && hasRepo);
 
         UpdateMapsCommand = ReactiveCommand.CreateFromTask(UpdateMapsAsync, canRun);
         RepairMapsCommand = ReactiveCommand.CreateFromTask(() => UpdateMapsAsync(repair: true), canRun);
@@ -1031,6 +1042,7 @@ public partial class MapperViewModel : ReactiveObject
         _core     = core;
         _engine   = core.AutoMapper;
         _zoneRepo = core.ZoneRepository;
+        HasZoneRepo = _zoneRepo is not null;
         _commands = core.Commands;
 
         // Tee the auto-load diagnostic (LoadStatus) into the Live Audit log so a
@@ -1542,7 +1554,10 @@ public partial class MapperViewModel : ReactiveObject
         var repo = _zoneRepo;
         var dir  = MapsDirectory;
 
-        var (idIndex, fpIndex) = await Task.Run(() =>
+        Dictionary<string, string> idIndex, fpIndex;
+        try
+        {
+        (idIndex, fpIndex) = await Task.Run(() =>
         {
             var ids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var fps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -1571,6 +1586,16 @@ public partial class MapperViewModel : ReactiveObject
             }
             return (ids, fps);
         });
+        }
+        catch (Exception ex)
+        {
+            // Fire-and-forget caller: without this a failed scan left the
+            // indexes empty and the status stuck on "Waiting for zone index".
+            Genie.App.Diagnostics.ErrorLog.Log("MapperZoneIndex", ex);
+            Dispatcher.UIThread.Post(() =>
+                LoadStatus = $"Zone index build failed: {ex.Message}");
+            return;
+        }
 
         _serverIdToZoneFile    = idIndex;
         _fingerprintToZoneFile = fpIndex;
