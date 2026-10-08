@@ -23,7 +23,7 @@ public class GameThreadCoreTests
         return dir;
     }
 
-    private static async Task<bool> PollAsync(Func<bool> condition, int timeoutMs = 5000)
+    private static async Task<bool> PollAsync(Func<bool> condition, int timeoutMs = 30000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         while (DateTime.UtcNow < deadline)

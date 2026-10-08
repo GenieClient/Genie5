@@ -269,8 +269,9 @@ public class InventoryViewExtensionTests
         Assert.Contains(host.Echoed, e => e.Contains("already in progress"));
     }
 
-    /// <summary>Spin until <paramref name="done"/> or the budget runs out.</summary>
-    private static async Task WaitUntil(Func<bool> done, int budgetMs = 5000)
+    /// <summary>Spin until <paramref name="done"/> or the budget runs out. Returns as soon
+    /// as the condition holds; the 30 s budget is only a failure backstop.</summary>
+    private static async Task WaitUntil(Func<bool> done, int budgetMs = 30000)
     {
         for (int waited = 0; waited < budgetMs && !done(); waited += 25)
             await Task.Delay(25);

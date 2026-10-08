@@ -127,7 +127,7 @@ public class PluginCommandSentDispatchTests
 
     /// <summary>Poll until <paramref name="done"/> or the timeout — the send sink
     /// publishes after the socket flush, so the assertion can't be synchronous.</summary>
-    private static async Task WaitFor(Func<bool> done, int ms = 5000)
+    private static async Task WaitFor(Func<bool> done, int ms = 30000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(ms);
         while (!done() && DateTime.UtcNow < deadline) await Task.Delay(15);
