@@ -268,7 +268,12 @@ public class SimuCoinsTests
         public IDictionary<string, string> Globals => Vars;
         public string ConfigDir { get; } = Directory.CreateDirectory(
             Path.Combine(Path.GetTempPath(), "genie-sc-" + Guid.NewGuid().ToString("N"))).FullName;
-        public void Echo(string text) { lock (Echoed) Echoed.Add(text); }
+        public void Echo(string text)
+        {
+            // Wake any WaitForEcho blocked on this host — the test waits on the
+            // signal, not on a polling loop against the scheduler.
+            lock (Echoed) { Echoed.Add(text); Monitor.PulseAll(Echoed); }
+        }
         public void SendCommand(string command) { }
         public void SetWindow(string window, string content) { }
         public void Log(string message) { }
@@ -288,20 +293,28 @@ public class SimuCoinsTests
     }
 
     /// <summary>The work is deliberately fire-and-forget so the store round-trip
-    /// can't block input; the tests wait for the echo it ends with.</summary>
+    /// can't block input; the tests wait for the echo it ends with. The wait is
+    /// signalled by <see cref="FakeHost.Echo"/> itself, so it returns the instant
+    /// the echo lands however loaded the machine is; the timeout is only a
+    /// failure backstop for an echo that never comes.</summary>
     private static void WaitForEcho(FakeHost host, string fragment)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (DateTime.UtcNow < deadline)
-        {
-            lock (host.Echoed)
-                if (host.Echoed.Any(e => e.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
-                    return;
-            Thread.Sleep(10);
-        }
+        var backstop = System.Diagnostics.Stopwatch.StartNew();
+        var limit = TimeSpan.FromSeconds(60);
 
         lock (host.Echoed)
-            Assert.Fail($"Never echoed '{fragment}'. Saw: {string.Join(" | ", host.Echoed)}");
+        {
+            while (!host.Echoed.Any(e => e.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+            {
+                var left = limit - backstop.Elapsed;
+                if (left <= TimeSpan.Zero || !Monitor.Wait(host.Echoed, left))
+                {
+                    if (host.Echoed.Any(e => e.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+                        return;
+                    Assert.Fail($"Never echoed '{fragment}'. Saw: {string.Join(" | ", host.Echoed)}");
+                }
+            }
+        }
     }
 
     [Theory]
