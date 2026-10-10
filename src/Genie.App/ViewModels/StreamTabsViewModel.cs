@@ -397,6 +397,23 @@ public class StreamBuffer(string name) : ReactiveObject, Controls.IScrollHoldSin
         Lines.Add(new TextLine(line, StreamColor.Main, links, bolds, presets, Window: Name));
         Trim();
     }
+
+    /// <summary>A coloured <c>#echo &gt;window</c> line: rendered as an echo run in
+    /// the requested colour (no highlight pass), same as the main window.</summary>
+    public void AddColoredEcho(string line, string color)
+    {
+        IReadOnlyList<LinkSpan>? links = null;
+        if (Genie.Core.Parsing.InlineClickMarkup.MightContain(line))
+            (line, links, _, _) = Genie.Core.Parsing.InlineClickMarkup.Apply(line);
+        if (Settings?.Timestamp == true)
+        {
+            var prefix = WindowTimestamp.Prefix();
+            line  = prefix + line;
+            links = links?.Select(s => s with { Start = s.Start + prefix.Length }).ToList();
+        }
+        Lines.Add(new TextLine(line, StreamColor.System, links, EchoColor: color, Window: Name));
+        Trim();
+    }
 }
 
 /// <summary>Shared per-window timestamp prefix (#90). Fixed 24-hour

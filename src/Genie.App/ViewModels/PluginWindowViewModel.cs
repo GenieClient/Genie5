@@ -67,9 +67,9 @@ public class PluginWindowViewModel : ReactiveObject, Controls.IScrollHoldSink
 
     /// <summary>Append a plain line (<c>EchoToWindow</c> / <c>#echo &gt;Name</c>).
     /// Keeps the panel growing like a log.</summary>
-    public void AppendLine(string text)
+    public void AppendLine(string text, string? color = null)
     {
-        Lines.Add(Line(text ?? ""));
+        Lines.Add(Line(text ?? "", color: color));
         Trim();
     }
 
@@ -88,16 +88,19 @@ public class PluginWindowViewModel : ReactiveObject, Controls.IScrollHoldSink
     public void AppendImage(Genie.Core.Commanding.ImageRequest request)
     {
         Lines.Add(new TextLine(request.Placeholder, StreamColor.Main, Window: Title,
-                               Image: new InlineImage(request, AppendLine)));
+                               Image: new InlineImage(request, t => AppendLine(t))));
         Trim();
     }
 
     /// <summary>A panel line after the #362 <c>{display:command}</c> inline-link
     /// pass — script menus are the main users of it.</summary>
-    private TextLine Line(string text, IReadOnlyList<LinkSpan>? links = null)
+    private TextLine Line(string text, IReadOnlyList<LinkSpan>? links = null, string? color = null)
     {
         if (Genie.Core.Parsing.InlineClickMarkup.MightContain(text))
             (text, links, _, _) = Genie.Core.Parsing.InlineClickMarkup.Apply(text, links);
+        // A coloured #echo renders as an echo run in that colour (no highlight pass).
+        if (color is not null)
+            return new TextLine(text, StreamColor.System, Links: links, EchoColor: color, Window: Title);
         return new TextLine(text, StreamColor.Main, Links: links, Window: Title);
     }
 

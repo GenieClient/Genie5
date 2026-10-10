@@ -3776,7 +3776,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             };
             if (buf is not null)
             {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() => buf.Add(text));
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (string.IsNullOrEmpty(color)) buf.Add(text);
+                    else buf.AddColoredEcho(text, color);
+                });
                 return;
             }
             if (IsReservedWindow(window))
@@ -3791,7 +3795,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 if (DockFactory is GenieDockFactory f)
-                    f.GetOrCreatePluginWindow(window!, show: false).AppendLine(text);
+                    f.GetOrCreatePluginWindow(window!, show: false).AppendLine(text, color);
             });
         };
 
