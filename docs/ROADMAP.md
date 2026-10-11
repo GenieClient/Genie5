@@ -21,7 +21,7 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.9.7 "Healing Hands"
+## Where we are — v5.0.0-beta.9.8 "Mapped Out"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
@@ -78,6 +78,9 @@ DragonRealms' injuries dialog folded in with right-click transfer (#263, #375)
 (#361) and precompiled, faster-starting builds (#288), with a further run of
 Genie 4 script-engine parity fixes (adjacent function arguments, `%name(...)`
 indexing, base-10 `log()`).
+**beta.9.8** is a fixes-only follow-up: the mapper no longer overwrites a good
+map link on a wrong room match, `#mapper reset` reloads the zone from disk,
+and a coloured `#echo >window` keeps its colour.
 Self-update is now **verified end-to-end on all three platforms** (#27 —
 thanks @dylb0t for the macOS validation).
 

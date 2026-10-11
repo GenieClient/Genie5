@@ -1,4 +1,8 @@
-# Unreleased — staged for the next cut
+# Genie 5 — v5.0.0-beta.9.8
+
+**"Mapped Out"** — a small, fixes-only release. The mapper stops losing its own
+links mid-session, `#mapper reset` can recover them, and a coloured
+`#echo >window` keeps its colour.
 
 ## 🐛 Fixes
 - **Map links no longer vanish mid-session, and `#goto` stops failing for it** —

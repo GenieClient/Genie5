@@ -4,11 +4,21 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` or `v5.0.0-beta.N.M` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.9.7 — Healing Hands
+## Latest: v5.0.0-beta.9.8 — Mapped Out
+
+A fixes-only release for the mapper and `#echo`.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.8** as a delta from beta.9.7.
+
+- **Map links no longer vanish mid-session** — with auto-create (record mode) on, a wrong room match in a run of similar-looking rooms could overwrite a good map link, and routes through it then failed ("destination not found", `#goto` going nowhere) until the zone was reloaded from disk. An existing link is now only retargeted when the game's own room id confirms the room; a refused overwrite is logged under `#config mapperdebug`.
+- **`#mapper reset` also reloads the zone from disk**, restoring links already lost and clearing what the mapper learned about room ids during the session. With record mode on it skips the reload so unsaved rooms are kept; `#mapper save` then `#mapper load` does it by hand.
+- **A coloured `#echo >window` keeps its colour** in stream windows and custom windows.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.8)
+
+## v5.0.0-beta.9.7 — Healing Hands
 
 An Empath can now work from one window, and the built-in script editor, `#shunt`, per-window logs and system voices for text to speech arrive with a run of Genie 4 script-engine parity fixes.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.7** as a delta from beta.9.6.
 
 - **Healing window for Empaths** — per-patient body diagrams on the full 13-step scale, click-to-heal, Take All and spell buttons, with the patient's HEALTH bar, **Transfer Vit** and **Re-Link** in the header. A right-click on a part DragonRealms marks sends the transfer. Genie 4's Crutch `GCTextBox*` variables carry over, and a reading from your own `touch` fills in any part DragonRealms left blank (#263, #375).
 - **Built-in script editor** — `#edit`, Script Manager ▸ Edit and the Script Bar ✏ open an in-app editor with `.cmd` / `.js` colouring, Ctrl+S and Ctrl+F, and prompts for unsaved and outside-changed files. `#config externaleditor on` keeps your own editor (#243).
