@@ -6754,6 +6754,16 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 Echo(reloaded is null ? "[mapper] No zone loaded." : $"[mapper] Reloaded {reloaded}.");
                 break;
 
+            // Second half of `#mapper reset` (Core already re-resolved the room).
+            // Reload the zone from disk so arcs lost in memory come back — but
+            // never while recording, where the in-memory map holds unsaved work.
+            case "reset":
+                if (!_core!.Config.AutoMapper)
+                    Mapper.ReloadActiveZone();
+                else
+                    Echo("[mapper] Record mode is on — zone not reloaded (unsaved rooms kept). #mapper save, then #mapper load to reload from disk.");
+                break;
+
             case "clear":
                 Mapper.ClearActiveZone();
                 Echo("[mapper] Current zone cleared in memory — #mapper save to persist, or #mapper load to undo.");

@@ -983,18 +983,28 @@ public sealed class AutoMapperEngine
         if (IsEnabled && prevNode != null && usedDir != Direction.None && prevNode.Id != node.Id)
         {
             // Forward exit: prevNode → node
+            // An EXISTING arc to a different room is only retargeted when the
+            // match is server-id authoritative. A fuzzy/guessed match (twin
+            // rooms, stale pending move) used to silently clobber a good arc,
+            // which then vanished from the map and broke #goto until the zone
+            // was reloaded from disk.
+            bool mayRetarget = tier == "a:server-id" && !_serverIdStale;
             var fwd = prevNode.GetOrAddExit(usedDir, usedDir.ToString().ToLowerInvariant());
-            if (fwd.DestinationId != node.Id)
+            if (fwd.DestinationId != node.Id && (fwd.DestinationId is null || mayRetarget))
             {
                 fwd.DestinationId = node.Id;
                 zoneChanged = true;
             }
+            else if (fwd.DestinationId != node.Id)
+                Diagnostics?.Invoke(
+                    $"[mapper]   arc #{prevNode.Id} {usedDir} -> #{fwd.DestinationId} kept " +
+                    $"(not overwritten with #{node.Id}; match tier {tier} is not authoritative)");
 
             // Back exit: node → prevNode
             if (DirectionHelper.Opposite.TryGetValue(usedDir, out var opp) && opp != Direction.None)
             {
                 var back = node.GetOrAddExit(opp, opp.ToString().ToLowerInvariant());
-                if (back.DestinationId != prevNode.Id)
+                if (back.DestinationId != prevNode.Id && (back.DestinationId is null || mayRetarget))
                 {
                     back.DestinationId = prevNode.Id;
                     zoneChanged = true;
