@@ -84,7 +84,7 @@
       </Grid>
 
       <!-- Direct (SGE) fields -->
-      <Grid ColumnDefinitions="90,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+      <Grid ColumnDefinitions="90,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
             IsVisible="{Binding IsDirectMode}">
 
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Instance"  VerticalAlignment="Center"/>
@@ -124,10 +124,10 @@
                    Text="{Binding FetchStatus}"
                    Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="0,2,0,0"/>
 
-        <CheckBox  Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2"
+        <CheckBox  Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2"
                    IsChecked="{Binding UseTls}"
                    AutomationProperties.HelpText="Authenticate over TLS (port 7910). Recommended — otherwise the password is only obfuscated over the wire. Uncheck to use plaintext port 7900."
-                   Content="Secure connection (TLS)" Margin="0,4,0,0"
+                   Content="Secure connection (TLS)" Margin="0,8,0,0"
                    ToolTip.Tip="Authenticate over TLS (port 7910). Recommended — otherwise the password is only obfuscated over the wire. Uncheck to use plaintext port 7900."/>
 
         <!-- FE:STORM checkbox removed May 25, 2026 after empirical A/B
