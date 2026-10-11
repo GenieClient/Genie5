@@ -6,12 +6,14 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 ## Latest: v5.0.0-beta.9.8 — Mapped Out
 
-A fixes-only release for the mapper and `#echo`.
+A fixes-only release for the mapper, the Connect dialog and `#echo`.
 
 > **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.8** as a delta from beta.9.7.
 
 - **Map links no longer vanish mid-session** — with auto-create (record mode) on, a wrong room match in a run of similar-looking rooms could overwrite a good map link, and routes through it then failed ("destination not found", `#goto` going nowhere) until the zone was reloaded from disk. An existing link is now only retargeted when the game's own room id confirms the room; a refused overwrite is logged under `#config mapperdebug`.
 - **`#mapper reset` also reloads the zone from disk**, restoring links already lost and clearing what the mapper learned about room ids during the session. With record mode on it skips the reload so unsaved rooms are kept; `#mapper save` then `#mapper load` does it by hand.
+- **Update Maps and Repair Maps are clickable again** — both stayed greyed out all session. A failed zone-index scan now shows in the Mapper status.
+- **The Connect dialog's TLS checkbox no longer overlaps the character status line.**
 - **A coloured `#echo >window` keeps its colour** in stream windows and custom windows.
 
 [Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.8)

@@ -1,8 +1,8 @@
 # Genie 5 — v5.0.0-beta.9.8
 
 **"Mapped Out"** — a small, fixes-only release. The mapper stops losing its own
-links mid-session, `#mapper reset` can recover them, and a coloured
-`#echo >window` keeps its colour.
+links mid-session, `#mapper reset` can recover them, Update/Repair Maps work
+again, and a coloured `#echo >window` keeps its colour.
 
 ## 🐛 Fixes
 - **Map links no longer vanish mid-session, and `#goto` stops failing for it** —
@@ -17,6 +17,12 @@ links mid-session, `#mapper reset` can recover them, and a coloured
   restores them and clears what the mapper learned about room ids during the
   session. While record mode is on it skips the reload, so rooms you have not
   saved are kept; `#mapper save` then `#mapper load` does it by hand.
+- **Update Maps and Repair Maps are clickable again** — both stayed greyed out
+  for the whole session because the mapper checked for its map store before it
+  was attached. A failed zone-index scan is now reported in the Mapper status
+  instead of leaving it on "Waiting for zone index".
+- **The Connect dialog's TLS checkbox no longer overlaps the character status
+  line** in Direct (SGE) mode.
 - **A coloured `#echo >window` keeps its colour** in stream windows and
   custom windows, instead of coming out in the window's default colour.
 
