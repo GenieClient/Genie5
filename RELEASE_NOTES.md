@@ -1,3 +1,23 @@
+# Unreleased — staged for the next cut
+
+## 🐛 Fixes
+- **Map links no longer vanish mid-session, and `#goto` stops failing for it** —
+  with auto-create (record mode) on, a wrong room match in a run of
+  similar-looking rooms could overwrite a good map link. The link then
+  disappeared from the map and routes through it failed ("destination not
+  found", `#goto` going nowhere) until the zone was reloaded from disk. An
+  existing link is now only retargeted when the game's own room id confirms
+  the room; a refused overwrite is logged under `#config mapperdebug`.
+- **`#mapper reset` also reloads the zone from disk** — it used to only
+  re-resolve your location, so a link already lost stayed lost. It now
+  restores them and clears what the mapper learned about room ids during the
+  session. While record mode is on it skips the reload, so rooms you have not
+  saved are kept; `#mapper save` then `#mapper load` does it by hand.
+- **A coloured `#echo >window` keeps its colour** in stream windows and
+  custom windows, instead of coming out in the window's default colour.
+
+---
+
 # Genie 5 — v5.0.0-beta.9.7
 
 **"Healing Hands"** — the release where an Empath can finally work from one
