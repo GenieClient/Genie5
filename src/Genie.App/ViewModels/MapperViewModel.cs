@@ -282,6 +282,8 @@ public partial class MapperViewModel : ReactiveObject
     /// label positioned at the right-click ("Add Label Here"); the toolbar
     /// passes null and the label is placed beside the current room.</summary>
     public ReactiveCommand<MapLabel?, Unit> AddLabelCommand   { get; }
+    /// <summary>Right-click "Add Room Here" (edit mode): add an unlinked room at the click.</summary>
+    public ReactiveCommand<MapNode, Unit> AddNodeCommand      { get; }
     /// <summary>Delete a specific label — canvas context item / Delete key.</summary>
     public ReactiveCommand<MapLabel, Unit> RemoveLabelCommand { get; }
     /// <summary>Invoked by the canvas after a label drag completes.</summary>
@@ -755,6 +757,7 @@ public partial class MapperViewModel : ReactiveObject
         NodeMovedCommand      = ReactiveCommand.Create<MapNode>(_ => { IsZoneDirty = true; RenderTick++; });
         RemoveNodeCommand     = ReactiveCommand.Create<MapNode>(RemoveNodeById);
         AddLabelCommand       = ReactiveCommand.Create<MapLabel?>(AddLabel);
+        AddNodeCommand        = ReactiveCommand.Create<MapNode>(AddRoom);
         RemoveLabelCommand    = ReactiveCommand.Create<MapLabel>(RemoveLabel);
         LabelMovedCommand     = ReactiveCommand.Create<MapLabel>(l =>
         {
@@ -1840,6 +1843,18 @@ public partial class MapperViewModel : ReactiveObject
         if (SelectedNode is not null) { RemoveNodeById(SelectedNode); return; }
         if (SelectedLabel is not null) { RemoveLabel(SelectedLabel); return; }
         LoadStatus = "No room or label selected.";
+    }
+
+    // ── Manual room add ("Add Room Here") ────────────────────────────────
+    private void AddRoom(MapNode at)
+    {
+        if (_engine is null) { LoadStatus = "Mapper not ready."; return; }
+        var node = _engine.AddNode(at.Title, at.PixelX, at.PixelY, at.Z);
+        SelectedLabel = null;
+        SelectedNode  = node;
+        IsZoneDirty   = true;
+        RenderTick++;
+        LoadStatus = $"Added room #{node.Id} — set its title, exits and server room id in Details, then Save.";
     }
 
     // ── Label editing (Genie 4 LabelDetails: New / Apply / Remove) ────────

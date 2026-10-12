@@ -254,6 +254,11 @@ public class MapCanvas : Control
     public static readonly StyledProperty<ICommand?> AddLabelCommandProperty =
         AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(AddLabelCommand));
 
+    /// <summary>Fired with a new <see cref="MapNode"/> positioned at the right-click
+    /// ("Add Room Here", edit mode). The VM adds it to the zone.</summary>
+    public static readonly StyledProperty<ICommand?> AddNodeCommandProperty =
+        AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(AddNodeCommand));
+
     /// <summary>Fired with the label to delete (Remove Label context item /
     /// Delete key with a label selected).</summary>
     public static readonly StyledProperty<ICommand?> RemoveLabelCommandProperty =
@@ -265,6 +270,7 @@ public class MapCanvas : Control
 
     public MapLabel? SelectedLabel      { get => GetValue(SelectedLabelProperty);      set => SetValue(SelectedLabelProperty, value); }
     public ICommand? AddLabelCommand    { get => GetValue(AddLabelCommandProperty);    set => SetValue(AddLabelCommandProperty, value); }
+    public ICommand? AddNodeCommand     { get => GetValue(AddNodeCommandProperty);     set => SetValue(AddNodeCommandProperty, value); }
     public ICommand? RemoveLabelCommand { get => GetValue(RemoveLabelCommandProperty); set => SetValue(RemoveLabelCommandProperty, value); }
     public ICommand? LabelMovedCommand  { get => GetValue(LabelMovedCommandProperty);  set => SetValue(LabelMovedCommandProperty, value); }
 
@@ -1241,6 +1247,22 @@ public class MapCanvas : Control
         if (EditMode)
         {
             var proj = GetProjection();
+            if (AddNodeCommand is not null && proj.Any)
+            {
+                var addRoom = new MenuItem { Header = "Add Room Here" };
+                addRoom.Click += (_, _) =>
+                {
+                    var n = new MapNode
+                    {
+                        Title  = "New Room",
+                        PixelX = MapProjection.SnapMapPx(proj.ToMapX(at.X), SnapToGrid),
+                        PixelY = MapProjection.SnapMapPx(proj.ToMapY(at.Y), SnapToGrid),
+                        Z      = Level,
+                    };
+                    if (AddNodeCommand?.CanExecute(n) == true) AddNodeCommand.Execute(n);
+                };
+                items.Add(addRoom);
+            }
             if (AddLabelCommand is not null && proj.Any)
             {
                 var add = new MenuItem { Header = "Add Label Here" };

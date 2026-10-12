@@ -1166,6 +1166,7 @@
                                     RemoveNodeCommand="{Binding ViewModel.RemoveNodeCommand}"
                                     SelectedLabel="{Binding ViewModel.SelectedLabel, Mode=TwoWay}"
                                     AddLabelCommand="{Binding ViewModel.AddLabelCommand}"
+                                    AddNodeCommand="{Binding ViewModel.AddNodeCommand}"
                                     RemoveLabelCommand="{Binding ViewModel.RemoveLabelCommand}"
                                     LabelMovedCommand="{Binding ViewModel.LabelMovedCommand}"/>
               </ScrollViewer>

@@ -384,6 +384,30 @@ public sealed class AutoMapperEngine
     }
 
     /// <summary>
+    /// Add a room by hand at a map position (the map editor's "Add Room Here").
+    /// Unlike the recorder it needs no walk evidence: the room is created
+    /// unlinked, on the given floor, with an optional server room id so the
+    /// tracker can find it by thumbprint. Keeps the lookup indexes consistent
+    /// and fires <see cref="MapChanged"/>. The new node is returned.
+    /// </summary>
+    public MapNode AddNode(string title, int pixelX, int pixelY, int z, string? serverRoomId = null)
+    {
+        var node = new MapNode
+        {
+            Id           = NextNodeId(),
+            Title        = string.IsNullOrWhiteSpace(title) ? "New Room" : title.Trim(),
+            PixelX       = pixelX,
+            PixelY       = pixelY,
+            Z            = z,
+            ServerRoomId = serverRoomId?.Trim() ?? string.Empty,
+        };
+        _zone.Nodes[node.Id] = node;
+        RebuildIndex();
+        MapChanged?.Invoke();
+        return node;
+    }
+
+    /// <summary>
     /// Renumber every node to a dense 1..N sequence in ascending current-id
     /// order, remapping all arc destinations to match (Genie 4 "Reset Map IDs").
     /// Preserves the current-room selection across the renumber. Useful after a
