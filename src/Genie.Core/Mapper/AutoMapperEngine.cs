@@ -1004,7 +1004,11 @@ public sealed class AutoMapperEngine
             if (DirectionHelper.Opposite.TryGetValue(usedDir, out var opp) && opp != Direction.None)
             {
                 var back = node.GetOrAddExit(opp, opp.ToString().ToLowerInvariant());
-                if (back.DestinationId != prevNode.Id && (back.DestinationId is null || mayRetarget))
+                // The back arc is an INFERENCE (we walked prev -> node, not node ->
+                // prev), and DR exits are often asymmetric (Crafting Society halls),
+                // so it only ever fills an empty slot — never overwrites a real arc,
+                // even on a server-id match.
+                if (back.DestinationId is null)
                 {
                     back.DestinationId = prevNode.Id;
                     zoneChanged = true;

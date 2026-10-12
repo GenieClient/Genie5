@@ -1,3 +1,15 @@
+# Unreleased — staged for the next cut
+
+## 🐛 Fixes
+- **Walking through a room no longer rewrites that room's return exit** — with
+  auto-create (record mode) on, stepping from A into B also pointed B's opposite
+  exit back at A, overwriting a real link whenever the exits are not mirror
+  images (common in society halls and town squares). That was the main way map
+  links such as the Forging Society's went missing mid-session. The return link
+  is now only filled in when that exit has no destination yet.
+
+---
+
 # Genie 5 — v5.0.0-beta.9.8
 
 **"Mapped Out"** — a small, fixes-only release. The mapper stops losing its own
