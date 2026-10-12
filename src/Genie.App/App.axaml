@@ -1376,7 +1376,7 @@
                   <CheckBox Content="Auto-create new rooms"
                             IsChecked="{Binding ViewModel.AutoCreateEnabled}"
                             FontSize="11"
-                            ToolTip.Tip="When ON, walking into an unmapped room adds a new node to the active zone. When OFF, the mapper only matches against existing zone data."/>
+                            ToolTip.Tip="When ON, walking into an unmapped room adds a new node to the active zone. When OFF, the mapper only matches against existing zone data. Starts OFF every session and is not saved."/>
                   <TextBlock Text="Map background:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                   <ColorPicker Color="{Binding ViewModel.MapBackground, Mode=TwoWay}"
                                IsAlphaEnabled="False"

@@ -241,9 +241,12 @@ public sealed class GenieConfig
     /// the reasoning at <c>AutoMapperEngine</c>'s match branch: an imported
     /// community map is read-only until the user opts in, so a wrong match can't
     /// silently mutate the right node and fork the map from upstream. A profile
-    /// that says <c>automapper = True</c> — including a Genie 4 settings.cfg,
-    /// where the automapper did record as you walk — turns recording on, which
-    /// before #274 it silently failed to do.</para></summary>
+    /// that says <c>automapper = True</c> turns recording on for THAT SESSION
+    /// (a Genie 4 settings.cfg, or a script's <c>#config automapper true</c>),
+    /// but the value is never persisted: <see cref="Load"/> ignores it and
+    /// <see cref="Save"/> writes <c>False</c>, so every launch starts with Record
+    /// off. Record edits the loaded map in memory, which is easy to leave on by
+    /// accident and then pollute (teleport arrivals, wrong-match arcs).</para></summary>
     public bool AutoMapper { get; set; }
 
     /// <summary>Opacity (0–255) of the ghost rooms drawn for the floors directly
@@ -719,7 +722,13 @@ public sealed class GenieConfig
             var pairs = ToConfigPairs();
             var lines = new string[pairs.Count];
             for (var i = 0; i < pairs.Count; i++)
-                lines[i] = $"#config {{{pairs[i].Key}}} {{{pairs[i].Value}}}";
+            {
+                // Record is session-only: always written as False (see AutoMapper).
+                var value = pairs[i].Key.Equals(SessionOnlyKey, StringComparison.OrdinalIgnoreCase)
+                    ? bool.FalseString
+                    : pairs[i].Value;
+                lines[i] = $"#config {{{pairs[i].Key}}} {{{value}}}";
+            }
             File.WriteAllLines(path, lines);
             return true;
         }
@@ -911,6 +920,9 @@ public sealed class GenieConfig
         ("Directories",      new[] { "scriptdir", "reposcriptdir", "sounddir", "artdir", "mapdir", "plugindir", "configdir", "logdir" }),
     };
 
+    /// <summary>The one setting that is never persisted: Record (auto-create rooms).</summary>
+    private const string SessionOnlyKey = "automapper";
+
     public bool Load(string fileName = "settings.cfg")
     {
         var path = Path.IsPathRooted(fileName) ? fileName : Path.Combine(ConfigDir, fileName);
@@ -919,7 +931,11 @@ public sealed class GenieConfig
         {
             var parts = ArgumentParser.ParseArgs(line);
             if (parts.Count == 3)
+            {
+                // Record (auto-create rooms) is session-only: never restored from disk.
+                if (parts[1].Equals(SessionOnlyKey, StringComparison.OrdinalIgnoreCase)) continue;
                 SetSetting(parts[1], parts[2], showException: false);
+            }
         }
         return true;
     }

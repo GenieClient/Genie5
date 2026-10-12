@@ -13,6 +13,13 @@
   that is not there yet), and the From/To room fields suggest that zone's rooms by
   number or title. Typing a value by hand still works.
 
+## 🔄 Changes
+- **Record starts off every session** — the mapper's Record toggle (`#config automapper`,
+  "Auto-create new rooms") is no longer saved. Genie always launches with it off, so a
+  forgotten Record can't keep editing your maps from one day to the next. A script (such
+  as `uber.cmd`) or you can still switch it on for the session; settings.cfg keeps
+  `automapper False`.
+
 ## 🐛 Fixes
 - **Walking through a room no longer rewrites that room's return exit** — with
   auto-create (record mode) on, stepping from A into B also pointed B's opposite
