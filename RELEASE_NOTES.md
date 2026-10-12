@@ -33,6 +33,12 @@
   images (common in society halls and town squares). That was the main way map
   links such as the Forging Society's went missing mid-session. The return link
   is now only filled in when that exit has no destination yet.
+- **Crossing a map boundary lands on the right one of two identical rooms** — stepping
+  from one map into another could place you on the wrong twin (the Crossing's two
+  "The Strand, Sandy Path" rooms), after which a script planned its next move from the
+  wrong room and failed. The room you just came through now settles which one it is.
+- **A shortened move command still follows its arc** — `go portal` now finds the arc
+  `go exit portal` (when only one arc fits), instead of falling back to a guess.
 - **Map links an earlier build damaged now heal as you walk them** — a link whose
   destination is clearly the wrong room (a different title, or a room the server
   has shown is another one) is corrected when you step through it into a room

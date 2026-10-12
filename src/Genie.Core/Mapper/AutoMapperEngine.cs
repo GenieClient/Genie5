@@ -248,7 +248,15 @@ public sealed class AutoMapperEngine
         }
     }
 
-    public void LoadZone(MapZone zone)
+    /// <summary>
+    /// Load a zone and re-resolve the current room in it. <paramref name="arrivalHint"/> is
+    /// the boundary stub the character was standing on in the zone they just left (a copy
+    /// of this zone's room, carrying a note that named this zone). When several rooms here
+    /// look identical, its non-compass exits pick the right one — "The Strand, Sandy
+    /// Path" exists twice in the Crossing, and only one has the stub's `go meeting portal`.
+    /// The hint is used for that first resolution only.
+    /// </summary>
+    public void LoadZone(MapZone zone, MapNode? arrivalHint = null)
     {
         _zone = zone;
         _zoneEverLoaded = true;
@@ -256,7 +264,27 @@ public sealed class AutoMapperEngine
         CurrentNode = null;
         CurrentNodeChanged?.Invoke();
         MapChanged?.Invoke();
-        Recalculate();
+        _arrivalHint = arrivalHint;
+        try { Recalculate(); }
+        finally { _arrivalHint = null; }
+    }
+
+    private MapNode? _arrivalHint;
+
+    /// <summary>Non-compass exit commands of a node, normalised — the part of a room's identity
+    /// the compass fingerprint leaves out.</summary>
+    private static HashSet<string> NonCompassVerbs(MapNode n) =>
+        n.Exits.Where(e => e.Direction == Direction.None && !string.IsNullOrEmpty(e.MoveCommand))
+               .Select(e => MoveVerb.Normalize(e.MoveCommand).ToLowerInvariant())
+               .ToHashSet();
+
+    /// <summary>True when the candidate has every non-compass exit the arrival stub has
+    /// (and the stub has at least one to go by).</summary>
+    private bool MatchesArrivalHint(MapNode candidate)
+    {
+        if (_arrivalHint is null) return false;
+        var want = NonCompassVerbs(_arrivalHint);
+        return want.Count > 0 && want.IsSubsetOf(NonCompassVerbs(candidate));
     }
 
     /// <summary>
@@ -746,8 +774,7 @@ public sealed class AutoMapperEngine
             }
             else if (!string.IsNullOrEmpty(usedMoveCommand))
             {
-                arc = prevNode.Exits.FirstOrDefault(e =>
-                    MoveCommandMatches(e.MoveCommand, usedMoveCommand));
+                arc = FindArcByCommand(prevNode, usedMoveCommand);
             }
 
             if (arc?.DestinationId is { } destId &&
@@ -802,8 +829,7 @@ public sealed class AutoMapperEngine
                     if (matchDir != Direction.None)
                         fwd = prevNode.GetExit(matchDir);
                     else if (!string.IsNullOrEmpty(usedMoveCommand))
-                        fwd = prevNode.Exits.FirstOrDefault(e =>
-                            MoveCommandMatches(e.MoveCommand, usedMoveCommand));
+                        fwd = FindArcByCommand(prevNode, usedMoveCommand);
 
                     if (fwd?.DestinationId is { } destId && candidateIds.Contains(destId)
                         && _zone.Nodes.TryGetValue(destId, out var graphHit))
@@ -811,6 +837,20 @@ public sealed class AutoMapperEngine
                         node = graphHit;
                         graphGrounded = true;
                         tier = "c:fingerprint+adjacency";
+                    }
+                }
+
+                // Disambiguation 1b: the boundary stub we just came through. Its non-compass
+                // exits (a portal, a gate) say which of several identical rooms this is.
+                if (node is null && _arrivalHint is not null)
+                {
+                    var byHint = candidateIds
+                        .Where(id => _zone.Nodes.TryGetValue(id, out var hc) && MatchesArrivalHint(hc))
+                        .ToList();
+                    if (byHint.Count == 1 && _zone.Nodes.TryGetValue(byHint[0], out var hintHit))
+                    {
+                        node = hintHit;
+                        tier = "c:fingerprint+stub";
                     }
                 }
 
@@ -882,7 +922,8 @@ public sealed class AutoMapperEngine
                 .Where(d => d != Direction.None)
                 .ToHashSet();
 
-            foreach (var candidate in _zone.Nodes.Values)
+            // With an arrival stub, try the rooms it matches first.
+            foreach (var candidate in _zone.Nodes.Values.OrderBy(c => MatchesArrivalHint(c) ? 0 : 1))
             {
                 if (!candidate.Title.Equals(title, StringComparison.OrdinalIgnoreCase))
                     continue;
@@ -1174,6 +1215,32 @@ public sealed class AutoMapperEngine
     ///         <c>go door</c> on the wire via the #send queue).</item>
     /// </list>
     /// </summary>
+    /// <summary>
+    /// The arc of <paramref name="node"/> that <paramref name="used"/> takes. An exact or
+    /// idiom match (<see cref="MoveCommandMatches"/>) wins; failing that, a command typed
+    /// shorter than the arc's — `go portal` for `go exit portal`, DR accepts both — matches
+    /// when exactly ONE arc has the same verb and the typed words in order, so two doors
+    /// (`go oak door`, `go iron door`) never guess from `go door`.
+    /// </summary>
+    internal static MapExit? FindArcByCommand(MapNode node, string used)
+    {
+        var exact = node.Exits.FirstOrDefault(e => MoveCommandMatches(e.MoveCommand, used));
+        if (exact is not null) return exact;
+
+        var typed = used.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (typed.Length < 2) return null;
+        var partial = node.Exits.Where(e =>
+        {
+            var arc = (e.MoveCommand ?? "").Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (arc.Length <= typed.Length || arc[0] != typed[0]) return false;
+            var i = 1;                                   // typed words must appear in order after the verb
+            for (var j = 1; j < arc.Length && i < typed.Length; j++)
+                if (arc[j] == typed[i]) i++;
+            return i == typed.Length;
+        }).Take(2).ToList();
+        return partial.Count == 1 ? partial[0] : null;
+    }
+
     internal static bool MoveCommandMatches(string? arcMove, string used)
     {
         if (string.IsNullOrEmpty(arcMove)) return false;

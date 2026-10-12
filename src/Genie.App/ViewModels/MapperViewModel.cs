@@ -2353,7 +2353,10 @@ public partial class MapperViewModel : ReactiveObject
             _trackedZoneFile = filename;
         }
 
-        try { _engine.LoadZone(zone); }
+        // The boundary stub we were standing on (a copy of the new zone's room) tells the
+        // engine which of several identical rooms in the new zone is this one.
+        var stubHint = _followingEngine && _engine.CurrentNode is { } stub && HasZoneNote(stub) ? stub : null;
+        try { _engine.LoadZone(zone, stubHint); }
         finally { _loadingZone = false; }
 
         // Browse-hold detection: suspend auto-follow while the user
