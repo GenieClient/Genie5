@@ -983,13 +983,30 @@ public sealed class AutoMapperEngine
         if (IsEnabled && prevNode != null && usedDir != Direction.None && prevNode.Id != node.Id)
         {
             // Forward exit: prevNode → node
-            // An EXISTING arc to a different room is only retargeted when the
-            // match is server-id authoritative. A fuzzy/guessed match (twin
-            // rooms, stale pending move) used to silently clobber a good arc,
-            // which then vanished from the map and broke #goto until the zone
-            // was reloaded from disk.
+            // An EXISTING arc to a different room is retargeted only on strong
+            // evidence. A fuzzy/guessed match (twin rooms, stale pending move)
+            // used to silently clobber a good arc, which then vanished from the
+            // map and broke #goto until the zone was reloaded from disk. Allowed:
+            //   - a server-id match, or
+            //   - a unique-fingerprint / adjacency match when the arc's CURRENT
+            //     destination is demonstrably not this room (different title, or
+            //     a server id known to be another room) — this heals an arc an
+            //     older build already corrupted on disk (85 West -> wrong room).
             bool mayRetarget = tier == "a:server-id" && !_serverIdStale;
             var fwd = prevNode.GetOrAddExit(usedDir, usedDir.ToString().ToLowerInvariant());
+            if (!mayRetarget && fwd.DestinationId is int oldDest &&
+                (tier == "c:fingerprint-unique" || tier == "c:fingerprint+adjacency"))
+            {
+                if (!_zone.Nodes.TryGetValue(oldDest, out var oldNode))
+                    mayRetarget = true;                                   // dangling arc
+                else if (!oldNode.Title.Equals(title, StringComparison.OrdinalIgnoreCase))
+                    mayRetarget = true;                                   // points at a different-titled room
+                else if (!string.IsNullOrEmpty(serverRoomId) &&
+                         _nodeServerIdIndex.TryGetValue(oldNode.Id, out var oldSrv) &&
+                         !string.IsNullOrEmpty(oldSrv) &&
+                         !oldSrv.Equals(serverRoomId, StringComparison.OrdinalIgnoreCase))
+                    mayRetarget = true;                                   // known to be another server room
+            }
             if (fwd.DestinationId != node.Id && (fwd.DestinationId is null || mayRetarget))
             {
                 fwd.DestinationId = node.Id;

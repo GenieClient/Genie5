@@ -7,6 +7,11 @@
   images (common in society halls and town squares). That was the main way map
   links such as the Forging Society's went missing mid-session. The return link
   is now only filled in when that exit has no destination yet.
+- **Map links an earlier build damaged now heal as you walk them** — a link whose
+  destination is clearly the wrong room (a different title, or a room the server
+  has shown is another one) is corrected when you step through it into a room
+  the map recognises uniquely. Links damaged and saved to disk by earlier builds
+  also come back with **Repair Maps**.
 
 ---
 

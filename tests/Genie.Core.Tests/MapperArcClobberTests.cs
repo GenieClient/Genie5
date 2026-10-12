@@ -25,10 +25,12 @@ public class MapperArcClobberTests
         var a = new MapNode { Id = 1, Title = "Alpha" };
         var b = new MapNode { Id = 2, Title = "Beta" };
         var c = new MapNode { Id = 3, Title = "Gamma" };
+        var d = new MapNode { Id = 4, Title = "Gamma" };   // twin: the fingerprint is ambiguous
         a.Exits.Add(new MapExit { Direction = Direction.North, MoveCommand = "north", DestinationId = 2 });
         b.Exits.Add(new MapExit { Direction = Direction.South, MoveCommand = "south", DestinationId = 1 });
         c.Exits.Add(new MapExit { Direction = Direction.South, MoveCommand = "south" });
-        zone.Nodes[1] = a; zone.Nodes[2] = b; zone.Nodes[3] = c;
+        d.Exits.Add(new MapExit { Direction = Direction.South, MoveCommand = "south" });
+        zone.Nodes[1] = a; zone.Nodes[2] = b; zone.Nodes[3] = c; zone.Nodes[4] = d;
 
         var engine = new AutoMapperEngine(zone) { IsEnabled = true };
         var fake = new FakeGameState();
@@ -68,5 +70,30 @@ public class MapperArcClobberTests
 
         Assert.Equal(2, engine.CurrentNode?.Id);
         Assert.Equal(3, b.GetExit(Direction.South)!.DestinationId);
+    }
+
+    [Fact]
+    public void RecordMode_UniqueFingerprint_HealsArcPointingAtWrongRoom()
+    {
+        // An older build left A's north arc pointing at "Beta"; the room actually
+        // reached is "Gamma" (unique fingerprint). The wrong destination is healed.
+        var zone = new MapZone { Name = "z" };
+        var a = new MapNode { Id = 1, Title = "Alpha" };
+        var b = new MapNode { Id = 2, Title = "Beta" };
+        var c = new MapNode { Id = 3, Title = "Gamma" };
+        a.Exits.Add(new MapExit { Direction = Direction.North, MoveCommand = "north", DestinationId = 2 });
+        c.Exits.Add(new MapExit { Direction = Direction.South, MoveCommand = "south" });
+        zone.Nodes[1] = a; zone.Nodes[2] = b; zone.Nodes[3] = c;
+
+        var engine = new AutoMapperEngine(zone) { IsEnabled = true };
+        var fake = new FakeGameState();
+        engine.Attach(fake);
+        engine.LoadZone(zone);
+
+        fake.RoomTitle = "Alpha"; fake.Exits = new[] { "north" }; fake.Fire();
+        engine.OnCommandSent("north");
+        fake.RoomTitle = "Gamma"; fake.Exits = new[] { "south" }; fake.Fire();
+
+        Assert.Equal(3, a.GetExit(Direction.North)!.DestinationId);
     }
 }
