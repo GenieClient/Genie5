@@ -8,6 +8,10 @@
   its opposite. Together they let you add a room you cannot walk to (a border room,
   a secret exit) and connect it, then **Save**. Until now rooms and links only came
   from walking them with Record on.
+- **Pick zones and rooms in Cross-Zone Connections** — the From/To zone fields are
+  dropdowns of the maps in your Maps folder (with an **Add zone…** entry for one
+  that is not there yet), and the From/To room fields suggest that zone's rooms by
+  number or title. Typing a value by hand still works.
 
 ## 🐛 Fixes
 - **Walking through a room no longer rewrites that room's return exit** — with

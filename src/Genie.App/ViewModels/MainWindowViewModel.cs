@@ -1598,7 +1598,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
             var repo = new Genie.Core.Mapper.ZoneConnectionsRepository(
                 System.IO.Path.Combine(mapsDir, "ZoneConnections.xml"));
-            var vm = new ZoneConnectionsViewModel(repo);
+            var vm = new ZoneConnectionsViewModel(repo, mapsDir);
             await ShowZoneConnectionsDialog.Handle(vm);
         });
 

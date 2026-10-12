@@ -48,29 +48,62 @@
 
             <TextBlock Text="ENDPOINTS" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
                        FontWeight="SemiBold"/>
-            <Grid ColumnDefinitions="100,*">
+            <!-- Add-zone row: opened by the "Add zone…" entry of either zone dropdown. -->
+            <Border DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel"
+                    IsVisible="{Binding AddingZone}"
+                    Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}"
+                    BorderThickness="1" CornerRadius="3" Padding="8">
+              <StackPanel Spacing="4">
+                <TextBlock Text="New zone — the map file's name, without .xml" FontSize="11"
+                           Foreground="{DynamicResource Theme.TextMuted}"/>
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <TextBox Grid.Column="0" Text="{Binding NewZoneName}" Watermark="Map150_Fang_Cove"
+                           FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+                  <Button Grid.Column="1" Content="Add" Margin="6,0,0,0" Command="{Binding ConfirmAddZoneCommand}"/>
+                  <Button Grid.Column="2" Content="Cancel" Margin="4,0,0,0" Command="{Binding CancelAddZoneCommand}"/>
+                </Grid>
+                <TextBlock Text="{Binding AddZoneError}" FontSize="10" Foreground="{DynamicResource Theme.Danger}"
+                           IsVisible="{Binding AddZoneError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+              </StackPanel>
+            </Border>
+
+            <Grid ColumnDefinitions="100,*" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="From zone:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
-              <TextBox Grid.Column="1" Text="{Binding FromZone}"
-                       Watermark="Map01_Crossing"
-                       FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <ComboBox Grid.Column="1" ItemsSource="{Binding ZoneChoices}" SelectedItem="{Binding FromZoneSel}"
+                        PlaceholderText="Pick a zone" HorizontalAlignment="Stretch"
+                        FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
             </Grid>
-            <Grid ColumnDefinitions="100,*">
+            <Grid ColumnDefinitions="100,*,Auto" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="From room:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
-              <TextBox Grid.Column="1" Text="{Binding FromRoom}"
-                       Watermark="#37666999  or  42"
-                       FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <AutoCompleteBox x:Name="FromRoomBox" Grid.Column="1" ItemsSource="{Binding FromRooms}"
+                               Text="{Binding FromRoomText}" ValueMemberBinding="{ReflectionBinding Value}"
+                               MinimumPrefixLength="0" FilterMode="Custom" Watermark="Room number, or #server id"
+                               FontSize="11" FontFamily="Consolas,Courier New,monospace">
+                <AutoCompleteBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:RoomChoice"><TextBlock Text="{Binding Display}" FontSize="11"/></DataTemplate>
+                </AutoCompleteBox.ItemTemplate>
+              </AutoCompleteBox>
+              <Button x:Name="FromRoomDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
+                      ToolTip.Tip="Show this zone's rooms"/>
             </Grid>
-            <Grid ColumnDefinitions="100,*">
+            <Grid ColumnDefinitions="100,*" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="To zone:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
-              <TextBox Grid.Column="1" Text="{Binding ToZone}"
-                       Watermark="Map35_Throne_City"
-                       FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <ComboBox Grid.Column="1" ItemsSource="{Binding ZoneChoices}" SelectedItem="{Binding ToZoneSel}"
+                        PlaceholderText="Pick a zone" HorizontalAlignment="Stretch"
+                        FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
             </Grid>
-            <Grid ColumnDefinitions="100,*">
+            <Grid ColumnDefinitions="100,*,Auto" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="To room:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
-              <TextBox Grid.Column="1" Text="{Binding ToRoom}"
-                       Watermark="#37666500  or  17"
-                       FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <AutoCompleteBox x:Name="ToRoomBox" Grid.Column="1" ItemsSource="{Binding ToRooms}"
+                               Text="{Binding ToRoomText}" ValueMemberBinding="{ReflectionBinding Value}"
+                               MinimumPrefixLength="0" FilterMode="Custom" Watermark="Room number, or #server id"
+                               FontSize="11" FontFamily="Consolas,Courier New,monospace">
+                <AutoCompleteBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:RoomChoice"><TextBlock Text="{Binding Display}" FontSize="11"/></DataTemplate>
+                </AutoCompleteBox.ItemTemplate>
+              </AutoCompleteBox>
+              <Button x:Name="ToRoomDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
+                      ToolTip.Tip="Show this zone's rooms"/>
             </Grid>
 
             <Separator Margin="0,4,0,4"/>
