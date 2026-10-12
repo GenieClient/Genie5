@@ -36,6 +36,10 @@ Each connection is one directed link:
 
 On first launch Genie **seeds** a documented starter template (example routes with placeholder room ids) so you have something to edit, and writes a marker so it never re-seeds — if you delete the file deliberately, Genie respects that. Connections that can't be resolved (stale zone/room refs) are simply skipped, so a half-filled file degrades gracefully — the derived border-room links keep working regardless.
 
+## Return portals
+
+Some portals do not lead to a fixed place: Fang Cove's **EXIT portal** returns you to wherever you entered — the Crossing if you came from the Crossing, Shard if you came from Shard — and does nothing if you arrived by boat. Tick **Return portal** on a connection to model that. Its To zone and To room are not used; instead Genie remembers, when you enter a zone through a portal, the room you stepped out of, and `#goto` offers the return portal only while that origin is known. Arriving by boat or on foot, or leaving the zone, forgets it. `#mapper portal` shows what is remembered and `#mapper portal clear` forgets it. The origin is session memory: after a restart it is unknown until you next enter through a portal.
+
 ## The pathfinder
 
 The multi-zone pathfinder runs **Dijkstra over a meta-graph of (zone, room) pairs**, loading each zone lazily (read at most once per search). It draws edges from two sources:
@@ -54,7 +58,7 @@ Rooms can be referenced by integer node id or by DragonRealms server-room id (`#
 
 ## The editor
 
-**Maps ▸ Cross-Zone Connections…** opens a grid editor: add, remove, edit, and save connections. This is the curation surface for the transit graph the pathfinder consults. You can also let the community Maps repo ship richer versions over time — see [Updating Maps & Scripts](Updating-Maps-and-Scripts).
+**Maps ▸ Cross-Zone Connections…** opens an editor: add, remove, edit, and save connections. The From/To zone fields are type-to-filter dropdowns of the maps in your Maps folder (**Add zone…** names one that is not there yet), and the From/To room fields suggest that zone's rooms by number or title and name the room you picked. Saving warns about a zone that has no map file, since those links are skipped. This is the curation surface for the transit graph the pathfinder consults. You can also let the community Maps repo ship richer versions over time — see [Updating Maps & Scripts](Updating-Maps-and-Scripts).
 
 ## The walker
 

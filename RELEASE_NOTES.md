@@ -1,4 +1,10 @@
-# Unreleased — staged for the next cut
+# Genie 5 — v5.0.0-beta.9.9
+
+**"Return Trip"** — a mapper release. Portals that take you back to wherever you
+entered finally route correctly, the map editor can add a room and connect two rooms
+by hand, the Cross-Zone Connections editor picks zones and rooms from lists, Record
+starts off every session, and a batch of fixes stops the mapper losing links and
+mixing up identical rooms.
 
 ## ✨ New
 - **Add Room Here and Link to… in the map editor** — in edit mode, right-click an

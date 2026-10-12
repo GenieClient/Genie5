@@ -34,7 +34,7 @@ Genie identifies your current room from what the game sends — the room title, 
 ### Lookup vs. learning
 
 - **Lookup-only (default)** — Genie matches you against the community map but never changes the map files.
-- **Learning (AutoMapper toggle on)** — Genie also stamps server-room ids onto matched rooms, records exits it sees you use, and adds new rooms it doesn't recognize, saving the zone back to disk. This makes your future visits resolve instantly and fills gaps in the community map.
+- **Learning (Record on)** — Genie also stamps server-room ids onto matched rooms it is sure of, records exits it sees you use, and adds new rooms it doesn't recognize. The changes live in memory until you **Save** the zone (a dot marks unsaved edits), so you can reload the zone to discard them. Record starts **off** every session and is never saved, so it cannot stay on by accident; `#config automapper true` (or the Record button, or a script) turns it on for the session only.
 
 ## Click-to-walk
 
@@ -102,8 +102,9 @@ You can add a note to a room (a landmark, a warning, a shop name) in the Mapper'
 The toolbar under the zone picker carries Genie 4's AutoMapper edit tools:
 
 - **✎ Edit** — edit mode: click a room to select it, drag to move it. Off (the default), a click does nothing and right-click offers **Go Here**.
-- **⏺ Record** — add new rooms to the active zone as you walk into them (Genie 4 Record Mode).
+- **⏺ Record** — add new rooms to the active zone as you walk into them (Genie 4 Record Mode). Off at every launch.
 - **New** starts an empty zone; **Save** writes the active zone to its XML file (a dot marks unsaved edits).
+- In edit mode, right-click an empty spot for **Add Room Here** (an unlinked room at the click, for a room you cannot walk to; fill in its title and server id in Details). Right-click a room for **Link to…**: click the room it leads to, then give the command (`west`, `go oak door`) and choose whether to add the way back — a compass command fills in its opposite. **Save** keeps the result; links stay within the open zone (use [Cross-Zone Travel](Cross-Zone-Travel) for links between maps).
 - In edit mode: **Remove** deletes the selected room or label, **+ Label** adds a landmark label beside your room (or right-click ▸ **Add Label Here**), **Reset IDs** renumbers rooms 1..N, **Snap** snaps dragged rooms to Genie 4's 10px grid, **Lock** stops rooms being dragged, and **Dup** allows duplicate rooms while recording.
 
 The **Details** panel slides out from the map's right edge when you hover the **DETAILS** strip (or click it to keep it open); the **📌** pin holds it open until you release it. It shows the current room's server id and notes, an **Edit Room** form for the selected room (title, notes, colour, server id, tags — **Apply**, then **Save** the zone), an **Edit Label** form for a selected label, the zone's room count and last update, and the map's background and text colours.
