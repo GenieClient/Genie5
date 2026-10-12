@@ -59,6 +59,11 @@ public sealed class MultiZonePathfinder
     /// quick-send arcs, as <see cref="AutoMapperEngine.AvoidSpoilerMoves"/> does.</summary>
     public bool AvoidSpoilerMoves { get; init; }
 
+    /// <summary>Where each zone's return portal (<see cref="ZoneConnection.ReturnsToOrigin"/>)
+    /// would take you right now, by zone entered. A return-portal connection is only
+    /// used when its zone has an entry here.</summary>
+    public IReadOnlyDictionary<string, PortalOrigin>? PortalOrigins { get; init; }
+
     public MultiZonePathfinder(
         MapZoneRepository zoneRepo,
         string mapsDirectory,
@@ -178,7 +183,17 @@ public sealed class MultiZonePathfinder
                     var weight  = 1 + (conn.RtCost ?? 0) / 4 + avgWait / 4
                                     + AutoMapperEngine.EffortPenalty(conn.Verb, _athleticsRank);
 
-                    var nextKey = (conn.ToZone, conn.ToRoom);
+                    var toZone = conn.ToZone;
+                    var toRoom = conn.ToRoom;
+                    if (conn.ReturnsToOrigin)
+                    {
+                        // A return portal goes back where you came in. No remembered
+                        // origin (you arrived by boat, or by walking) means it can't be used.
+                        if (PortalOrigins is null || !PortalOrigins.TryGetValue(conn.FromZone, out var origin)) continue;
+                        toZone = origin.Zone;
+                        toRoom = origin.Room;
+                    }
+                    var nextKey = (toZone, toRoom);
 
                     if (!distances.TryGetValue(nextKey, out var existingDist) ||
                         currentDist + weight < existingDist)
@@ -191,7 +206,7 @@ public sealed class MultiZonePathfinder
                             IsCrossZone            = true,
                             ExpectedWaitMinSeconds = conn.WaitMin,
                             ExpectedWaitMaxSeconds = conn.WaitMax,
-                            TargetZone             = conn.ToZone,
+                            TargetZone             = toZone,
                             Description            = string.IsNullOrEmpty(conn.TransitType)
                                 ? conn.Verb
                                 : $"{conn.TransitType}: {conn.Verb}",

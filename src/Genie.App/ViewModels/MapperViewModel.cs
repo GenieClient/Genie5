@@ -1113,6 +1113,9 @@ public partial class MapperViewModel : ReactiveObject
         _engine.CurrentNodeChanged += () => Dispatcher.UIThread.Post(() =>
         {
             Refresh();
+            if (!BrowsingZone && _engine?.CurrentNode is { } here && !HasZoneNote(here) &&
+                !string.IsNullOrEmpty(SelectedZoneFile))
+                _lastGoodRoom = (SelectedZoneFile, here.Id);
             // Live Audit: log the mapper's resolved room/zone on EVERY room
             // change — including "(**)" rooms that carry no server id and so
             // produce no NAV line. This is what reveals a cross-zone stall
@@ -2276,6 +2279,17 @@ public partial class MapperViewModel : ReactiveObject
         try { if (!string.IsNullOrEmpty(_displayPath)) _display.Save(_displayPath); } catch { /* best effort */ }
     }
 
+    // ── Return-portal origins ─────────────────────────────────────────────
+    /// <summary>Where each zone's return portal would take you (see <see cref="PortalOriginTracker"/>).</summary>
+    public PortalOriginTracker PortalOrigins { get; } = new();
+
+    // The character's last well-placed room (zone file + node id), kept so that when the
+    // zone changes we know which room they stepped out of. Boundary stubs (a note naming
+    // another map) are skipped: they are the arrival copy of the NEW room, not the old one.
+    private (string Zone, int Node)? _lastGoodRoom;
+    // The zone the character is in, as last set by engine-driven tracking (not browsing).
+    private string? _trackedZoneFile;
+
     private void LoadSelectedZone(string? filename)
     {
         if (_suppressAutoLoad)         return;
@@ -2320,6 +2334,23 @@ public partial class MapperViewModel : ReactiveObject
             ZoneLastWriteTime = null;
             ZoneAgeDisplay    = "";
             IsZoneStale       = false;
+        }
+
+        // Engine-driven zone change (the character moved, not the user browsing): note
+        // whether it went through a portal, so a return portal knows where to take you.
+        if (_autoZoneSwitch || _followingEngine || _trackedZoneFile is null)
+        {
+            if (_trackedZoneFile is not null &&
+                !string.Equals(_trackedZoneFile, filename, StringComparison.OrdinalIgnoreCase))
+            {
+                var from = _lastGoodRoom is { } r &&
+                           string.Equals(r.Zone, _trackedZoneFile, StringComparison.OrdinalIgnoreCase)
+                    ? r.Node.ToString() : null;
+                PortalOrigins.OnZoneChanged(_trackedZoneFile, from, filename, _engine.LastSentCommand);
+                if (PortalOrigins.Origins.TryGetValue(filename, out var o))
+                    _audit?.Note("PORTAL", $"entered '{filename}' through a portal from '{o.Zone}' room {o.Room}");
+            }
+            _trackedZoneFile = filename;
         }
 
         try { _engine.LoadZone(zone); }
@@ -2539,6 +2570,11 @@ public partial class MapperViewModel : ReactiveObject
     /// arrival). Returns false when the origin can't be determined (offline / the
     /// current room isn't mapped) or the destination is actually in the same zone.
     /// </summary>
+    /// <summary>True when the room's note names another zone file (a boundary stub).</summary>
+    private static bool HasZoneNote(MapNode n) =>
+        !string.IsNullOrEmpty(n.Notes) &&
+        n.Notes.Split('|').Any(x => x.Trim().EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
+
     private bool TryStartCrossZoneWalk(string destZone, int destNodeId, string destTitle)
     {
         if (_engine is null || _zoneRepo is null || AutoWalk is null ||
@@ -2557,6 +2593,7 @@ public partial class MapperViewModel : ReactiveObject
             _skillStore, _engine.CharacterClass, _engine.CharacterLevel)
         {
             AvoidSpoilerMoves = _engine.AvoidSpoilerMoves,   // #254
+            PortalOrigins     = PortalOrigins.Origins,
         };
 
         var plan = pathfinder.FindPath(

@@ -6830,10 +6830,25 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 Echo(Mapper.NoteCommand(RestAfterFirstToken(args)));
                 break;
 
+            // Return portals (a connection marked "returns you to where you came from"):
+            // show where each would take you now, or forget the remembered origins.
+            case "portal": case "portals":
+                if (parts.Length > 1 && parts[1].Equals("clear", StringComparison.OrdinalIgnoreCase))
+                {
+                    Mapper.PortalOrigins.Clear();
+                    Echo("[mapper] Portal origins cleared.");
+                }
+                else if (Mapper.PortalOrigins.Origins.Count == 0)
+                    Echo("[mapper] No portal origin remembered — a return portal is used only after you enter a zone through a portal.");
+                else
+                    foreach (var kv in Mapper.PortalOrigins.Origins)
+                        Echo($"[mapper] Return portal in {kv.Key} → {kv.Value.Zone} room {kv.Value.Room}");
+                break;
+
             default:
                 Echo("[mapper] Usage: #mapper reset | save | load | clear | zone [<id|name>] | " +
                      "color <bg|text> <colour> | allowdupes [on|off] | record [on|off] | " +
-                     "tag add|remove <tag> | tag list | tags | note [<text>]");
+                     "tag add|remove <tag> | tag list | tags | note [<text>] | portal [clear]");
                 break;
         }
     }

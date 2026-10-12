@@ -18,6 +18,6 @@ public class ZoneConnectionChangeTests
         c.Verb     = "go exit portal";
         c.Verb     = "go exit portal";     // no change, no event
 
-        Assert.Equal(new[] { "FromZone", "ToZone", "Verb" }, seen);
+        Assert.Equal(new[] { "FromZone", "ToZone", "ToLabel", "Verb" }, seen);   // ToZone also refreshes the list label
     }
 }

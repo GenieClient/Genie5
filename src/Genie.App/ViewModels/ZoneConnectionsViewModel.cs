@@ -55,6 +55,8 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
     [Reactive] public string? ToZoneSel    { get; set; }
     [Reactive] public string  FromRoomText { get; set; } = "";
     [Reactive] public string  ToRoomText   { get; set; } = "";
+    /// <summary>Mirrors <see cref="ZoneConnection.ReturnsToOrigin"/>; the To zone/room fields are unused when set.</summary>
+    [Reactive] public bool    ReturnsToOrigin { get; set; }
     [Reactive] public IReadOnlyList<RoomChoice> FromRooms { get; private set; } = Array.Empty<RoomChoice>();
     [Reactive] public IReadOnlyList<RoomChoice> ToRooms   { get; private set; } = Array.Empty<RoomChoice>();
 
@@ -136,6 +138,11 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
             if (!_syncing && Selected is not null) Selected.ToRoom = v ?? "";
         });
 
+        this.WhenAnyValue(x => x.ReturnsToOrigin).Skip(1).Subscribe(v =>
+        {
+            if (!_syncing && Selected is not null) Selected.ReturnsToOrigin = v;
+        });
+
         // Keep the "what is this room" captions current.
         this.WhenAnyValue(x => x.FromRoomText, x => x.FromRooms).Subscribe(_ => FromRoomLabel = Describe(FromRoomText, FromRooms));
         this.WhenAnyValue(x => x.ToRoomText,   x => x.ToRooms)  .Subscribe(_ => ToRoomLabel   = Describe(ToRoomText,   ToRooms));
@@ -191,6 +198,7 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
             ToZoneSel    = string.IsNullOrWhiteSpace(s?.ToZone)   ? null : s!.ToZone;
             FromRoomText = s?.FromRoom ?? "";
             ToRoomText   = s?.ToRoom   ?? "";
+            ReturnsToOrigin = s?.ReturnsToOrigin ?? false;
         }
         finally { _syncing = false; }
         _ = RefreshRoomsAsync(isFrom: true);

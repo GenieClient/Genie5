@@ -48,8 +48,32 @@ public sealed class ZoneConnection : INotifyPropertyChanged
     /// `<see cref="MapNode.ServerRoomId"/>` indexing strategy.</summary>
     public string FromRoom { get; set; } = string.Empty;
 
+    /// <summary>
+    /// A return portal: taking it puts you back in the room you entered this zone
+    /// from, which depends on how you arrived (Fang Cove's EXIT portal returns you
+    /// to the Crossing, Shard, … whichever you came through). When true,
+    /// <see cref="ToZone"/> / <see cref="ToRoom"/> are not used — the router
+    /// reads the remembered origin (<see cref="PortalOriginTracker"/>) and only
+    /// offers this connection when one is known.
+    /// </summary>
+    public bool ReturnsToOrigin
+    {
+        get => _returnsToOrigin;
+        set
+        {
+            if (_returnsToOrigin == value) return;
+            _returnsToOrigin = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ReturnsToOrigin)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ToLabel)));
+        }
+    }
+    private bool _returnsToOrigin;
+
+    /// <summary>What the editor's list shows after the arrow.</summary>
+    public string ToLabel => ReturnsToOrigin ? "(where you came from)" : ToZone;
+
     /// <summary>Destination zone file basename without `.xml` extension.</summary>
-    public string ToZone { get => _toZone; set => Set(ref _toZone, value); }
+    public string ToZone { get => _toZone; set { Set(ref _toZone, value); PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ToLabel))); } }
     private string _toZone = string.Empty;
 
     /// <summary>Destination room — same encoding as <see cref="FromRoom"/>.</summary>

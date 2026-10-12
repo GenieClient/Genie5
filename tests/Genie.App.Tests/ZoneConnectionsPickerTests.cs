@@ -144,4 +144,22 @@ public sealed class ZoneConnectionsPickerTests : IDisposable
         Assert.Contains("Map999_Nowhere", vm.Status);
         Assert.DoesNotContain("Map1_Crossing,", vm.Status);
     }
+
+    [Fact]
+    public void ReturnPortalCheckbox_WritesBack_ShowsInTheListLabel_AndLoadsFromASavedConnection()
+    {
+        var vm = NewVm();
+        vm.AddCommand.Execute().Subscribe();
+        vm.FromZoneSel = "Map150_Fang_Cove";
+        Assert.False(vm.Selected!.ReturnsToOrigin);
+
+        vm.ReturnsToOrigin = true;
+        Assert.True(vm.Selected.ReturnsToOrigin);
+        Assert.Equal("(where you came from)", vm.Selected.ToLabel);
+
+        vm.SaveCommand.Execute().Subscribe();
+        var reloaded = NewVm();
+        reloaded.Selected = reloaded.Connections.Single();
+        Assert.True(reloaded.ReturnsToOrigin);
+    }
 }

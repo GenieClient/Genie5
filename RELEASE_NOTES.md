@@ -12,6 +12,12 @@
   dropdowns of the maps in your Maps folder (with an **Add zone…** entry for one
   that is not there yet), and the From/To room fields suggest that zone's rooms by
   number or title. Typing a value by hand still works.
+- **Return portals** — a Cross-Zone Connection can be marked as a return portal, for a
+  portal like Fang Cove's EXIT portal that takes you back to wherever you entered (the
+  Crossing, Shard, …). Genie remembers the room you stepped through a portal from when
+  you enter a zone, and `#goto` only plans the return portal when that origin is known;
+  arriving by boat or on foot forgets it. `#mapper portal` shows what is remembered and
+  `#mapper portal clear` forgets it. The origin is not kept across a restart.
 
 ## 🔄 Changes
 - **Record starts off every session** — the mapper's Record toggle (`#config automapper`,

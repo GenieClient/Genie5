@@ -91,6 +91,7 @@ public sealed class ZoneConnectionsRepository
                     WaitMin     = int.TryParse(el.GetAttribute("wait-min"), out var waitMin) ? waitMin : null,
                     WaitMax     = int.TryParse(el.GetAttribute("wait-max"), out var waitMax) ? waitMax : null,
                     Notes       = el.GetAttribute("notes"),
+                    ReturnsToOrigin = string.Equals(el.GetAttribute("returns-to-origin"), "true", StringComparison.OrdinalIgnoreCase),
                 });
             }
             return list;
@@ -128,6 +129,7 @@ public sealed class ZoneConnectionsRepository
             if (c.WaitMin.HasValue)                   writer.WriteAttributeString("wait-min", c.WaitMin.Value.ToString());
             if (c.WaitMax.HasValue)                   writer.WriteAttributeString("wait-max", c.WaitMax.Value.ToString());
             if (!string.IsNullOrEmpty(c.Notes))       writer.WriteAttributeString("notes", c.Notes);
+            if (c.ReturnsToOrigin)                    writer.WriteAttributeString("returns-to-origin", "true");
             writer.WriteEndElement();
         }
 

@@ -203,6 +203,11 @@ public sealed class AutoMapperEngine
         state.StateChanged += OnStateChanged;
     }
 
+    /// <summary>The last command sent to the game (first of a ';' chain), kept until the
+    /// next one. Lets the host tell, when the zone changes, whether that move went
+    /// through a portal (see <see cref="PortalOriginTracker"/>).</summary>
+    public string LastSentCommand { get; private set; } = string.Empty;
+
     /// <summary>
     /// Called by the command intercept layer before each command reaches the
     /// server. Tracks the most recently sent movement so the engine's
@@ -218,6 +223,7 @@ public sealed class AutoMapperEngine
         // by looking at the first token only.
         var first = rawCommand.Split(';')[0].Trim();
         if (first.Length == 0) return;
+        LastSentCommand = first;
 
         var dir = DirectionHelper.Parse(first);
         if (dir != Direction.None)
