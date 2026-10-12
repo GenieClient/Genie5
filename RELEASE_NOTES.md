@@ -10,8 +10,8 @@
 - **Map links an earlier build damaged now heal as you walk them** — a link whose
   destination is clearly the wrong room (a different title, or a room the server
   has shown is another one) is corrected when you step through it into a room
-  the map recognises uniquely. Links damaged and saved to disk by earlier builds
-  also come back with **Repair Maps**.
+  the map recognises uniquely. Reloading the zone (or `#mapper reset` with record
+  mode off) always brings back the links as saved on disk.
 
 ---
 
