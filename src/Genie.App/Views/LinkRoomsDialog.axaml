@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Genie.App.ViewModels"
+        x:Class="Genie.App.Views.LinkRoomsDialog"
+        x:DataType="vm:LinkRoomsViewModel"
+        Title="Link Rooms"
+        Width="460" SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+
+  <StackPanel Margin="16" Spacing="12">
+    <Border Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}"
+            BorderThickness="1" CornerRadius="3" Padding="12,8">
+      <StackPanel Spacing="3">
+        <Grid ColumnDefinitions="50,*">
+          <TextBlock Text="From:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
+          <TextBlock Grid.Column="1" Text="{Binding FromLabel}" FontSize="11" FontWeight="SemiBold"
+                     Foreground="{DynamicResource Theme.TextPrimary}" TextWrapping="Wrap"/>
+        </Grid>
+        <Grid ColumnDefinitions="50,*">
+          <TextBlock Text="To:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
+          <TextBlock Grid.Column="1" Text="{Binding ToLabel}" FontSize="11" FontWeight="SemiBold"
+                     Foreground="{DynamicResource Theme.TextPrimary}" TextWrapping="Wrap"/>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Command that takes you there" FontSize="12"
+                 Foreground="{DynamicResource Theme.TextMuted}"/>
+      <TextBox Text="{Binding Verb}" Watermark="west  ·  go oak door  ·  climb wall" FontSize="12"/>
+    </StackPanel>
+
+    <CheckBox IsChecked="{Binding AddReturn}" Content="Also add the way back" FontSize="12"/>
+
+    <StackPanel Spacing="4" IsVisible="{Binding AddReturn}">
+      <TextBlock Text="Return command (blank = none)" FontSize="12"
+                 Foreground="{DynamicResource Theme.TextMuted}"/>
+      <TextBox Text="{Binding ReturnVerb}" Watermark="east  ·  go oak door" FontSize="12"/>
+      <TextBlock Text="A compass command fills in its opposite. Other commands have no automatic return, so type one if the door works both ways."
+                 FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource Theme.TextMuted}"/>
+    </StackPanel>
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="Cancel" Command="{Binding CancelCommand}" MinWidth="80"/>
+      <Button Content="Link" Command="{Binding OkCommand}" MinWidth="80" IsDefault="True"/>
+    </StackPanel>
+  </StackPanel>
+</Window>

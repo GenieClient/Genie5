@@ -154,6 +154,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public Interaction<ConfigurationViewModel, Unit>      ShowConfigurationDialog  { get; } = new();
     public Interaction<Genie4ImportViewModel, Unit>       ShowGenie4ImportDialog   { get; } = new();
     public Interaction<EditExitViewModel, bool>           ShowEditExitDialog       { get; } = new();
+    public Interaction<LinkRoomsViewModel, bool>          ShowLinkRoomsDialog      { get; } = new();
     public Interaction<ZoneConnectionsViewModel, Unit>    ShowZoneConnectionsDialog{ get; } = new();
     public ReactiveCommand<Unit, Unit>                    ConnectCommand           { get; }
     public ReactiveCommand<Unit, Unit>                    DisconnectCommand        { get; }
@@ -5884,6 +5885,18 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 var editVm = new EditExitViewModel(exit, fromTitle, toTitle);
                 var ok = await ShowEditExitDialog.Handle(editVm);
                 if (ok) Mapper.SaveCurrentZone();
+            });
+
+        // Mapper "Link to…": the target room was picked — ask for the command(s),
+        // then create the link. The zone stays unsaved until the user saves.
+        Mapper.LinkRoomsRequested += (from, to) =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+            {
+                var dlg = new LinkRoomsViewModel($"#{from.Id}  {from.Title}", $"#{to.Id}  {to.Title}");
+                if (await ShowLinkRoomsDialog.Handle(dlg))
+                    Mapper.ApplyLink(from, to, dlg.Verb, dlg.AddReturn, dlg.ReturnVerb);
+                else
+                    Mapper.BeginLinkCommand.Execute(null).Subscribe();
             });
 
         // ── Container noun map: harvest <container target='#NNNN' title='…'/>

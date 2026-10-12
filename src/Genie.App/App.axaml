@@ -1167,6 +1167,8 @@
                                     SelectedLabel="{Binding ViewModel.SelectedLabel, Mode=TwoWay}"
                                     AddLabelCommand="{Binding ViewModel.AddLabelCommand}"
                                     AddNodeCommand="{Binding ViewModel.AddNodeCommand}"
+                                    BeginLinkCommand="{Binding ViewModel.BeginLinkCommand}"
+                                    LinkPending="{Binding ViewModel.LinkSource, Converter={x:Static ObjectConverters.IsNotNull}}"
                                     RemoveLabelCommand="{Binding ViewModel.RemoveLabelCommand}"
                                     LabelMovedCommand="{Binding ViewModel.LabelMovedCommand}"/>
               </ScrollViewer>

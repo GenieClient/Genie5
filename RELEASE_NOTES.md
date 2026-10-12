@@ -1,5 +1,14 @@
 # Unreleased — staged for the next cut
 
+## ✨ New
+- **Add Room Here and Link to… in the map editor** — in edit mode, right-click an
+  empty spot to drop a room by hand, then right-click a room, choose **Link to…**
+  and click the room it leads to. A small dialog asks for the command (`west`,
+  `go oak door`, `climb wall`) and can add the way back; a compass command fills in
+  its opposite. Together they let you add a room you cannot walk to (a border room,
+  a secret exit) and connect it, then **Save**. Until now rooms and links only came
+  from walking them with Record on.
+
 ## 🐛 Fixes
 - **Walking through a room no longer rewrites that room's return exit** — with
   auto-create (record mode) on, stepping from A into B also pointed B's opposite

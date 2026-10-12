@@ -408,6 +408,61 @@ public sealed class AutoMapperEngine
     }
 
     /// <summary>
+    /// Connect two rooms of the active zone by hand (the map editor's "Link to…").
+    /// Creates — or, when <paramref name="from"/> already has an exit with that
+    /// verb, re-points — the exit <c>from --verb--&gt; to</c>. With
+    /// <paramref name="addReturn"/> it also creates <c>to --back--&gt; from</c>, where
+    /// the return verb is <paramref name="returnVerb"/> or, for a compass verb,
+    /// the opposite direction; a non-compass verb with no return verb gets no
+    /// return exit. This is an explicit author action, so unlike the recorder
+    /// it may replace an existing destination. Returns null when the link is
+    /// not possible (same room, blank verb, or a room outside the zone).
+    /// </summary>
+    public (MapExit Forward, MapExit? Back)? LinkRooms(
+        MapNode from, MapNode to, string verb, bool addReturn, string? returnVerb = null)
+    {
+        verb = (verb ?? string.Empty).Trim();
+        if (verb.Length == 0 || from.Id == to.Id) return null;
+        if (!_zone.Nodes.ContainsKey(from.Id) || !_zone.Nodes.ContainsKey(to.Id)) return null;
+
+        var forward = SetExit(from, verb, to.Id);
+
+        MapExit? back = null;
+        if (addReturn)
+        {
+            var retVerb = (returnVerb ?? string.Empty).Trim();
+            if (retVerb.Length == 0 &&
+                DirectionHelper.Parse(verb) is var d && d != Direction.None &&
+                DirectionHelper.Opposite.TryGetValue(d, out var opp) && opp != Direction.None)
+                retVerb = opp.ToString().ToLowerInvariant();
+            if (retVerb.Length > 0) back = SetExit(to, retVerb, from.Id);
+        }
+
+        RebuildIndex();
+        MapChanged?.Invoke();
+        return (forward, back);
+    }
+
+    private static MapExit SetExit(MapNode node, string verb, int destinationId)
+    {
+        var dir = DirectionHelper.Parse(verb);
+        var exit = dir != Direction.None
+            ? node.GetExit(dir)
+            : node.Exits.FirstOrDefault(e => e.Direction == Direction.None &&
+                                             MoveCommandMatches(e.MoveCommand, verb));
+        if (exit is null)
+        {
+            exit = new MapExit { Direction = dir };
+            node.Exits.Add(exit);
+        }
+        exit.MoveCommand    = verb;
+        exit.ExitToken      = verb;
+        exit.DestinationId  = destinationId;
+        exit.RawDestination = string.Empty;
+        return exit;
+    }
+
+    /// <summary>
     /// Renumber every node to a dense 1..N sequence in ascending current-id
     /// order, remapping all arc destinations to match (Genie 4 "Reset Map IDs").
     /// Preserves the current-room selection across the renumber. Useful after a

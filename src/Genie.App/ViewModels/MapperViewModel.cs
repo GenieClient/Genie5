@@ -233,6 +233,8 @@ public partial class MapperViewModel : ReactiveObject
 
     /// <summary>The node selected in the canvas (edit mode). Two-way bound.</summary>
     [Reactive] public MapNode? SelectedNode { get; set; }
+    /// <summary>The room a pending "Link to…" starts from (null = no link in progress).</summary>
+    [Reactive] public MapNode? LinkSource   { get; private set; }
 
     /// <summary>True when the active zone has unsaved edits. Drives the Save
     /// button's enabled state + a "● unsaved" hint.</summary>
@@ -282,6 +284,9 @@ public partial class MapperViewModel : ReactiveObject
     /// label positioned at the right-click ("Add Label Here"); the toolbar
     /// passes null and the label is placed beside the current room.</summary>
     public ReactiveCommand<MapLabel?, Unit> AddLabelCommand   { get; }
+    /// <summary>Right-click "Link to…" (edit mode): remember the source room, then the
+    /// next room clicked becomes the target. Null cancels a pending link.</summary>
+    public ReactiveCommand<MapNode?, Unit> BeginLinkCommand   { get; }
     /// <summary>Right-click "Add Room Here" (edit mode): add an unlinked room at the click.</summary>
     public ReactiveCommand<MapNode, Unit> AddNodeCommand      { get; }
     /// <summary>Delete a specific label — canvas context item / Delete key.</summary>
@@ -758,6 +763,16 @@ public partial class MapperViewModel : ReactiveObject
         RemoveNodeCommand     = ReactiveCommand.Create<MapNode>(RemoveNodeById);
         AddLabelCommand       = ReactiveCommand.Create<MapLabel?>(AddLabel);
         AddNodeCommand        = ReactiveCommand.Create<MapNode>(AddRoom);
+        BeginLinkCommand      = ReactiveCommand.Create<MapNode?>(BeginLink);
+        // The next room selected while a link is pending is its target.
+        this.WhenAnyValue(x => x.SelectedNode).Subscribe(n =>
+        {
+            if (LinkSource is { } src && n is not null && n.Id != src.Id)
+            {
+                LinkSource = null;
+                LinkRoomsRequested?.Invoke(src, n);
+            }
+        });
         RemoveLabelCommand    = ReactiveCommand.Create<MapLabel>(RemoveLabel);
         LabelMovedCommand     = ReactiveCommand.Create<MapLabel>(l =>
         {
@@ -1843,6 +1858,32 @@ public partial class MapperViewModel : ReactiveObject
         if (SelectedNode is not null) { RemoveNodeById(SelectedNode); return; }
         if (SelectedLabel is not null) { RemoveLabel(SelectedLabel); return; }
         LoadStatus = "No room or label selected.";
+    }
+
+    // ── Link rooms ("Link to…") ───────────────────────────────────────────
+    /// <summary>Raised when a pending link gets its target; the host shows the
+    /// <c>LinkRoomsDialog</c> and calls <see cref="ApplyLink"/> on OK.</summary>
+    public event Action<MapNode, MapNode>? LinkRoomsRequested;
+
+    private void BeginLink(MapNode? from)
+    {
+        LinkSource = from;
+        LoadStatus = from is null
+            ? "Link cancelled."
+            : $"Linking from #{from.Id} {from.Title} — click the target room (Esc cancels).";
+    }
+
+    /// <summary>Create the link the dialog described and mark the zone unsaved.</summary>
+    public void ApplyLink(MapNode from, MapNode to, string verb, bool addReturn, string? returnVerb)
+    {
+        if (_engine is null) { LoadStatus = "Mapper not ready."; return; }
+        var r = _engine.LinkRooms(from, to, verb, addReturn, returnVerb);
+        if (r is null) { LoadStatus = "Could not link those rooms."; return; }
+        IsZoneDirty = true;
+        RenderTick++;
+        LoadStatus = $"Linked #{from.Id} → #{to.Id} via \"{verb.Trim()}\"" +
+                     (r.Value.Back is { } b ? $" and back via \"{b.MoveCommand}\"" : "") +
+                     ". Save to persist.";
     }
 
     // ── Manual room add ("Add Room Here") ────────────────────────────────
