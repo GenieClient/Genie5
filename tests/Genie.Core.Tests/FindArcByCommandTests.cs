@@ -21,6 +21,8 @@ public class FindArcByCommandTests
     [InlineData("go portal", "go exit portal")]
     [InlineData("go door", "go oak door")]
     [InlineData("climb wall", "climb stone wall")]
+    [InlineData("go port", "go meeting portal")]      // an abbreviated word
+    [InlineData("go mee port", "go meeting portal")]
     public void AShorterTypedCommandMatchesTheOnlyArcThatContainsIt(string typed, string arc) =>
         Assert.Equal(arc, AutoMapperEngine.FindArcByCommand(Node(arc, "go palm cabana"), typed)!.MoveCommand);
 
@@ -32,6 +34,7 @@ public class FindArcByCommandTests
     [InlineData("go")]                  // a bare verb is not abbreviating anything
     [InlineData("look portal")]         // a different verb
     [InlineData("go gate")]             // word not in any arc
+    [InlineData("go portx")]            // not a prefix of anything
     public void UnrelatedCommandsMatchNothing(string typed) =>
         Assert.Null(AutoMapperEngine.FindArcByCommand(Node("go exit portal"), typed));
 }

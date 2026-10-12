@@ -42,7 +42,8 @@
   every later match (the two Strand rooms ended up with each other's ids). Ids are now
   only stamped from a trustworthy match, and never from a stale one.
 - **A shortened move command still follows its arc** — `go portal` now finds the arc
-  `go exit portal` (when only one arc fits), instead of falling back to a guess.
+  `go exit portal`, and `go port` finds `go meeting portal` (when only one arc fits),
+  instead of falling back to a guess.
 - **Map links an earlier build damaged now heal as you walk them** — a link whose
   destination is clearly the wrong room (a different title, or a room the server
   has shown is another one) is corrected when you step through it into a room

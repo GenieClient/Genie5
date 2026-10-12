@@ -1223,8 +1223,9 @@ public sealed class AutoMapperEngine
     /// <summary>
     /// The arc of <paramref name="node"/> that <paramref name="used"/> takes. An exact or
     /// idiom match (<see cref="MoveCommandMatches"/>) wins; failing that, a command typed
-    /// shorter than the arc's — `go portal` for `go exit portal`, DR accepts both — matches
-    /// when exactly ONE arc has the same verb and the typed words in order, so two doors
+    /// shorter than the arc's — `go portal` for `go exit portal`, or `go port` for
+    /// `go meeting portal`, DR accepts both — matches when exactly ONE arc has the same
+    /// verb and the typed words (whole or abbreviated) in order, so two doors
     /// (`go oak door`, `go iron door`) never guess from `go door`.
     /// </summary>
     internal static MapExit? FindArcByCommand(MapNode node, string used)
@@ -1237,10 +1238,10 @@ public sealed class AutoMapperEngine
         var partial = node.Exits.Where(e =>
         {
             var arc = (e.MoveCommand ?? "").Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (arc.Length <= typed.Length || arc[0] != typed[0]) return false;
-            var i = 1;                                   // typed words must appear in order after the verb
-            for (var j = 1; j < arc.Length && i < typed.Length; j++)
-                if (arc[j] == typed[i]) i++;
+            if (arc.Length < typed.Length || arc[0] != typed[0]) return false;
+            var i = 1;                                   // typed words must appear in order after the verb,
+            for (var j = 1; j < arc.Length && i < typed.Length; j++)   // each whole or abbreviated (DR: `go port`)
+                if (arc[j] == typed[i] || arc[j].StartsWith(typed[i], StringComparison.Ordinal)) i++;
             return i == typed.Length;
         }).Take(2).ToList();
         return partial.Count == 1 ? partial[0] : null;
