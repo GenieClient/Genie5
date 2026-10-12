@@ -37,6 +37,10 @@
   from one map into another could place you on the wrong twin (the Crossing's two
   "The Strand, Sandy Path" rooms), after which a script planned its next move from the
   wrong room and failed. The room you just came through now settles which one it is.
+- **Record mode no longer stamps a server room id from a weak guess** — a guess between
+  twin rooms used to write the game's room id onto the wrong one, which then steered
+  every later match (the two Strand rooms ended up with each other's ids). Ids are now
+  only stamped from a trustworthy match, and never from a stale one.
 - **A shortened move command still follows its arc** — `go portal` now finds the arc
   `go exit portal` (when only one arc fits), instead of falling back to a guess.
 - **Map links an earlier build damaged now heal as you walk them** — a link whose

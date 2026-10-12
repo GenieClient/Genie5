@@ -963,8 +963,13 @@ public sealed class AutoMapperEngine
                     node.Description = description;
                     zoneChanged = true;
                 }
-                // Stamp server room ID on nodes that don't have it yet
-                if (!string.IsNullOrEmpty(serverRoomId) && string.IsNullOrEmpty(node.ServerRoomId))
+                // Stamp server room ID on nodes that don't have it yet — but only from a match
+                // we trust. A weak guess (e: description only, f: title + any shared exit) between
+                // twin rooms used to stamp the wrong node, and the wrong id then steered every
+                // later match (the Crossing's two "The Strand, Sandy Path" rooms swapped ids), and
+                // a stale id belongs to the PREVIOUS room.
+                if (!string.IsNullOrEmpty(serverRoomId) && string.IsNullOrEmpty(node.ServerRoomId) &&
+                    tier is not ("e:desc-only" or "f:title+exit-overlap") && !_serverIdStale)
                 {
                     node.ServerRoomId = serverRoomId;
                     if (_serverRoomIndex.TryAdd(serverRoomId, node.Id))

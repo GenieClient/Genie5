@@ -70,4 +70,23 @@ public class MapperArrivalHintTests
         e.LoadZone(z);
         Assert.Equal(49, e.CurrentNode?.Id);
     }
+
+    [Fact]
+    public void RecordMode_DoesNotStampAServerIdOnAWeakTwinGuess_ButDoesOnAHintedMatch()
+    {
+        // No hint: the twin is a tier-f guess — the server id must not be written onto it.
+        var (e, z) = Crossing();
+        e.IsEnabled = true;
+        e.LoadZone(z);
+        Assert.Equal(49, e.CurrentNode?.Id);
+        Assert.Equal("", z.Nodes[49].ServerRoomId);
+
+        // With the stub hint the match is trustworthy, so the id is stamped on the RIGHT room.
+        var (e2, z2) = Crossing();
+        e2.IsEnabled = true;
+        e2.LoadZone(z2, Room(139, "go meeting portal"));
+        Assert.Equal(50, e2.CurrentNode?.Id);
+        Assert.Equal("10171", z2.Nodes[50].ServerRoomId);
+        Assert.Equal("", z2.Nodes[49].ServerRoomId);
+    }
 }
