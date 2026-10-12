@@ -8,7 +8,7 @@ using ReactiveUI.Fody.Helpers;
 namespace Genie.App.ViewModels;
 
 /// <summary>One pickable room in a zone: the text stored in the connection and what the list shows.</summary>
-public sealed record RoomChoice(string Value, string Display);
+public sealed record RoomChoice(string Value, string Display, string Title = "", int Id = 0, string ServerId = "");
 
 /// <summary>
 /// View-model for the Cross-Zone Connections editor dialog. Shows the
@@ -58,6 +58,10 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
     [Reactive] public IReadOnlyList<RoomChoice> FromRooms { get; private set; } = Array.Empty<RoomChoice>();
     [Reactive] public IReadOnlyList<RoomChoice> ToRooms   { get; private set; } = Array.Empty<RoomChoice>();
 
+    /// <summary>What the typed room resolves to ("→ Fang Cove, Fate's Fortune Lane (#85)"), so a pick is visibly confirmed.</summary>
+    [Reactive] public string FromRoomLabel { get; private set; } = "";
+    [Reactive] public string ToRoomLabel   { get; private set; } = "";
+
     // ── Inline "add zone" row ───────────────────────────────────────────────
     [Reactive] public bool   AddingZone   { get; private set; }
     [Reactive] public string NewZoneName  { get; set; } = "";
@@ -102,7 +106,7 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
             try
             {
                 _repo.Save(Connections);
-                Status = $"Saved {Connections.Count} connection{(Connections.Count == 1 ? "" : "s")}.";
+                Status = $"Saved {Connections.Count} connection{(Connections.Count == 1 ? "" : "s")}." + UnknownZoneWarning();
                 return true;
             }
             catch (Exception ex)
@@ -131,6 +135,10 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
         {
             if (!_syncing && Selected is not null) Selected.ToRoom = v ?? "";
         });
+
+        // Keep the "what is this room" captions current.
+        this.WhenAnyValue(x => x.FromRoomText, x => x.FromRooms).Subscribe(_ => FromRoomLabel = Describe(FromRoomText, FromRooms));
+        this.WhenAnyValue(x => x.ToRoomText,   x => x.ToRooms)  .Subscribe(_ => ToRoomLabel   = Describe(ToRoomText,   ToRooms));
     }
 
     // ── Zone list ───────────────────────────────────────────────────────────
@@ -261,6 +269,34 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
         if (isFrom) FromRooms = rooms; else ToRooms = rooms;
     }
 
+    /// <summary>Caption for a typed room: the matching room's title, or why it didn't match.</summary>
+    internal static string Describe(string? text, IReadOnlyList<RoomChoice> rooms)
+    {
+        text = (text ?? "").Trim();
+        if (text.Length == 0 || rooms.Count == 0) return "";
+        var hit = rooms.FirstOrDefault(r =>
+            r.Value.Equals(text, StringComparison.OrdinalIgnoreCase) ||
+            (r.Id.ToString() == text) ||
+            (r.ServerId.Length > 0 && ("#" + r.ServerId).Equals(text, StringComparison.OrdinalIgnoreCase)));
+        return hit is null
+            ? $"No room \"{text}\" in this zone"
+            : $"→ {hit.Title}  (room {hit.Id}" + (hit.ServerId.Length > 0 ? $", #{hit.ServerId}" : "") + ")";
+    }
+
+    /// <summary>A saved zone name with no map file is skipped silently by the router — say so.</summary>
+    private string UnknownZoneWarning()
+    {
+        var known = new HashSet<string>(ZoneChoices.Skip(1), StringComparer.OrdinalIgnoreCase);
+        var onDisk = string.IsNullOrEmpty(_mapsDir) ? null : _mapsDir;
+        var bad = Connections
+            .SelectMany(c => new[] { c.FromZone, c.ToZone })
+            .Where(z => !string.IsNullOrWhiteSpace(z))
+            .Where(z => onDisk is not null && !File.Exists(Path.Combine(onDisk, z + ".xml")))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return bad.Count == 0 ? "" : $"  Warning: no map file for {string.Join(", ", bad)} — those links are skipped until the file exists.";
+    }
+
     private static IReadOnlyList<RoomChoice> LoadRooms(string path)
     {
         var zone = new MapZoneRepository().Load(path);
@@ -272,7 +308,7 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
                 // A server room id survives map regeneration, so prefer it when the map has one.
                 var value = !string.IsNullOrWhiteSpace(n.ServerRoomId) ? "#" + n.ServerRoomId : n.Id.ToString();
                 var srv   = !string.IsNullOrWhiteSpace(n.ServerRoomId) ? $"  ·  #{n.ServerRoomId}" : "";
-                return new RoomChoice(value, $"{n.Id}  ·  {n.Title}{srv}");
+                return new RoomChoice(value, $"{n.Id}  ·  {n.Title}{srv}", n.Title, n.Id, n.ServerRoomId ?? "");
             })
             .ToList();
     }

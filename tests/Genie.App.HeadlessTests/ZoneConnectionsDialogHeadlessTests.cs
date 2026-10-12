@@ -35,11 +35,15 @@ public sealed class ZoneConnectionsDialogHeadlessTests
             Dispatcher.UIThread.RunJobs();
             try
             {
-                var combos = dlg.GetVisualDescendants().OfType<ComboBox>().ToList();
-                Assert.Equal(2, combos.Count);                              // From zone + To zone
-                Assert.All(combos, c => Assert.Equal(
-                    new[] { ZoneConnectionsViewModel.AddZoneItem, "Map1_Crossing" },
-                    c.Items.Cast<string>().ToArray()));
+                foreach (var name in new[] { "FromZoneBox", "ToZoneBox" })
+                {
+                    var zbox = dlg.FindControl<AutoCompleteBox>(name)!;
+                    Assert.Equal(new[] { ZoneConnectionsViewModel.AddZoneItem, "Map1_Crossing" },
+                                 zbox.ItemsSource!.Cast<string>().ToArray());
+                    Assert.True(zbox.ItemFilter!("cross", "Map1_Crossing"));      // type-to-filter
+                    Assert.False(zbox.ItemFilter!("cross", "Map150_Fang_Cove"));
+                    Assert.True(zbox.ItemFilter!("zzz", ZoneConnectionsViewModel.AddZoneItem)); // always offered
+                }
 
                 var box = dlg.FindControl<AutoCompleteBox>("ToRoomBox")!;
                 var room = new RoomChoice("50", "50  ·  The Strand, Sandy Path");
@@ -47,6 +51,45 @@ public sealed class ZoneConnectionsDialogHeadlessTests
                 Assert.True(box.ItemFilter!("50", room));
                 Assert.False(box.ItemFilter!("teller", room));
                 Assert.NotNull(dlg.FindControl<Button>("ToRoomDrop"));
+            }
+            finally { dlg.Close(); }
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [AvaloniaFact]
+    public async System.Threading.Tasks.Task Picking_a_room_from_the_filtered_list_fills_the_field_the_connection_and_the_caption()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "g5zcp-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var z = new MapZone { Name = "Map150_Fang_Cove" };
+            z.Nodes[85]  = new MapNode { Id = 85,  Title = "Fang Cove, Fate's Fortune Lane" };
+            z.Nodes[185] = new MapNode { Id = 185, Title = "Fang Cove Outfitting Society, Book Store" };
+            new MapZoneRepository().Save(Path.Combine(dir, "Map150_Fang_Cove.xml"), z);
+
+            var vm = new ZoneConnectionsViewModel(
+                new ZoneConnectionsRepository(Path.Combine(dir, "ZoneConnections.xml")), dir);
+            vm.AddCommand.Execute().Subscribe();
+            vm.FromZoneSel = "Map150_Fang_Cove";
+            await vm.RefreshRoomsAsync(isFrom: true);
+
+            var dlg = new ZoneConnectionsDialog { DataContext = vm };
+            dlg.Show();
+            Dispatcher.UIThread.RunJobs();
+            try
+            {
+                var box = dlg.FindControl<AutoCompleteBox>("FromRoomBox")!;
+                box.Text = "fate";
+                Dispatcher.UIThread.RunJobs();
+                box.SelectedItem = vm.FromRooms.First(r => r.Value == "85");
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Equal("85", box.Text);
+                Assert.Equal("85", vm.FromRoomText);
+                Assert.Equal("85", vm.Selected!.FromRoom);
+                Assert.Contains("Fate's Fortune Lane", vm.FromRoomLabel);
             }
             finally { dlg.Close(); }
         }

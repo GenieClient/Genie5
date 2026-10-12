@@ -112,4 +112,36 @@ public sealed class ZoneConnectionsPickerTests : IDisposable
         vm.Selected = vm.Connections[0];
         Assert.Equal("Map77_Missing", vm.FromZoneSel);
     }
+
+    [Fact]
+    public async Task RoomCaption_NamesTheResolvedRoom_OrSaysItIsMissing()
+    {
+        var vm = NewVm();
+        vm.AddCommand.Execute().Subscribe();
+        vm.ToZoneSel = "Map1_Crossing";
+        await vm.RefreshRoomsAsync(isFrom: false);
+
+        vm.ToRoomText = "50";
+        Assert.Contains("The Strand, Sandy Path", vm.ToRoomLabel);
+        vm.ToRoomText = "#777";                       // matched by server id
+        Assert.Contains("Crystalline Beach", vm.ToRoomLabel);
+        vm.ToRoomText = "51";                         // matched by room number even though stored as #777
+        Assert.Contains("Crystalline Beach", vm.ToRoomLabel);
+        vm.ToRoomText = "999";
+        Assert.Contains("No room", vm.ToRoomLabel);
+        vm.ToRoomText = "";
+        Assert.Equal("", vm.ToRoomLabel);
+    }
+
+    [Fact]
+    public void Save_WarnsAboutAZoneWithNoMapFile()
+    {
+        var vm = NewVm();
+        vm.AddCommand.Execute().Subscribe();
+        vm.FromZoneSel = "Map1_Crossing";
+        vm.ToZoneSel   = "Map999_Nowhere";
+        vm.SaveCommand.Execute().Subscribe();
+        Assert.Contains("Map999_Nowhere", vm.Status);
+        Assert.DoesNotContain("Map1_Crossing,", vm.Status);
+    }
 }

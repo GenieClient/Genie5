@@ -67,11 +67,13 @@
               </StackPanel>
             </Border>
 
-            <Grid ColumnDefinitions="100,*" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
+            <Grid ColumnDefinitions="100,*,Auto" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="From zone:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
-              <ComboBox Grid.Column="1" ItemsSource="{Binding ZoneChoices}" SelectedItem="{Binding FromZoneSel}"
-                        PlaceholderText="Pick a zone" HorizontalAlignment="Stretch"
-                        FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <AutoCompleteBox x:Name="FromZoneBox" Grid.Column="1" ItemsSource="{Binding ZoneChoices}"
+                               Text="{Binding FromZoneSel}" MinimumPrefixLength="0" FilterMode="Custom"
+                               Watermark="Type to search zones" FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <Button x:Name="FromZoneDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
+                      ToolTip.Tip="Show all zones"/>
             </Grid>
             <Grid ColumnDefinitions="100,*,Auto" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="From room:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
@@ -86,11 +88,17 @@
               <Button x:Name="FromRoomDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
                       ToolTip.Tip="Show this zone's rooms"/>
             </Grid>
-            <Grid ColumnDefinitions="100,*" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
+            <TextBlock DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel"
+                       Text="{Binding FromRoomLabel}" Margin="100,-4,0,0" FontSize="10"
+                       Foreground="{DynamicResource Theme.Accent}" TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding FromRoomLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+            <Grid ColumnDefinitions="100,*,Auto" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="To zone:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
-              <ComboBox Grid.Column="1" ItemsSource="{Binding ZoneChoices}" SelectedItem="{Binding ToZoneSel}"
-                        PlaceholderText="Pick a zone" HorizontalAlignment="Stretch"
-                        FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <AutoCompleteBox x:Name="ToZoneBox" Grid.Column="1" ItemsSource="{Binding ZoneChoices}"
+                               Text="{Binding ToZoneSel}" MinimumPrefixLength="0" FilterMode="Custom"
+                               Watermark="Type to search zones" FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <Button x:Name="ToZoneDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
+                      ToolTip.Tip="Show all zones"/>
             </Grid>
             <Grid ColumnDefinitions="100,*,Auto" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="To room:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
@@ -105,6 +113,10 @@
               <Button x:Name="ToRoomDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
                       ToolTip.Tip="Show this zone's rooms"/>
             </Grid>
+            <TextBlock DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel"
+                       Text="{Binding ToRoomLabel}" Margin="100,-4,0,0" FontSize="10"
+                       Foreground="{DynamicResource Theme.Accent}" TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding ToRoomLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
             <Separator Margin="0,4,0,4"/>
             <TextBlock Text="TRANSIT" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
