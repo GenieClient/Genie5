@@ -95,4 +95,37 @@ public sealed class ZoneConnectionsDialogHeadlessTests
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
+
+    [AvaloniaFact]
+    public void The_connection_list_updates_as_the_selected_connection_is_edited()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "g5zcl-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var vm = new ZoneConnectionsViewModel(
+                new ZoneConnectionsRepository(Path.Combine(dir, "ZoneConnections.xml")), dir);
+            vm.AddCommand.Execute().Subscribe();
+            var dlg = new ZoneConnectionsDialog { DataContext = vm };
+            dlg.Show();
+            Dispatcher.UIThread.RunJobs();
+            try
+            {
+                vm.Selected!.Verb     = "go exit portal";
+                vm.Selected.FromZone  = "Map150_Fang_Cove";
+                vm.Selected.ToZone    = "Map1_Crossing";
+                Dispatcher.UIThread.RunJobs();
+
+                var list = dlg.GetVisualDescendants().OfType<ListBox>().First();
+                var texts = list.GetVisualDescendants().OfType<TextBlock>()
+                                .Select(t => t.Text + string.Concat(t.Inlines?.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text) ?? Array.Empty<string>()))
+                                .ToList();
+                Assert.Contains(texts, x => x.Contains("go exit portal"));
+                Assert.Contains(texts, x => x.Contains("Map150_Fang_Cove") && x.Contains("Map1_Crossing"));
+                Assert.DoesNotContain(texts, x => x.Contains("board boat"));
+            }
+            finally { dlg.Close(); }
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
 }
