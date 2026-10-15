@@ -214,6 +214,46 @@ public class InjuriesParsingTests
         Assert.Contains(events.OfType<TextEvent>(), t => t.Text == line);
     }
 
+    [Theory]
+    [InlineData("You have difficulty controlling actions.",                          nameof(InjuryKind.Wound), 2)]
+    [InlineData("You have some minor twitching, slight numbness in your arms and legs.", nameof(InjuryKind.Wound), 1)]
+    [InlineData("You have slight numbness in your arms and legs.",                   nameof(InjuryKind.Scar),  1)]
+    [InlineData("You have numbness in your arms and legs.",                          nameof(InjuryKind.Scar),  2)]
+    [InlineData("You have general numbness all over and have difficulty thinking.",  nameof(InjuryKind.Scar),  3)]
+    [InlineData("You have complete paralysis of the entire body.",                   nameof(InjuryKind.Wound), 3)]
+    public void HealthSummary_NervePhrases_ReadNsys(string line, string kindName, int severity)
+    {
+        var nsys = Assert.Single(Feed(line + "\n").OfType<InjuryEvent>());
+        Assert.Equal("nsys", nsys.Area);
+        Assert.Equal(Enum.Parse<InjuryKind>(kindName), nsys.Kind);
+        Assert.Equal(severity, nsys.Severity);
+    }
+
+    [Fact]
+    public void InjuriesDialog_UnknownRegion_RaisesGapEvent()
+    {
+        var events = Feed(
+            "<dialogData id=\"injuries\">" +
+            "<image id=\"tail\" name=\"Injury2\" height=\"0\" width=\"0\"/>" +
+            "<image id=\"head\" name=\"head\" height=\"0\" width=\"0\"/></dialogData>");
+
+        var gap = Assert.Single(events.OfType<UnknownInjuryRegionEvent>());
+        Assert.Equal("tail", gap.Area);
+        Assert.Equal("Injury2", gap.ImageName);
+        Assert.Contains("tail", gap.RawXml);
+        // The injury reading itself still flows.
+        Assert.Contains(events.OfType<InjuryEvent>(), i => i.Area == "tail" && i.Kind == InjuryKind.Wound);
+    }
+
+    [Fact]
+    public void InjuriesDialog_KnownRegions_RaiseNoGapEvent()
+    {
+        var events = Feed(
+            "<dialogData id=\"injuries\">" +
+            "<image id=\"leftFoot\" name=\"Scar1\"/><image id=\"nsys\" name=\"Nsys2\"/></dialogData>");
+        Assert.Empty(events.OfType<UnknownInjuryRegionEvent>());
+    }
+
     [Fact]
     public void NervePhrase_InSpeech_DoesNotFire()
     {
@@ -320,7 +360,9 @@ public class InjuriesParsingTests
             "You have some minor abrasions to the chest, complete paralysis of the " +
             "entire body compounded by open and bleeding sores all over the skin.\n");
 
-        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.Damage, 3), state.Injuries["nsys"]);
+        // "complete paralysis of the entire body" is a known nerve phrase, so
+        // the scan refines the dialog's indeterminate Damage to a rank-3 wound.
+        Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.Wound, 3), state.Injuries["nsys"]);
         Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.Wound, 1),  state.Injuries["chest"]);
         Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.None, 0),   state.Injuries["leftArm"]);
     }

@@ -379,7 +379,28 @@ public sealed partial class DrXmlParser : IDisposable
         ("a very difficult time with muscle control", InjuryKind.Scar,  3),
         ("constant muscle spasms",                    InjuryKind.Scar,  2),
         ("developed slurred speech",                  InjuryKind.Scar,  1),
+        // The `health` summary's own wording for nerve damage (Lich 5
+        // common-healing-data.rb, the "skin" entries with internal: true) —
+        // what live DR prints today. Lich severity 3–8 → panel rank 1–3.
+        // Wounds (twitching / paralysis):
+        ("some minor twitching",                      InjuryKind.Wound, 1),
+        ("some severe twitching",                     InjuryKind.Wound, 1),
+        ("difficulty controlling actions",            InjuryKind.Wound, 2),
+        ("partial paralysis of the entire body",      InjuryKind.Wound, 2),
+        ("severe paralysis of the entire body",       InjuryKind.Wound, 3),
+        ("complete paralysis of the entire body",     InjuryKind.Wound, 3),
+        // Scars (numbness / difficulty moving):
+        ("slight difficulty moving your fingers and toes", InjuryKind.Scar, 1),
+        ("slight numbness in your arms and legs",     InjuryKind.Scar,  1),
+        ("numbness in your fingers and toes",         InjuryKind.Scar,  2),
+        ("general numbness all over",                 InjuryKind.Scar,  3),
     };
+
+    // "numbness in your arms and legs" (rank 2) is a suffix of "slight numbness
+    // in your arms and legs" (rank 1) — a plain Contains can't tell them apart.
+    private static readonly System.Text.RegularExpressions.Regex _nerveArmsLegsRe = NerveArmsLegsRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?<!slight )numbness in your arms and legs", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex NerveArmsLegsRegex();
 
     // ── `health` report window (#18 — clearing a stale injuries panel) ───────
     // Armed by the report's "Your body feels …" first line; the injuries
@@ -418,7 +439,7 @@ public sealed partial class DrXmlParser : IDisposable
     // sores all over the skin"). nsys is left alone whenever one of these shows
     // up, so the always-on nerve scan below owns the reading.
     private static readonly System.Text.RegularExpressions.Regex _healthNsysRe = HealthNsysRegex();
-    [System.Text.RegularExpressions.GeneratedRegex(@"\b(nerve\w*|nervous|skin|entire body|paralysis|numb\w*|muscle|convulsion\w*|spasm\w*|twitch\w*|slurred speech)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    [System.Text.RegularExpressions.GeneratedRegex(@"\b(nerve\w*|nervous|skin|entire body|paralysis|numb\w*|muscle|convulsion\w*|spasm\w*|twitch\w*|slurred speech|difficulty (?:controlling|moving|thinking))\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
     private static partial System.Text.RegularExpressions.Regex HealthNsysRegex();
 
     /// <summary>
@@ -869,12 +890,24 @@ public sealed partial class DrXmlParser : IDisposable
         // say). Always on — a user-typed `health` refines the panel.
         if (_activeStream == "main" && stripped.StartsWith("You", StringComparison.Ordinal))
         {
-            foreach (var (phrase, kind, severity) in _nervePhrases)
+            // One line can carry several readings ("You have some minor
+            // twitching, slight numbness in your arms and legs."): fresh beats
+            // scar, then the highest rank wins.
+            InjuryKind bestKind = InjuryKind.None;
+            int bestSeverity = 0;
+            void Consider(InjuryKind kind, int severity)
             {
-                if (!stripped.Contains(phrase, StringComparison.Ordinal)) continue;
-                _events.OnNext(new InjuryEvent("nsys", kind, severity));
-                break;
+                if (bestKind == InjuryKind.None
+                    || (kind == InjuryKind.Wound && bestKind == InjuryKind.Scar)
+                    || (kind == bestKind && severity > bestSeverity))
+                { bestKind = kind; bestSeverity = severity; }
             }
+            foreach (var (phrase, kind, severity) in _nervePhrases)
+                if (stripped.Contains(phrase, StringComparison.Ordinal))
+                    Consider(kind, severity);
+            if (_nerveArmsLegsRe.IsMatch(stripped)) Consider(InjuryKind.Scar, 2);
+            if (bestKind != InjuryKind.None)
+                _events.OnNext(new InjuryEvent("nsys", bestKind, bestSeverity));
         }
 
         // News-listing auto-link (public issue #30). Updates the listing-context
@@ -1926,6 +1959,10 @@ public sealed partial class DrXmlParser : IDisposable
                 if (area.Length == 0) break;
                 var (kind, severity) = InjuryImageName.Decode(r["name"]);
                 _events.OnNext(new InjuryEvent(area, kind, severity));
+                // A region the panel has no cell for (tail, …) is dropped
+                // downstream — flag it so the app can offer a gap report.
+                if (!InjuryImageName.KnownRegions.Contains(area))
+                    _events.OnNext(new UnknownInjuryRegionEvent(area, r["name"] ?? "", rawTag));
                 break;
             }
 

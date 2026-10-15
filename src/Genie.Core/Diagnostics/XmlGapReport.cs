@@ -79,6 +79,48 @@ Genie's parser received a `<{tag}>` element it does not currently consume — cl
         return new Draft(title, body, labels, url);
     }
 
+    /// <summary>
+    /// Issue draft for an injuries-dialog region the panel has no cell for
+    /// (e.g. <c>tail</c>) — data the app receives but drops. Same redaction
+    /// and review-then-submit flow as <see cref="Build"/>.
+    /// </summary>
+    public static Draft BuildInjuryRegion(
+        string area,
+        string imageName,
+        string rawSample,
+        ReportContext ctx,
+        string repoUrl = DefaultRepo,
+        CaptureRedactor? redactor = null)
+    {
+        redactor ??= new CaptureRedactor();
+        var sample = Truncate(redactor.RedactRawXml(rawSample ?? string.Empty).Trim(), MaxSampleChars);
+
+        var title  = $"[XML coverage] Injuries dialog region \"{area}\" is not shown";
+        const string labels = "xml-coverage";
+
+        var body =
+$@"### Injuries region dropped
+
+The server's injuries dialog sent a region **`{area}`** (image `{imageName}`) that the Injuries panel has no cell for, so the reading is discarded.
+
+**Sample**
+
+```xml
+{sample}
+```
+
+**Environment**
+- Genie 5: {ctx.AppVersion}
+- OS: {ctx.Os}
+- Parser commit: {ctx.Commit}
+- Triggered by: {ctx.Trigger ?? "(not specified)"}
+
+<sub>Auto-drafted by Genie's coverage reporter. Nothing is posted automatically — you are reviewing and submitting this issue yourself.</sub>";
+
+        var url = $"{repoUrl}/issues/new?labels={Enc(labels)}&title={Enc(title)}&body={Enc(body)}";
+        return new Draft(title, body, labels, url);
+    }
+
     private static string FateLabel(DrXmlParser.TagFate f) => f switch
     {
         DrXmlParser.TagFate.DroppedData => "game data we currently discard (DROP-DATA)",

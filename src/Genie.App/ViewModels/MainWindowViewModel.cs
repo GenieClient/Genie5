@@ -5409,6 +5409,23 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 catch (Exception ex) { ErrorLog.Log("XmlGapReport", ex); }
             });
 
+        // Same flow for an injuries-dialog region the panel has no cell for
+        // (e.g. tail): the reading would otherwise vanish silently.
+        _core.GameEvents.OfType<UnknownInjuryRegionEvent>()
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(e =>
+            {
+                if (string.IsNullOrWhiteSpace(e.Area)) return;
+                if (!_reportedGapTags.Add("injuries:" + e.Area)) return;
+                try
+                {
+                    _pendingXmlGapDraft = Genie.Core.Diagnostics.XmlGapReport.BuildInjuryRegion(
+                        e.Area, e.ImageName, e.RawXml, BuildXmlGapContext($"injuries dialog region {e.Area}"));
+                    XmlGapNotice = $"Genie received an injuries region it can't display: {e.Area}. Help improve the parser — report it?";
+                }
+                catch (Exception ex) { ErrorLog.Log("XmlGapReport", ex); }
+            });
+
         _core.ConnectionState.ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(e =>
             {
