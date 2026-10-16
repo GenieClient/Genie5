@@ -254,6 +254,61 @@ public class InjuriesParsingTests
         Assert.Empty(events.OfType<UnknownInjuryRegionEvent>());
     }
 
+    // ── Dialog-primary precedence ────────────────────────────────────────────
+
+    private const string DialogNsys2 =
+        "<dialogData id=\"injuries\"><image id=\"nsys\" name=\"Nsys2\"/></dialogData>";
+    private const string DialogNsysHealthy =
+        "<dialogData id=\"injuries\"><image id=\"nsys\" name=\"nsys\"/></dialogData>";
+
+    [Fact]
+    public void NerveText_RefinesDialogDamage_KeepingDialogSeverity()
+    {
+        // Dialog says rank 2; the text's own rank guess for "minor twitching"
+        // is 1. Text supplies wound-vs-scar only — the dialog owns severity.
+        var events = Feed(DialogNsys2, "You have some minor twitching.\n")
+            .OfType<InjuryEvent>().Where(i => i.Area == "nsys").ToList();
+
+        Assert.Equal(2, events.Count);
+        Assert.Equal(new InjuryEvent("nsys", InjuryKind.Damage, 2), events[0]);
+        Assert.Equal(new InjuryEvent("nsys", InjuryKind.Wound,  2), events[1]);
+    }
+
+    [Fact]
+    public void NerveText_IgnoredWhenDialogReportsNervesHealthy()
+    {
+        var events = Feed(DialogNsysHealthy, "You have some minor twitching.\n")
+            .OfType<InjuryEvent>().Where(i => i.Area == "nsys").ToList();
+
+        // Only the dialog's own healthy reading — the text does not override it.
+        var only = Assert.Single(events);
+        Assert.Equal(InjuryKind.None, only.Kind);
+    }
+
+    [Fact]
+    public void NerveText_FillsWhenDialogNeverReportedNsys()
+    {
+        var events = Feed("You have some minor twitching.\n").OfType<InjuryEvent>().ToList();
+        Assert.Equal(new InjuryEvent("nsys", InjuryKind.Wound, 1), Assert.Single(events));
+    }
+
+    [Fact]
+    public void HealthSummaryClear_ForgetsStaleDialogReading_SoTextMayFill()
+    {
+        // Dialog reads nsys damage, then the all-clear summary proves it stale
+        // (the character died or was healed with no dialog push). A later nerve
+        // line is then new information, not a disagreement with the dialog.
+        var events = Feed(
+                DialogNsys2,
+                "Your body feels fine.\n",
+                "You have no significant injuries.\n",
+                "You have some minor twitching.\n")
+            .OfType<InjuryEvent>().Where(i => i.Area == "nsys").ToList();
+
+        Assert.Equal(InjuryKind.None, events[1].Kind);
+        Assert.Equal(new InjuryEvent("nsys", InjuryKind.Wound, 1), events[^1]);
+    }
+
     [Fact]
     public void NervePhrase_InSpeech_DoesNotFire()
     {
