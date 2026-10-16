@@ -234,15 +234,15 @@ public class InjuriesParsingTests
     {
         var events = Feed(
             "<dialogData id=\"injuries\">" +
-            "<image id=\"tail\" name=\"Injury2\" height=\"0\" width=\"0\"/>" +
+            "<image id=\"wing\" name=\"Injury2\" height=\"0\" width=\"0\"/>" +
             "<image id=\"head\" name=\"head\" height=\"0\" width=\"0\"/></dialogData>");
 
         var gap = Assert.Single(events.OfType<UnknownInjuryRegionEvent>());
-        Assert.Equal("tail", gap.Area);
+        Assert.Equal("wing", gap.Area);
         Assert.Equal("Injury2", gap.ImageName);
-        Assert.Contains("tail", gap.RawXml);
+        Assert.Contains("wing", gap.RawXml);
         // The injury reading itself still flows.
-        Assert.Contains(events.OfType<InjuryEvent>(), i => i.Area == "tail" && i.Kind == InjuryKind.Wound);
+        Assert.Contains(events.OfType<InjuryEvent>(), i => i.Area == "wing" && i.Kind == InjuryKind.Wound);
     }
 
     [Fact]
@@ -252,6 +252,65 @@ public class InjuriesParsingTests
             "<dialogData id=\"injuries\">" +
             "<image id=\"leftFoot\" name=\"Scar1\"/><image id=\"nsys\" name=\"Nsys2\"/></dialogData>");
         Assert.Empty(events.OfType<UnknownInjuryRegionEvent>());
+    }
+
+    // ── Tail (text-only region) ──────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("You have minor abrasions to the tail.",                       nameof(InjuryKind.Wound), 1)]
+    [InlineData("You have a few nearly invisible scars along the tail.",       nameof(InjuryKind.Scar),  1)]
+    [InlineData("You have deep slashes across the tail.",                      nameof(InjuryKind.Wound), 2)]
+    [InlineData("You have a severely swollen and deeply bruised tail with bones protruding out from the skin.",
+                                                                               nameof(InjuryKind.Wound), 3)]
+    [InlineData("You have an ugly flesh stump for a tail.",                    nameof(InjuryKind.Scar),  3)]
+    public void HealthSummary_ReadsTail(string line, string kindName, int rank)
+    {
+        var events = Feed("Your body feels fine.\n", line + "\n")
+            .OfType<InjuryEvent>().Where(i => i.Area == "tail").ToList();
+
+        Assert.Equal(new InjuryEvent("tail", Enum.Parse<InjuryKind>(kindName), rank), events[^1]);
+    }
+
+    [Fact]
+    public void HealthSummary_NotNamingTail_ClearsIt()
+    {
+        var events = Feed(
+                "Your body feels fine.\n",
+                "You have minor abrasions to the tail.\n",
+                "Your body feels fine.\n",
+                "You have no significant injuries.\n")
+            .OfType<InjuryEvent>().Where(i => i.Area == "tail").ToList();
+
+        Assert.Equal(InjuryKind.Wound, events[0].Kind);
+        Assert.Equal(InjuryKind.None,  events[^1].Kind);
+    }
+
+    [Fact]
+    public void HealthSummary_TailAndOtherRegion_ReadsBoth()
+    {
+        var events = Feed(
+                "Your body feels fine.\n",
+                "You have minor abrasions to the tail, some tiny scars along the chest.\n")
+            .OfType<InjuryEvent>().ToList();
+
+        Assert.Contains(events, i => i.Area == "tail" && i.Kind == InjuryKind.Wound);
+        // The chest is named, so it is left to the dialog — no text reading.
+        Assert.DoesNotContain(events, i => i.Area == "chest");
+    }
+
+    [Fact]
+    public void Tail_DialogImageIsAcceptedAndWinsOverText()
+    {
+        // If DR ever does send a tail image, it is known (no gap event) and the
+        // dialog stays primary over the text.
+        var events = Feed(
+            "<dialogData id=\"injuries\"><image id=\"tail\" name=\"Injury3\"/></dialogData>",
+            "Your body feels fine.\n",
+            "You have minor abrasions to the tail.\n");
+
+        Assert.Empty(events.OfType<UnknownInjuryRegionEvent>());
+        Assert.DoesNotContain(events.OfType<InjuryEvent>(),
+            i => i.Area == "tail" && i.Kind == InjuryKind.Wound && i.Severity == 1);
     }
 
     // ── Dialog-primary precedence ────────────────────────────────────────────
@@ -379,12 +438,13 @@ public class InjuriesParsingTests
         Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.None, 0), state.Injuries["leftArm"]);
         Assert.Equal(new Genie.Core.Models.InjuryReading(InjuryKind.None, 0), state.Injuries["nsys"]);
 
-        // The cleared areas must be the dialog's own region ids — a typo here
-        // would quietly add a phantom key and leave the real region stale.
+        // The cleared areas must be the dialog's own region ids (plus the
+        // text-only tail) — a typo here would quietly add a phantom key and
+        // leave the real region stale.
         Assert.Equal(
             new[] { "abdomen", "back", "chest", "head", "leftArm", "leftEye", "leftFoot",
                     "leftHand", "leftLeg", "neck", "nsys", "rightArm", "rightEye",
-                    "rightFoot", "rightHand", "rightLeg" },
+                    "rightFoot", "rightHand", "rightLeg", "tail" },
             state.Injuries.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray());
     }
 

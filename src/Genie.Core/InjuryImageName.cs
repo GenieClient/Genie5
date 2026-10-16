@@ -10,13 +10,15 @@ public static class InjuryImageName
 {
     /// <summary>The region ids the injuries panel has a cell for. An injuries
     /// dialog image outside this set is data the panel drops — keep in step
-    /// with <c>InjuriesViewModel</c>'s cells.</summary>
+    /// with <c>InjuriesViewModel</c>'s cells. <c>tail</c> is included although
+    /// DR's dialog has never sent it: the panel shows it from `health` text, and
+    /// a dialog image for it would display correctly.</summary>
     public static readonly IReadOnlySet<string> KnownRegions =
         new HashSet<string>(StringComparer.Ordinal)
         {
             "head", "neck", "chest", "abdomen", "back", "nsys",
             "leftEye", "rightEye", "leftArm", "rightArm", "leftHand", "rightHand",
-            "leftLeg", "rightLeg", "leftFoot", "rightFoot",
+            "leftLeg", "rightLeg", "leftFoot", "rightFoot", "tail",
         };
 
     /// <summary>

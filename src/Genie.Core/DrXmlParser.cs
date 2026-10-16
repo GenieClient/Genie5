@@ -423,6 +423,7 @@ public sealed partial class DrXmlParser : IDisposable
             "head", "neck", "right eye", "left eye", "right arm", "left arm",
             "right hand", "left hand", "chest", "abdomen", "back",
             "right leg", "left leg", "right foot", "left foot",
+            "tail",   // text-only region: DR's dialog never sends it
         }
         .Select(name => (
             Region: string.Concat(name.Split(' ').Select((w, i) =>
@@ -502,6 +503,16 @@ public sealed partial class DrXmlParser : IDisposable
         {
             _dialogReadings.Remove("nsys");
             _events.OnNext(new InjuryEvent("nsys", InjuryKind.None, 0));
+        }
+
+        // The tail is a text-only region (DR's dialog never reports it), so the
+        // summary is its only reading: FILL under the dialog-primary rules.
+        if (named.Contains("tail") && !_dialogReadings.ContainsKey("tail"))
+        {
+            if (Health.HealthWoundText.Read(line, "tail") is { } tail)
+                _events.OnNext(new InjuryEvent("tail", tail.Kind, tail.Rank));
+            else
+                _log.LogDebug("health summary names the tail but no known phrase matched: {Line}", line);
         }
         return true;
     }

@@ -268,8 +268,8 @@ public sealed record InjuryEvent(string Area, InjuryKind Kind, int Severity) : G
 
 /// <summary>
 /// An <c>&lt;image&gt;</c> in the injuries dialog whose region id is not one of
-/// the 16 the panel knows (<see cref="InjuryImageName.KnownRegions"/>) — e.g.
-/// DR starts sending <c>tail</c>. The matching <see cref="InjuryEvent"/> is
+/// the ones the panel has a cell for (<see cref="InjuryImageName.KnownRegions"/>)
+/// — i.e. DR starts sending a region the panel can't show. The matching <see cref="InjuryEvent"/> is
 /// still emitted; this is the "we are dropping data" signal that drives the
 /// one-click gap report.
 /// </summary>
