@@ -254,6 +254,19 @@ public class MapCanvas : Control
     public static readonly StyledProperty<ICommand?> AddLabelCommandProperty =
         AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(AddLabelCommand));
 
+    /// <summary>Fired with a new <see cref="MapNode"/> positioned at the right-click
+    /// ("Add Room Here", edit mode). The VM adds it to the zone.</summary>
+    public static readonly StyledProperty<ICommand?> AddNodeCommandProperty =
+        AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(AddNodeCommand));
+
+    /// <summary>Starts ("Link to…", with the room) or cancels (null) a hand-made link.</summary>
+    public static readonly StyledProperty<ICommand?> BeginLinkCommandProperty =
+        AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(BeginLinkCommand));
+
+    /// <summary>True while a link is waiting for its target room.</summary>
+    public static readonly StyledProperty<bool> LinkPendingProperty =
+        AvaloniaProperty.Register<MapCanvas, bool>(nameof(LinkPending));
+
     /// <summary>Fired with the label to delete (Remove Label context item /
     /// Delete key with a label selected).</summary>
     public static readonly StyledProperty<ICommand?> RemoveLabelCommandProperty =
@@ -265,6 +278,9 @@ public class MapCanvas : Control
 
     public MapLabel? SelectedLabel      { get => GetValue(SelectedLabelProperty);      set => SetValue(SelectedLabelProperty, value); }
     public ICommand? AddLabelCommand    { get => GetValue(AddLabelCommandProperty);    set => SetValue(AddLabelCommandProperty, value); }
+    public ICommand? AddNodeCommand     { get => GetValue(AddNodeCommandProperty);     set => SetValue(AddNodeCommandProperty, value); }
+    public ICommand? BeginLinkCommand   { get => GetValue(BeginLinkCommandProperty);   set => SetValue(BeginLinkCommandProperty, value); }
+    public bool      LinkPending        { get => GetValue(LinkPendingProperty);        set => SetValue(LinkPendingProperty, value); }
     public ICommand? RemoveLabelCommand { get => GetValue(RemoveLabelCommandProperty); set => SetValue(RemoveLabelCommandProperty, value); }
     public ICommand? LabelMovedCommand  { get => GetValue(LabelMovedCommandProperty);  set => SetValue(LabelMovedCommandProperty, value); }
 
@@ -1119,7 +1135,12 @@ public class MapCanvas : Control
         // Delete removes the selected room in edit mode (Genie 4 "Remove
         // Selected Nodes/Labels"). Gated on EditMode so the key is inert in
         // the read-only navigator.
-        if (EditMode && e.Key == Key.Delete && SelectedNode is { } node)
+        if (e.Key == Key.Escape && LinkPending && BeginLinkCommand?.CanExecute(null) == true)
+        {
+            BeginLinkCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (EditMode && e.Key == Key.Delete && SelectedNode is { } node)
         {
             if (RemoveNodeCommand?.CanExecute(node) == true)
             {
@@ -1236,11 +1257,43 @@ public class MapCanvas : Control
             items.Add(remove);
         }
 
+        // Edit-mode-only: connect two rooms by hand. "Link to…" remembers this room;
+        // the next room clicked becomes the target and a dialog asks for the command.
+        if (EditMode && BeginLinkCommand is not null)
+        {
+            var link = new MenuItem { Header = "Link to…", IsEnabled = node is not null };
+            if (node is not null)
+                link.Click += (_, _) => { if (BeginLinkCommand?.CanExecute(node) == true) BeginLinkCommand.Execute(node); };
+            items.Add(link);
+            if (LinkPending)
+            {
+                var cancel = new MenuItem { Header = "Cancel Link" };
+                cancel.Click += (_, _) => { if (BeginLinkCommand?.CanExecute(null) == true) BeginLinkCommand.Execute(null); };
+                items.Add(cancel);
+            }
+        }
+
         // Edit-mode-only label actions (Genie 4 LabelDetails "New" / "Remove"):
         // add a label at the click point, or remove the label under it.
         if (EditMode)
         {
             var proj = GetProjection();
+            if (AddNodeCommand is not null && proj.Any)
+            {
+                var addRoom = new MenuItem { Header = "Add Room Here" };
+                addRoom.Click += (_, _) =>
+                {
+                    var n = new MapNode
+                    {
+                        Title  = "New Room",
+                        PixelX = MapProjection.SnapMapPx(proj.ToMapX(at.X), SnapToGrid),
+                        PixelY = MapProjection.SnapMapPx(proj.ToMapY(at.Y), SnapToGrid),
+                        Z      = Level,
+                    };
+                    if (AddNodeCommand?.CanExecute(n) == true) AddNodeCommand.Execute(n);
+                };
+                items.Add(addRoom);
+            }
             if (AddLabelCommand is not null && proj.Any)
             {
                 var add = new MenuItem { Header = "Add Label Here" };

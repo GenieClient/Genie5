@@ -233,6 +233,8 @@ public partial class MapperViewModel : ReactiveObject
 
     /// <summary>The node selected in the canvas (edit mode). Two-way bound.</summary>
     [Reactive] public MapNode? SelectedNode { get; set; }
+    /// <summary>The room a pending "Link to…" starts from (null = no link in progress).</summary>
+    [Reactive] public MapNode? LinkSource   { get; private set; }
 
     /// <summary>True when the active zone has unsaved edits. Drives the Save
     /// button's enabled state + a "● unsaved" hint.</summary>
@@ -282,6 +284,11 @@ public partial class MapperViewModel : ReactiveObject
     /// label positioned at the right-click ("Add Label Here"); the toolbar
     /// passes null and the label is placed beside the current room.</summary>
     public ReactiveCommand<MapLabel?, Unit> AddLabelCommand   { get; }
+    /// <summary>Right-click "Link to…" (edit mode): remember the source room, then the
+    /// next room clicked becomes the target. Null cancels a pending link.</summary>
+    public ReactiveCommand<MapNode?, Unit> BeginLinkCommand   { get; }
+    /// <summary>Right-click "Add Room Here" (edit mode): add an unlinked room at the click.</summary>
+    public ReactiveCommand<MapNode, Unit> AddNodeCommand      { get; }
     /// <summary>Delete a specific label — canvas context item / Delete key.</summary>
     public ReactiveCommand<MapLabel, Unit> RemoveLabelCommand { get; }
     /// <summary>Invoked by the canvas after a label drag completes.</summary>
@@ -338,6 +345,16 @@ public partial class MapperViewModel : ReactiveObject
 
     /// <summary>Absolute path to the Maps directory the next update will write into.</summary>
     [Reactive] public string MapsDirectory    { get; set; } = "";
+
+    /// <summary>
+    /// True once <see cref="Attach"/> has supplied the zone repository. Reactive
+    /// so Update/Repair Maps re-evaluate their CanExecute when it flips: the
+    /// Maps directory is set at startup, BEFORE the core attaches, and a plain
+    /// <c>_zoneRepo is not null</c> check inside the predicate is only sampled
+    /// when IsUpdating/MapsDirectory change — it left both commands greyed out
+    /// for the whole session.
+    /// </summary>
+    [Reactive] public bool HasZoneRepo { get; private set; }
 
     /// <summary>
     /// True when <see cref="MapsDirectory"/> contains a <c>.git</c> subfolder —
@@ -703,7 +720,8 @@ public partial class MapperViewModel : ReactiveObject
         var canRun = this.WhenAnyValue(
             x => x.IsUpdating,
             x => x.MapsDirectory,
-            (busy, dir) => !busy && !string.IsNullOrWhiteSpace(dir) && _zoneRepo is not null);
+            x => x.HasZoneRepo,
+            (busy, dir, hasRepo) => !busy && !string.IsNullOrWhiteSpace(dir) && hasRepo);
 
         UpdateMapsCommand = ReactiveCommand.CreateFromTask(UpdateMapsAsync, canRun);
         RepairMapsCommand = ReactiveCommand.CreateFromTask(() => UpdateMapsAsync(repair: true), canRun);
@@ -744,6 +762,17 @@ public partial class MapperViewModel : ReactiveObject
         NodeMovedCommand      = ReactiveCommand.Create<MapNode>(_ => { IsZoneDirty = true; RenderTick++; });
         RemoveNodeCommand     = ReactiveCommand.Create<MapNode>(RemoveNodeById);
         AddLabelCommand       = ReactiveCommand.Create<MapLabel?>(AddLabel);
+        AddNodeCommand        = ReactiveCommand.Create<MapNode>(AddRoom);
+        BeginLinkCommand      = ReactiveCommand.Create<MapNode?>(BeginLink);
+        // The next room selected while a link is pending is its target.
+        this.WhenAnyValue(x => x.SelectedNode).Subscribe(n =>
+        {
+            if (LinkSource is { } src && n is not null && n.Id != src.Id)
+            {
+                LinkSource = null;
+                LinkRoomsRequested?.Invoke(src, n);
+            }
+        });
         RemoveLabelCommand    = ReactiveCommand.Create<MapLabel>(RemoveLabel);
         LabelMovedCommand     = ReactiveCommand.Create<MapLabel>(l =>
         {
@@ -1031,6 +1060,7 @@ public partial class MapperViewModel : ReactiveObject
         _core     = core;
         _engine   = core.AutoMapper;
         _zoneRepo = core.ZoneRepository;
+        HasZoneRepo = _zoneRepo is not null;
         _commands = core.Commands;
 
         // Tee the auto-load diagnostic (LoadStatus) into the Live Audit log so a
@@ -1083,6 +1113,9 @@ public partial class MapperViewModel : ReactiveObject
         _engine.CurrentNodeChanged += () => Dispatcher.UIThread.Post(() =>
         {
             Refresh();
+            if (!BrowsingZone && _engine?.CurrentNode is { } here && !HasZoneNote(here) &&
+                !string.IsNullOrEmpty(SelectedZoneFile))
+                _lastGoodRoom = (SelectedZoneFile, here.Id);
             // Live Audit: log the mapper's resolved room/zone on EVERY room
             // change — including "(**)" rooms that carry no server id and so
             // produce no NAV line. This is what reveals a cross-zone stall
@@ -1542,7 +1575,10 @@ public partial class MapperViewModel : ReactiveObject
         var repo = _zoneRepo;
         var dir  = MapsDirectory;
 
-        var (idIndex, fpIndex) = await Task.Run(() =>
+        Dictionary<string, string> idIndex, fpIndex;
+        try
+        {
+        (idIndex, fpIndex) = await Task.Run(() =>
         {
             var ids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var fps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -1571,6 +1607,16 @@ public partial class MapperViewModel : ReactiveObject
             }
             return (ids, fps);
         });
+        }
+        catch (Exception ex)
+        {
+            // Fire-and-forget caller: without this a failed scan left the
+            // indexes empty and the status stuck on "Waiting for zone index".
+            Genie.App.Diagnostics.ErrorLog.Log("MapperZoneIndex", ex);
+            Dispatcher.UIThread.Post(() =>
+                LoadStatus = $"Zone index build failed: {ex.Message}");
+            return;
+        }
 
         _serverIdToZoneFile    = idIndex;
         _fingerprintToZoneFile = fpIndex;
@@ -1815,6 +1861,44 @@ public partial class MapperViewModel : ReactiveObject
         if (SelectedNode is not null) { RemoveNodeById(SelectedNode); return; }
         if (SelectedLabel is not null) { RemoveLabel(SelectedLabel); return; }
         LoadStatus = "No room or label selected.";
+    }
+
+    // ── Link rooms ("Link to…") ───────────────────────────────────────────
+    /// <summary>Raised when a pending link gets its target; the host shows the
+    /// <c>LinkRoomsDialog</c> and calls <see cref="ApplyLink"/> on OK.</summary>
+    public event Action<MapNode, MapNode>? LinkRoomsRequested;
+
+    private void BeginLink(MapNode? from)
+    {
+        LinkSource = from;
+        LoadStatus = from is null
+            ? "Link cancelled."
+            : $"Linking from #{from.Id} {from.Title} — click the target room (Esc cancels).";
+    }
+
+    /// <summary>Create the link the dialog described and mark the zone unsaved.</summary>
+    public void ApplyLink(MapNode from, MapNode to, string verb, bool addReturn, string? returnVerb)
+    {
+        if (_engine is null) { LoadStatus = "Mapper not ready."; return; }
+        var r = _engine.LinkRooms(from, to, verb, addReturn, returnVerb);
+        if (r is null) { LoadStatus = "Could not link those rooms."; return; }
+        IsZoneDirty = true;
+        RenderTick++;
+        LoadStatus = $"Linked #{from.Id} → #{to.Id} via \"{verb.Trim()}\"" +
+                     (r.Value.Back is { } b ? $" and back via \"{b.MoveCommand}\"" : "") +
+                     ". Save to persist.";
+    }
+
+    // ── Manual room add ("Add Room Here") ────────────────────────────────
+    private void AddRoom(MapNode at)
+    {
+        if (_engine is null) { LoadStatus = "Mapper not ready."; return; }
+        var node = _engine.AddNode(at.Title, at.PixelX, at.PixelY, at.Z);
+        SelectedLabel = null;
+        SelectedNode  = node;
+        IsZoneDirty   = true;
+        RenderTick++;
+        LoadStatus = $"Added room #{node.Id} — set its title, exits and server room id in Details, then Save.";
     }
 
     // ── Label editing (Genie 4 LabelDetails: New / Apply / Remove) ────────
@@ -2195,6 +2279,17 @@ public partial class MapperViewModel : ReactiveObject
         try { if (!string.IsNullOrEmpty(_displayPath)) _display.Save(_displayPath); } catch { /* best effort */ }
     }
 
+    // ── Return-portal origins ─────────────────────────────────────────────
+    /// <summary>Where each zone's return portal would take you (see <see cref="PortalOriginTracker"/>).</summary>
+    public PortalOriginTracker PortalOrigins { get; } = new();
+
+    // The character's last well-placed room (zone file + node id), kept so that when the
+    // zone changes we know which room they stepped out of. Boundary stubs (a note naming
+    // another map) are skipped: they are the arrival copy of the NEW room, not the old one.
+    private (string Zone, int Node)? _lastGoodRoom;
+    // The zone the character is in, as last set by engine-driven tracking (not browsing).
+    private string? _trackedZoneFile;
+
     private void LoadSelectedZone(string? filename)
     {
         if (_suppressAutoLoad)         return;
@@ -2241,7 +2336,27 @@ public partial class MapperViewModel : ReactiveObject
             IsZoneStale       = false;
         }
 
-        try { _engine.LoadZone(zone); }
+        // Engine-driven zone change (the character moved, not the user browsing): note
+        // whether it went through a portal, so a return portal knows where to take you.
+        if (_autoZoneSwitch || _followingEngine || _trackedZoneFile is null)
+        {
+            if (_trackedZoneFile is not null &&
+                !string.Equals(_trackedZoneFile, filename, StringComparison.OrdinalIgnoreCase))
+            {
+                var from = _lastGoodRoom is { } r &&
+                           string.Equals(r.Zone, _trackedZoneFile, StringComparison.OrdinalIgnoreCase)
+                    ? r.Node.ToString() : null;
+                PortalOrigins.OnZoneChanged(_trackedZoneFile, from, filename, _engine.LastSentCommand);
+                if (PortalOrigins.Origins.TryGetValue(filename, out var o))
+                    _audit?.Note("PORTAL", $"entered '{filename}' through a portal from '{o.Zone}' room {o.Room}");
+            }
+            _trackedZoneFile = filename;
+        }
+
+        // The boundary stub we were standing on (a copy of the new zone's room) tells the
+        // engine which of several identical rooms in the new zone is this one.
+        var stubHint = _followingEngine && _engine.CurrentNode is { } stub && HasZoneNote(stub) ? stub : null;
+        try { _engine.LoadZone(zone, stubHint); }
         finally { _loadingZone = false; }
 
         // Browse-hold detection: suspend auto-follow while the user
@@ -2458,6 +2573,11 @@ public partial class MapperViewModel : ReactiveObject
     /// arrival). Returns false when the origin can't be determined (offline / the
     /// current room isn't mapped) or the destination is actually in the same zone.
     /// </summary>
+    /// <summary>True when the room's note names another zone file (a boundary stub).</summary>
+    private static bool HasZoneNote(MapNode n) =>
+        !string.IsNullOrEmpty(n.Notes) &&
+        n.Notes.Split('|').Any(x => x.Trim().EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
+
     private bool TryStartCrossZoneWalk(string destZone, int destNodeId, string destTitle)
     {
         if (_engine is null || _zoneRepo is null || AutoWalk is null ||
@@ -2476,6 +2596,7 @@ public partial class MapperViewModel : ReactiveObject
             _skillStore, _engine.CharacterClass, _engine.CharacterLevel)
         {
             AvoidSpoilerMoves = _engine.AvoidSpoilerMoves,   // #254
+            PortalOrigins     = PortalOrigins.Origins,
         };
 
         var plan = pathfinder.FindPath(

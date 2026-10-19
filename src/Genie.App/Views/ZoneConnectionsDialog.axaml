@@ -33,7 +33,7 @@
                 <TextBlock Text="{Binding Verb}" FontSize="12" FontWeight="SemiBold"
                            Foreground="{DynamicResource Theme.TextPrimary}" TextTrimming="CharacterEllipsis"/>
                 <TextBlock FontSize="10" Foreground="{DynamicResource Theme.TextMuted}" TextTrimming="CharacterEllipsis">
-                  <Run Text="{Binding FromZone}"/><Run Text=" → "/><Run Text="{Binding ToZone}"/>
+                  <Run Text="{Binding FromZone}"/><Run Text=" → "/><Run Text="{Binding ToLabel}"/>
                 </TextBlock>
               </StackPanel>
             </DataTemplate>
@@ -48,30 +48,79 @@
 
             <TextBlock Text="ENDPOINTS" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
                        FontWeight="SemiBold"/>
-            <Grid ColumnDefinitions="100,*">
+            <!-- Add-zone row: opened by the "Add zone…" entry of either zone dropdown. -->
+            <Border DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel"
+                    IsVisible="{Binding AddingZone}"
+                    Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}"
+                    BorderThickness="1" CornerRadius="3" Padding="8">
+              <StackPanel Spacing="4">
+                <TextBlock Text="New zone — the map file's name, without .xml" FontSize="11"
+                           Foreground="{DynamicResource Theme.TextMuted}"/>
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <TextBox Grid.Column="0" Text="{Binding NewZoneName}" Watermark="Map150_Fang_Cove"
+                           FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+                  <Button Grid.Column="1" Content="Add" Margin="6,0,0,0" Command="{Binding ConfirmAddZoneCommand}"/>
+                  <Button Grid.Column="2" Content="Cancel" Margin="4,0,0,0" Command="{Binding CancelAddZoneCommand}"/>
+                </Grid>
+                <TextBlock Text="{Binding AddZoneError}" FontSize="10" Foreground="{DynamicResource Theme.Danger}"
+                           IsVisible="{Binding AddZoneError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+              </StackPanel>
+            </Border>
+
+            <Grid ColumnDefinitions="100,*,Auto" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="From zone:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
-              <TextBox Grid.Column="1" Text="{Binding FromZone}"
-                       Watermark="Map01_Crossing"
-                       FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <AutoCompleteBox x:Name="FromZoneBox" Grid.Column="1" ItemsSource="{Binding ZoneChoices}"
+                               Text="{Binding FromZoneSel}" MinimumPrefixLength="0" FilterMode="Custom"
+                               Watermark="Type to search zones" FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <Button x:Name="FromZoneDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
+                      ToolTip.Tip="Show all zones"/>
             </Grid>
-            <Grid ColumnDefinitions="100,*">
+            <Grid ColumnDefinitions="100,*,Auto" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="From room:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
-              <TextBox Grid.Column="1" Text="{Binding FromRoom}"
-                       Watermark="#37666999  or  42"
-                       FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <AutoCompleteBox x:Name="FromRoomBox" Grid.Column="1" ItemsSource="{Binding FromRooms}"
+                               Text="{Binding FromRoomText}" ValueMemberBinding="{ReflectionBinding Value}"
+                               MinimumPrefixLength="0" FilterMode="Custom" Watermark="Room number, or #server id"
+                               FontSize="11" FontFamily="Consolas,Courier New,monospace">
+                <AutoCompleteBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:RoomChoice"><TextBlock Text="{Binding Display}" FontSize="11"/></DataTemplate>
+                </AutoCompleteBox.ItemTemplate>
+              </AutoCompleteBox>
+              <Button x:Name="FromRoomDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
+                      ToolTip.Tip="Show this zone's rooms"/>
             </Grid>
-            <Grid ColumnDefinitions="100,*">
+            <TextBlock DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel"
+                       Text="{Binding FromRoomLabel}" Margin="100,-4,0,0" FontSize="10"
+                       Foreground="{DynamicResource Theme.Accent}" TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding FromRoomLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+            <CheckBox DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel"
+                      IsChecked="{Binding ReturnsToOrigin}" FontSize="11"
+                      Content="Return portal — takes you back to where you entered this zone"
+                      ToolTip.Tip="For a portal like Fang Cove's EXIT portal: it returns you to the room you came from (the Crossing, Shard, …). Genie remembers where you entered, and only offers this link then. To zone / room are not used."/>
+            <Grid ColumnDefinitions="100,*,Auto" IsEnabled="{Binding !ReturnsToOrigin}" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="To zone:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
-              <TextBox Grid.Column="1" Text="{Binding ToZone}"
-                       Watermark="Map35_Throne_City"
-                       FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <AutoCompleteBox x:Name="ToZoneBox" Grid.Column="1" ItemsSource="{Binding ZoneChoices}"
+                               Text="{Binding ToZoneSel}" MinimumPrefixLength="0" FilterMode="Custom"
+                               Watermark="Type to search zones" FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <Button x:Name="ToZoneDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
+                      ToolTip.Tip="Show all zones"/>
             </Grid>
-            <Grid ColumnDefinitions="100,*">
+            <Grid ColumnDefinitions="100,*,Auto" IsEnabled="{Binding !ReturnsToOrigin}" DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel">
               <TextBlock Grid.Column="0" Text="To room:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
-              <TextBox Grid.Column="1" Text="{Binding ToRoom}"
-                       Watermark="#37666500  or  17"
-                       FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+              <AutoCompleteBox x:Name="ToRoomBox" Grid.Column="1" ItemsSource="{Binding ToRooms}"
+                               Text="{Binding ToRoomText}" ValueMemberBinding="{ReflectionBinding Value}"
+                               MinimumPrefixLength="0" FilterMode="Custom" Watermark="Room number, or #server id"
+                               FontSize="11" FontFamily="Consolas,Courier New,monospace">
+                <AutoCompleteBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:RoomChoice"><TextBlock Text="{Binding Display}" FontSize="11"/></DataTemplate>
+                </AutoCompleteBox.ItemTemplate>
+              </AutoCompleteBox>
+              <Button x:Name="ToRoomDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
+                      ToolTip.Tip="Show this zone's rooms"/>
             </Grid>
+            <TextBlock DataContext="{Binding $parent[Window].DataContext}" x:DataType="vm:ZoneConnectionsViewModel"
+                       Text="{Binding ToRoomLabel}" Margin="100,-4,0,0" FontSize="10"
+                       Foreground="{DynamicResource Theme.Accent}" TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding ToRoomLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
             <Separator Margin="0,4,0,4"/>
             <TextBlock Text="TRANSIT" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"

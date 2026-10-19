@@ -379,7 +379,28 @@ public sealed partial class DrXmlParser : IDisposable
         ("a very difficult time with muscle control", InjuryKind.Scar,  3),
         ("constant muscle spasms",                    InjuryKind.Scar,  2),
         ("developed slurred speech",                  InjuryKind.Scar,  1),
+        // The `health` summary's own wording for nerve damage (Lich 5
+        // common-healing-data.rb, the "skin" entries with internal: true) —
+        // what live DR prints today. Lich severity 3–8 → panel rank 1–3.
+        // Wounds (twitching / paralysis):
+        ("some minor twitching",                      InjuryKind.Wound, 1),
+        ("some severe twitching",                     InjuryKind.Wound, 1),
+        ("difficulty controlling actions",            InjuryKind.Wound, 2),
+        ("partial paralysis of the entire body",      InjuryKind.Wound, 2),
+        ("severe paralysis of the entire body",       InjuryKind.Wound, 3),
+        ("complete paralysis of the entire body",     InjuryKind.Wound, 3),
+        // Scars (numbness / difficulty moving):
+        ("slight difficulty moving your fingers and toes", InjuryKind.Scar, 1),
+        ("slight numbness in your arms and legs",     InjuryKind.Scar,  1),
+        ("numbness in your fingers and toes",         InjuryKind.Scar,  2),
+        ("general numbness all over",                 InjuryKind.Scar,  3),
     };
+
+    // "numbness in your arms and legs" (rank 2) is a suffix of "slight numbness
+    // in your arms and legs" (rank 1) — a plain Contains can't tell them apart.
+    private static readonly System.Text.RegularExpressions.Regex _nerveArmsLegsRe = NerveArmsLegsRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?<!slight )numbness in your arms and legs", System.Text.RegularExpressions.RegexOptions.None)]
+    private static partial System.Text.RegularExpressions.Regex NerveArmsLegsRegex();
 
     // ── `health` report window (#18 — clearing a stale injuries panel) ───────
     // Armed by the report's "Your body feels …" first line; the injuries
@@ -402,6 +423,7 @@ public sealed partial class DrXmlParser : IDisposable
             "head", "neck", "right eye", "left eye", "right arm", "left arm",
             "right hand", "left hand", "chest", "abdomen", "back",
             "right leg", "left leg", "right foot", "left foot",
+            "tail",   // text-only region: DR's dialog never sends it
         }
         .Select(name => (
             Region: string.Concat(name.Split(' ').Select((w, i) =>
@@ -418,8 +440,41 @@ public sealed partial class DrXmlParser : IDisposable
     // sores all over the skin"). nsys is left alone whenever one of these shows
     // up, so the always-on nerve scan below owns the reading.
     private static readonly System.Text.RegularExpressions.Regex _healthNsysRe = HealthNsysRegex();
-    [System.Text.RegularExpressions.GeneratedRegex(@"\b(nerve\w*|nervous|skin|entire body|paralysis|numb\w*|muscle|convulsion\w*|spasm\w*|twitch\w*|slurred speech)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    [System.Text.RegularExpressions.GeneratedRegex(@"\b(nerve\w*|nervous|skin|entire body|paralysis|numb\w*|muscle|convulsion\w*|spasm\w*|twitch\w*|slurred speech|difficulty (?:controlling|moving|thinking))\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
     private static partial System.Text.RegularExpressions.Regex HealthNsysRegex();
+
+    // ── Dialog-primary precedence ────────────────────────────────────────────
+    // The server's injuries dialog is the authoritative source; the `health`
+    // text is secondary. The last dialog reading per region is remembered so
+    // the text may only do three things:
+    //   • CLEAR   — the summary names no such region. The one text-wins case:
+    //               DR pushes no dialog while the character is dead/unconscious,
+    //               so a stale reading can only be cleared from the text.
+    //   • REFINE  — nsys arrives from the dialog as an indeterminate Damage; the
+    //               nerve line says wound vs scar. The dialog's SEVERITY is kept
+    //               (the text's rank is only a mapping guess).
+    //   • FILL    — a region the dialog has not reported at all this session.
+    // Anything else (text disagreeing with a dialog reading) is ignored.
+    private readonly Dictionary<string, (InjuryKind Kind, int Severity)> _dialogReadings =
+        new(StringComparer.Ordinal);
+
+    /// <summary>Apply a nerve-line reading under dialog-primary rules.</summary>
+    private void ApplyNerveText(InjuryKind kind, int severity)
+    {
+        if (!_dialogReadings.TryGetValue("nsys", out var dialog))
+        {
+            _events.OnNext(new InjuryEvent("nsys", kind, severity));   // FILL
+            return;
+        }
+        if (dialog.Kind == InjuryKind.Damage)
+        {
+            _events.OnNext(new InjuryEvent("nsys", kind, dialog.Severity));   // REFINE
+            return;
+        }
+        _log.LogDebug(
+            "nerve text ({Kind} {Sev}) ignored: injuries dialog reports nsys {DKind} {DSev}",
+            kind, severity, dialog.Kind, dialog.Severity);
+    }
 
     /// <summary>
     /// Apply the `health` verb's injuries summary: every region the line does
@@ -437,11 +492,28 @@ public sealed partial class DrXmlParser : IDisposable
 
         if (!allClear && named.Count == 0 && !nsysNamed) return false;   // not the summary
 
+        // CLEAR: the dialog reading for a cleared region is stale, so forget it.
         foreach (var (region, _) in _healthRegions)
             if (!named.Contains(region))
+            {
+                _dialogReadings.Remove(region);
                 _events.OnNext(new InjuryEvent(region, InjuryKind.None, 0));
+            }
         if (!nsysNamed)
+        {
+            _dialogReadings.Remove("nsys");
             _events.OnNext(new InjuryEvent("nsys", InjuryKind.None, 0));
+        }
+
+        // The tail is a text-only region (DR's dialog never reports it), so the
+        // summary is its only reading: FILL under the dialog-primary rules.
+        if (named.Contains("tail") && !_dialogReadings.ContainsKey("tail"))
+        {
+            if (Health.HealthWoundText.Read(line, "tail") is { } tail)
+                _events.OnNext(new InjuryEvent("tail", tail.Kind, tail.Rank));
+            else
+                _log.LogDebug("health summary names the tail but no known phrase matched: {Line}", line);
+        }
         return true;
     }
 
@@ -869,12 +941,24 @@ public sealed partial class DrXmlParser : IDisposable
         // say). Always on — a user-typed `health` refines the panel.
         if (_activeStream == "main" && stripped.StartsWith("You", StringComparison.Ordinal))
         {
-            foreach (var (phrase, kind, severity) in _nervePhrases)
+            // One line can carry several readings ("You have some minor
+            // twitching, slight numbness in your arms and legs."): fresh beats
+            // scar, then the highest rank wins.
+            InjuryKind bestKind = InjuryKind.None;
+            int bestSeverity = 0;
+            void Consider(InjuryKind kind, int severity)
             {
-                if (!stripped.Contains(phrase, StringComparison.Ordinal)) continue;
-                _events.OnNext(new InjuryEvent("nsys", kind, severity));
-                break;
+                if (bestKind == InjuryKind.None
+                    || (kind == InjuryKind.Wound && bestKind == InjuryKind.Scar)
+                    || (kind == bestKind && severity > bestSeverity))
+                { bestKind = kind; bestSeverity = severity; }
             }
+            foreach (var (phrase, kind, severity) in _nervePhrases)
+                if (stripped.Contains(phrase, StringComparison.Ordinal))
+                    Consider(kind, severity);
+            if (_nerveArmsLegsRe.IsMatch(stripped)) Consider(InjuryKind.Scar, 2);
+            if (bestKind != InjuryKind.None)
+                ApplyNerveText(bestKind, bestSeverity);
         }
 
         // News-listing auto-link (public issue #30). Updates the listing-context
@@ -1925,7 +2009,12 @@ public sealed partial class DrXmlParser : IDisposable
                 var area = r["id"] ?? "";
                 if (area.Length == 0) break;
                 var (kind, severity) = InjuryImageName.Decode(r["name"]);
+                _dialogReadings[area] = (kind, severity);
                 _events.OnNext(new InjuryEvent(area, kind, severity));
+                // A region the panel has no cell for (tail, …) is dropped
+                // downstream — flag it so the app can offer a gap report.
+                if (!InjuryImageName.KnownRegions.Contains(area))
+                    _events.OnNext(new UnknownInjuryRegionEvent(area, r["name"] ?? "", rawTag));
                 break;
             }
 

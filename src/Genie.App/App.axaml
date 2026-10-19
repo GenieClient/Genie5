@@ -760,7 +760,8 @@
 
     <!-- ── Injuries ─────────────────────────────────────────────────────── -->
     <!-- Body-part sprite display (issue #18), fed by the server's injuries
-         dialog. Each of the 16 regions renders its Assets/Injuries sprite in
+         dialog (the tail, which DR reports only in `health` text, is the 17th
+         cell). Each region renders its Assets/Injuries sprite in
          a colour variant baked by InjurySprites (natural ivory ghosted =
          healthy, yellow→orange→red = wound 1–3, steel blue = scar, purple =
          nerve damage); the list below repeats every reading in words, so
@@ -848,6 +849,10 @@
                      Source="{Binding ViewModel.Nsys.FigureSprite}" Opacity="{Binding ViewModel.Nsys.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.Nsys.Tip}"/>
               <TextBlock Canvas.Left="628" Canvas.Top="778" Text="Nerves" FontSize="30"
                          Foreground="{Binding ViewModel.Nsys.Foreground}"/>
+              <Image Canvas.Left="610" Canvas.Top="840" Width="130" Height="195" Stretch="Uniform"
+                     Source="{Binding ViewModel.Tail.FigureSprite}" Opacity="{Binding ViewModel.Tail.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.Tail.Tip}"/>
+              <TextBlock Canvas.Left="648" Canvas.Top="1040" Text="Tail" FontSize="30"
+                         Foreground="{Binding ViewModel.Tail.Foreground}"/>
             </Canvas>
           </Viewbox>
           <CheckBox Content="Figure layout" FontSize="10" MinHeight="0" Padding="4,0"
@@ -1171,6 +1176,9 @@
                                     RemoveNodeCommand="{Binding ViewModel.RemoveNodeCommand}"
                                     SelectedLabel="{Binding ViewModel.SelectedLabel, Mode=TwoWay}"
                                     AddLabelCommand="{Binding ViewModel.AddLabelCommand}"
+                                    AddNodeCommand="{Binding ViewModel.AddNodeCommand}"
+                                    BeginLinkCommand="{Binding ViewModel.BeginLinkCommand}"
+                                    LinkPending="{Binding ViewModel.LinkSource, Converter={x:Static ObjectConverters.IsNotNull}}"
                                     RemoveLabelCommand="{Binding ViewModel.RemoveLabelCommand}"
                                     LabelMovedCommand="{Binding ViewModel.LabelMovedCommand}"/>
               </ScrollViewer>
@@ -1378,7 +1386,7 @@
                   <CheckBox Content="Auto-create new rooms"
                             IsChecked="{Binding ViewModel.AutoCreateEnabled}"
                             FontSize="11"
-                            ToolTip.Tip="When ON, walking into an unmapped room adds a new node to the active zone. When OFF, the mapper only matches against existing zone data."/>
+                            ToolTip.Tip="When ON, walking into an unmapped room adds a new node to the active zone. When OFF, the mapper only matches against existing zone data. Starts OFF every session and is not saved."/>
                   <TextBlock Text="Map background:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                   <ColorPicker Color="{Binding ViewModel.MapBackground, Mode=TwoWay}"
                                IsAlphaEnabled="False"

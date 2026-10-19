@@ -17,7 +17,7 @@ namespace Genie.App.ViewModels;
 /// grid fed by the server's injuries dialog
 /// (<c>&lt;dialogData id="injuries"&gt;&lt;image id="rightLeg" name="Injury1"/&gt;…</c>).
 ///
-/// Each of DR's 16 hit-test regions gets a sprite cell whose colour variant
+/// Each of DR's 16 hit-test regions (plus the text-only tail) gets a sprite cell whose colour variant
 /// encodes the last reading (natural ivory = healthy, yellow→orange→red =
 /// wound 1–3, steel blue = scar, purple = nerve damage — nsys can't
 /// distinguish wound from scar); the list below the grid spells the same
@@ -134,6 +134,11 @@ public sealed class InjuriesViewModel : ReactiveObject
     // regression traded for no gain.
     public InjuryCell LeftFoot  { get; } = new("leftFoot",  "L Foot", "Left Foot");
     public InjuryCell Nsys      { get; } = new("nsys",      "Nerves", "Nervous System");
+    // Not in the dialog's 16 hit-test regions — DR never sends it there — so the
+    // reading comes only from `health` text (and a dialog image if DR ever adds
+    // one; the parser's gap report flags that). The tail sprite is placeholder
+    // art in the same ivory style so the tint pipeline works.
+    public InjuryCell Tail      { get; } = new("tail",      "Tail",   "Tail");
 
     /// <summary>Grid display order (4 columns): torso row first, then the
     /// paired limbs with the character's RIGHT side leading — the doll
@@ -185,6 +190,7 @@ public sealed class InjuriesViewModel : ReactiveObject
             Abdomen,  Nsys,    RightEye,  LeftEye,
             RightArm, LeftArm, RightHand, LeftHand,
             RightLeg, LeftLeg, RightFoot, LeftFoot,
+            Tail,
         };
         _cells = new Dictionary<string, InjuryCell>(StringComparer.OrdinalIgnoreCase)
         {
@@ -196,6 +202,7 @@ public sealed class InjuriesViewModel : ReactiveObject
             ["back"] = Back,           ["rightLeg"] = RightLeg,
             ["leftLeg"] = LeftLeg,     ["rightFoot"] = RightFoot,
             ["leftFoot"] = LeftFoot,   ["nsys"] = Nsys,
+            ["tail"] = Tail,
         };
     }
 

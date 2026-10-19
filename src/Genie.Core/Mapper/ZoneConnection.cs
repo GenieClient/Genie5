@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
 namespace Genie.Core.Mapper;
 
 /// <summary>
@@ -16,30 +19,70 @@ namespace Genie.Core.Mapper;
 /// departures like boats).
 /// </para>
 /// </summary>
-public sealed class ZoneConnection
+public sealed class ZoneConnection : INotifyPropertyChanged
 {
+    // FromZone / ToZone / Verb raise PropertyChanged so the editor's list (which shows
+    // "verb  from → to") updates as the author types instead of keeping the values the
+    // row was created with.
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void Set(ref string field, string value, [CallerMemberName] string? name = null)
+    {
+        value ??= string.Empty;
+        if (field == value) return;
+        field = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
     /// <summary>Unique id for this connection. Used as XML attribute for
     /// stable refs in PRs. Auto-generated if blank on save.</summary>
     public string Id { get; set; } = Guid.NewGuid().ToString("N").Substring(0, 8);
 
     /// <summary>Source zone file basename without `.xml` extension
     /// ("Map01_Crossing").</summary>
-    public string FromZone { get; set; } = string.Empty;
+    public string FromZone { get => _fromZone; set => Set(ref _fromZone, value); }
+    private string _fromZone = string.Empty;
 
     /// <summary>Source room — either the integer node Id or the DR server
     /// room id (`#NNNN`). Stored as string for forward-compat with the
     /// `<see cref="MapNode.ServerRoomId"/>` indexing strategy.</summary>
     public string FromRoom { get; set; } = string.Empty;
 
+    /// <summary>
+    /// A return portal: taking it puts you back in the room you entered this zone
+    /// from, which depends on how you arrived (Fang Cove's EXIT portal returns you
+    /// to the Crossing, Shard, … whichever you came through). When true,
+    /// <see cref="ToZone"/> / <see cref="ToRoom"/> are not used — the router
+    /// reads the remembered origin (<see cref="PortalOriginTracker"/>) and only
+    /// offers this connection when one is known.
+    /// </summary>
+    public bool ReturnsToOrigin
+    {
+        get => _returnsToOrigin;
+        set
+        {
+            if (_returnsToOrigin == value) return;
+            _returnsToOrigin = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ReturnsToOrigin)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ToLabel)));
+        }
+    }
+    private bool _returnsToOrigin;
+
+    /// <summary>What the editor's list shows after the arrow.</summary>
+    public string ToLabel => ReturnsToOrigin ? "(where you came from)" : ToZone;
+
     /// <summary>Destination zone file basename without `.xml` extension.</summary>
-    public string ToZone { get; set; } = string.Empty;
+    public string ToZone { get => _toZone; set { Set(ref _toZone, value); PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ToLabel))); } }
+    private string _toZone = string.Empty;
 
     /// <summary>Destination room — same encoding as <see cref="FromRoom"/>.</summary>
     public string ToRoom { get; set; } = string.Empty;
 
     /// <summary>The verb the walker sends to take this connection
     /// ("board boat", "climb wall", "swim river"). Required.</summary>
-    public string Verb { get; set; } = string.Empty;
+    public string Verb { get => _verb; set => Set(ref _verb, value); }
+    private string _verb = string.Empty;
 
     /// <summary>Optional type tag for the UI / pathfinder ("boat",
     /// "climb", "ride", "portal", …). Free-form.</summary>

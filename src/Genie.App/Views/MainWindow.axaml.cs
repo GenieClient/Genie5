@@ -278,6 +278,21 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 }
             }));
 
+            d(ViewModel!.ShowLinkRoomsDialog.RegisterHandler(async ctx =>
+            {
+                try
+                {
+                    var dlg = new LinkRoomsDialog { DataContext = ctx.Input };
+                    var ok = await dlg.ShowDialog<bool>(this);
+                    ctx.SetOutput(ok);
+                }
+                catch (Exception ex)
+                {
+                    Genie.App.Diagnostics.ErrorLog.Log("LinkRoomsDialog.Show", ex);
+                    ctx.SetOutput(false);
+                }
+            }));
+
             d(ViewModel!.ShowZoneConnectionsDialog.RegisterHandler(async ctx =>
             {
                 try

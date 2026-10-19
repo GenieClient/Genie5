@@ -2091,6 +2091,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // direct re-resolve here repaints the UI + refreshes $roomid/$zoneid via
         // the existing CurrentNodeChanged subscription — no App round-trip.
         AutoMapper.Reset();
+        // The App additionally reloads the zone from disk (restores arcs a bad
+        // match clobbered, drops the in-session server-id cache) — see
+        // MainWindowViewModel.HandleMapperCommand "reset".
+        MapperCommandRequested?.Invoke("reset");
     }
 
     void ICommandHost.MapperCommand(string args)

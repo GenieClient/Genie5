@@ -203,6 +203,11 @@ public sealed class AutoMapperEngine
         state.StateChanged += OnStateChanged;
     }
 
+    /// <summary>The last command sent to the game (first of a ';' chain), kept until the
+    /// next one. Lets the host tell, when the zone changes, whether that move went
+    /// through a portal (see <see cref="PortalOriginTracker"/>).</summary>
+    public string LastSentCommand { get; private set; } = string.Empty;
+
     /// <summary>
     /// Called by the command intercept layer before each command reaches the
     /// server. Tracks the most recently sent movement so the engine's
@@ -218,6 +223,7 @@ public sealed class AutoMapperEngine
         // by looking at the first token only.
         var first = rawCommand.Split(';')[0].Trim();
         if (first.Length == 0) return;
+        LastSentCommand = first;
 
         var dir = DirectionHelper.Parse(first);
         if (dir != Direction.None)
@@ -242,7 +248,15 @@ public sealed class AutoMapperEngine
         }
     }
 
-    public void LoadZone(MapZone zone)
+    /// <summary>
+    /// Load a zone and re-resolve the current room in it. <paramref name="arrivalHint"/> is
+    /// the boundary stub the character was standing on in the zone they just left (a copy
+    /// of this zone's room, carrying a note that named this zone). When several rooms here
+    /// look identical, its non-compass exits pick the right one — "The Strand, Sandy
+    /// Path" exists twice in the Crossing, and only one has the stub's `go meeting portal`.
+    /// The hint is used for that first resolution only.
+    /// </summary>
+    public void LoadZone(MapZone zone, MapNode? arrivalHint = null)
     {
         _zone = zone;
         _zoneEverLoaded = true;
@@ -250,7 +264,27 @@ public sealed class AutoMapperEngine
         CurrentNode = null;
         CurrentNodeChanged?.Invoke();
         MapChanged?.Invoke();
-        Recalculate();
+        _arrivalHint = arrivalHint;
+        try { Recalculate(); }
+        finally { _arrivalHint = null; }
+    }
+
+    private MapNode? _arrivalHint;
+
+    /// <summary>Non-compass exit commands of a node, normalised — the part of a room's identity
+    /// the compass fingerprint leaves out.</summary>
+    private static HashSet<string> NonCompassVerbs(MapNode n) =>
+        n.Exits.Where(e => e.Direction == Direction.None && !string.IsNullOrEmpty(e.MoveCommand))
+               .Select(e => MoveVerb.Normalize(e.MoveCommand).ToLowerInvariant())
+               .ToHashSet();
+
+    /// <summary>True when the candidate has every non-compass exit the arrival stub has
+    /// (and the stub has at least one to go by).</summary>
+    private bool MatchesArrivalHint(MapNode candidate)
+    {
+        if (_arrivalHint is null) return false;
+        var want = NonCompassVerbs(_arrivalHint);
+        return want.Count > 0 && want.IsSubsetOf(NonCompassVerbs(candidate));
     }
 
     /// <summary>
@@ -381,6 +415,85 @@ public sealed class AutoMapperEngine
         RebuildIndex();
         MapChanged?.Invoke();
         return true;
+    }
+
+    /// <summary>
+    /// Add a room by hand at a map position (the map editor's "Add Room Here").
+    /// Unlike the recorder it needs no walk evidence: the room is created
+    /// unlinked, on the given floor, with an optional server room id so the
+    /// tracker can find it by thumbprint. Keeps the lookup indexes consistent
+    /// and fires <see cref="MapChanged"/>. The new node is returned.
+    /// </summary>
+    public MapNode AddNode(string title, int pixelX, int pixelY, int z, string? serverRoomId = null)
+    {
+        var node = new MapNode
+        {
+            Id           = NextNodeId(),
+            Title        = string.IsNullOrWhiteSpace(title) ? "New Room" : title.Trim(),
+            PixelX       = pixelX,
+            PixelY       = pixelY,
+            Z            = z,
+            ServerRoomId = serverRoomId?.Trim() ?? string.Empty,
+        };
+        _zone.Nodes[node.Id] = node;
+        RebuildIndex();
+        MapChanged?.Invoke();
+        return node;
+    }
+
+    /// <summary>
+    /// Connect two rooms of the active zone by hand (the map editor's "Link to…").
+    /// Creates — or, when <paramref name="from"/> already has an exit with that
+    /// verb, re-points — the exit <c>from --verb--&gt; to</c>. With
+    /// <paramref name="addReturn"/> it also creates <c>to --back--&gt; from</c>, where
+    /// the return verb is <paramref name="returnVerb"/> or, for a compass verb,
+    /// the opposite direction; a non-compass verb with no return verb gets no
+    /// return exit. This is an explicit author action, so unlike the recorder
+    /// it may replace an existing destination. Returns null when the link is
+    /// not possible (same room, blank verb, or a room outside the zone).
+    /// </summary>
+    public (MapExit Forward, MapExit? Back)? LinkRooms(
+        MapNode from, MapNode to, string verb, bool addReturn, string? returnVerb = null)
+    {
+        verb = (verb ?? string.Empty).Trim();
+        if (verb.Length == 0 || from.Id == to.Id) return null;
+        if (!_zone.Nodes.ContainsKey(from.Id) || !_zone.Nodes.ContainsKey(to.Id)) return null;
+
+        var forward = SetExit(from, verb, to.Id);
+
+        MapExit? back = null;
+        if (addReturn)
+        {
+            var retVerb = (returnVerb ?? string.Empty).Trim();
+            if (retVerb.Length == 0 &&
+                DirectionHelper.Parse(verb) is var d && d != Direction.None &&
+                DirectionHelper.Opposite.TryGetValue(d, out var opp) && opp != Direction.None)
+                retVerb = opp.ToString().ToLowerInvariant();
+            if (retVerb.Length > 0) back = SetExit(to, retVerb, from.Id);
+        }
+
+        RebuildIndex();
+        MapChanged?.Invoke();
+        return (forward, back);
+    }
+
+    private static MapExit SetExit(MapNode node, string verb, int destinationId)
+    {
+        var dir = DirectionHelper.Parse(verb);
+        var exit = dir != Direction.None
+            ? node.GetExit(dir)
+            : node.Exits.FirstOrDefault(e => e.Direction == Direction.None &&
+                                             MoveCommandMatches(e.MoveCommand, verb));
+        if (exit is null)
+        {
+            exit = new MapExit { Direction = dir };
+            node.Exits.Add(exit);
+        }
+        exit.MoveCommand    = verb;
+        exit.ExitToken      = verb;
+        exit.DestinationId  = destinationId;
+        exit.RawDestination = string.Empty;
+        return exit;
     }
 
     /// <summary>
@@ -661,8 +774,7 @@ public sealed class AutoMapperEngine
             }
             else if (!string.IsNullOrEmpty(usedMoveCommand))
             {
-                arc = prevNode.Exits.FirstOrDefault(e =>
-                    MoveCommandMatches(e.MoveCommand, usedMoveCommand));
+                arc = FindArcByCommand(prevNode, usedMoveCommand);
             }
 
             if (arc?.DestinationId is { } destId &&
@@ -717,8 +829,7 @@ public sealed class AutoMapperEngine
                     if (matchDir != Direction.None)
                         fwd = prevNode.GetExit(matchDir);
                     else if (!string.IsNullOrEmpty(usedMoveCommand))
-                        fwd = prevNode.Exits.FirstOrDefault(e =>
-                            MoveCommandMatches(e.MoveCommand, usedMoveCommand));
+                        fwd = FindArcByCommand(prevNode, usedMoveCommand);
 
                     if (fwd?.DestinationId is { } destId && candidateIds.Contains(destId)
                         && _zone.Nodes.TryGetValue(destId, out var graphHit))
@@ -726,6 +837,20 @@ public sealed class AutoMapperEngine
                         node = graphHit;
                         graphGrounded = true;
                         tier = "c:fingerprint+adjacency";
+                    }
+                }
+
+                // Disambiguation 1b: the boundary stub we just came through. Its non-compass
+                // exits (a portal, a gate) say which of several identical rooms this is.
+                if (node is null && _arrivalHint is not null)
+                {
+                    var byHint = candidateIds
+                        .Where(id => _zone.Nodes.TryGetValue(id, out var hc) && MatchesArrivalHint(hc))
+                        .ToList();
+                    if (byHint.Count == 1 && _zone.Nodes.TryGetValue(byHint[0], out var hintHit))
+                    {
+                        node = hintHit;
+                        tier = "c:fingerprint+stub";
                     }
                 }
 
@@ -797,7 +922,8 @@ public sealed class AutoMapperEngine
                 .Where(d => d != Direction.None)
                 .ToHashSet();
 
-            foreach (var candidate in _zone.Nodes.Values)
+            // With an arrival stub, try the rooms it matches first.
+            foreach (var candidate in _zone.Nodes.Values.OrderBy(c => MatchesArrivalHint(c) ? 0 : 1))
             {
                 if (!candidate.Title.Equals(title, StringComparison.OrdinalIgnoreCase))
                     continue;
@@ -837,8 +963,13 @@ public sealed class AutoMapperEngine
                     node.Description = description;
                     zoneChanged = true;
                 }
-                // Stamp server room ID on nodes that don't have it yet
-                if (!string.IsNullOrEmpty(serverRoomId) && string.IsNullOrEmpty(node.ServerRoomId))
+                // Stamp server room ID on nodes that don't have it yet — but only from a match
+                // we trust. A weak guess (e: description only, f: title + any shared exit) between
+                // twin rooms used to stamp the wrong node, and the wrong id then steered every
+                // later match (the Crossing's two "The Strand, Sandy Path" rooms swapped ids), and
+                // a stale id belongs to the PREVIOUS room.
+                if (!string.IsNullOrEmpty(serverRoomId) && string.IsNullOrEmpty(node.ServerRoomId) &&
+                    tier is not ("e:desc-only" or "f:title+exit-overlap") && !_serverIdStale)
                 {
                     node.ServerRoomId = serverRoomId;
                     if (_serverRoomIndex.TryAdd(serverRoomId, node.Id))
@@ -983,18 +1114,49 @@ public sealed class AutoMapperEngine
         if (IsEnabled && prevNode != null && usedDir != Direction.None && prevNode.Id != node.Id)
         {
             // Forward exit: prevNode → node
+            // An EXISTING arc to a different room is retargeted only on strong
+            // evidence. A fuzzy/guessed match (twin rooms, stale pending move)
+            // used to silently clobber a good arc, which then vanished from the
+            // map and broke #goto until the zone was reloaded from disk. Allowed:
+            //   - a server-id match, or
+            //   - a unique-fingerprint / adjacency match when the arc's CURRENT
+            //     destination is demonstrably not this room (different title, or
+            //     a server id known to be another room) — this heals an arc an
+            //     older build already corrupted on disk (85 West -> wrong room).
+            bool mayRetarget = tier == "a:server-id" && !_serverIdStale;
             var fwd = prevNode.GetOrAddExit(usedDir, usedDir.ToString().ToLowerInvariant());
-            if (fwd.DestinationId != node.Id)
+            if (!mayRetarget && fwd.DestinationId is int oldDest &&
+                (tier == "c:fingerprint-unique" || tier == "c:fingerprint+adjacency"))
+            {
+                if (!_zone.Nodes.TryGetValue(oldDest, out var oldNode))
+                    mayRetarget = true;                                   // dangling arc
+                else if (!oldNode.Title.Equals(title, StringComparison.OrdinalIgnoreCase))
+                    mayRetarget = true;                                   // points at a different-titled room
+                else if (!string.IsNullOrEmpty(serverRoomId) &&
+                         _nodeServerIdIndex.TryGetValue(oldNode.Id, out var oldSrv) &&
+                         !string.IsNullOrEmpty(oldSrv) &&
+                         !oldSrv.Equals(serverRoomId, StringComparison.OrdinalIgnoreCase))
+                    mayRetarget = true;                                   // known to be another server room
+            }
+            if (fwd.DestinationId != node.Id && (fwd.DestinationId is null || mayRetarget))
             {
                 fwd.DestinationId = node.Id;
                 zoneChanged = true;
             }
+            else if (fwd.DestinationId != node.Id)
+                Diagnostics?.Invoke(
+                    $"[mapper]   arc #{prevNode.Id} {usedDir} -> #{fwd.DestinationId} kept " +
+                    $"(not overwritten with #{node.Id}; match tier {tier} is not authoritative)");
 
             // Back exit: node → prevNode
             if (DirectionHelper.Opposite.TryGetValue(usedDir, out var opp) && opp != Direction.None)
             {
                 var back = node.GetOrAddExit(opp, opp.ToString().ToLowerInvariant());
-                if (back.DestinationId != prevNode.Id)
+                // The back arc is an INFERENCE (we walked prev -> node, not node ->
+                // prev), and DR exits are often asymmetric (Crafting Society halls),
+                // so it only ever fills an empty slot — never overwrites a real arc,
+                // even on a server-id match.
+                if (back.DestinationId is null)
                 {
                     back.DestinationId = prevNode.Id;
                     zoneChanged = true;
@@ -1058,6 +1220,33 @@ public sealed class AutoMapperEngine
     ///         <c>go door</c> on the wire via the #send queue).</item>
     /// </list>
     /// </summary>
+    /// <summary>
+    /// The arc of <paramref name="node"/> that <paramref name="used"/> takes. An exact or
+    /// idiom match (<see cref="MoveCommandMatches"/>) wins; failing that, a command typed
+    /// shorter than the arc's — `go portal` for `go exit portal`, or `go port` for
+    /// `go meeting portal`, DR accepts both — matches when exactly ONE arc has the same
+    /// verb and the typed words (whole or abbreviated) in order, so two doors
+    /// (`go oak door`, `go iron door`) never guess from `go door`.
+    /// </summary>
+    internal static MapExit? FindArcByCommand(MapNode node, string used)
+    {
+        var exact = node.Exits.FirstOrDefault(e => MoveCommandMatches(e.MoveCommand, used));
+        if (exact is not null) return exact;
+
+        var typed = used.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (typed.Length < 2) return null;
+        var partial = node.Exits.Where(e =>
+        {
+            var arc = (e.MoveCommand ?? "").Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (arc.Length < typed.Length || arc[0] != typed[0]) return false;
+            var i = 1;                                   // typed words must appear in order after the verb,
+            for (var j = 1; j < arc.Length && i < typed.Length; j++)   // each whole or abbreviated (DR: `go port`)
+                if (arc[j] == typed[i] || arc[j].StartsWith(typed[i], StringComparison.Ordinal)) i++;
+            return i == typed.Length;
+        }).Take(2).ToList();
+        return partial.Count == 1 ? partial[0] : null;
+    }
+
     internal static bool MoveCommandMatches(string? arcMove, string used)
     {
         if (string.IsNullOrEmpty(arcMove)) return false;

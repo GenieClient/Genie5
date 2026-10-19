@@ -154,6 +154,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public Interaction<ConfigurationViewModel, Unit>      ShowConfigurationDialog  { get; } = new();
     public Interaction<Genie4ImportViewModel, Unit>       ShowGenie4ImportDialog   { get; } = new();
     public Interaction<EditExitViewModel, bool>           ShowEditExitDialog       { get; } = new();
+    public Interaction<LinkRoomsViewModel, bool>          ShowLinkRoomsDialog      { get; } = new();
     public Interaction<ZoneConnectionsViewModel, Unit>    ShowZoneConnectionsDialog{ get; } = new();
     public ReactiveCommand<Unit, Unit>                    ConnectCommand           { get; }
     public ReactiveCommand<Unit, Unit>                    DisconnectCommand        { get; }
@@ -1597,7 +1598,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
             var repo = new Genie.Core.Mapper.ZoneConnectionsRepository(
                 System.IO.Path.Combine(mapsDir, "ZoneConnections.xml"));
-            var vm = new ZoneConnectionsViewModel(repo);
+            var vm = new ZoneConnectionsViewModel(repo, mapsDir);
             await ShowZoneConnectionsDialog.Handle(vm);
         });
 
@@ -5408,6 +5409,23 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 catch (Exception ex) { ErrorLog.Log("XmlGapReport", ex); }
             });
 
+        // Same flow for an injuries-dialog region the panel has no cell for
+        // (e.g. tail): the reading would otherwise vanish silently.
+        _core.GameEvents.OfType<UnknownInjuryRegionEvent>()
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(e =>
+            {
+                if (string.IsNullOrWhiteSpace(e.Area)) return;
+                if (!_reportedGapTags.Add("injuries:" + e.Area)) return;
+                try
+                {
+                    _pendingXmlGapDraft = Genie.Core.Diagnostics.XmlGapReport.BuildInjuryRegion(
+                        e.Area, e.ImageName, e.RawXml, BuildXmlGapContext($"injuries dialog region {e.Area}"));
+                    XmlGapNotice = $"Genie received an injuries region it can't display: {e.Area}. Help improve the parser — report it?";
+                }
+                catch (Exception ex) { ErrorLog.Log("XmlGapReport", ex); }
+            });
+
         _core.ConnectionState.ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(e =>
             {
@@ -5884,6 +5902,18 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 var editVm = new EditExitViewModel(exit, fromTitle, toTitle);
                 var ok = await ShowEditExitDialog.Handle(editVm);
                 if (ok) Mapper.SaveCurrentZone();
+            });
+
+        // Mapper "Link to…": the target room was picked — ask for the command(s),
+        // then create the link. The zone stays unsaved until the user saves.
+        Mapper.LinkRoomsRequested += (from, to) =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+            {
+                var dlg = new LinkRoomsViewModel($"#{from.Id}  {from.Title}", $"#{to.Id}  {to.Title}");
+                if (await ShowLinkRoomsDialog.Handle(dlg))
+                    Mapper.ApplyLink(from, to, dlg.Verb, dlg.AddReturn, dlg.ReturnVerb);
+                else
+                    Mapper.BeginLinkCommand.Execute(null).Subscribe();
             });
 
         // ── Container noun map: harvest <container target='#NNNN' title='…'/>
@@ -6754,6 +6784,16 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 Echo(reloaded is null ? "[mapper] No zone loaded." : $"[mapper] Reloaded {reloaded}.");
                 break;
 
+            // Second half of `#mapper reset` (Core already re-resolved the room).
+            // Reload the zone from disk so arcs lost in memory come back — but
+            // never while recording, where the in-memory map holds unsaved work.
+            case "reset":
+                if (!_core!.Config.AutoMapper)
+                    Mapper.ReloadActiveZone();
+                else
+                    Echo("[mapper] Record mode is on — zone not reloaded (unsaved rooms kept). #mapper save, then #mapper load to reload from disk.");
+                break;
+
             case "clear":
                 Mapper.ClearActiveZone();
                 Echo("[mapper] Current zone cleared in memory — #mapper save to persist, or #mapper load to undo.");
@@ -6807,10 +6847,25 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 Echo(Mapper.NoteCommand(RestAfterFirstToken(args)));
                 break;
 
+            // Return portals (a connection marked "returns you to where you came from"):
+            // show where each would take you now, or forget the remembered origins.
+            case "portal": case "portals":
+                if (parts.Length > 1 && parts[1].Equals("clear", StringComparison.OrdinalIgnoreCase))
+                {
+                    Mapper.PortalOrigins.Clear();
+                    Echo("[mapper] Portal origins cleared.");
+                }
+                else if (Mapper.PortalOrigins.Origins.Count == 0)
+                    Echo("[mapper] No portal origin remembered — a return portal is used only after you enter a zone through a portal.");
+                else
+                    foreach (var kv in Mapper.PortalOrigins.Origins)
+                        Echo($"[mapper] Return portal in {kv.Key} → {kv.Value.Zone} room {kv.Value.Room}");
+                break;
+
             default:
                 Echo("[mapper] Usage: #mapper reset | save | load | clear | zone [<id|name>] | " +
                      "color <bg|text> <colour> | allowdupes [on|off] | record [on|off] | " +
-                     "tag add|remove <tag> | tag list | tags | note [<text>]");
+                     "tag add|remove <tag> | tag list | tags | note [<text>] | portal [clear]");
                 break;
         }
     }

@@ -4,11 +4,35 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` or `v5.0.0-beta.N.M` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.9.7 — Healing Hands
+## Latest: v5.0.0-beta.9.9 — Return Trip
+
+A mapper release: portals that return you to where you entered route correctly, the map editor can add and connect rooms by hand, and a batch of fixes stops the mapper losing links and mixing up identical rooms.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.9** as a delta from beta.9.8.
+
+- **Return portals** — a Cross-Zone Connection can be marked as a return portal, for a portal like Fang Cove's EXIT portal that takes you back to wherever you entered (the Crossing, Shard, …). Genie remembers the room you stepped through a portal from when you enter a zone, and `#goto` only plans the return portal when that origin is known; arriving by boat or on foot forgets it. `#mapper portal` shows what is remembered and `#mapper portal clear` forgets it. The origin is not kept across a restart.
+- **Add Room Here and Link to…** — in the map editor's edit mode, right-click empty space to drop a room by hand, then right-click a room, choose **Link to…** and click the room it leads to. A dialog takes the command (`west`, `go oak door`, `climb wall`) and can add the way back. Together they let you add a room you cannot walk to and connect it; **Save** keeps it.
+- **Pick zones and rooms in Cross-Zone Connections** — the From/To zone fields are type-to-filter dropdowns of the maps in your Maps folder (with an **Add zone…** entry), and the room fields suggest that zone's rooms by number or title and name the room you picked. The list on the left now updates as you edit.
+- **Record starts off every session** — the mapper's Record toggle (`#config automapper`) is no longer saved, so a forgotten Record can't keep editing your maps from one day to the next. A script (such as `uber.cmd`) or you can still switch it on for the session.
+- **Mapper fixes** — walking through a room no longer rewrites its return exit (the main way links went missing mid-session); links an earlier build damaged heal as you walk them; crossing a map boundary lands on the right one of two identical rooms; Record no longer stamps a server room id from a weak guess; and `go port` / `go portal` still follow the arc `go meeting portal` / `go exit portal` when only one arc fits.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.9)
+
+## v5.0.0-beta.9.8 — Mapped Out
+
+A fixes-only release for the mapper, the Connect dialog and `#echo`.
+
+- **Map links no longer vanish mid-session** — with auto-create (record mode) on, a wrong room match in a run of similar-looking rooms could overwrite a good map link, and routes through it then failed ("destination not found", `#goto` going nowhere) until the zone was reloaded from disk. An existing link is now only retargeted when the game's own room id confirms the room; a refused overwrite is logged under `#config mapperdebug`.
+- **`#mapper reset` also reloads the zone from disk**, restoring links already lost and clearing what the mapper learned about room ids during the session. With record mode on it skips the reload so unsaved rooms are kept; `#mapper save` then `#mapper load` does it by hand.
+- **Update Maps and Repair Maps are clickable again** — both stayed greyed out all session. A failed zone-index scan now shows in the Mapper status.
+- **The Connect dialog's TLS checkbox no longer overlaps the character status line.**
+- **A coloured `#echo >window` keeps its colour** in stream windows and custom windows.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.8)
+
+## v5.0.0-beta.9.7 — Healing Hands
 
 An Empath can now work from one window, and the built-in script editor, `#shunt`, per-window logs and system voices for text to speech arrive with a run of Genie 4 script-engine parity fixes.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.7** as a delta from beta.9.6.
 
 - **Healing window for Empaths** — per-patient body diagrams on the full 13-step scale, click-to-heal, Take All and spell buttons, with the patient's HEALTH bar, **Transfer Vit** and **Re-Link** in the header. A right-click on a part DragonRealms marks sends the transfer. Genie 4's Crutch `GCTextBox*` variables carry over, and a reading from your own `touch` fills in any part DragonRealms left blank (#263, #375).
 - **Built-in script editor** — `#edit`, Script Manager ▸ Edit and the Script Bar ✏ open an in-app editor with `.cmd` / `.js` colouring, Ctrl+S and Ctrl+F, and prompts for unsaved and outside-changed files. `#config externaleditor on` keeps your own editor (#243).

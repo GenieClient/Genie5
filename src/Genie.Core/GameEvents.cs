@@ -267,6 +267,15 @@ public enum InjuryKind
 public sealed record InjuryEvent(string Area, InjuryKind Kind, int Severity) : GameEvent;
 
 /// <summary>
+/// An <c>&lt;image&gt;</c> in the injuries dialog whose region id is not one of
+/// the ones the panel has a cell for (<see cref="InjuryImageName.KnownRegions"/>)
+/// — i.e. DR starts sending a region the panel can't show. The matching <see cref="InjuryEvent"/> is
+/// still emitted; this is the "we are dropping data" signal that drives the
+/// one-click gap report.
+/// </summary>
+public sealed record UnknownInjuryRegionEvent(string Area, string ImageName, string RawXml) : GameEvent;
+
+/// <summary>
 /// A completed <c>perceive health</c> reading (public #277) - any patient, the
 /// true 1-13 severity ladder, and all four Fresh/Scars x External/Internal
 /// axes at once.

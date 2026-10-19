@@ -1,3 +1,93 @@
+# Genie 5 — v5.0.0-beta.9.9
+
+**"Return Trip"** — a mapper release. Portals that take you back to wherever you
+entered finally route correctly, the map editor can add a room and connect two rooms
+by hand, the Cross-Zone Connections editor picks zones and rooms from lists, Record
+starts off every session, and a batch of fixes stops the mapper losing links and
+mixing up identical rooms.
+
+## ✨ New
+- **Add Room Here and Link to… in the map editor** — in edit mode, right-click an
+  empty spot to drop a room by hand, then right-click a room, choose **Link to…**
+  and click the room it leads to. A small dialog asks for the command (`west`,
+  `go oak door`, `climb wall`) and can add the way back; a compass command fills in
+  its opposite. Together they let you add a room you cannot walk to (a border room,
+  a secret exit) and connect it, then **Save**. Until now rooms and links only came
+  from walking them with Record on.
+- **Pick zones and rooms in Cross-Zone Connections** — the From/To zone fields are
+  dropdowns of the maps in your Maps folder (with an **Add zone…** entry for one
+  that is not there yet), and the From/To room fields suggest that zone's rooms by
+  number or title. Typing a value by hand still works.
+- **Return portals** — a Cross-Zone Connection can be marked as a return portal, for a
+  portal like Fang Cove's EXIT portal that takes you back to wherever you entered (the
+  Crossing, Shard, …). Genie remembers the room you stepped through a portal from when
+  you enter a zone, and `#goto` only plans the return portal when that origin is known;
+  arriving by boat or on foot forgets it. `#mapper portal` shows what is remembered and
+  `#mapper portal clear` forgets it. The origin is not kept across a restart.
+
+## 🔄 Changes
+- **Record starts off every session** — the mapper's Record toggle (`#config automapper`,
+  "Auto-create new rooms") is no longer saved. Genie always launches with it off, so a
+  forgotten Record can't keep editing your maps from one day to the next. A script (such
+  as `uber.cmd`) or you can still switch it on for the session; settings.cfg keeps
+  `automapper False`.
+
+## 🐛 Fixes
+- **Walking through a room no longer rewrites that room's return exit** — with
+  auto-create (record mode) on, stepping from A into B also pointed B's opposite
+  exit back at A, overwriting a real link whenever the exits are not mirror
+  images (common in society halls and town squares). That was the main way map
+  links such as the Forging Society's went missing mid-session. The return link
+  is now only filled in when that exit has no destination yet.
+- **Crossing a map boundary lands on the right one of two identical rooms** — stepping
+  from one map into another could place you on the wrong twin (the Crossing's two
+  "The Strand, Sandy Path" rooms), after which a script planned its next move from the
+  wrong room and failed. The room you just came through now settles which one it is.
+- **Record mode no longer stamps a server room id from a weak guess** — a guess between
+  twin rooms used to write the game's room id onto the wrong one, which then steered
+  every later match (the two Strand rooms ended up with each other's ids). Ids are now
+  only stamped from a trustworthy match, and never from a stale one.
+- **A shortened move command still follows its arc** — `go portal` now finds the arc
+  `go exit portal`, and `go port` finds `go meeting portal` (when only one arc fits),
+  instead of falling back to a guess.
+- **Map links an earlier build damaged now heal as you walk them** — a link whose
+  destination is clearly the wrong room (a different title, or a room the server
+  has shown is another one) is corrected when you step through it into a room
+  the map recognises uniquely. Reloading the zone (or `#mapper reset` with record
+  mode off) always brings back the links as saved on disk.
+
+---
+
+# Genie 5 — v5.0.0-beta.9.8
+
+**"Mapped Out"** — a small, fixes-only release. The mapper stops losing its own
+links mid-session, `#mapper reset` can recover them, Update/Repair Maps work
+again, and a coloured `#echo >window` keeps its colour.
+
+## 🐛 Fixes
+- **Map links no longer vanish mid-session, and `#goto` stops failing for it** —
+  with auto-create (record mode) on, a wrong room match in a run of
+  similar-looking rooms could overwrite a good map link. The link then
+  disappeared from the map and routes through it failed ("destination not
+  found", `#goto` going nowhere) until the zone was reloaded from disk. An
+  existing link is now only retargeted when the game's own room id confirms
+  the room; a refused overwrite is logged under `#config mapperdebug`.
+- **`#mapper reset` also reloads the zone from disk** — it used to only
+  re-resolve your location, so a link already lost stayed lost. It now
+  restores them and clears what the mapper learned about room ids during the
+  session. While record mode is on it skips the reload, so rooms you have not
+  saved are kept; `#mapper save` then `#mapper load` does it by hand.
+- **Update Maps and Repair Maps are clickable again** — both stayed greyed out
+  for the whole session because the mapper checked for its map store before it
+  was attached. A failed zone-index scan is now reported in the Mapper status
+  instead of leaving it on "Waiting for zone index".
+- **The Connect dialog's TLS checkbox no longer overlaps the character status
+  line** in Direct (SGE) mode.
+- **A coloured `#echo >window` keeps its colour** in stream windows and
+  custom windows, instead of coming out in the window's default colour.
+
+---
+
 # Genie 5 — v5.0.0-beta.9.7
 
 **"Healing Hands"** — the release where an Empath can finally work from one
