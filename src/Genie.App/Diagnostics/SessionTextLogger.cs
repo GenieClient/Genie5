@@ -23,6 +23,11 @@ namespace Genie.App.Diagnostics;
 /// session does not pay a synchronous disk write per line, and a crash loses at
 /// most the last second of text.</para>
 ///
+/// <para><b>Midnight roll.</b> The file name carries the date, so a session left
+/// open across local midnight rolls to the new day's file on its next line
+/// (<see cref="RollIfNewDay"/>) rather than appending to yesterday's. A failed
+/// roll keeps writing to the old file — losing the day label beats losing lines.</para>
+///
 /// <para>Sibling of <see cref="SessionRecorder"/> (which captures the raw XML
 /// stream on a manual toggle); this one captures the <i>rendered</i> text
 /// automatically. Same local-only policy stance — recording the user's own
@@ -43,10 +48,15 @@ public sealed class SessionTextLogger : IDisposable
     private GameTextViewModel? _source;
     private NotifyCollectionChangedEventHandler? _handler;
     private string? _currentFile;
+    private string  _safeChar = "";
+    private string  _safeGame = "";
+    private DateTime _openDay;
+    private readonly Func<DateTime> _now;
 
-    public SessionTextLogger(string logsDir)
+    public SessionTextLogger(string logsDir, Func<DateTime>? now = null)
     {
         _logsDir = logsDir;
+        _now = now ?? (() => DateTime.Now);
         try { Directory.CreateDirectory(_logsDir); }
         catch (Exception ex) { ErrorLog.Log("SessionTextLogger.CreateDirectory", ex); }
     }
@@ -69,16 +79,15 @@ public sealed class SessionTextLogger : IDisposable
         Stop();
         LastError = null;
 
-        var safeChar = Sanitize(characterName, "unknown");
-        var safeGame = Sanitize(gameName, string.Empty);
-        var file = Path.Combine(
-            _logsDir, $"{safeChar}{safeGame}_{DateTime.Now:yyyy-MM-dd}.log");
+        _safeChar = Sanitize(characterName, "unknown");
+        _safeGame = Sanitize(gameName, string.Empty);
+        var day = _now().Date;
 
         StreamWriter writer;
+        string file;
         try
         {
-            Directory.CreateDirectory(_logsDir);
-            writer = new StreamWriter(file, append: true);
+            (writer, file) = OpenFor(day);
         }
         catch (Exception ex)
         {
@@ -86,6 +95,7 @@ public sealed class SessionTextLogger : IDisposable
             LastError = ex.Message;
             return false;
         }
+        _openDay = day;
 
         lock (_gate)
         {
@@ -100,6 +110,7 @@ public sealed class SessionTextLogger : IDisposable
             lock (_gate)
             {
                 if (_writer is null) return;
+                RollIfNewDay();
                 foreach (TextLine line in e.NewItems)
                 {
                     try { _writer.WriteLine(line.Text); _dirty = true; }
@@ -110,6 +121,36 @@ public sealed class SessionTextLogger : IDisposable
         source.Lines.CollectionChanged += _handler;
         _flushTimer = new Timer(_ => FlushIfDirty(), null, FlushInterval, FlushInterval);
         return true;
+    }
+
+    private (StreamWriter Writer, string File) OpenFor(DateTime day)
+    {
+        var file = Path.Combine(_logsDir, $"{_safeChar}{_safeGame}_{day:yyyy-MM-dd}.log");
+        Directory.CreateDirectory(_logsDir);
+        return (new StreamWriter(file, append: true), file);
+    }
+
+    /// <summary>Reopen under today's date when local midnight has passed since
+    /// the file was opened. Caller holds <see cref="_gate"/>. A failed open leaves
+    /// the old writer in place and retries on the next line.</summary>
+    private void RollIfNewDay()
+    {
+        var day = _now().Date;
+        if (day == _openDay || _writer is null) return;
+        try
+        {
+            var (next, file) = OpenFor(day);
+            try { _writer.Dispose(); }
+            catch (Exception ex) { ErrorLog.Log("SessionTextLogger.CloseFile", ex); }
+            _writer      = next;
+            _currentFile = file;
+            _openDay     = day;
+            _dirty       = false;
+        }
+        catch (Exception ex)
+        {
+            ErrorLog.Log("SessionTextLogger.Roll", ex);
+        }
     }
 
     /// <summary>Push buffered lines to disk now. The flush timer calls this on

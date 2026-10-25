@@ -61,6 +61,27 @@ public class SessionTextLoggerTests : IDisposable
     }
 
     [Fact]
+    public void A_session_open_across_midnight_rolls_to_the_new_days_file()
+    {
+        var clock = new DateTime(2026, 10, 17, 23, 58, 0);
+        var text = new GameTextViewModel();
+        using var logger = new SessionTextLogger(_dir, () => clock);
+        Assert.True(logger.Start(text, "Renucci", "DR"));
+        var day1 = Path.Combine(_dir, "RenucciDR_2026-10-17.log");
+        Assert.Equal(day1, logger.CurrentFile);
+
+        text.AddSystemLine("before midnight");
+        clock = new DateTime(2026, 10, 18, 0, 0, 5);
+        text.AddSystemLine("after midnight");
+        logger.Stop();
+
+        var day2 = Path.Combine(_dir, "RenucciDR_2026-10-18.log");
+        Assert.Contains("before midnight", File.ReadAllText(day1));
+        Assert.DoesNotContain("after midnight", File.ReadAllText(day1));
+        Assert.Contains("after midnight", File.ReadAllText(day2));
+    }
+
+    [Fact]
     public void Lines_reach_the_file_on_flush_and_on_stop()
     {
         var text = new GameTextViewModel();
