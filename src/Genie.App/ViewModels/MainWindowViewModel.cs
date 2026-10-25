@@ -1005,6 +1005,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         GameText.AddSystemLine("[autolog] session logging on → Logs folder. Turn off with File ▸ Auto Log or #config autolog false.");
         if (!AutoLogger.Start(GameText, characterName, gameName))
             GameText.AddSystemLine($"[autolog] could not open the session log ({AutoLogger.LastError}) — logging is off for this session.");
+        else if (AutoLogger.UsingFallbackFile)
+            GameText.AddSystemLine($"[autolog] today's log is in use by another Genie window — logging to {Path.GetFileName(AutoLogger.CurrentFile)} instead.");
     }
 
     /// <summary>

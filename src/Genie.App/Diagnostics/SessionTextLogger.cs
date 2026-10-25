@@ -16,8 +16,10 @@ namespace Genie.App.Diagnostics;
 ///
 /// <para><b>Failure and flush policy.</b> Opening the file can fail — most
 /// often a second Genie instance logging the same character on the same day
-/// holds it. That is reported (<see cref="LastError"/>, <see cref="ErrorLog"/>)
-/// and the logger simply stays off: a log file must never abort a connect.
+/// holds it. Then the log goes to a numbered sibling (<c>…_2.log</c>) so that
+/// session is still recorded. Only when no candidate opens is it reported
+/// (<see cref="LastError"/>, <see cref="ErrorLog"/>) and the logger stays off:
+/// a log file must never abort a connect.
 /// Lines go into the writer's buffer on the UI thread and are flushed at most
 /// once per <see cref="FlushInterval"/> (plus on <see cref="Stop"/>), so a busy
 /// session does not pay a synchronous disk write per line, and a crash loses at
@@ -67,6 +69,9 @@ public sealed class SessionTextLogger : IDisposable
     public string? CurrentFile => _currentFile;
     /// <summary>Why the last <see cref="Start"/> could not open its file, or null.</summary>
     public string? LastError   { get; private set; }
+    /// <summary>True when the day's file was held by another process and the
+    /// log went to a numbered sibling instead (see <see cref="OpenFor"/>).</summary>
+    public bool    UsingFallbackFile { get; private set; }
 
     /// <summary>
     /// Begin logging the rendered lines from <paramref name="source"/> to the
@@ -123,11 +128,33 @@ public sealed class SessionTextLogger : IDisposable
         return true;
     }
 
+    /// <summary>How many numbered siblings (<c>_2</c> … ) to try when the day's
+    /// file is held by another process.</summary>
+    private const int MaxFallbackFiles = 9;
+
+    /// <summary>Open the day's file, or — when another process holds it (a
+    /// second Genie instance on the same character) — the first free numbered
+    /// sibling, <c>{Char}{Game}_{date}_2.log</c> and up. Before this, the held
+    /// file left the second instance logging nothing for the whole session.
+    /// Throws the last failure when every candidate is unavailable.</summary>
     private (StreamWriter Writer, string File) OpenFor(DateTime day)
     {
-        var file = Path.Combine(_logsDir, $"{_safeChar}{_safeGame}_{day:yyyy-MM-dd}.log");
         Directory.CreateDirectory(_logsDir);
-        return (new StreamWriter(file, append: true), file);
+        var stem = Path.Combine(_logsDir, $"{_safeChar}{_safeGame}_{day:yyyy-MM-dd}");
+        for (int n = 1; ; n++)
+        {
+            var file = n == 1 ? stem + ".log" : $"{stem}_{n}.log";
+            try
+            {
+                var writer = new StreamWriter(file, append: true);
+                UsingFallbackFile = n > 1;
+                return (writer, file);
+            }
+            catch (IOException ex) when (n < MaxFallbackFiles)
+            {
+                ErrorLog.Log("SessionTextLogger.OpenFile", ex);
+            }
+        }
     }
 
     /// <summary>Reopen under today's date when local midnight has passed since

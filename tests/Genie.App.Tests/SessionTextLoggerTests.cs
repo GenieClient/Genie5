@@ -29,34 +29,61 @@ public class SessionTextLoggerTests : IDisposable
         Path.Combine(_dir, $"{ch}{game}_{DateTime.Now:yyyy-MM-dd}.log");
 
     [Fact]
-    public void An_open_failure_does_not_throw_and_leaves_logging_off()
+    public void A_file_held_by_another_instance_falls_back_to_a_numbered_sibling()
     {
         using var logger = new SessionTextLogger(_dir);
-        // Another instance holding the file exclusively — the real-world case.
+        Directory.CreateDirectory(_dir);
+        // Another instance holding today's file exclusively — the real-world case
+        // (two Genie windows on the same character). It used to leave this
+        // session logging nothing at all.
         using var holder = new FileStream(ExpectedFile("Renucci", "DR"),
             FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
 
-        var started = true;
-        var ex = Record.Exception(() =>
-            started = logger.Start(new GameTextViewModel(), "Renucci", "DR"));
+        var text = new GameTextViewModel();
+        Assert.True(logger.Start(text, "Renucci", "DR"));
+        Assert.True(logger.UsingFallbackFile);
+        Assert.Equal(
+            Path.Combine(_dir, $"RenucciDR_{DateTime.Now:yyyy-MM-dd}_2.log"),
+            logger.CurrentFile);
 
-        Assert.Null(ex);
-        Assert.False(started);
-        Assert.False(logger.IsLogging);
-        Assert.Null(logger.CurrentFile);
-        Assert.False(string.IsNullOrEmpty(logger.LastError));
+        text.AddSystemLine("still recorded");
+        var file = logger.CurrentFile!;
+        logger.Stop();
+        Assert.Contains("still recorded", File.ReadAllText(file));
+    }
+
+    [Fact]
+    public void An_open_failure_does_not_throw_and_leaves_logging_off()
+    {
+        // The logs "directory" is a file, so nothing under it can be opened.
+        File.WriteAllText(_dir, "not a directory");
+        try
+        {
+            using var logger = new SessionTextLogger(_dir);
+            var started = true;
+            var ex = Record.Exception(() =>
+                started = logger.Start(new GameTextViewModel(), "Renucci", "DR"));
+
+            Assert.Null(ex);
+            Assert.False(started);
+            Assert.False(logger.IsLogging);
+            Assert.Null(logger.CurrentFile);
+            Assert.False(string.IsNullOrEmpty(logger.LastError));
+        }
+        finally { File.Delete(_dir); }
     }
 
     [Fact]
     public void A_later_successful_start_clears_the_error()
     {
+        File.WriteAllText(_dir, "not a directory");
         using var logger = new SessionTextLogger(_dir);
-        using (new FileStream(ExpectedFile("Renucci", "DR"),
-                   FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
-            Assert.False(logger.Start(new GameTextViewModel(), "Renucci", "DR"));
+        Assert.False(logger.Start(new GameTextViewModel(), "Renucci", "DR"));
+        File.Delete(_dir);
 
         Assert.True(logger.Start(new GameTextViewModel(), "Renucci", "DR"));
         Assert.True(logger.IsLogging);
+        Assert.False(logger.UsingFallbackFile);
         Assert.Null(logger.LastError);
     }
 
