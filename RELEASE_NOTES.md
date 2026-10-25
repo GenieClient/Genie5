@@ -1,3 +1,35 @@
+# Genie 5 — v5.0.0-beta.9.9.1
+
+**"After Hours"** — a small fixes release. The Injuries panel reads nerve damage and
+tail wounds from `health`, the DragonRealms injuries dialog now wins over the health
+text when they disagree, a session left open past midnight rolls to the next day's
+log, and Cross-Zone Connections loads again.
+
+## ✨ New
+- **Tail in the Injuries panel** — DragonRealms' injuries dialog never reports the
+  tail, so Genie reads it from the `health` summary. The panel has a Tail cell in both
+  the grid and figure layouts (the sprite is a placeholder for now).
+
+## 🐛 Fixes
+- **Nerve damage shows in the Injuries panel** — the `health` summary words it as "some
+  minor twitching", "slight numbness in your arms and legs", "difficulty controlling
+  actions" and so on; Genie only recognised six older phrases, so none matched. The ten
+  current phrases are now read, and a line with several keeps the worst.
+- **The server's injuries dialog wins over the `health` text** — the two used to
+  overwrite each other, last one in. The dialog's reading now stays; `health` can only
+  clear a region it no longer names (the stale-after-death case), refine wound versus
+  scar, or fill a region the dialog never reported. If the injuries dialog sends a
+  region the panel has no cell for, **Report XML Gap** offers a redacted issue draft.
+- **AutoLog rolls over at midnight** — a session left open past local midnight kept
+  writing to the previous day's log file. It now switches to the new day's file on the
+  next line. (A report of a log that stayed empty after a reconnect is still being
+  looked into — [#380](https://github.com/GenieClient/Genie5/issues/380).)
+- **Cross-Zone Connections loads again** — the starter file shipped with a comment that
+  is not valid XML, so the editor came up empty. Thanks @digitalnyc1
+  ([#381](https://github.com/GenieClient/Genie5/pull/381)).
+
+---
+
 # Genie 5 — v5.0.0-beta.9.9
 
 **"Return Trip"** — a mapper release. Portals that take you back to wherever you

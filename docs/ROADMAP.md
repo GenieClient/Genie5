@@ -21,7 +21,7 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.9.9 "Return Trip"
+## Where we are — v5.0.0-beta.9.9.1 "After Hours"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
@@ -81,7 +81,9 @@ indexing, base-10 `log()`).
 **beta.9.8** is a fixes-only follow-up: the mapper no longer overwrites a good
 map link on a wrong room match, `#mapper reset` reloads the zone from disk,
 and a coloured `#echo >window` keeps its colour.
-**beta.9.9** is a mapper release: return portals (Fang Cove's EXIT portal) route back to
+**beta.9.9.1** is a small fixes release: the Injuries panel reads nerve damage and the
+tail from `health` with the server dialog winning on conflicts, AutoLog rolls to the new
+day's file at midnight, and Cross-Zone Connections loads again. **beta.9.9** is a mapper release: return portals (Fang Cove's EXIT portal) route back to
 where you entered, the map editor gains **Add Room Here** and **Link to…**, the
 Cross-Zone Connections editor picks zones and rooms from lists, Record starts off every
 session, and the mapper stops overwriting links or confusing identical rooms.

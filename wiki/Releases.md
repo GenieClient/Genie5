@@ -4,11 +4,23 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` or `v5.0.0-beta.N.M` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.9.9 — Return Trip
+## Latest: v5.0.0-beta.9.9.1 — After Hours
+
+A small fixes release: the Injuries panel reads nerve damage and the tail, the server's injuries dialog wins over the `health` text, AutoLog rolls over at midnight, and Cross-Zone Connections loads again.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.9.1** as a delta from beta.9.9.
+
+- **Tail in the Injuries panel** — DragonRealms' injuries dialog never reports the tail, so Genie reads it from the `health` summary. The panel has a Tail cell in both the grid and figure layouts (placeholder sprite for now).
+- **Nerve damage shows in the Injuries panel** — the ten current `health` phrases ("some minor twitching", "slight numbness in your arms and legs", "difficulty controlling actions", …) are now read; a line with several keeps the worst.
+- **The injuries dialog wins over `health`** — the two used to overwrite each other. `health` can now only clear a region the dialog no longer names, refine wound versus scar, or fill a region the dialog never reported.
+- **AutoLog rolls over at midnight** — a session left open past local midnight now switches to the new day's log file instead of appending to the old one.
+- **Cross-Zone Connections loads again** — the starter file contained an invalid XML comment. Thanks @digitalnyc1.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.9.1)
+
+## v5.0.0-beta.9.9 — Return Trip
 
 A mapper release: portals that return you to where you entered route correctly, the map editor can add and connect rooms by hand, and a batch of fixes stops the mapper losing links and mixing up identical rooms.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.9** as a delta from beta.9.8.
 
 - **Return portals** — a Cross-Zone Connection can be marked as a return portal, for a portal like Fang Cove's EXIT portal that takes you back to wherever you entered (the Crossing, Shard, …). Genie remembers the room you stepped through a portal from when you enter a zone, and `#goto` only plans the return portal when that origin is known; arriving by boat or on foot forgets it. `#mapper portal` shows what is remembered and `#mapper portal clear` forgets it. The origin is not kept across a restart.
 - **Add Room Here and Link to…** — in the map editor's edit mode, right-click empty space to drop a room by hand, then right-click a room, choose **Link to…** and click the room it leads to. A dialog takes the command (`west`, `go oak door`, `climb wall`) and can add the way back. Together they let you add a room you cannot walk to and connect it; **Save** keeps it.
