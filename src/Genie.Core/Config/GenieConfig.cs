@@ -861,6 +861,7 @@ public sealed class GenieConfig
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["fe"] = "frontend",
+            ["rubypath"] = "lichruby",
         };
 
     /// <summary>
@@ -1075,7 +1076,10 @@ public sealed class GenieConfig
                     break;
                 case "connectscript": ConnectScript = value; break;
                 case "lichautolaunch": LichAutoLaunch = ToBool(value); break;
-                case "lichruby": LichRubyPath = value.Trim(); break;
+                case "rubypath":
+                case "lichruby":
+                    LichRubyPath = value.Trim();
+                    break;
                 case "lichpath": LichPath = value.Trim(); break;
                 case "lichargs": LichArguments = value.Trim(); break;
                 case "lichstartpause": LichStartPause = Math.Clamp((int)UtilityCore.StringToDouble(value), 1, 120); break;
