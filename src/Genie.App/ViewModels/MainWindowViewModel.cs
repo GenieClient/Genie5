@@ -455,6 +455,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit>                    HandsBarToBottomCommand  { get; }
     /// <summary>Window → Enhanced Hands Strip. Toggles the dylb0t-derived icon widgets (compass / body / status icons) into / out of the strip.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleEnhancedHandsStripCommand { get; }
+    public ReactiveCommand<Unit, Unit>                    ToggleRestedExpBarCommand { get; }
     /// <summary>Window → Roundtime Position → Command Bar. Keeps the "⏱ N.Ns" badge inline with the input row.</summary>
     public ReactiveCommand<Unit, Unit>                    RoundTimeToCommandBarCommand { get; }
     /// <summary>Window → Roundtime Position → Hands Strip. Moves the RT badge onto the L/R/S row.</summary>
@@ -2079,6 +2080,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleEnhancedHandsStripCommand = ReactiveCommand.Create(() =>
         {
             Display.UseEnhancedHandsStrip = !Display.UseEnhancedHandsStrip;
+            Display.Save(_displayPath);
+        });
+
+        ToggleRestedExpBarCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ShowRestedExpBar = !Display.ShowRestedExpBar;
             Display.Save(_displayPath);
         });
 

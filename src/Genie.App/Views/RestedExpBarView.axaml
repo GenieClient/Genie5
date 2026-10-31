@@ -1,0 +1,32 @@
+<!-- Rested-EXP gauge for the right end of the hands strip. Declared once here and
+     hosted in both the top and bottom strip, like StatusBarView. The fill is
+     SPENDABLE time (min of banked / this cycle's allowance) over the cap, coloured
+     green / yellow / red by Vitals.ApplyRestedExp. Hidden until the first
+     `exp rexp` line arrives or when the user turns it off. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Genie.App.ViewModels"
+             x:Class="Genie.App.Views.RestedExpBarView"
+             x:DataType="vm:MainWindowViewModel">
+  <Border MinWidth="100" Width="110" VerticalAlignment="Center"
+          BorderBrush="#444" BorderThickness="1" CornerRadius="3"
+          ToolTip.Tip="{Binding Vitals.RestedTip}">
+    <Border.IsVisible>
+      <MultiBinding Converter="{x:Static BoolConverters.And}">
+        <Binding Path="Vitals.HasRestedExp"/>
+        <Binding Path="Display.ShowRestedExpBar"/>
+      </MultiBinding>
+    </Border.IsVisible>
+    <Grid>
+      <ProgressBar Value="{Binding Vitals.RestedFill}" Maximum="100"
+                   AutomationProperties.Name="Rested experience, spendable time"
+                   Foreground="{Binding Vitals.RestedBarBrush}"
+                   Background="{Binding Vitals.RestedTrackBrush}"
+                   Height="14" CornerRadius="2"/>
+      <TextBlock Text="{Binding Vitals.RestedLabel}"
+                 AutomationProperties.LiveSetting="Off"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                 FontSize="10" Foreground="#fff" FontWeight="SemiBold"/>
+    </Grid>
+  </Border>
+</UserControl>
