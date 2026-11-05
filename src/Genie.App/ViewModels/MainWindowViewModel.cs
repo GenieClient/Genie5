@@ -2654,7 +2654,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     try
                     {
                         var src = UpdatesDialogViewModel.MakeScriptsSource(feed);
-                        var u = new Genie.Core.Update.Updaters.ScriptsUpdater(scriptsDir, new[] { src });
+                        var u = new Genie.Core.Update.Updaters.ScriptsUpdater(scriptsDir, new[] { src }, feed.IgnoredFiles);
                         if (!(await u.CheckAsync()).UpdateAvailable) continue;
                         if (cfg.ScriptsPolicy.AutoApply && (await u.ApplyAsync()).Succeeded)
                             applied.Add("Scripts");

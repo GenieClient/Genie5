@@ -14,7 +14,7 @@
          narrow on purpose — wide enough to read, narrow enough that 5+ rows
          fit without scrolling on a typical window. -->
     <DataTemplate x:Key="FeedRowTemplate" x:DataType="vm:UpdateFeedRow">
-      <Grid ColumnDefinitions="Auto,2*,3*,Auto,Auto,Auto" Margin="0,3" VerticalAlignment="Center">
+      <Grid ColumnDefinitions="Auto,2*,3*,Auto,Auto,Auto,Auto" Margin="0,3" VerticalAlignment="Center">
         <CheckBox  Grid.Column="0"
                    IsChecked="{Binding Enabled}"
                    Margin="2,0,10,0"
@@ -46,13 +46,19 @@
                        Height="4"/>
         </StackPanel>
 
-        <Button    Grid.Column="3" Content="Check"
+        <!-- Scripts rows only: choose which files to update / ignore. -->
+        <Button    Grid.Column="3" Content="Files…"
+                   Command="{Binding FilesCommand}"
+                   IsVisible="{Binding HasFileChooser}"
+                   MinWidth="60" Margin="2,0"
+                   ToolTip.Tip="Choose which files to update and which to ignore."/>
+        <Button    Grid.Column="4" Content="Check"
                    Command="{Binding CheckCommand}"
                    MinWidth="60" Margin="2,0"/>
-        <Button    Grid.Column="4" Content="Update"
+        <Button    Grid.Column="5" Content="Update"
                    Command="{Binding UpdateCommand}"
                    MinWidth="64" Margin="2,0"/>
-        <Button    Grid.Column="5" Content="✕"
+        <Button    Grid.Column="6" Content="✕"
                    Command="{Binding RemoveCommand}"
                    Width="28"  Margin="6,0,0,0"
                    AutomationProperties.Name="Remove source"

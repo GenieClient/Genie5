@@ -26,6 +26,7 @@ public sealed class ScriptsUpdater : IUpdater
 {
     private readonly string            _scriptsDir;
     private readonly IFileListSource[] _sources;
+    private readonly HashSet<string>   _ignored;
 
     public string Name           => "Scripts";
     public string CurrentVersion => DescribeInstalled();
@@ -33,24 +34,28 @@ public sealed class ScriptsUpdater : IUpdater
     /// <summary>
     /// Construct a Scripts updater that pulls from every supplied source in
     /// turn. Empty source list is valid and means "nothing to check / apply".
+    /// <paramref name="ignoredFiles"/> are source-relative names that Check and
+    /// Apply skip entirely (the per-file "never update this" list).
     /// </summary>
-    public ScriptsUpdater(string scriptsDir, IEnumerable<IFileListSource> sources)
+    public ScriptsUpdater(string scriptsDir, IEnumerable<IFileListSource> sources,
+                          IEnumerable<string>? ignoredFiles = null)
     {
         _scriptsDir = scriptsDir;
         _sources    = sources?.ToArray() ?? Array.Empty<IFileListSource>();
+        _ignored    = new HashSet<string>(ignoredFiles ?? Array.Empty<string>(),
+                                          StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
-    /// Count how many remote files are new or differ from local. Cheap — the
-    /// blob-sha comparison means no file bytes are downloaded, same as
-    /// <see cref="MapsUpdater.CheckAsync"/>.
+    /// Every remote file that is new or differs from local, INCLUDING ignored
+    /// ones (flagged) so the file chooser can show and un-ignore them. Cheap —
+    /// blob-sha comparison, no file bytes downloaded.
     /// </summary>
-    public async Task<UpdateCheckResult> CheckAsync(CancellationToken ct = default)
+    public async Task<(IReadOnlyList<ScriptFileChange> Files, IReadOnlyList<string> Errors)>
+        ListChangesAsync(CancellationToken ct = default)
     {
-        int newCount     = 0;
-        int changedCount = 0;
-        var notesLines   = new List<string>();
-        var changes      = new List<UpdateChange>();
+        var files  = new List<ScriptFileChange>();
+        var errors = new List<string>();
 
         foreach (var source in _sources)
         {
@@ -62,7 +67,7 @@ public sealed class ScriptsUpdater : IUpdater
             }
             catch (Exception ex)
             {
-                notesLines.Add($"{source.Description}: {ex.Message}");
+                errors.Add($"{source.Description}: {ex.Message}");
                 continue;
             }
 
@@ -71,21 +76,40 @@ public sealed class ScriptsUpdater : IUpdater
                 if (!TryResolveLocalPath(entry.Name, out var localPath))
                     continue; // hostile / malformed path — Apply reports it, Check just skips
 
+                bool ignored = _ignored.Contains(entry.Name);
+
                 if (!File.Exists(localPath))
                 {
-                    newCount++;
-                    changes.Add(new UpdateChange(entry.Name, IsNew: true));
+                    files.Add(new ScriptFileChange(entry.Name, IsNew: true, ignored));
                     continue;
                 }
 
                 if (!string.IsNullOrEmpty(entry.Sha) &&
                     GithubContentsSource.GitBlobSha1(localPath) != entry.Sha)
                 {
-                    changedCount++;
-                    changes.Add(new UpdateChange(entry.Name, IsNew: false));
+                    files.Add(new ScriptFileChange(entry.Name, IsNew: false, ignored));
                 }
             }
         }
+
+        return (files, errors);
+    }
+
+    /// <summary>
+    /// Count how many remote files are new or differ from local (ignored files
+    /// excluded). Cheap — the blob-sha comparison means no file bytes are
+    /// downloaded, same as <see cref="MapsUpdater.CheckAsync"/>.
+    /// </summary>
+    public async Task<UpdateCheckResult> CheckAsync(CancellationToken ct = default)
+    {
+        var (all, errors) = await ListChangesAsync(ct);
+        var notesLines    = errors.ToList();
+        var live          = all.Where(f => !f.Ignored).ToList();
+        int newCount      = live.Count(f =>  f.IsNew);
+        int changedCount  = live.Count(f => !f.IsNew);
+        var changes       = live.Select(f => new UpdateChange(f.Name, f.IsNew)).ToList();
+        int skipped       = all.Count - live.Count;
+        if (skipped > 0) notesLines.Add($"{skipped} ignored file(s) skipped.");
 
         int total = newCount + changedCount;
         var summary = total switch
@@ -108,11 +132,26 @@ public sealed class ScriptsUpdater : IUpdater
     /// a fresh pull near-instant). Per-file failures are collected rather
     /// than fatal so one bad file doesn't abort the whole pull.
     /// </summary>
-    public async Task<UpdateApplyResult> ApplyAsync(
+    public Task<UpdateApplyResult> ApplyAsync(
         IProgress<UpdateProgress>? progress = null,
         CancellationToken          ct       = default)
+        => ApplySelectedAsync(null, progress, ct);
+
+    /// <summary>
+    /// Like <see cref="ApplyAsync"/> but limited to <paramref name="only"/>
+    /// (source-relative names) when non-null — the file chooser's "Update
+    /// Selected". Ignored files are never written, even if named in
+    /// <paramref name="only"/>.
+    /// </summary>
+    public async Task<UpdateApplyResult> ApplySelectedAsync(
+        IReadOnlyCollection<string>? only,
+        IProgress<UpdateProgress>?   progress = null,
+        CancellationToken            ct       = default)
     {
         Directory.CreateDirectory(_scriptsDir);
+        var onlySet = only is null
+            ? null
+            : new HashSet<string>(only, StringComparer.OrdinalIgnoreCase);
 
         progress?.Report(new UpdateProgress(0, 0, "Listing", "fetching file list…", Indeterminate: true));
         var workItems = new List<(IFileListSource Source, FileEntry Entry)>();
@@ -124,7 +163,10 @@ public sealed class ScriptsUpdater : IUpdater
             try
             {
                 var listing = await source.GetFileListAsync(ct);
-                workItems.AddRange(listing.Files.Select(f => (source, f)));
+                workItems.AddRange(listing.Files
+                    .Where(f => !_ignored.Contains(f.Name) &&
+                                (onlySet is null || onlySet.Contains(f.Name)))
+                    .Select(f => (source, f)));
             }
             catch (Exception ex)
             {

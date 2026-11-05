@@ -63,6 +63,9 @@ public sealed record UpdateCheckResult(
 /// <summary>One file a check found out of date — new locally, or changed upstream.</summary>
 public sealed record UpdateChange(string Name, bool IsNew);
 
+/// <summary>One script file that differs from local, with whether the user ignores it.</summary>
+public sealed record ScriptFileChange(string Name, bool IsNew, bool Ignored);
+
 /// <summary>Result of an apply pass.</summary>
 /// <param name="Succeeded">True if the apply completed without any per-item failures.</param>
 /// <param name="Summary">One-line human-readable summary (e.g. "Updated 42 zones (3 new, 39 merged)").</param>

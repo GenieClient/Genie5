@@ -67,18 +67,27 @@ public sealed class UpdateFeedRow : ReactiveObject
     public ReactiveCommand<Unit, Unit> UpdateCommand { get; }
     public ReactiveCommand<Unit, Unit> RemoveCommand { get; }
 
+    /// <summary>"Files…" — pick which files to update / ignore. Only Scripts
+    /// rows supply a chooser; the button is hidden otherwise.</summary>
+    public ReactiveCommand<Unit, Unit> FilesCommand  { get; }
+    public bool                        HasFileChooser => _chooseFiles is not null;
+
+    private readonly Func<FeedEntry, IProgress<UpdateProgress>?, Task<string>>? _chooseFiles;
+
     public UpdateFeedRow(
         FeedEntry                                                                feed,
         Func<FeedEntry, CancellationToken, Task<(string Status, string? Details)>> check,
         Func<FeedEntry, IProgress<UpdateProgress>?, CancellationToken, Task<string>> apply,
         Action<FeedEntry, bool>                                                  toggle,
-        Action<FeedEntry>                                                        remove)
+        Action<FeedEntry>                                                        remove,
+        Func<FeedEntry, IProgress<UpdateProgress>?, Task<string>>?               chooseFiles = null)
     {
         _feed    = feed;
         _check   = check;
         _apply   = apply;
         _toggle  = toggle;
         _remove  = remove;
+        _chooseFiles = chooseFiles;
         Enabled  = feed.Enabled;
 
         // Toggle-on-change: persist whenever the checkbox flips. Skip the
@@ -92,6 +101,41 @@ public sealed class UpdateFeedRow : ReactiveObject
         CheckCommand  = ReactiveCommand.CreateFromTask(RunCheck,  notBusy);
         UpdateCommand = ReactiveCommand.CreateFromTask(RunUpdate, notBusy);
         RemoveCommand = ReactiveCommand.Create(() => _remove(_feed), notBusy);
+        FilesCommand  = ReactiveCommand.CreateFromTask(RunChooseFiles, notBusy);
+    }
+
+    /// <summary>Open the file chooser; if the user hits "Update Selected" the
+    /// chooser applies just those files and we show its progress like a
+    /// normal Update.</summary>
+    private async Task RunChooseFiles()
+    {
+        if (_chooseFiles is null) return;
+        IsBusy         = true;
+        ProgressActive = true;
+        ProgressIndeterminate = true;
+        try
+        {
+            Status        = "Loading file list…";
+            StatusDetails = null;
+            var progress = new Progress<UpdateProgress>(p =>
+                Dispatcher.UIThread.Post(() =>
+                {
+                    ProgressIndeterminate = p.Indeterminate || p.Total <= 0;
+                    Progress              = p.Total > 0
+                        ? Math.Clamp(p.Current * 100.0 / p.Total, 0, 100)
+                        : 0;
+                    Status = p.Indeterminate || p.Total <= 1
+                        ? $"{p.Item} — {p.Status}"
+                        : $"[{p.Current}/{p.Total}] {p.Item} — {p.Status}";
+                }));
+            Status = await _chooseFiles(_feed, progress);
+        }
+        catch (Exception ex) { Status = $"Error: {ex.Message}"; }
+        finally
+        {
+            IsBusy         = false;
+            ProgressActive = false;
+        }
     }
 
     private async Task RunCheck()

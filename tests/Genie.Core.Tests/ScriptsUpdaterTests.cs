@@ -156,4 +156,35 @@ public class ScriptsUpdaterTests : IDisposable
         Assert.Empty(GithubTreeSource.ParseExtensions(null));
         Assert.Empty(GithubTreeSource.ParseExtensions("  "));
     }
+
+    [Fact]
+    public async Task Ignored_files_are_skipped_by_check_and_apply_but_listed_flagged()
+    {
+        var source  = new FakeSource(("a.cmd", "a"), ("sub/b.cmd", "b"));
+        var updater = new ScriptsUpdater(_dir, new[] { source }, new[] { "SUB/B.cmd" });
+
+        var check = await updater.CheckAsync();
+        Assert.Equal(new[] { new UpdateChange("a.cmd", true) }, check.Changes);
+
+        var (all, _) = await updater.ListChangesAsync();
+        Assert.Contains(new ScriptFileChange("sub/b.cmd", true, Ignored: true), all);
+
+        await updater.ApplyAsync();
+        Assert.True(File.Exists(Path.Combine(_dir, "a.cmd")));
+        Assert.False(File.Exists(Path.Combine(_dir, "sub", "b.cmd")));
+    }
+
+    [Fact]
+    public async Task ApplySelected_pulls_only_named_files()
+    {
+        var source  = new FakeSource(("a.cmd", "a"), ("b.cmd", "b"), ("c.cmd", "c"));
+        var updater = new ScriptsUpdater(_dir, new[] { source }, new[] { "c.cmd" });
+
+        // c.cmd is ignored even when explicitly requested.
+        await updater.ApplySelectedAsync(new[] { "b.cmd", "c.cmd" });
+
+        Assert.False(File.Exists(Path.Combine(_dir, "a.cmd")));
+        Assert.True(File.Exists(Path.Combine(_dir, "b.cmd")));
+        Assert.False(File.Exists(Path.Combine(_dir, "c.cmd")));
+    }
 }
