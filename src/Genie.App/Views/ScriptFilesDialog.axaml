@@ -1,0 +1,53 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Genie.App.ViewModels"
+        x:Class="Genie.App.Views.ScriptFilesDialog"
+        x:DataType="vm:ScriptFilesViewModel"
+        Title="Choose script files"
+        Width="620" Height="520"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="14">
+    <TextBlock Grid.Row="0" Text="{Binding Header}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+    <TextBlock Grid.Row="1" Margin="0,4,0,8" FontSize="11" TextWrapping="Wrap"
+               Foreground="{DynamicResource Theme.TextSecondary}"
+               Text="Update: pull this file now. Ignore: never update this file from this source (Check, Update and auto-update all skip it). Leave both unticked to skip it this time only."/>
+
+    <Grid Grid.Row="2" RowDefinitions="Auto,*">
+      <Grid Grid.Row="0" ColumnDefinitions="70,70,*,80" Margin="4,0,4,2">
+        <TextBlock Grid.Column="0" Text="Update" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}"/>
+        <TextBlock Grid.Column="1" Text="Ignore" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}"/>
+        <TextBlock Grid.Column="2" Text="File"   FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}"/>
+        <TextBlock Grid.Column="3" Text="State"  FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}"/>
+      </Grid>
+      <ScrollViewer Grid.Row="1">
+        <ItemsControl ItemsSource="{Binding Rows}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ScriptFileRow">
+              <Grid ColumnDefinitions="70,70,*,80" Margin="4,1">
+                <CheckBox Grid.Column="0" IsChecked="{Binding Update}"
+                          AutomationProperties.Name="Update this file"/>
+                <CheckBox Grid.Column="1" IsChecked="{Binding Ignore}"
+                          AutomationProperties.Name="Ignore this file"/>
+                <TextBlock Grid.Column="2" Text="{Binding Name}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}"/>
+                <TextBlock Grid.Column="3" Text="{Binding Kind}" VerticalAlignment="Center" FontSize="11"
+                           Foreground="{DynamicResource Theme.Success}"/>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Grid>
+
+    <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" Margin="0,12,0,0">
+      <Button Grid.Column="0" Content="Select All"  Click="OnSelectAll"  MinWidth="80"/>
+      <Button Grid.Column="1" Content="Select None" Click="OnSelectNone" MinWidth="90" Margin="6,0,0,0"/>
+      <Button Grid.Column="3" Content="Save Ignores" Click="OnSaveIgnores" MinWidth="100" Margin="0,0,6,0"
+              ToolTip.Tip="Save the ignore list without updating anything."/>
+      <Button Grid.Column="4" Content="Update Selected" Click="OnUpdateSelected" MinWidth="120" Margin="0,0,6,0"
+              ToolTip.Tip="Save the ignore list, then pull the files ticked Update."/>
+      <Button Grid.Column="5" Content="Cancel" Click="OnCancel" MinWidth="80" IsCancel="True"/>
+    </Grid>
+  </Grid>
+</Window>

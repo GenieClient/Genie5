@@ -4,11 +4,38 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` or `v5.0.0-beta.N.M` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.9.9 — Return Trip
+## Latest: v5.0.0-beta.9.10 — Bedside Manner
+
+An Empath release: the Healing window draws the same body as the Injuries window, as four figures or one overlaid figure, with bulk-take options, partial takes and patient link messages.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.10** as a delta from beta.9.9.1.
+
+- **Body figures in the Healing window** — **Four figures** (fresh outside, fresh inside, scar outside, scar inside) or **Overlay** (every wound on one body: outside wounds on a part's edge, inside wounds in its centre, scars striped). In Overlay, clicking a part lists its wounds with a **Take** button for each. See [the Healing window](The-Interface#the-healing-window).
+- **Bulk-take options** — **Take Minor**, plus **Include internal**, **Include scars**, **Half on major** and **Leave bleeders** for Take All and Take Minor.
+- **Partial takes** — pick **all**, **most**, **half** or **some** before clicking a part.
+- **Patient link messages** — when a game line matches one of your patterns (the empathic-link line by default), that patient becomes the target. Nothing is sent.
+- **Poison and disease** — gangrene and oozing sores count as disease, and more than one poison shows as "Poisoned ×2".
+- **Rested EXP bar** — a green / yellow / red gauge at the right end of the Hands Strip showing how much 3x learning time you can still spend: green = on, yellow = under an hour, red = none (empty bank, or this cycle's allowance used up). Hover it for a plain-language breakdown; turn it on under **Window → Rested EXP Bar** (off by default). **Known limits:** the bar's full mark is fixed at 6 hours (the Premium bank), so Standard (4 h) and Platinum (8 h) accounts will see it sit low or fill early, and Death's Sting is not detected yet. Account-type detection and a manual account-type setting are planned.
+- **AutoLog with two copies of Genie open** — a second copy logging the same character writes to a numbered file (`…_2.log`) instead of stopping logging ([#380](https://github.com/GenieClient/Genie5/issues/380)).
+- **`#mapper reset` reloads the zone even with Record on**, as long as nothing is unsaved. A script that switches Record on at launch (uber.cmd does) used to block every reload for the whole session, so a map that went stale after a ferry or a portal never recovered and travel scripts looped for hours. The reload is refused only when Record has added rooms or links you have not saved.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.10)
+
+## v5.0.0-beta.9.9.1 — After Hours
+
+A small fixes release: the Injuries panel reads nerve damage and the tail, the server's injuries dialog wins over the `health` text, AutoLog rolls over at midnight, and Cross-Zone Connections loads again.
+
+- **Tail in the Injuries panel** — DragonRealms' injuries dialog never reports the tail, so Genie reads it from the `health` summary. The panel has a Tail cell in both the grid and figure layouts (placeholder sprite for now).
+- **Nerve damage shows in the Injuries panel** — the ten current `health` phrases ("some minor twitching", "slight numbness in your arms and legs", "difficulty controlling actions", …) are now read; a line with several keeps the worst.
+- **The injuries dialog wins over `health`** — the two used to overwrite each other. `health` can now only clear a region the dialog no longer names, refine wound versus scar, or fill a region the dialog never reported.
+- **AutoLog rolls over at midnight** — a session left open past local midnight now switches to the new day's log file instead of appending to the old one.
+- **Cross-Zone Connections loads again** — the starter file contained an invalid XML comment. Thanks @digitalnyc1.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.9.1)
+
+## v5.0.0-beta.9.9 — Return Trip
 
 A mapper release: portals that return you to where you entered route correctly, the map editor can add and connect rooms by hand, and a batch of fixes stops the mapper losing links and mixing up identical rooms.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.9** as a delta from beta.9.8.
 
 - **Return portals** — a Cross-Zone Connection can be marked as a return portal, for a portal like Fang Cove's EXIT portal that takes you back to wherever you entered (the Crossing, Shard, …). Genie remembers the room you stepped through a portal from when you enter a zone, and `#goto` only plans the return portal when that origin is known; arriving by boat or on foot forgets it. `#mapper portal` shows what is remembered and `#mapper portal clear` forgets it. The origin is not kept across a restart.
 - **Add Room Here and Link to…** — in the map editor's edit mode, right-click empty space to drop a room by hand, then right-click a room, choose **Link to…** and click the room it leads to. A dialog takes the command (`west`, `go oak door`, `climb wall`) and can add the way back. Together they let you add a room you cannot walk to and connect it; **Save** keeps it.

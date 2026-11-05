@@ -22,6 +22,7 @@ public sealed class ZoneConnectionsDialogHeadlessTests
         Directory.CreateDirectory(dir);
         try
         {
+            File.WriteAllText(Path.Combine(dir, "ZoneConnections.xml"), "<connections/>");
             var z = new MapZone { Name = "Map1_Crossing" };
             z.Nodes[50] = new MapNode { Id = 50, Title = "The Strand, Sandy Path" };
             new MapZoneRepository().Save(Path.Combine(dir, "Map1_Crossing.xml"), z);
@@ -103,6 +104,7 @@ public sealed class ZoneConnectionsDialogHeadlessTests
         Directory.CreateDirectory(dir);
         try
         {
+            File.WriteAllText(Path.Combine(dir, "ZoneConnections.xml"), "<connections/>");
             var vm = new ZoneConnectionsViewModel(
                 new ZoneConnectionsRepository(Path.Combine(dir, "ZoneConnections.xml")), dir);
             vm.AddCommand.Execute().Subscribe();

@@ -1,3 +1,89 @@
+# Genie 5 — v5.0.0-beta.9.10
+
+**"Bedside Manner"** — an Empath release. The Healing window now draws the same body as the
+Injuries window, as four figures or one overlaid figure, and gains bulk-take options,
+partial takes and patient link messages.
+
+## ✨ New
+- **Body figures in the Healing window** — choose **Four figures** (fresh outside,
+  fresh inside, scar outside, scar inside) or **Overlay** (every wound on one body:
+  outside wounds on a part's edge, inside wounds in its centre, scars striped). Colour
+  deepens as a wound gets worse on DragonRealms' 13-step scale. In Overlay, clicking a
+  part lists its wounds with a **Take** button for each.
+- **Bulk-take options** — **Take Minor**, plus **Include internal**, **Include scars**,
+  **Half on major** and **Leave bleeders** for Take All and Take Minor.
+- **Partial takes** — pick **all**, **most**, **half** or **some** before clicking a part.
+- **Patient link messages** — when a game line matches one of your patterns (the
+  empathic-link line by default), that patient becomes the target. Nothing is sent.
+- **Poison and disease** — gangrene and oozing sores now count as disease, and more
+  than one poison shows as "Poisoned ×2".
+- **Rested EXP bar** — a green / yellow / red gauge at the right end of the Hands
+  Strip showing how much 3x learning time you can still spend. Green: bonus learning is
+  on. Yellow: under an hour left. Red: none (an empty bank, or this cycle's allowance is
+  used up). The bar follows whichever of *banked* and *usable this cycle* runs out first,
+  and hovering it explains all three numbers in plain words. Toggle it under
+  **Window → Rested EXP Bar** (off by default). Once on, it appears when the game sends
+  a rested-EXP line, so accounts without rested EXP never see it.
+
+### ⚠️ Rested EXP bar — known limits
+The bar's full-scale mark is fixed at **6 hours**, the Premium bank size, because Genie
+doesn't yet know your account type. Until that is added:
+- **Standard accounts** (4-hour bank) will see the bar sit lower than it should; the
+  colours and the hover text still read correctly.
+- **Platinum instance** (8-hour bank) will fill the bar at 6 hours.
+- **Death's Sting** (rested EXP disabled after an unassisted depart) is not detected
+  yet, so the bar may stay green while the bonus is off.
+
+What would make the bar fully trustworthy: reading the account tier at login (the game
+login already reports whether the account is Premium; `ltb info` also reports it),
+detecting the Platinum instance from the session's game code, and a setting to pick the
+account type by hand for anyone Genie can't detect.
+
+## 🐛 Fixes
+- **AutoLog with two copies of Genie open** — a second copy logging the same character
+  now writes to a numbered file (`…_2.log`) instead of stopping logging
+  ([#380](https://github.com/GenieClient/Genie5/issues/380)).
+- **`#mapper reset` reloads the zone even with Record on** — as long as nothing is
+  unsaved. A script that switches Record on at launch (uber.cmd does) used to block
+  every reload for the whole session, so a map that went stale after a ferry or a
+  portal never recovered and travel scripts looped for hours. The reload is refused
+  only when Record has added rooms or links you have not saved; the Save button's
+  "unsaved" state now also tracks what Record adds, and a reload clears it.
+
+---
+
+# Genie 5 — v5.0.0-beta.9.9.1
+
+**"After Hours"** — a small fixes release. The Injuries panel reads nerve damage and
+tail wounds from `health`, the DragonRealms injuries dialog now wins over the health
+text when they disagree, a session left open past midnight rolls to the next day's
+log, and Cross-Zone Connections loads again.
+
+## ✨ New
+- **Tail in the Injuries panel** — DragonRealms' injuries dialog never reports the
+  tail, so Genie reads it from the `health` summary. The panel has a Tail cell in both
+  the grid and figure layouts (the sprite is a placeholder for now).
+
+## 🐛 Fixes
+- **Nerve damage shows in the Injuries panel** — the `health` summary words it as "some
+  minor twitching", "slight numbness in your arms and legs", "difficulty controlling
+  actions" and so on; Genie only recognised six older phrases, so none matched. The ten
+  current phrases are now read, and a line with several keeps the worst.
+- **The server's injuries dialog wins over the `health` text** — the two used to
+  overwrite each other, last one in. The dialog's reading now stays; `health` can only
+  clear a region it no longer names (the stale-after-death case), refine wound versus
+  scar, or fill a region the dialog never reported. If the injuries dialog sends a
+  region the panel has no cell for, **Report XML Gap** offers a redacted issue draft.
+- **AutoLog rolls over at midnight** — a session left open past local midnight kept
+  writing to the previous day's log file. It now switches to the new day's file on the
+  next line. (A report of a log that stayed empty after a reconnect is still being
+  looked into — [#380](https://github.com/GenieClient/Genie5/issues/380).)
+- **Cross-Zone Connections loads again** — the starter file shipped with a comment that
+  is not valid XML, so the editor came up empty. Thanks @digitalnyc1
+  ([#381](https://github.com/GenieClient/Genie5/pull/381)).
+
+---
+
 # Genie 5 — v5.0.0-beta.9.9
 
 **"Return Trip"** — a mapper release. Portals that take you back to wherever you

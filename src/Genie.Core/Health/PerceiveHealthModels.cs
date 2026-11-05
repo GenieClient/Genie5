@@ -138,6 +138,11 @@ public sealed class PatientHealth
     /// <summary>True when the block reported poison.</summary>
     public bool IsPoisoned { get; init; }
 
+    /// <summary>How many lines of the block mentioned poison — a rough
+    /// measure of how many poisons are active, since DR words each one on its
+    /// own line.</summary>
+    public int PoisonLines { get; init; }
+
     /// <summary>True when the block reported disease or infection.</summary>
     public bool IsDiseased { get; init; }
 

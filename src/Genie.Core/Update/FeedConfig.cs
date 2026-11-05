@@ -127,6 +127,14 @@ public sealed class FeedEntry
     public bool             Enabled     { get; set; } = true;
     public DateTimeOffset?  LastChecked { get; set; }
 
+    /// <summary>
+    /// Source-relative file names (forward-slash, e.g. <c>"GenieHunter/hunt.cmd"</c>)
+    /// the user chose to never update from this source (Scripts tab ▸ Files…).
+    /// Ignored files are skipped by Check, Update, and the startup auto-apply,
+    /// so a locally customised script is never overwritten. Compared
+    /// case-insensitively.</summary>
+    public List<string> IgnoredFiles { get; set; } = new();
+
     /// <summary>The default GenieClient/Maps repo (XML-files-in-root, .xml-filtered).</summary>
     public static FeedEntry OfficialMaps() => new()
     {

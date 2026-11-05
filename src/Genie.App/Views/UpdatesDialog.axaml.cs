@@ -23,6 +23,8 @@ public partial class UpdatesDialog : ReactiveWindow<UpdatesDialogViewModel>
                 var entry = await AddSourceDialog.ShowAsync(this, ctx.Input);
                 ctx.SetOutput(entry);
             }));
+            d(ViewModel!.ShowScriptFilesDialog.RegisterHandler(async ctx =>
+                ctx.SetOutput(await ScriptFilesDialog.ShowAsync(this, ctx.Input))));
         });
     }
 

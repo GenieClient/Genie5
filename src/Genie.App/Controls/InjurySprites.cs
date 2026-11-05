@@ -67,7 +67,7 @@ internal static class InjurySprites
         _                                   => Damage,
     };
 
-    private static Bitmap? GetBase(string regionId)
+    internal static Bitmap? GetBase(string regionId)
     {
         if (BaseCache.TryGetValue(regionId, out var cached)) return cached;
         Bitmap? bmp = null;

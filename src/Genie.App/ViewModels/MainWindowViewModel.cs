@@ -455,6 +455,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit>                    HandsBarToBottomCommand  { get; }
     /// <summary>Window → Enhanced Hands Strip. Toggles the dylb0t-derived icon widgets (compass / body / status icons) into / out of the strip.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleEnhancedHandsStripCommand { get; }
+    public ReactiveCommand<Unit, Unit>                    ToggleRestedExpBarCommand { get; }
     /// <summary>Window → Roundtime Position → Command Bar. Keeps the "⏱ N.Ns" badge inline with the input row.</summary>
     public ReactiveCommand<Unit, Unit>                    RoundTimeToCommandBarCommand { get; }
     /// <summary>Window → Roundtime Position → Hands Strip. Moves the RT badge onto the L/R/S row.</summary>
@@ -1005,6 +1006,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         GameText.AddSystemLine("[autolog] session logging on → Logs folder. Turn off with File ▸ Auto Log or #config autolog false.");
         if (!AutoLogger.Start(GameText, characterName, gameName))
             GameText.AddSystemLine($"[autolog] could not open the session log ({AutoLogger.LastError}) — logging is off for this session.");
+        else if (AutoLogger.UsingFallbackFile)
+            GameText.AddSystemLine($"[autolog] today's log is in use by another Genie window — logging to {Path.GetFileName(AutoLogger.CurrentFile)} instead.");
     }
 
     /// <summary>
@@ -2080,6 +2083,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Display.Save(_displayPath);
         });
 
+        ToggleRestedExpBarCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ShowRestedExpBar = !Display.ShowRestedExpBar;
+            Display.Save(_displayPath);
+        });
+
         RoundTimeToCommandBarCommand = ReactiveCommand.Create(() =>
         {
             Display.RoundTimeOnHandsStrip = false;
@@ -2645,7 +2654,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     try
                     {
                         var src = UpdatesDialogViewModel.MakeScriptsSource(feed);
-                        var u = new Genie.Core.Update.Updaters.ScriptsUpdater(scriptsDir, new[] { src });
+                        var u = new Genie.Core.Update.Updaters.ScriptsUpdater(scriptsDir, new[] { src }, feed.IgnoredFiles);
                         if (!(await u.CheckAsync()).UpdateAvailable) continue;
                         if (cfg.ScriptsPolicy.AutoApply && (await u.ApplyAsync()).Succeeded)
                             applied.Add("Scripts");
@@ -6785,13 +6794,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 break;
 
             // Second half of `#mapper reset` (Core already re-resolved the room).
-            // Reload the zone from disk so arcs lost in memory come back — but
-            // never while recording, where the in-memory map holds unsaved work.
+            // Reload the zone from disk so arcs lost in memory come back — unless
+            // Record mode holds unsaved work in memory (MapperViewModel decides).
             case "reset":
-                if (!_core!.Config.AutoMapper)
-                    Mapper.ReloadActiveZone();
-                else
-                    Echo("[mapper] Record mode is on — zone not reloaded (unsaved rooms kept). #mapper save, then #mapper load to reload from disk.");
+                if (Mapper.ReloadForReset() is { } resetMsg) Echo(resetMsg);
                 break;
 
             case "clear":

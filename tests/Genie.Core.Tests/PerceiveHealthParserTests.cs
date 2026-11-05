@@ -295,6 +295,24 @@ public class PerceiveHealthParserTests
         Assert.True(chart.IsDiseased);
     }
 
+    [Theory]
+    [InlineData("A patch of gangrene festers on the skin.")]
+    [InlineData("Open oozing sores cover the skin.")]
+    [InlineData("A dormant infection lingers.")]
+    public void Other_disease_wordings_are_recorded(string line)
+        => Assert.True(Run(SelfBlock("Wounds to the HEAD:", "  Fresh External:  -- minor", line)).IsDiseased);
+
+    [Fact]
+    public void Each_poison_line_is_counted()
+    {
+        var chart = Run(SelfBlock(
+            "Wounds to the HEAD:",
+            "  Fresh External:  -- minor",
+            "You have a nerve poison coursing through you.",
+            "You have a Cyanide poison!"));
+        Assert.Equal(2, chart.PoisonLines);
+    }
+
     /// <summary>Vitality is derived as 100 - N per #277. The raw number is kept
     /// alongside it precisely because that inversion is the one part of the
     /// grammar no capture has confirmed yet.</summary>

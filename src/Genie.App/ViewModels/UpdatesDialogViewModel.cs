@@ -133,6 +133,9 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
     /// </summary>
     public Interaction<AddSourceKind, FeedEntry?>            ShowAddSourceDialog       { get; } = new();
 
+    /// <summary>Code-behind shows the per-file chooser for a Scripts row; null result = cancelled.</summary>
+    public Interaction<ScriptFilesRequest, ScriptFilesResult?> ShowScriptFilesDialog   { get; } = new();
+
     /// <summary>Designer ctor.</summary>
     public UpdatesDialogViewModel() : this(
         new FeedConfigStore(Path.GetTempPath()),
@@ -288,7 +291,51 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
             check:  (f, ct)         => CheckOneAsync(f,  Kind.Scripts, ct),
             apply:  (f, prog, ct)   => ApplyOneAsync(f,  Kind.Scripts, prog, ct),
             toggle: (f, on)         => ToggleFeed(f, on),
-            remove: f               => RemoveFeed(f, Kind.Scripts));
+            remove: f               => RemoveFeed(f, Kind.Scripts),
+            chooseFiles: ChooseScriptFilesAsync);
+
+    /// <summary>
+    /// "Files…" flow for a Scripts row: list what differs (ignored files
+    /// included, flagged), let the user tick which to update and which to
+    /// ignore permanently, persist the ignore list, then pull only the ticked
+    /// files. Returns the row's new status line.
+    /// </summary>
+    private async Task<string> ChooseScriptFilesAsync(FeedEntry feed, IProgress<UpdateProgress>? progress)
+    {
+        try
+        {
+            var lister = (ScriptsUpdater)BuildUpdater(feed, Kind.Scripts);
+            var (files, errors) = await lister.ListChangesAsync();
+            if (files.Count == 0 && feed.IgnoredFiles.Count == 0)
+                return errors.Count > 0 ? $"Check failed: {errors[0]}" : "Up to date — no files to choose.";
+
+            var result = await ShowScriptFilesDialog.Handle(new ScriptFilesRequest(feed.Name, files));
+            if (result is null) return "File selection cancelled.";
+
+            // Keep ignores for files not in the listing (currently identical
+            // upstream) so they stay ignored if upstream changes them later.
+            var listed = files.Select(f => f.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            feed.IgnoredFiles = feed.IgnoredFiles.Where(n => !listed.Contains(n))
+                                    .Concat(result.Ignored)
+                                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                                    .ToList();
+            _store.Save(_config);
+
+            if (result.UpdateNow.Count == 0)
+                return $"Ignore list saved ({feed.IgnoredFiles.Count} file(s) ignored).";
+
+            // Fresh updater so the ctor picks up the just-saved ignore list.
+            var u = (ScriptsUpdater)BuildUpdater(feed, Kind.Scripts);
+            var r = await u.ApplySelectedAsync(result.UpdateNow, progress);
+            feed.LastChecked = DateTimeOffset.UtcNow;
+            _store.Save(_config);
+            return $"{r.Summary} {feed.IgnoredFiles.Count} file(s) ignored.";
+        }
+        catch (Exception ex)
+        {
+            return $"Update failed: {ex.Message}";
+        }
+    }
 
     // ── Per-feed Check / Apply (dispatched by Kind) ────────────────────────
 
@@ -392,7 +439,8 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
             // the whole repo (subfolders included) in one API call.
             return new ScriptsUpdater(
                 _scriptsDir,
-                new[] { MakeScriptsSource(feed) });
+                new[] { MakeScriptsSource(feed) },
+                feed.IgnoredFiles);
         }
         else
         {

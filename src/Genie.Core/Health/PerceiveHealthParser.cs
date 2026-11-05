@@ -133,6 +133,7 @@ public sealed partial class PerceiveHealthParser
     private int?    _remainingVitality;
     private string? _vitalityWord;
     private bool    _poisoned;
+    private int     _poisonLines;
     private bool    _diseased;
 
     private readonly Dictionary<string, Dictionary<InjuryAxis, WoundSeverity>> _regions =
@@ -271,9 +272,13 @@ public sealed partial class PerceiveHealthParser
         }
 
         // Poison / disease markers appear as trailing lines inside the block.
-        if (line.Contains("poison", StringComparison.OrdinalIgnoreCase)) { _poisoned = true; return true; }
-        if (line.Contains("disease", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("infect",  StringComparison.OrdinalIgnoreCase)) { _diseased = true; return true; }
+        if (line.Contains("poison", StringComparison.OrdinalIgnoreCase)) { _poisoned = true; _poisonLines++; return true; }
+        // Disease wordings an empath sees: the plain word, infections (fresh
+        // and dormant), gangrene, and the open oozing sores of rot.
+        if (line.Contains("disease",  StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("infect",   StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("gangrene", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("oozing sores", StringComparison.OrdinalIgnoreCase)) { _diseased = true; return true; }
 
         // Vitality can also arrive on its own line inside the block.
         if (VitalityRe.IsMatch(line)) { ReadVitality(line); return true; }
@@ -313,6 +318,7 @@ public sealed partial class PerceiveHealthParser
             VitalityPercent    = _remainingVitality ?? (_rawVitality is { } raw ? 100 - raw : null),
             VitalityWord       = _vitalityWord,
             IsPoisoned         = _poisoned,
+            PoisonLines        = _poisonLines,
             IsDiseased         = _diseased,
             CapturedAt         = _now(),
         };
@@ -330,6 +336,7 @@ public sealed partial class PerceiveHealthParser
         _remainingVitality = null;
         _vitalityWord  = null;
         _poisoned      = false;
+        _poisonLines   = 0;
         _diseased      = false;
     }
 

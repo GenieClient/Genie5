@@ -148,6 +148,148 @@ public class HealingCommandsTests
     }
 
     [Fact]
+    public void Take_all_can_leave_out_internal_wounds_and_scars()
+    {
+        Assert.Equal(new[] { "#send take Renucci left arm" },
+                     Builder(new HealingSettings { IncludeInternal = false }).TakeAll(Renucci()).Lines);
+        Assert.Equal(new[] { "#send take Renucci left arm", "#send take Renucci head internal" },
+                     Builder(new HealingSettings { IncludeScars = false }).TakeAll(Renucci()).Lines);
+    }
+
+    /// <summary>Leave Bleeders skips FRESH wounds worse than harmful; the
+    /// harmful one and every scar are still taken.</summary>
+    [Fact]
+    public void Leave_bleeders_skips_serious_fresh_wounds_only()
+        => Assert.Equal(new[]
+        {
+            "#send take Renucci head internal",
+            "#send take Renucci left arm internal scar",
+        }, Builder(new HealingSettings { LeaveBleeders = true }).TakeAll(Renucci()).Lines);
+
+    /// <summary>Half on Major: very damaging (8/13) and worse ask for half,
+    /// ahead of quick.</summary>
+    [Fact]
+    public void Half_on_major_halves_only_very_damaging_and_worse()
+        => Assert.Equal(new[]
+        {
+            "#send take Renucci left arm half quick",
+            "#send take Renucci head internal quick",
+            "#send take Renucci left arm internal scar quick",
+        }, Builder(new HealingSettings { HalfOnMajor = true, QuickTake = true }).TakeAll(Renucci()).Lines);
+
+    [Fact]
+    public void Take_minor_leaves_the_serious_wounds()
+        => Assert.Equal(new[] { "#send take Renucci left arm internal scar" },
+                        Builder().TakeMinor(Renucci()).Lines);
+
+    [Fact]
+    public void Take_minor_honours_the_include_toggles_and_is_nothing_for_self()
+    {
+        Assert.True(Builder(new HealingSettings { IncludeScars = false }).TakeMinor(Renucci()).IsEmpty);
+        Assert.True(Builder().TakeMinor(null).IsEmpty);
+    }
+
+    [Fact]
+    public void Bulk_options_round_trip_through_the_settings_file()
+    {
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"healing-{Guid.NewGuid():N}.json");
+        try
+        {
+            var a = new HealingSettings { IncludeInternal = false, IncludeScars = false, HalfOnMajor = true, LeaveBleeders = true };
+            Assert.True(a.Save(path));
+            var b = new HealingSettings();
+            Assert.True(b.Load(path));
+            Assert.False(b.IncludeInternal); Assert.False(b.IncludeScars);
+            Assert.True(b.HalfOnMajor);      Assert.True(b.LeaveBleeders);
+        }
+        finally { System.IO.File.Delete(path); }
+    }
+
+    [Fact]
+    public void Bulk_options_default_to_the_old_take_all_behaviour()
+    {
+        var s = new HealingSettings();
+        Assert.True(s.IncludeInternal); Assert.True(s.IncludeScars);
+        Assert.False(s.HalfOnMajor);    Assert.False(s.LeaveBleeders);
+    }
+
+    // ── Touch patterns ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void The_empathic_link_line_names_the_patient_by_default()
+    {
+        var s = new HealingSettings();
+        Assert.True(s.TryMatchPatient("You sense a successful empathic link has been forged between you and Renucci.", out var who));
+        Assert.Equal("Renucci", who);
+        Assert.False(s.TryMatchPatient("You sense nothing.", out _));
+    }
+
+    [Fact]
+    public void Custom_patterns_match_literally_and_all_are_live()
+    {
+        var s = new HealingSettings();
+        s.SetTouchPatterns(new[] { "A link forms with {name}!", "bad pattern", "{name}", "{name} and {name}" });
+        Assert.Equal(new[] { "A link forms with {name}!" }, s.TouchPatterns);
+        Assert.True(s.TryMatchPatient("A link forms with Naper!", out var who));
+        Assert.Equal("Naper", who);
+        Assert.False(s.TryMatchPatient("You sense a successful empathic link has been forged between you and Naper.", out _));
+    }
+
+    [Fact]
+    public void A_matched_name_cannot_carry_a_second_command()
+    {
+        var s = new HealingSettings();
+        Assert.True(s.TryMatchPatient("You sense a successful empathic link has been forged between you and Naper;#quit.", out var who));
+        Assert.Equal("Naper", who);
+    }
+
+    [Fact]
+    public void Touch_patterns_persist_and_an_empty_list_survives_a_round_trip()
+    {
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"healing-{Guid.NewGuid():N}.json");
+        try
+        {
+            var a = new HealingSettings();
+            a.SetTouchPatterns(new[] { "Linked to {name}." });
+            Assert.True(a.Save(path));
+            var b = new HealingSettings();
+            Assert.True(b.Load(path));
+            Assert.Equal(new[] { "Linked to {name}." }, b.TouchPatterns);
+
+            a.SetTouchPatterns(Array.Empty<string>());
+            a.Save(path);
+            b.Load(path);
+            Assert.Empty(b.TouchPatterns);
+        }
+        finally { System.IO.File.Delete(path); }
+    }
+
+    [Theory]
+    [InlineData(TakeAmount.All,  "take Naper chest")]
+    [InlineData(TakeAmount.Most, "take Naper chest most")]
+    [InlineData(TakeAmount.Half, "take Naper chest half")]
+    [InlineData(TakeAmount.Part, "take Naper chest part")]
+    public void A_region_click_can_take_part_of_a_wound(TakeAmount amount, string expected)
+        => Assert.Equal(new[] { expected },
+                        Builder().HealRegion("Naper", "chest", InjuryAxis.FreshExternal, amount).Lines);
+
+    [Fact]
+    public void The_amount_sits_after_internal_and_scar_and_before_quick()
+        => Assert.Equal(new[] { "take Naper left arm internal scar half quick" },
+                        Builder(new HealingSettings { QuickTake = true })
+                            .HealRegion("Naper", "leftArm", InjuryAxis.ScarInternal, TakeAmount.Half).Lines);
+
+    [Fact]
+    public void An_explicit_amount_replaces_half_on_major_and_yourself_ignores_it()
+    {
+        var s = new HealingSettings { HalfOnMajor = true };
+        Assert.Equal(new[] { "take Naper chest part" },
+                     Builder(s).HealRegion("Naper", "chest", InjuryAxis.FreshExternal, TakeAmount.Part).Lines);
+        Assert.Equal(new[] { "prep hw" },
+                     Builder().HealRegion("", "chest", InjuryAxis.FreshExternal, TakeAmount.Half).Lines);
+    }
+
+    [Fact]
     public void Take_all_uses_the_players_command_character()
         => Assert.All(Builder(cc: '!').TakeAll(Renucci()).Lines,
                       l => Assert.StartsWith("!send take Renucci", l));

@@ -236,6 +236,14 @@ public sealed class DisplaySettings : ReactiveObject
     /// </summary>
     [Reactive] public bool   UseEnhancedHandsStrip { get; set; }
 
+    /// <summary>
+    /// Show the rested-EXP gauge at the right end of the hands strip — a
+    /// green / yellow / red bar of spendable 3x-learning time. Only appears
+    /// once the server has sent a rested-EXP line (accounts without REXP never
+    /// do). On by default; toggled via <c>Window → Rested EXP Bar</c>.
+    /// </summary>
+    [Reactive] public bool   ShowRestedExpBar { get; set; } = false;
+
     /// <summary>True iff the hands strip is visible at the top AND classic style.</summary>
     [JsonIgnore] public bool ShowHandsTopClassic     => ShowHandsTop    && !UseEnhancedHandsStrip;
     /// <summary>True iff the hands strip is visible at the top AND enhanced style.</summary>

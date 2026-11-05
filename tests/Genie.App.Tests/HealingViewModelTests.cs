@@ -52,6 +52,26 @@ public class HealingViewModelTests
         return (vm, sent);
     }
 
+    [Fact]
+    public void A_link_message_selects_the_patient_without_sending()
+    {
+        var (vm, sent) = New();
+        vm.OnGameLine("You sense a successful empathic link has been forged between you and Renucci.");
+        Assert.Equal("Renucci", vm.PatientName);
+        Assert.Empty(sent);
+        vm.OnGameLine("Something else entirely.");
+        Assert.Equal("Renucci", vm.PatientName);
+    }
+
+    [Fact]
+    public void Editing_the_patterns_text_changes_what_is_matched()
+    {
+        var (vm, _) = New();
+        vm.TouchPatternsText = "Linked to {name}.\nnot valid";
+        vm.OnGameLine("Linked to Naper.");
+        Assert.Equal("Naper", vm.PatientName);
+    }
+
     private static HealingViewModel.RegionCell Cell(HealingViewModel vm, string id)
         => vm.Cells.Single(c => c.RegionId == id);
 

@@ -1,7 +1,9 @@
 using System.Reactive.Linq;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Genie.Core;
 using Genie.Core.Events;
+using Genie.Core.Extensions.Builtin;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
 
@@ -73,6 +75,19 @@ public class VitalsViewModel : ReactiveObject
     // strip doesn't use this; only the enhanced one does.
     [Reactive] public HashSet<string> CompassExits { get; private set; } =
         new(StringComparer.OrdinalIgnoreCase);
+
+    // ── Rested-EXP gauge ──────────────────────────────────────────────────
+    // Fed by the <component id='exp rexp'> line (see RestedExpGauge). The bar
+    // fills with SPENDABLE time (the smaller of banked and this cycle's
+    // allowance) over the cap, coloured green / yellow / red. Hidden until the
+    // first reading arrives (free accounts never get one).
+    [Reactive] public bool    HasRestedExp      { get; private set; }
+    /// <summary>Bar fill, 0–100.</summary>
+    [Reactive] public double  RestedFill        { get; private set; }
+    [Reactive] public string  RestedLabel       { get; private set; } = "";
+    [Reactive] public string  RestedTip         { get; private set; } = "";
+    [Reactive] public IBrush  RestedBarBrush    { get; private set; } = Brushes.Transparent;
+    [Reactive] public IBrush  RestedTrackBrush  { get; private set; } = Brushes.Transparent;
 
     // ── Status indicators ─────────────────────────────────────────────────
     // Each flips on/off as the server emits <indicator id="IconX" visible="y|n"/>.
@@ -338,7 +353,46 @@ public class VitalsViewModel : ReactiveObject
                     default:          StanceLabel = ""; StanceTooltip = "";                                       break;
                 }
             });
+
+        // ── Rested EXP ────────────────────────────────────────────────────
+        core.GameEvents.OfType<ComponentEvent>()
+            .Where(e => string.Equals(e.ComponentId, "exp rexp", StringComparison.OrdinalIgnoreCase))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(e =>
+            {
+                if (RestedExpGauge.TryParse(e.Content, out var reading))
+                    ApplyRestedExp(reading);
+            });
     }
+
+    /// <summary>Apply one <c>exp rexp</c> reading to the gauge properties.</summary>
+    internal void ApplyRestedExp(RestedExpReading r)
+    {
+        var level = RestedExpGauge.LevelOf(r);
+        RestedFill       = RestedExpGauge.FillOf(r) * 100.0;
+        RestedLabel      = "REXP " + RestedExpGauge.Format(r.Spendable);
+        RestedTip        = RestedExpGauge.Describe(r, level);
+        RestedBarBrush   = level switch
+        {
+            RestedExpLevel.Green  => RestedGreen,
+            RestedExpLevel.Yellow => RestedYellow,
+            _                     => RestedRed,
+        };
+        RestedTrackBrush = level switch
+        {
+            RestedExpLevel.Green  => RestedGreenTrack,
+            RestedExpLevel.Yellow => RestedYellowTrack,
+            _                     => RestedRedTrack,
+        };
+        HasRestedExp = true;
+    }
+
+    private static readonly IBrush RestedGreen       = new SolidColorBrush(Color.Parse("#40A040"));
+    private static readonly IBrush RestedYellow      = new SolidColorBrush(Color.Parse("#D8A020"));
+    private static readonly IBrush RestedRed         = new SolidColorBrush(Color.Parse("#C04040"));
+    private static readonly IBrush RestedGreenTrack  = new SolidColorBrush(Color.Parse("#143a14"));
+    private static readonly IBrush RestedYellowTrack = new SolidColorBrush(Color.Parse("#4a3818"));
+    private static readonly IBrush RestedRedTrack    = new SolidColorBrush(Color.Parse("#4a1414"));
 
     // ── Tick ──────────────────────────────────────────────────────────────
 

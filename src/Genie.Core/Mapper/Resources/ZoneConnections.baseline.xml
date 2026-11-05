@@ -9,7 +9,7 @@
   zone from the player.
 
   HOW THIS WORKS
-  --------------
+  ——————————————
   * Place this file at the root of your Maps directory (next to the
     individual Map##_*.xml zone files). Genie 5 seeds it from this
     baseline the first time it runs; subsequent edits stay on disk.
@@ -29,7 +29,7 @@
     silently sit out until you fill the real values in.
 
   ENTRIES BELOW ARE EXAMPLES — VERIFY ROOM IDS BEFORE RELYING ON THEM
-  -------------------------------------------------------------------
+  ———————————————————————————————————————————————————————————————————
   Each connection is marked with a TODO comment indicating which fields
   need to be set against your installed maps. The verbs, wait windows,
   and transit-type tags are based on common community knowledge of DR
