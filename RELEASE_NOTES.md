@@ -17,6 +17,16 @@ partial takes and patient link messages.
   empathic-link line by default), that patient becomes the target. Nothing is sent.
 - **Poison and disease** — gangrene and oozing sores now count as disease, and more
   than one poison shows as "Poisoned ×2".
+- **Choose which script files to update** — every row on the **Scripts** tab of
+  **Help → Check for Updates** has a **Files…** button that lists each new or changed
+  file with an **Update** and an **Ignore** box. **Update Selected** pulls only the
+  ticked files; **Ignore** is remembered per source, so a script you have customised is
+  skipped by Check, Update and the start-up auto-update from then on, and **Save
+  Ignores** keeps the list without pulling anything.
+- **"This character only" in Inventory View** — the catalog is shared across your
+  characters, so another character's items used to show under the one you are logged in
+  as. A toolbar box (off by default) limits the tree to the connected character, with a
+  hint when that character has no scan yet.
 - **Rested EXP bar** — a green / yellow / red gauge at the right end of the Hands
   Strip showing how much 3x learning time you can still spend. Green: bonus learning is
   on. Yellow: under an hour left. Red: none (an empty bank, or this cycle's allowance is
@@ -49,6 +59,16 @@ account type by hand for anyone Genie can't detect.
   portal never recovered and travel scripts looped for hours. The reload is refused
   only when Record has added rooms or links you have not saved; the Save button's
   "unsaved" state now also tracks what Record adds, and a reload clears it.
+- **Inventory View scan with TABLEINV on** — with `TOGGLE TABLEINV` on, `inventory
+  list` prints the spreadsheet table instead of the "You have:" list, so `/iv scan`
+  sat in "Start" until its 45-second timeout and saved nothing. The scan now notices
+  the table view, switches to the standard view for the scan, and switches back when it
+  finishes or is abandoned. If the game keeps answering with the table, the scan stops
+  with a hint instead of flip-flopping.
+- **`#config rubypath` works again** — Genie 4's name for the Lich Ruby path is now
+  an alias for `lichruby`, on both set and get
+  ([#383](https://github.com/GenieClient/Genie5/issues/383)). Thanks @digitalnyc1
+  for the fix and @mrhoribu for the report.
 
 ---
 

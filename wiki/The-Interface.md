@@ -74,6 +74,7 @@ A character dropdown switches whose history you're looking at. The store lives i
 **Inventory View** (toggle it from the **Window** menu, or type `/iv open`) catalogs everything your characters own. Run `/iv scan` while connected and it walks your possessions — items on your person, your **vault** (if you're holding a vault book), your **deed register**, your **home**, and **Trader storage** — into a per-character tree that persists between sessions and across characters, so you can finally answer "which character has the …?" without logging everyone in.
 
 - **Search all characters** — type in the search box to filter the tree live; matching items highlight, their container chain stays visible, and the count shows how many matched.
+- **This character only** — tick it to hide the other characters' catalogs and list just the connected character (off by default, so the cross-character view is what you see first). The status line says so if that character has no scan yet.
 - **Wt / Size columns** — each item's weight (stones) and dimensions, filled in automatically from [Elanthipedia's](https://elanthipedia.play.net) item database the first time an item is seen, then cached locally. Items the wiki doesn't document stay blank.
 - **Sortable columns** — click **Item**, **Wt**, or **Size** in the header to sort within each container (click again to flip). Handy for spotting what's weighing you down.
 - **Wiki Lookup** — opens the selected item's Elanthipedia page in your browser (or the wiki's search when there's no exact page).
