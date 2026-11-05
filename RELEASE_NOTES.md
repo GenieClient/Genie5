@@ -17,6 +17,27 @@ partial takes and patient link messages.
   empathic-link line by default), that patient becomes the target. Nothing is sent.
 - **Poison and disease** — gangrene and oozing sores now count as disease, and more
   than one poison shows as "Poisoned ×2".
+- **Rested EXP bar** — a green / yellow / red gauge at the right end of the Hands
+  Strip showing how much 3x learning time you can still spend. Green: bonus learning is
+  on. Yellow: under an hour left. Red: none (an empty bank, or this cycle's allowance is
+  used up). The bar follows whichever of *banked* and *usable this cycle* runs out first,
+  and hovering it explains all three numbers in plain words. Toggle it under
+  **Window → Rested EXP Bar** (off by default). Once on, it appears when the game sends
+  a rested-EXP line, so accounts without rested EXP never see it.
+
+### ⚠️ Rested EXP bar — known limits
+The bar's full-scale mark is fixed at **6 hours**, the Premium bank size, because Genie
+doesn't yet know your account type. Until that is added:
+- **Standard accounts** (4-hour bank) will see the bar sit lower than it should; the
+  colours and the hover text still read correctly.
+- **Platinum instance** (8-hour bank) will fill the bar at 6 hours.
+- **Death's Sting** (rested EXP disabled after an unassisted depart) is not detected
+  yet, so the bar may stay green while the bonus is off.
+
+What would make the bar fully trustworthy: reading the account tier at login (the game
+login already reports whether the account is Premium; `ltb info` also reports it),
+detecting the Platinum instance from the session's game code, and a setting to pick the
+account type by hand for anyone Genie can't detect.
 
 ## 🐛 Fixes
 - **AutoLog with two copies of Genie open** — a second copy logging the same character
