@@ -1,4 +1,5 @@
 using System;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -22,6 +23,7 @@ public partial class HealingPanel : UserControl
     private void OnTouch(object? sender, RoutedEventArgs e)    => Vm?.Touch();
     private void OnForget(object? sender, RoutedEventArgs e)   => Vm?.Forget();
     private void OnTakeAll(object? sender, RoutedEventArgs e)  => Vm?.TakeAll();
+    private void OnTakeMinor(object? sender, RoutedEventArgs e) => Vm?.TakeMinor();
     private void OnStop(object? sender, RoutedEventArgs e)     => Vm?.Stop();
     private void OnCast(object? sender, RoutedEventArgs e)     => Vm?.CastPending();
 
@@ -63,5 +65,55 @@ public partial class HealingPanel : UserControl
     private void OnSpell(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.Tag is HealingViewModel.SpellRow row) Vm?.CastSpell(row.Info.Spell);
+    }
+
+    // ── Body figures ─────────────────────────────────────────────────────────
+
+    private static HealingViewModel.BodyFigure? FigureOf(object? sender)
+        => (sender as Control)?.Tag as HealingViewModel.BodyFigure;
+
+    private void OnFigurePointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (e.InitialPressMouseButton != MouseButton.Left) return;
+        if (FigureOf(sender) is not { } fig || sender is not Visual v) return;
+        Vm?.FigureClicked(fig, e.GetPosition(v));
+        e.Handled = true;
+    }
+
+    /// <summary>Right-click = transfer, claimed on ContextRequested so the
+    /// dock's window menu (hung on an ancestor) does not open over a figure —
+    /// the same reason the old tiles did it this way.</summary>
+    private void OnFigureContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        if (FigureOf(sender) is not { } fig || sender is not Control c) return;
+        e.Handled = true;
+        if (e.TryGetPosition(c, out var p)) Vm?.FigureRightClicked(fig, p);
+    }
+
+    /// <summary>The figure is one hit-test target, so its tooltip follows the
+    /// part under the pointer.</summary>
+    private void OnFigurePointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (FigureOf(sender) is not { } fig || sender is not Control c) return;
+        var part = HealingViewModel.PartAt(fig, e.GetPosition(c));
+        var tip = part?.Tip;
+        if (!Equals(ToolTip.GetTip(c), tip))
+        {
+            ToolTip.SetTip(c, tip);
+            ToolTip.SetIsOpen(c, false);
+            if (tip is not null) ToolTip.SetIsOpen(c, true);
+        }
+    }
+
+    private void OnClosePart(object? sender, RoutedEventArgs e) => Vm?.SelectPart(null);
+
+    private void OnTakeWound(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.Tag is HealingViewModel.PartWound w) Vm?.TakeSelected(w);
+    }
+
+    private void OnTransferWound(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.Tag is HealingViewModel.PartWound w) Vm?.TransferSelected(w);
     }
 }

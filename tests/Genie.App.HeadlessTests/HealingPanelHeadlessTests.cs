@@ -18,9 +18,9 @@ using Xunit;
 namespace Genie.App.HeadlessTests;
 
 /// <summary>
-/// Public #263 — the Healing panel's view renders its body diagram as a real
-/// grid and its buttons reach the view-model's click entry points, so a click
-/// on a wounded region sends a take and nothing else does.
+/// Public #263 — the Healing panel's view draws its body figures (four, or one
+/// overlay) and its clicks reach the view-model's entry points, so a click on
+/// a wounded part sends a take and nothing else does.
 /// </summary>
 public sealed class HealingPanelHeadlessTests
 {
@@ -44,7 +44,7 @@ public sealed class HealingPanelHeadlessTests
         var vm = new HealingViewModel();
         vm.AttachForTest(sent.Add);
         var panel = new HealingPanel { DataContext = vm };
-        var window = new Window { Width = 420, Height = 900, Content = panel };
+        var window = new Window { Width = 480, Height = 1800, Content = panel };
         window.Show();
         Pump(window);
         return (panel, window, vm, sent);
@@ -57,36 +57,63 @@ public sealed class HealingPanelHeadlessTests
         w.UpdateLayout();
     }
 
-    private static List<Button> Regions(Control panel) =>
-        panel.GetVisualDescendants().OfType<Button>()
-             .Where(b => b.Classes.Contains("region")).ToList();
-
     private static void Click(Button b) => b.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
+    /// <summary>The drawn figure for an axis (four-figure layout) or, with
+    /// null, the overlay figure.</summary>
+    private static Panel FigureFor(Control panel, InjuryAxis? axis) =>
+        panel.GetVisualDescendants().OfType<Panel>()
+             .Single(p => p.Tag is HealingViewModel.BodyFigure f && f.Axis == axis);
+
+    /// <summary>A part's centre, in window coordinates, through the figure's
+    /// Viewbox scaling.</summary>
+    private static Point PartCentre(Window window, Panel figure, string region)
+    {
+        var fig  = (HealingViewModel.BodyFigure)figure.Tag!;
+        var part = fig.Parts.Single(p => p.RegionId == region);
+        var local = new Point(part.Left + part.Width / 2, part.Top + part.Height / 2);
+        return figure.TranslatePoint(local, window)!.Value;
+    }
+
+    private static void Press(Window w, Point at, MouseButton button)
+    {
+        w.MouseDown(at, button);
+        w.MouseUp(at, button);
+        Pump(w);
+    }
+
     [AvaloniaFact]
-    public void The_body_diagram_lays_every_region_out_on_its_grid_cell()
+    public void Four_figures_show_by_default_with_every_part_placed_on_the_canvas()
     {
         var (panel, window, vm, _) = Host();
         try
         {
-            var buttons = Regions(panel);
-            Assert.Equal(vm.Cells.Count, buttons.Count);
+            foreach (var axis in new[] { InjuryAxis.FreshExternal, InjuryAxis.FreshInternal,
+                                         InjuryAxis.ScarExternal, InjuryAxis.ScarInternal })
+                Assert.True(FigureFor(panel, axis).IsEffectivelyVisible);
 
-            // The container carries the Grid placement from the cell's Row/Column.
-            var head = buttons.Single(b => ((HealingViewModel.RegionCell)b.Tag!).RegionId == "head");
-            var presenter = head.GetVisualAncestors().OfType<ContentPresenter>()
-                                .First(p => p.GetVisualParent() is Grid);
-            Assert.Equal(0, Grid.GetRow(presenter));
-            Assert.Equal(1, Grid.GetColumn(presenter));
+            // Each part's container carries its Canvas placement.
+            var figure = FigureFor(panel, InjuryAxis.FreshExternal);
+            var presenters = figure.GetVisualDescendants().OfType<ContentPresenter>()
+                                   .Where(p => p.DataContext is HealingViewModel.FigurePart).ToList();
+            Assert.Equal(vm.PanelFigures[0].Parts.Count, presenters.Count);
+            var head = presenters.Single(p => ((HealingViewModel.FigurePart)p.DataContext!).RegionId == "head");
+            Assert.Equal(242, Canvas.GetLeft(head));
+            Assert.Equal(48,  Canvas.GetTop(head));
+
+            vm.OverlayLayout = true;
+            Pump(window);
+            Assert.True(FigureFor(panel, null).IsEffectivelyVisible);
+            Assert.False(FigureFor(panel, InjuryAxis.FreshExternal).IsEffectivelyVisible);
         }
         finally { window.Close(); }
     }
 
-    /// <summary>A REAL pointer click (press + release over the tile), not a
-    /// raised Click event: the 2026-09-30 walk found tiles that showed the
-    /// reading but sent nothing when clicked.</summary>
+    /// <summary>A REAL pointer click (press + release over the part), not a
+    /// raised event: the 2026-09-30 walk found tiles that showed the reading
+    /// but sent nothing when clicked.</summary>
     [AvaloniaFact]
-    public void A_pointer_click_on_a_wounded_tile_sends_the_take()
+    public void A_pointer_click_on_a_wounded_part_sends_the_take()
     {
         var (panel, window, vm, sent) = Host();
         try
@@ -94,12 +121,33 @@ public sealed class HealingPanelHeadlessTests
             vm.Apply(Naper());
             Pump(window);
 
-            var arm = Regions(panel).Single(b => ((HealingViewModel.RegionCell)b.Tag!).RegionId == "leftArm");
-            var centre = arm.TranslatePoint(new Point(arm.Bounds.Width / 2, arm.Bounds.Height / 2), window)!.Value;
-            window.MouseDown(centre, MouseButton.Left);
-            window.MouseUp(centre, MouseButton.Left);
+            Press(window, PartCentre(window, FigureFor(panel, InjuryAxis.FreshExternal), "leftArm"), MouseButton.Left);
+            Assert.Equal(new[] { "take Naper left arm" }, sent);
+
+            // The same part on a figure where it is healthy sends nothing.
+            Press(window, PartCentre(window, FigureFor(panel, InjuryAxis.ScarExternal), "leftArm"), MouseButton.Left);
+            Assert.Single(sent);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void An_overlay_click_opens_the_card_and_its_take_button_sends()
+    {
+        var (panel, window, vm, sent) = Host();
+        try
+        {
+            vm.Apply(Naper());
+            vm.OverlayLayout = true;
             Pump(window);
 
+            Press(window, PartCentre(window, FigureFor(panel, null), "leftArm"), MouseButton.Left);
+            Assert.Empty(sent);
+            Assert.True(vm.HasSelectedPart);
+
+            var take = panel.GetVisualDescendants().OfType<Button>()
+                            .Single(b => b.Content as string == "Take" && b.IsEffectivelyVisible);
+            Click(take);
             Assert.Equal(new[] { "take Naper left arm" }, sent);
         }
         finally { window.Close(); }
@@ -188,10 +236,10 @@ public sealed class HealingPanelHeadlessTests
         finally { window.Close(); }
     }
 
-    /// <summary>The ⇄ renders on the part DR marked, and a REAL right-button
-    /// press and release over it sends DR's transfer (and no take).</summary>
+    /// <summary>A REAL right-button press and release over the part DR marked
+    /// sends DR's transfer (and no take); its tooltip names it.</summary>
     [AvaloniaFact]
-    public void A_pointer_right_click_on_a_marked_tile_sends_DRs_transfer()
+    public void A_pointer_right_click_on_a_marked_part_sends_DRs_transfer()
     {
         var (panel, window, vm, sent) = Host();
         try
@@ -200,33 +248,16 @@ public sealed class HealingPanelHeadlessTests
             vm.Apply(RenucciTouch());
             Pump(window);
 
-            Button Tile(string id) => Regions(panel).Single(b => ((HealingViewModel.RegionCell)b.Tag!).RegionId == id);
-            TextBlock Marker(Button b) => b.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Classes.Contains("xfer"));
+            var figure = FigureFor(panel, InjuryAxis.FreshExternal);
+            var leg = vm.PanelFigures[0].Parts.Single(p => p.RegionId == "leftLeg");
+            Assert.Contains("right-click: transfer internal left leg", leg.Tip);   // DR's own tooltip text
 
-            var leg = Tile("leftLeg");
-            Assert.True(Marker(leg).IsEffectivelyVisible);
-            Assert.Equal("⇄", Marker(leg).Text);
-            Assert.False(Marker(Tile("head")).IsEffectivelyVisible);
-
-            // The ⇄ must not print over the label (the 2026-09-30 walk read
-            // "R Ar~m"): compare their rectangles in the tile's own space.
-            var label  = leg.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "L Leg");
-            var marker = Marker(leg);
-            var labelRect  = new Rect(label.TranslatePoint(default, leg)!.Value, label.Bounds.Size);
-            var markerRect = new Rect(marker.TranslatePoint(default, leg)!.Value, marker.Bounds.Size);
-            Assert.False(labelRect.Intersects(markerRect), $"marker {markerRect} overlaps label {labelRect}");
-
-            var centre = leg.TranslatePoint(new Point(leg.Bounds.Width / 2, leg.Bounds.Height / 2), window)!.Value;
-            window.MouseDown(centre, MouseButton.Right);
-            window.MouseUp(centre, MouseButton.Right);
-            Pump(window);
-
+            var centre = PartCentre(window, figure, "leftLeg");
+            Press(window, centre, MouseButton.Right);
             Assert.Equal(new[] { "transfer Renucci internal left leg" }, hostSent.Select(a => a.Value));
             Assert.Empty(sent);                                   // a right-click never takes
 
-            window.MouseDown(centre, MouseButton.Left);           // left-click still takes
-            window.MouseUp(centre, MouseButton.Left);
-            Pump(window);
+            Press(window, centre, MouseButton.Left);              // left-click still takes
             Assert.Equal(new[] { "take Renucci left leg" }, sent);
             Assert.Single(hostSent);
         }
@@ -241,7 +272,7 @@ public sealed class HealingPanelHeadlessTests
     /// wrapping the panel in a parent that owns a real ContextMenu.
     /// </summary>
     [AvaloniaFact]
-    public void A_right_click_on_a_marked_tile_beats_the_window_menu()
+    public void A_right_click_on_a_figure_beats_the_window_menu()
     {
         var sent = new List<string>();
         var vm = new HealingViewModel();
@@ -249,7 +280,7 @@ public sealed class HealingPanelHeadlessTests
         var panel = new HealingPanel { DataContext = vm };
         var menu = new ContextMenu { ItemsSource = new[] { "Flash on Activity", "Float", "Close Window" } };
         var owner = new Border { Child = panel, ContextMenu = menu };
-        var window = new Window { Width = 420, Height = 900, Content = owner };
+        var window = new Window { Width = 480, Height = 1800, Content = owner };
         window.Show();
         Pump(window);
         try
@@ -258,42 +289,19 @@ public sealed class HealingPanelHeadlessTests
             vm.Apply(RenucciTouch());
             Pump(window);
 
-            var leg = Regions(panel).Single(b => ((HealingViewModel.RegionCell)b.Tag!).RegionId == "leftLeg");
-            var centre = leg.TranslatePoint(new Point(leg.Bounds.Width / 2, leg.Bounds.Height / 2), window)!.Value;
-            window.MouseDown(centre, MouseButton.Right);
-            window.MouseUp(centre, MouseButton.Right);
-            Pump(window);
+            var centre = PartCentre(window, FigureFor(panel, InjuryAxis.FreshExternal), "leftLeg");
+            Press(window, centre, MouseButton.Right);
 
-            Assert.False(menu.IsOpen, "the window menu opened over a transferable tile");
+            Assert.False(menu.IsOpen, "the window menu opened over a figure");
             Assert.Equal(new[] { "transfer Renucci internal left leg" }, hostSent.Select(a => a.Value));
             Assert.Empty(sent);
 
-            // Off the tiles, the window menu still opens as before.
+            // Off the figures, the window menu still opens as before.
             window.MouseDown(new Point(4, 4), MouseButton.Right);
             window.MouseUp(new Point(4, 4), MouseButton.Right);
             Pump(window);
-            Assert.True(menu.IsOpen, "the window menu must still open off the tiles");
+            Assert.True(menu.IsOpen, "the window menu must still open off the figures");
             menu.Close();
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void Clicking_a_wounded_region_takes_it_and_a_healthy_one_sends_nothing()
-    {
-        var (panel, window, vm, sent) = Host();
-        try
-        {
-            vm.Apply(Naper());
-            Pump(window);
-            Assert.Empty(sent);   // a reading arriving never sends
-
-            var buttons = Regions(panel);
-            Click(buttons.Single(b => ((HealingViewModel.RegionCell)b.Tag!).RegionId == "head"));
-            Assert.Empty(sent);
-
-            Click(buttons.Single(b => ((HealingViewModel.RegionCell)b.Tag!).RegionId == "leftArm"));
-            Assert.Equal(new[] { "take Naper left arm" }, sent);
         }
         finally { window.Close(); }
     }

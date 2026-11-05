@@ -5,6 +5,23 @@ using System.Text;
 
 namespace Genie.Core.Health;
 
+/// <summary>
+/// How much of one wound a single take asks for. DR's <c>take</c> accepts a
+/// trailing amount word, which lets an empath move part of a deep wound at a
+/// time instead of all of it. Wording as Genie 4's Crutch sent it.
+/// </summary>
+public enum TakeAmount
+{
+    /// <summary>Everything — no amount word.</summary>
+    All,
+    /// <summary><c>most</c>.</summary>
+    Most,
+    /// <summary><c>half</c>.</summary>
+    Half,
+    /// <summary><c>part</c> — the smallest take.</summary>
+    Part,
+}
+
 /// <summary>The three whole-body conditions a Healing panel can act on.</summary>
 public enum HealingCondition
 {
@@ -143,10 +160,11 @@ public sealed class HealingCommandBuilder
 
     /// <summary>
     /// A body region was clicked on the given axis. For a patient: take that
-    /// wound. For the player: Heal Wounds on a fresh wound, Heal Scars on a
+    /// wound, for <paramref name="amount"/> of it. For the player: Heal Wounds on a fresh wound, Heal Scars on a
     /// scar, cast at the part.
     /// </summary>
-    public HealingAction HealRegion(string? patient, string regionId, InjuryAxis axis)
+    public HealingAction HealRegion(string? patient, string regionId, InjuryAxis axis,
+                                    TakeAmount amount = TakeAmount.All)
     {
         var part = PartWords(regionId);
         if (part.Length == 0) return HealingAction.None;
@@ -155,7 +173,7 @@ public sealed class HealingCommandBuilder
             return Cast(IsScar(axis) ? HealingSpell.HS : HealingSpell.HW, part);
 
         var p = CleanPatient(patient);
-        return p.Length == 0 ? HealingAction.None : HealingAction.Of(TakeLine(p, part, axis));
+        return p.Length == 0 ? HealingAction.None : HealingAction.Of(TakeLine(p, part, axis, amount: amount));
     }
 
     /// <summary>
@@ -190,7 +208,17 @@ public sealed class HealingCommandBuilder
     /// chart (the panel heals your own body one region at a time) or a
     /// healthy one.
     /// </summary>
-    public HealingAction TakeAll(PatientHealth? chart)
+    public HealingAction TakeAll(PatientHealth? chart) => TakeWounds(chart, maxSeverity: null);
+
+    /// <summary>
+    /// Take only the minor wounds — more than minor or lighter — so the
+    /// empath clears the nuisances without touching the serious ones.
+    /// Same ordering and filters as <see cref="TakeAll"/>.
+    /// </summary>
+    public HealingAction TakeMinor(PatientHealth? chart)
+        => TakeWounds(chart, maxSeverity: WoundSeverity.MoreThanMinor);
+
+    private HealingAction TakeWounds(PatientHealth? chart, WoundSeverity? maxSeverity)
     {
         if (chart is null || chart.IsSelf) return HealingAction.None;
         var p = CleanPatient(chart.Patient);
@@ -200,6 +228,7 @@ public sealed class HealingCommandBuilder
             .SelectMany(r => r.Axes
                 .Where(a => a.Value > WoundSeverity.None)
                 .Select(a => (Region: r.Region, Axis: a.Key, Severity: a.Value)))
+            .Where(w => PassesBulkFilters(w.Axis, w.Severity, maxSeverity))
             .OrderBy(w => IsScar(w.Axis))                 // fresh before scars
             .ThenByDescending(w => w.Severity)            // worst first
             .ThenBy(w => w.Region, StringComparer.OrdinalIgnoreCase)
@@ -207,8 +236,17 @@ public sealed class HealingCommandBuilder
             .ToList();
 
         return new HealingAction(wounds
-            .Select(w => $"{_commandChar}send {TakeLine(p, PartWords(w.Region), w.Axis)}")
+            .Select(w => $"{_commandChar}send {TakeLine(p, PartWords(w.Region), w.Axis, w.Severity)}")
             .ToList());
+    }
+
+    private bool PassesBulkFilters(InjuryAxis axis, WoundSeverity severity, WoundSeverity? maxSeverity)
+    {
+        if (maxSeverity is { } max && severity > max) return false;
+        if (!_settings.IncludeInternal && (axis is InjuryAxis.FreshInternal or InjuryAxis.ScarInternal)) return false;
+        if (!_settings.IncludeScars && IsScar(axis)) return false;
+        if (_settings.LeaveBleeders && !IsScar(axis) && severity > WoundSeverity.Harmful) return false;
+        return true;
     }
 
     /// <summary>
@@ -258,11 +296,14 @@ public sealed class HealingCommandBuilder
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private string TakeLine(string patient, string part, InjuryAxis axis)
+    private string TakeLine(string patient, string part, InjuryAxis axis, WoundSeverity? severity = null,
+                            TakeAmount amount = TakeAmount.All)
     {
         var sb = new StringBuilder("take ").Append(patient).Append(' ').Append(part);
         if (axis is InjuryAxis.FreshInternal or InjuryAxis.ScarInternal) sb.Append(" internal");
         if (IsScar(axis)) sb.Append(" scar");
+        if (amount != TakeAmount.All) sb.Append(' ').Append(amount.ToString().ToLowerInvariant());
+        else if (_settings.HalfOnMajor && severity > WoundSeverity.Damaging) sb.Append(" half");
         sb.Append(QuickSuffix());
         return sb.ToString();
     }

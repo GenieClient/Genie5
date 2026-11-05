@@ -49,7 +49,7 @@ namespace Genie.App.ViewModels;
 ///
 /// Hidden by default; re-open via Window → Healing.
 /// </summary>
-public sealed class HealingViewModel : ReactiveObject
+public sealed partial class HealingViewModel : ReactiveObject
 {
     // ── Nested rows ──────────────────────────────────────────────────────────
 
@@ -202,6 +202,20 @@ public sealed class HealingViewModel : ReactiveObject
 
     // ── Static tables ────────────────────────────────────────────────────────
 
+    /// <summary>One entry of the take-amount picker.</summary>
+    public sealed record AmountOption(TakeAmount Amount, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    public static IReadOnlyList<AmountOption> AmountOptions { get; } = new[]
+    {
+        new AmountOption(TakeAmount.All,  "Take all of it"),
+        new AmountOption(TakeAmount.Most, "Take most"),
+        new AmountOption(TakeAmount.Half, "Take half"),
+        new AmountOption(TakeAmount.Part, "Take some (part)"),
+    };
+
     public static IReadOnlyList<AxisOption> AxisOptions { get; } = new[]
     {
         new AxisOption(InjuryAxis.FreshExternal, "Fresh External"),
@@ -300,6 +314,8 @@ public sealed class HealingViewModel : ReactiveObject
 
         Spells = HealingSpells.All.Select(i => new SpellRow(this, i)).ToList();
         _selectedAxis = AxisOptions[0];
+        PanelFigures  = BuildPanelFigures();
+        OverlayFigure = BuildFigure("All wounds", axis: null);
         RefreshSettings();
         _settings.Changed += OnSettingsChanged;
     }
@@ -366,10 +382,20 @@ public sealed class HealingViewModel : ReactiveObject
         }
     }
 
+    private AmountOption _selectedAmount = AmountOptions[0];
+    /// <summary>How much of a wound a region click takes from a patient.
+    /// Session-only; ignored when healing yourself.</summary>
+    public AmountOption SelectedAmount
+    {
+        get => _selectedAmount;
+        set => this.RaiseAndSetIfChanged(ref _selectedAmount, value ?? AmountOptions[0]);
+    }
+
     [Reactive] public bool   HasReading   { get; private set; }
     [Reactive] public string ReadingTitle { get; private set; } = "No reading yet — click Perceive or Touch.";
     [Reactive] public string VitalityText { get; private set; } = "";
     [Reactive] public bool   IsPoisoned   { get; private set; }
+    [Reactive] public string PoisonText   { get; private set; } = "Poisoned";
     [Reactive] public bool   IsDiseased   { get; private set; }
     [Reactive] public bool   HasWounds    { get; private set; }
 
@@ -388,6 +414,78 @@ public sealed class HealingViewModel : ReactiveObject
             this.RaiseAndSetIfChanged(ref _quickTake, value);
             if (!_refreshing) EditSetting(s => s.QuickTake = value);
         }
+    }
+
+
+    private bool _includeInternal;
+    /// <summary>Bulk takes include internal wounds. Persisted.</summary>
+    public bool IncludeInternal
+    {
+        get => _includeInternal;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _includeInternal, value);
+            if (!_refreshing) EditSetting(s => s.IncludeInternal = value);
+        }
+    }
+
+    private bool _includeScars;
+    /// <summary>Bulk takes include scars. Persisted.</summary>
+    public bool IncludeScars
+    {
+        get => _includeScars;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _includeScars, value);
+            if (!_refreshing) EditSetting(s => s.IncludeScars = value);
+        }
+    }
+
+    private bool _halfOnMajor;
+    /// <summary>Bulk takes ask for half of very damaging or worse wounds. Persisted.</summary>
+    public bool HalfOnMajor
+    {
+        get => _halfOnMajor;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _halfOnMajor, value);
+            if (!_refreshing) EditSetting(s => s.HalfOnMajor = value);
+        }
+    }
+
+    private bool _leaveBleeders;
+    /// <summary>Bulk takes skip fresh wounds worse than harmful. Persisted.</summary>
+    public bool LeaveBleeders
+    {
+        get => _leaveBleeders;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _leaveBleeders, value);
+            if (!_refreshing) EditSetting(s => s.LeaveBleeders = value);
+        }
+    }
+
+    private string _touchPatternsText = string.Join("\n", HealingSettings.DefaultTouchPatterns);
+    /// <summary>The touch patterns, one per line. Lines without exactly one
+    /// <c>{name}</c> are ignored. Persisted.</summary>
+    public string TouchPatternsText
+    {
+        get => _touchPatternsText;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _touchPatternsText, value ?? "");
+            if (!_refreshing)
+                EditSetting(s => s.SetTouchPatterns(
+                    _touchPatternsText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)));
+        }
+    }
+
+    /// <summary>A game line arrived: when it matches a touch pattern, the
+    /// patient it names becomes the one the buttons act on. Selecting only —
+    /// nothing is sent.</summary>
+    public void OnGameLine(string? line)
+    {
+        if (_settings.TryMatchPatient(line, out var patient)) PatientName = patient;
     }
 
     // ── Wiring ───────────────────────────────────────────────────────────────
@@ -410,6 +508,10 @@ public sealed class HealingViewModel : ReactiveObject
         core.GameEvents.OfType<PatientHealthEvent>()
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(e => Apply(e.Health));
+
+        core.GameEvents.OfType<TextEvent>()
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(e => OnGameLine(e.Text));
 
         // Seed from the snapshot — a reading may have landed before attach.
         foreach (var chart in core.State.PatientHealth.Values.OrderBy(c => c.CapturedAt))
@@ -451,6 +553,12 @@ public sealed class HealingViewModel : ReactiveObject
         {
             foreach (var row in Spells) row.Load(_settings);
             QuickTake = _settings.QuickTake;
+            IncludeInternal = _settings.IncludeInternal;
+            IncludeScars    = _settings.IncludeScars;
+            HalfOnMajor     = _settings.HalfOnMajor;
+            LeaveBleeders   = _settings.LeaveBleeders;
+            OverlayLayout   = _settings.OverlayFigure;
+            TouchPatternsText = string.Join("\n", _settings.TouchPatterns);
         }
         finally { _refreshing = false; }
     }
@@ -537,6 +645,8 @@ public sealed class HealingViewModel : ReactiveObject
                 : HealingAction.None;
             cell.SetTransfer(false, fallback.Lines.Count > 0 ? fallback.Lines[0] : null);
         }
+        // The figures carry the same transfer hints in their tooltips.
+        RenderFigures(_selectedPatient?.Chart);
     }
 
     // ── Readings in (never sends) ────────────────────────────────────────────
@@ -601,6 +711,7 @@ public sealed class HealingViewModel : ReactiveObject
                      : chart.VitalityWord is { Length: > 0 } w ? $"Vitality: {w}"
                      : "Vitality —";
         IsPoisoned   = chart.IsPoisoned;
+        PoisonText   = chart.PoisonLines > 1 ? $"Poisoned ×{chart.PoisonLines}" : "Poisoned";
         IsDiseased   = chart.IsDiseased;
 
         foreach (var region in chart.Regions.Values.OrderByDescending(r => r.Worst))
@@ -627,7 +738,7 @@ public sealed class HealingViewModel : ReactiveObject
     public void HealRegion(RegionCell cell)
     {
         if (cell is null || !cell.IsWounded) return;
-        Dispatch(Builder().HealRegion(PatientName, cell.RegionId, _selectedAxis.Axis));
+        Dispatch(Builder().HealRegion(PatientName, cell.RegionId, _selectedAxis.Axis, _selectedAmount.Amount));
     }
 
     /// <summary>
@@ -643,6 +754,24 @@ public sealed class HealingViewModel : ReactiveObject
         if (DrDialog is { } dialog && dialog.TransferRegion(cell.RegionId)) return;
         if (!cell.IsWounded) return;
         Dispatch(Builder().Transfer(PatientName, cell.RegionId, _selectedAxis.Axis));
+    }
+
+    /// <summary>Heal one wound on one part: take it from a patient (for the
+    /// picked amount), or cast Heal Wounds / Heal Scars at it on yourself.</summary>
+    public void HealPart(string regionId, InjuryAxis axis)
+    {
+        if (string.IsNullOrEmpty(regionId)) return;
+        Dispatch(Builder().HealRegion(PatientName, regionId, axis, _selectedAmount.Amount));
+    }
+
+    /// <summary>Transfer a part: DR's own marked transfer when its dialog
+    /// offers one, else the builder's internal-axis transfer. Nothing on
+    /// yourself or for an external axis.</summary>
+    public void TransferPart(string regionId, InjuryAxis axis)
+    {
+        if (string.IsNullOrEmpty(regionId) || IsSelf) return;
+        if (DrDialog is { } dialog && dialog.TransferRegion(regionId)) return;
+        Dispatch(Builder().Transfer(PatientName, regionId, axis));
     }
 
     /// <summary>One of DR's own header buttons (Transfer Vit, Re-Link) was
@@ -664,6 +793,16 @@ public sealed class HealingViewModel : ReactiveObject
         var chart = Patients.FirstOrDefault(
             p => string.Equals(p.Key, name, StringComparison.OrdinalIgnoreCase))?.Chart;
         Dispatch(Builder().TakeAll(chart));
+    }
+
+    /// <summary>Take Minor: only the minor wounds, same filters as Take All.</summary>
+    public void TakeMinor()
+    {
+        if (IsSelf) return;
+        var name  = HealingCommandBuilder.CleanPatient(PatientName);
+        var chart = Patients.FirstOrDefault(
+            p => string.Equals(p.Key, name, StringComparison.OrdinalIgnoreCase))?.Chart;
+        Dispatch(Builder().TakeMinor(chart));
     }
 
     /// <summary>Vitality / Poison / Disease button.</summary>

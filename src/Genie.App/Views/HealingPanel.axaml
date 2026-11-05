@@ -12,6 +12,54 @@
              x:Class="Genie.App.Views.HealingPanel"
              x:DataType="vm:HealingViewModel">
 
+  <UserControl.Resources>
+    <!-- Diagonal stripes, for the scar swatches. -->
+    <VisualBrush x:Key="HealScarStripes" TileMode="Tile" SourceRect="0,0,8,8" DestinationRect="0,0,8,8"
+                 Stretch="None">
+      <VisualBrush.Visual>
+        <Canvas Width="8" Height="8">
+          <Path Data="M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6" Stroke="#4f86c4" StrokeThickness="2.5"/>
+        </Canvas>
+      </VisualBrush.Visual>
+    </VisualBrush>
+
+    <!-- One body figure, drawn on the Injuries panel's 920x1125 canvas. The
+         parts are not hit-test targets: their boxes overlap, so the figure
+         itself takes the pointer and asks the view-model which part's art is
+         under it (HealingViewModel.PartAt). -->
+    <DataTemplate x:Key="HealFigure" x:DataType="vm:HealingViewModel+BodyFigure">
+      <Panel Width="920" Height="1125" Background="Transparent" Tag="{Binding}"
+             PointerReleased="OnFigurePointerReleased"
+             PointerMoved="OnFigurePointerMoved"
+             ContextRequested="OnFigureContextRequested">
+        <ItemsControl Classes="figure" ItemsSource="{Binding Parts}" IsHitTestVisible="False">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><Canvas Width="920" Height="1125"/></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:HealingViewModel+FigurePart">
+              <Panel Width="{Binding Width}" Height="{Binding Height}">
+                <Image Source="{Binding Sprite}" Stretch="Uniform" Opacity="{Binding Opacity}"
+                       IsVisible="{Binding IsSprite}"/>
+                <Border IsVisible="{Binding IsBadge}" Background="{Binding BadgeFill}" CornerRadius="10">
+                  <TextBlock Text="{Binding BadgeLabel}" FontSize="40" Foreground="{Binding BadgeText}"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border IsVisible="{Binding IsSelected}" BorderBrush="{DynamicResource Theme.Accent}"
+                        BorderThickness="6" CornerRadius="12" Margin="-8"/>
+              </Panel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Canvas IsHitTestVisible="False">
+          <TextBlock Canvas.Left="646" Canvas.Top="408" Text="Back"   FontSize="30" Opacity="0.7"/>
+          <TextBlock Canvas.Left="628" Canvas.Top="778" Text="Nerves" FontSize="30" Opacity="0.4"/>
+          <TextBlock Canvas.Left="648" Canvas.Top="1040" Text="Tail"  FontSize="30" Opacity="0.7"/>
+        </Canvas>
+      </Panel>
+    </DataTemplate>
+  </UserControl.Resources>
+
   <UserControl.Styles>
     <Style Selector="Button.heal">
       <Setter Property="FontSize" Value="11"/>
@@ -30,6 +78,10 @@
     <!-- Place each region cell in the body grid. Reflection binding by
          necessity: style setters carry no x:DataType, and the container's
          DataContext IS the RegionCell. -->
+    <Style Selector="ItemsControl.figure > ContentPresenter">
+      <Setter Property="Canvas.Left" Value="{ReflectionBinding Left}"/>
+      <Setter Property="Canvas.Top"  Value="{ReflectionBinding Top}"/>
+    </Style>
     <Style Selector="ItemsControl.body > ContentPresenter">
       <Setter Property="Grid.Row"    Value="{ReflectionBinding Row}"/>
       <Setter Property="Grid.Column" Value="{ReflectionBinding Column}"/>
@@ -116,49 +168,107 @@
             </DataTemplate>
           </ItemsControl.DataTemplates>
         </ItemsControl>
-        <ComboBox ItemsSource="{Binding Source={x:Static vm:HealingViewModel.AxisOptions}}"
-                  SelectedItem="{Binding SelectedAxis}" FontSize="11" MinWidth="150"
-                  ToolTip.Tip="Which wound axis the body diagram colours. Clicking a region heals it on this axis."/>
-        <ItemsControl Classes="body" ItemsSource="{Binding Cells}" MaxWidth="320" HorizontalAlignment="Left">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"/>
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:HealingViewModel+RegionCell">
-              <Button Classes="region"
-                      Background="{Binding Fill}"
-                      ToolTip.Tip="{Binding Tip}"
-                      Tag="{Binding}"
-                      Click="OnRegionClicked"
-                      ContextRequested="OnRegionContextRequested">
-                <StackPanel Spacing="0">
-                  <!-- The ⇄ sits inline after the label, not in a corner overlay:
-                       on a narrow tile the label fills the width and an
-                       overlay printed over its last letters (2026-09-30 walk). -->
-                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="2">
-                    <TextBlock Text="{Binding Label}" FontSize="10"
-                               Foreground="{Binding Foreground}"/>
-                    <!-- DR marked this part transferable: right-click sends it. -->
-                    <TextBlock Classes="xfer" Text="⇄" FontSize="10"
-                               Foreground="{Binding Foreground}"
-                               IsVisible="{Binding DrTransfer}"/>
-                  </StackPanel>
-                  <TextBlock Text="{Binding Rung}" FontSize="11" FontWeight="SemiBold"
-                             HorizontalAlignment="Center" Foreground="{Binding Foreground}"
-                             IsVisible="{Binding IsWounded}"/>
-                </StackPanel>
-              </Button>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
         <StackPanel Orientation="Horizontal" Spacing="10">
           <TextBlock Text="{Binding VitalityText}" FontSize="11"/>
-          <TextBlock Text="Poisoned" FontSize="11" Foreground="#6fbf3a" FontWeight="SemiBold"
+          <TextBlock Text="{Binding PoisonText}" FontSize="11" Foreground="#6fbf3a" FontWeight="SemiBold"
                      IsVisible="{Binding IsPoisoned}"/>
           <TextBlock Text="Diseased" FontSize="11" Foreground="#c08a2e" FontWeight="SemiBold"
                      IsVisible="{Binding IsDiseased}"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <RadioButton GroupName="healLayout" Content="Four figures" FontSize="11" MinHeight="0"
+                       IsChecked="{Binding PanelLayout}"
+                       ToolTip.Tip="One figure per wound type: fresh outside, fresh inside, scar outside, scar inside. Click a part to heal it on that figure's wound type."/>
+          <RadioButton GroupName="healLayout" Content="Overlay" FontSize="11" MinHeight="0"
+                       IsChecked="{Binding OverlayLayout}"
+                       ToolTip.Tip="One figure with every wound drawn on it. Click a part to see its wounds and take one."/>
+        </StackPanel>
+        <ComboBox ItemsSource="{Binding Source={x:Static vm:HealingViewModel.AmountOptions}}"
+                  SelectedItem="{Binding SelectedAmount}" FontSize="11" MinWidth="150"
+                  IsEnabled="{Binding !IsSelf}"
+                  ToolTip.Tip="How much of the wound a click on a patient's part takes: all, most, half, or part."/>
+
+        <!-- Four figures: one per wound axis. -->
+        <ItemsControl ItemsSource="{Binding PanelFigures}" IsVisible="{Binding PanelLayout}"
+                      MaxWidth="460" HorizontalAlignment="Left">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><UniformGrid Columns="2"/></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:HealingViewModel+BodyFigure">
+              <Border BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1" CornerRadius="4"
+                      Margin="0,0,6,6" Padding="4">
+                <StackPanel Spacing="2">
+                  <Viewbox Stretch="Uniform" MaxHeight="270">
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource HealFigure}"/>
+                  </Viewbox>
+                  <TextBlock Text="{Binding Title}" FontSize="11" HorizontalAlignment="Center"/>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Overlay: one figure, every wound on it, plus the clicked part's card. -->
+        <StackPanel Spacing="6" IsVisible="{Binding OverlayLayout}">
+          <Viewbox Stretch="Uniform" MaxWidth="340" MaxHeight="420" HorizontalAlignment="Left">
+            <ContentControl Content="{Binding OverlayFigure}" ContentTemplate="{StaticResource HealFigure}"/>
+          </Viewbox>
+          <WrapPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,12,2">
+              <Border Width="14" Height="14" Background="#e07a1c"/>
+              <TextBlock Text="Fresh" FontSize="11" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,12,2">
+              <Border Width="14" Height="14" Background="{StaticResource HealScarStripes}"/>
+              <TextBlock Text="Scar (striped)" FontSize="11" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,12,2">
+              <Border Width="14" Height="14" BorderBrush="#c8c8c8" BorderThickness="4"/>
+              <TextBlock Text="Outside = edge" FontSize="11" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,12,2">
+              <Border Width="14" Height="14" Padding="4"><Border Background="#c8c8c8"/></Border>
+              <TextBlock Text="Inside = centre" FontSize="11" VerticalAlignment="Center"/>
+            </StackPanel>
+          </WrapPanel>
+          <TextBlock FontSize="10" Opacity="0.75" TextWrapping="Wrap"
+                     Text="Deeper colour = worse wound (1-13). Click a part to see its wounds."/>
+
+          <Border IsVisible="{Binding HasSelectedPart}" BorderBrush="{DynamicResource Theme.Accent}"
+                  BorderThickness="1" CornerRadius="6" Padding="8" MaxWidth="340" HorizontalAlignment="Left">
+            <StackPanel Spacing="4">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding SelectedPart.FullName, FallbackValue=''}" FontWeight="SemiBold" FontSize="12"/>
+                <Button Grid.Column="1" Classes="heal" Content="✕" Click="OnClosePart"
+                        ToolTip.Tip="Close"/>
+              </Grid>
+              <ItemsControl ItemsSource="{Binding SelectedPartWounds}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:HealingViewModel+PartWound">
+                    <Grid ColumnDefinitions="18,*,Auto,Auto" Margin="0,2">
+                      <Panel Width="12" Height="12" VerticalAlignment="Center">
+                        <Border Background="{Binding Swatch}" IsVisible="{Binding !Striped}"/>
+                        <Border Background="{Binding Swatch}" Opacity="0.35" IsVisible="{Binding Striped}"/>
+                        <Border Background="{StaticResource HealScarStripes}" IsVisible="{Binding Striped}"/>
+                      </Panel>
+                      <StackPanel Grid.Column="1" Spacing="0">
+                        <TextBlock Text="{Binding Label}" FontSize="11"/>
+                        <TextBlock Text="{Binding Rung}" FontSize="10" Opacity="0.75"/>
+                      </StackPanel>
+                      <Button Grid.Column="2" Classes="heal" Content="Take" Margin="4,0,0,0"
+                              Tag="{Binding}" Click="OnTakeWound" VerticalAlignment="Center"
+                              ToolTip.Tip="Take this wound (yourself: cast Heal Wounds or Heal Scars at it), for the amount picked above."/>
+                      <Button Grid.Column="3" Classes="heal" Content="Transfer" Margin="4,0,0,0"
+                              Tag="{Binding}" Click="OnTransferWound" VerticalAlignment="Center"
+                              IsVisible="{Binding CanTransfer}"
+                              ToolTip.Tip="transfer &lt;patient&gt; internal &lt;part&gt; [scar]"/>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
         </StackPanel>
       </StackPanel>
 
@@ -168,6 +278,8 @@
         <WrapPanel>
           <Button Classes="heal" Content="Take All" Click="OnTakeAll" IsEnabled="{Binding !IsSelf}"
                   ToolTip.Tip="Queue one take per wound on this patient's latest reading — fresh wounds first, worst first."/>
+          <Button Classes="heal" Content="Take Minor" Click="OnTakeMinor" IsEnabled="{Binding !IsSelf}"
+                  ToolTip.Tip="Queue takes only for minor wounds (more than minor or lighter), leaving the serious ones."/>
           <Button Classes="heal" Content="Vitality" Tag="Vitality" Click="OnCondition"
                   ToolTip.Tip="Patient: take &lt;patient&gt; vitality. Yourself: Vitality Healing."/>
           <Button Classes="heal" Content="Poison" Tag="Poison" Click="OnCondition"
@@ -180,6 +292,18 @@
         <CheckBox Content="Quick takes" FontSize="11" MinHeight="0" Padding="4,0"
                   IsChecked="{Binding QuickTake}"
                   ToolTip.Tip="Append quick to every take."/>
+        <CheckBox Content="Include internal" FontSize="11" MinHeight="0" Padding="4,0"
+                  IsChecked="{Binding IncludeInternal}"
+                  ToolTip.Tip="Take All / Take Minor include internal wounds."/>
+        <CheckBox Content="Include scars" FontSize="11" MinHeight="0" Padding="4,0"
+                  IsChecked="{Binding IncludeScars}"
+                  ToolTip.Tip="Take All / Take Minor include scars."/>
+        <CheckBox Content="Half on major" FontSize="11" MinHeight="0" Padding="4,0"
+                  IsChecked="{Binding HalfOnMajor}"
+                  ToolTip.Tip="Take All / Take Minor ask for half of very damaging or worse wounds."/>
+        <CheckBox Content="Leave bleeders" FontSize="11" MinHeight="0" Padding="4,0"
+                  IsChecked="{Binding LeaveBleeders}"
+                  ToolTip.Tip="Take All / Take Minor skip fresh wounds worse than harmful."/>
       </StackPanel>
 
       <!-- ── Spells ──────────────────────────────────────────────────── -->
@@ -227,6 +351,15 @@
           </StackPanel>
         </Expander>
       </StackPanel>
+
+      <Expander Header="Patient link messages" FontSize="11" HorizontalAlignment="Stretch">
+        <StackPanel Spacing="2">
+          <TextBlock FontSize="10" Opacity="0.75" TextWrapping="Wrap"
+                     Text="One per line, with {name} where the patient's name appears. When a game line matches, that patient becomes the target - nothing is sent. Lines without exactly one {name} are ignored."/>
+          <TextBox Text="{Binding TouchPatternsText}" AcceptsReturn="True" TextWrapping="Wrap"
+                   MinHeight="50" MaxHeight="120" FontSize="11"/>
+        </StackPanel>
+      </Expander>
 
       <!-- ── Wounds in words ─────────────────────────────────────────── -->
       <StackPanel Spacing="2" IsVisible="{Binding HasReading}">
