@@ -22,6 +22,12 @@ partial takes and patient link messages.
 - **AutoLog with two copies of Genie open** — a second copy logging the same character
   now writes to a numbered file (`…_2.log`) instead of stopping logging
   ([#380](https://github.com/GenieClient/Genie5/issues/380)).
+- **`#mapper reset` reloads the zone even with Record on** — as long as nothing is
+  unsaved. A script that switches Record on at launch (uber.cmd does) used to block
+  every reload for the whole session, so a map that went stale after a ferry or a
+  portal never recovered and travel scripts looped for hours. The reload is refused
+  only when Record has added rooms or links you have not saved; the Save button's
+  "unsaved" state now also tracks what Record adds, and a reload clears it.
 
 ---
 

@@ -626,6 +626,7 @@ public partial class MapperViewModel : ReactiveObject
         try
         {
             _zoneRepo.Save(path, _engine.ActiveZone);
+            _engine.MarkSaved();
             ZoneLastWriteTime = File.GetLastWriteTime(path);
             RefreshZoneAge();
             LoadStatus = "Zone saved.";
@@ -647,6 +648,27 @@ public partial class MapperViewModel : ReactiveObject
         if (string.IsNullOrEmpty(SelectedZoneFile)) return null;
         LoadSelectedZone(SelectedZoneFile);     // re-reads the file into the engine
         return ZoneName;
+    }
+
+    /// <summary>
+    /// Second half of <c>#mapper reset</c> (Core has already re-resolved the room):
+    /// reload the zone from disk so arcs lost in memory come back. In lookup-only
+    /// mode this always happens, silently. With Record mode on it still happens
+    /// when nothing is unsaved — a script's <c>#config automapper true</c> at
+    /// launch used to block every reload for the whole session, so a zone that
+    /// went stale after a ferry or portal never recovered and travel scripts
+    /// looped for hours (uber.cmd / travel.cmd, Oct 2026) — and is refused only
+    /// when the in-memory zone holds recorded or edited work a reload would lose.
+    /// Returns the line to echo, or null when there is nothing to say.
+    /// </summary>
+    public string? ReloadForReset()
+    {
+        if (_engine is null || string.IsNullOrEmpty(SelectedZoneFile)) return null;
+        if (!_engine.IsEnabled) { ReloadActiveZone(); return null; }
+        if (IsZoneDirty || _engine.HasUnsavedChanges)
+            return "[mapper] Record mode is on and the zone has unsaved changes — not reloaded. #mapper save, then #mapper load to reload from disk.";
+        var name = ReloadActiveZone();
+        return $"[mapper] Reloaded {name} from disk (Record mode is on, nothing unsaved to lose).";
     }
 
     /// <summary>Clear the active zone's rooms + labels in memory, keeping its
@@ -1783,6 +1805,7 @@ public partial class MapperViewModel : ReactiveObject
         try
         {
             _zoneRepo.Save(path, _engine.ActiveZone);
+            _engine.MarkSaved();
             // Updating the file refreshes its last-write time — reflect that
             // in the UI so "today" shows immediately after a save.
             ZoneLastWriteTime = File.GetLastWriteTime(path);
@@ -1834,6 +1857,7 @@ public partial class MapperViewModel : ReactiveObject
         try
         {
             _zoneRepo.Save(path, _engine.ActiveZone);
+            _engine.MarkSaved();
             ZoneLastWriteTime = File.GetLastWriteTime(path);
             RefreshZoneAge();
             IsZoneDirty = false;
@@ -2093,6 +2117,7 @@ public partial class MapperViewModel : ReactiveObject
         try
         {
             _zoneRepo.Save(path, _engine.ActiveZone);
+            _engine.MarkSaved();
             ZoneLastWriteTime = File.GetLastWriteTime(path);
             RefreshZoneAge();
             return $"Saved {SelectedZoneFile}.xml.";
@@ -2358,6 +2383,7 @@ public partial class MapperViewModel : ReactiveObject
         var stubHint = _followingEngine && _engine.CurrentNode is { } stub && HasZoneNote(stub) ? stub : null;
         try { _engine.LoadZone(zone, stubHint); }
         finally { _loadingZone = false; }
+        IsZoneDirty = false;   // memory now matches the file just read
 
         // Browse-hold detection: suspend auto-follow while the user
         // deliberately looks at a map that isn't the character's, so room

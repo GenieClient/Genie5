@@ -16,6 +16,7 @@ An Empath release: the Healing window draws the same body as the Injuries window
 - **Patient link messages** — when a game line matches one of your patterns (the empathic-link line by default), that patient becomes the target. Nothing is sent.
 - **Poison and disease** — gangrene and oozing sores count as disease, and more than one poison shows as "Poisoned ×2".
 - **AutoLog with two copies of Genie open** — a second copy logging the same character writes to a numbered file (`…_2.log`) instead of stopping logging ([#380](https://github.com/GenieClient/Genie5/issues/380)).
+- **`#mapper reset` reloads the zone even with Record on**, as long as nothing is unsaved. A script that switches Record on at launch (uber.cmd does) used to block every reload for the whole session, so a map that went stale after a ferry or a portal never recovered and travel scripts looped for hours. The reload is refused only when Record has added rooms or links you have not saved.
 
 [Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.10)
 

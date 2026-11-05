@@ -118,6 +118,25 @@ public sealed class AutoMapperEngine
     public bool      IsEnabled    { get; set; } = false;
 
     /// <summary>
+    /// True when the loaded zone differs in memory from what was last loaded or
+    /// saved: Record mode added a room, an arc or an exit stub, or the editor
+    /// changed the graph. <c>#mapper reset</c> consults it so a reload from disk
+    /// happens whenever nothing unsaved would be lost. Cleared by
+    /// <see cref="LoadZone"/> and <see cref="MarkSaved"/>.
+    /// </summary>
+    public bool HasUnsavedChanges { get; private set; }
+
+    /// <summary>The host wrote the active zone to disk: memory matches it again.</summary>
+    public void MarkSaved() => HasUnsavedChanges = false;
+
+    /// <summary>A structural change the host has not saved — flag it and repaint.</summary>
+    private void MarkChanged()
+    {
+        HasUnsavedChanges = true;
+        MapChanged?.Invoke();
+    }
+
+    /// <summary>
     /// Display-layer flag: the UI is BROWSING a zone the character isn't
     /// placed in (mapper browse-hold), so <see cref="ActiveZone"/> currently
     /// describes what's on screen, NOT where the character is. Consumers that
@@ -260,6 +279,7 @@ public sealed class AutoMapperEngine
     {
         _zone = zone;
         _zoneEverLoaded = true;
+        HasUnsavedChanges = false;
         RebuildIndex();
         CurrentNode = null;
         CurrentNodeChanged?.Invoke();
@@ -382,7 +402,7 @@ public sealed class AutoMapperEngine
             $"[mapper]   -> (deferred) => #{node.Id} via new-node " +
             "(host confirmed: no other zone claims this room)");
         CurrentNodeChanged?.Invoke();
-        MapChanged?.Invoke();
+        MarkChanged();
         return true;
     }
 
@@ -413,7 +433,7 @@ public sealed class AutoMapperEngine
         }
 
         RebuildIndex();
-        MapChanged?.Invoke();
+        MarkChanged();
         return true;
     }
 
@@ -437,7 +457,7 @@ public sealed class AutoMapperEngine
         };
         _zone.Nodes[node.Id] = node;
         RebuildIndex();
-        MapChanged?.Invoke();
+        MarkChanged();
         return node;
     }
 
@@ -473,7 +493,7 @@ public sealed class AutoMapperEngine
         }
 
         RebuildIndex();
-        MapChanged?.Invoke();
+        MarkChanged();
         return (forward, back);
     }
 
@@ -521,7 +541,7 @@ public sealed class AutoMapperEngine
 
         _zone.Nodes = rebuilt;
         RebuildIndex();
-        MapChanged?.Invoke();
+        MarkChanged();
         CurrentNodeChanged?.Invoke();   // CurrentNode object is unchanged; its Id moved
     }
 
@@ -534,7 +554,7 @@ public sealed class AutoMapperEngine
     public void NotifyStructureChanged()
     {
         RebuildIndex();
-        MapChanged?.Invoke();
+        MarkChanged();
     }
 
     // ── Internal ────────────────────────────────────────────────────────────
@@ -1193,7 +1213,7 @@ public sealed class AutoMapperEngine
 
         CurrentNode = node;
         CurrentNodeChanged?.Invoke();
-        if (zoneChanged) MapChanged?.Invoke();
+        if (zoneChanged) MarkChanged();
     }
 
     /// <summary>

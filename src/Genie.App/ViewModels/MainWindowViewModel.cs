@@ -6794,13 +6794,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 break;
 
             // Second half of `#mapper reset` (Core already re-resolved the room).
-            // Reload the zone from disk so arcs lost in memory come back — but
-            // never while recording, where the in-memory map holds unsaved work.
+            // Reload the zone from disk so arcs lost in memory come back — unless
+            // Record mode holds unsaved work in memory (MapperViewModel decides).
             case "reset":
-                if (!_core!.Config.AutoMapper)
-                    Mapper.ReloadActiveZone();
-                else
-                    Echo("[mapper] Record mode is on — zone not reloaded (unsaved rooms kept). #mapper save, then #mapper load to reload from disk.");
+                if (Mapper.ReloadForReset() is { } resetMsg) Echo(resetMsg);
                 break;
 
             case "clear":
