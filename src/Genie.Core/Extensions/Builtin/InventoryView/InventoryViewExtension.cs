@@ -518,6 +518,10 @@ public sealed partial class InventoryViewExtension : IGameExtension
     private string Global(string name) =>
         _host.Globals.TryGetValue(name, out var v) ? v : "";
 
+    /// <summary>The connected character's name ("" when not in a session) — the
+    /// window's "This character only" filter keys off it.</summary>
+    public string CurrentCharacter => Global("charactername");
+
     // ── The scan state machine (Genie 4 ParseText parity) ──────────────────────
     private void HandleScanLine(string text)
     {

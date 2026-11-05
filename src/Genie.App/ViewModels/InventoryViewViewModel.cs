@@ -40,6 +40,10 @@ public class InventoryViewViewModel : ReactiveObject
 
     [Reactive] public string SearchText { get; set; } = "";
     [Reactive] public InventoryNode? SelectedNode { get; set; }
+    /// <summary>Show only the connected character's catalog. Off by default (the
+    /// window is cross-character, like Genie 4's); ignored while no character is
+    /// connected so the tree never goes blank.</summary>
+    [Reactive] public bool ThisCharacterOnly { get; set; }
     /// <summary>"Found: N" while a search is active; total catalog size otherwise.</summary>
     [Reactive] public string CountText { get; private set; } = "";
     [Reactive] public string StatusText { get; private set; } =
@@ -127,6 +131,11 @@ public class InventoryViewViewModel : ReactiveObject
         // Live filter: rebuild the tree as the search text settles.
         this.WhenAnyValue(vm => vm.SearchText)
             .Throttle(TimeSpan.FromMilliseconds(200))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => Rebuild());
+
+        this.WhenAnyValue(vm => vm.ThisCharacterOnly)
+            .Skip(1)
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(_ => Rebuild());
 
@@ -330,7 +339,10 @@ public class InventoryViewViewModel : ReactiveObject
         int found = 0, total = 0;
 
         Roots.Clear();
+        var me = ThisCharacterOnly ? _ext?.CurrentCharacter ?? "" : "";
+        bool onlyMe = me.Length > 0;
         foreach (var character in _snapshot.Select(c => c.Name).Distinct()
+                                           .Where(n => !onlyMe || string.Equals(n, me, StringComparison.OrdinalIgnoreCase))
                                            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
         {
             var sources   = _snapshot.Where(c => c.Name == character).ToList();
@@ -366,6 +378,7 @@ public class InventoryViewViewModel : ReactiveObject
         CountText  = filtering ? $"Found: {found}" : (total > 0 ? $"Total: {total}" : "");
         StatusText = _snapshot.Count == 0
             ? "Nothing scanned yet — connect and use Scan (or /iv scan)."
+            : onlyMe && !filtering && Roots.Count == 0 ? $"{me} has not been scanned yet — use Scan (or /iv scan)."
             : filtering && found == 0 ? $"No items match \"{term}\"." : "";
         ApplySort();   // a rebuild resets to catalog order; restore the active sort
     }
