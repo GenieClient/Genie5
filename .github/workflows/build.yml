@@ -62,12 +62,11 @@ jobs:
         run: dotnet build src/Genie.App/Genie.App.csproj -c Release --no-restore
 
       # Build the solution (Core + App + the plugin contract assembly). The
-      # loadable plugins (EXPTracker / InventoryView / SpellTimer) are
-      # DELIBERATELY NOT part of this build — they live in their own standalone
-      # repos under github.com/GenieClient and are validated by their own CI.
-      # The Core build must never depend on them. For development they are built
-      # from local clones and dropped into the Plugins folder via
-      # scripts/deploy-plugins.ps1; at runtime PluginManager loads them as DLLs.
+      # plugin host (PluginManager) still loads third-party plugin DLLs at
+      # runtime, but ships with no first-party loadable plugin: the former
+      # EXPTracker / SpellTimer / TimeTracker / InventoryView plugins are now
+      # built-in Genie.Core/Extensions/Builtin extensions and compile as part of
+      # this solution (so there's nothing to deploy from an external repo).
       # This step still catches a .slnx referencing a project whose files weren't
       # committed (restore would fail). --no-restore: restore already ran above.
       - name: Build solution (Release)
