@@ -61,6 +61,11 @@ public sealed partial class InventoryViewExtension : IGameExtension
     /// has anything else pushed in ahead of it? Together they tell the list's own
     /// closing roundtime apart from a combat roundtime landing mid-list.</summary>
     private bool _invItemsSeen, _invChatterSeen;
+    /// <summary>The character has <c>TOGGLE TABLEINV</c> on, so <c>inventory list</c>
+    /// answers with the spreadsheet table (no <c>You have:</c> header, extra RT).
+    /// <c>_tableInvSeen</c> = this response was the table; <c>_tableInvToggled</c> =
+    /// the scan flipped the setting and must flip it back when it ends.</summary>
+    private bool _tableInvSeen, _tableInvToggled;
     /// <summary>UTC ticks after which an unadvanced scan is abandoned. Every phase
     /// change and every catalogued line pushes it out (<see cref="TouchScan"/>).</summary>
     private long _scanDeadlineTicks;
@@ -294,6 +299,7 @@ public sealed partial class InventoryViewExtension : IGameExtension
         var me = Global("charactername");
         lock (_sync) _characterData.RemoveAll(c => c.Name == me);
         _scanCharacter = me;
+        _tableInvSeen = _tableInvToggled = false;
         SetPhase("Start");
         StartWatchdog(Interlocked.Increment(ref _scanGeneration));
         ScanStateChanged?.Invoke();
@@ -335,6 +341,7 @@ public sealed partial class InventoryViewExtension : IGameExtension
             _level       = 1;
         }
         _scanCharacter = "";
+        RestoreTableInv();
         LoadSettings();          // the scan never saved, so disk is the pre-scan truth
         if (message is not null) _host.Echo(message);
         ScanStateChanged?.Invoke();
@@ -539,6 +546,27 @@ public sealed partial class InventoryViewExtension : IGameExtension
                     _level       = 1;
                     _invItemsSeen = _invChatterSeen = false;
                 }
+                else if (trimtext.StartsWith("Note: This version of INV LIST is intended for exporting"))
+                    _tableInvSeen = true;      // the table view — wait for its closing RT
+                else if (_tableInvSeen && text.StartsWith("Roundtime:"))
+                {
+                    _tableInvSeen = false;
+                    if (_tableInvToggled)
+                    {
+                        // Toggled once already and still the table: don't flip-flop.
+                        AbandonScan("InventoryView: the game keeps answering INVENTORY LIST with the " +
+                                    "table view. Run TOGGLE TABLEINV yourself, then /iv scan.");
+                        break;
+                    }
+                    // Waiting for a "You have:" that the table view never prints is
+                    // what used to run out the whole idle timeout. Switch to the
+                    // standard view for the scan (restored at the end) and retry.
+                    _tableInvToggled = true;
+                    _host.Echo("InventoryView: TABLEINV is on — switching to the standard view for the scan.");
+                    int seconds = ParseRoundtime(trimtext);
+                    SetPhase("Start", extraSeconds: seconds);
+                    PauseForRtThenSend(seconds, "toggle tableinv", "inventory list");
+                }
                 break;
 
             case "Inventory":
@@ -735,6 +763,7 @@ public sealed partial class InventoryViewExtension : IGameExtension
     {
         lock (_scanLifecycle) _scanMode = null;
         _scanCharacter = "";
+        RestoreTableInv();
         ScanStateChanged?.Invoke();
         _host.Echo("Scan Complete.");
         // Re-emit through the parse pipeline so scripts can
@@ -938,7 +967,7 @@ public sealed partial class InventoryViewExtension : IGameExtension
     /// <summary>Non-blocking replacement for the Genie 4 <c>Thread.Sleep(rt*1000)</c>:
     /// schedules the follow-up command after the roundtime without stalling the
     /// game/parse loop. Cancelled on shutdown.</summary>
-    private void PauseForRtThenSend(int seconds, string command)
+    private void PauseForRtThenSend(int seconds, params string[] commands)
     {
         _host.Echo($"Pausing {seconds} seconds for RT.");
         var token = _cts.Token;
@@ -946,8 +975,18 @@ public sealed partial class InventoryViewExtension : IGameExtension
         {
             try { await Task.Delay(Math.Max(0, seconds) * 1000, token); }
             catch (TaskCanceledException) { return; }
-            if (!token.IsCancellationRequested) _host.SendCommand(command);
+            if (token.IsCancellationRequested) return;
+            foreach (var command in commands) _host.SendCommand(command);
         });
+    }
+
+    /// <summary>Put TABLEINV back the way the character had it, if the scan flipped it.</summary>
+    private void RestoreTableInv()
+    {
+        if (!_tableInvToggled) return;
+        _tableInvToggled = false;
+        _host.SendCommand("toggle tableinv");
+        _host.Echo("InventoryView: restored the table inventory view (TOGGLE TABLEINV).");
     }
 
     // ── Console fallbacks (no window subscriber) ───────────────────────────────
