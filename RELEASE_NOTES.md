@@ -1,3 +1,30 @@
+# Genie 5 — v5.0.0-beta.9.10
+
+**"Bedside Manner"** — an Empath release. The Healing window now draws the same body as the
+Injuries window, as four figures or one overlaid figure, and gains bulk-take options,
+partial takes and patient link messages.
+
+## ✨ New
+- **Body figures in the Healing window** — choose **Four figures** (fresh outside,
+  fresh inside, scar outside, scar inside) or **Overlay** (every wound on one body:
+  outside wounds on a part's edge, inside wounds in its centre, scars striped). Colour
+  deepens as a wound gets worse on DragonRealms' 13-step scale. In Overlay, clicking a
+  part lists its wounds with a **Take** button for each.
+- **Bulk-take options** — **Take Minor**, plus **Include internal**, **Include scars**,
+  **Half on major** and **Leave bleeders** for Take All and Take Minor.
+- **Partial takes** — pick **all**, **most**, **half** or **some** before clicking a part.
+- **Patient link messages** — when a game line matches one of your patterns (the
+  empathic-link line by default), that patient becomes the target. Nothing is sent.
+- **Poison and disease** — gangrene and oozing sores now count as disease, and more
+  than one poison shows as "Poisoned ×2".
+
+## 🐛 Fixes
+- **AutoLog with two copies of Genie open** — a second copy logging the same character
+  now writes to a numbered file (`…_2.log`) instead of stopping logging
+  ([#380](https://github.com/GenieClient/Genie5/issues/380)).
+
+---
+
 # Genie 5 — v5.0.0-beta.9.9.1
 
 **"After Hours"** — a small fixes release. The Injuries panel reads nerve damage and

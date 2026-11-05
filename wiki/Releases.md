@@ -4,11 +4,24 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` or `v5.0.0-beta.N.M` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.9.9.1 — After Hours
+## Latest: v5.0.0-beta.9.10 — Bedside Manner
+
+An Empath release: the Healing window draws the same body as the Injuries window, as four figures or one overlaid figure, with bulk-take options, partial takes and patient link messages.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.10** as a delta from beta.9.9.1.
+
+- **Body figures in the Healing window** — **Four figures** (fresh outside, fresh inside, scar outside, scar inside) or **Overlay** (every wound on one body: outside wounds on a part's edge, inside wounds in its centre, scars striped). In Overlay, clicking a part lists its wounds with a **Take** button for each. See [the Healing window](The-Interface#the-healing-window).
+- **Bulk-take options** — **Take Minor**, plus **Include internal**, **Include scars**, **Half on major** and **Leave bleeders** for Take All and Take Minor.
+- **Partial takes** — pick **all**, **most**, **half** or **some** before clicking a part.
+- **Patient link messages** — when a game line matches one of your patterns (the empathic-link line by default), that patient becomes the target. Nothing is sent.
+- **Poison and disease** — gangrene and oozing sores count as disease, and more than one poison shows as "Poisoned ×2".
+- **AutoLog with two copies of Genie open** — a second copy logging the same character writes to a numbered file (`…_2.log`) instead of stopping logging ([#380](https://github.com/GenieClient/Genie5/issues/380)).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.10)
+
+## v5.0.0-beta.9.9.1 — After Hours
 
 A small fixes release: the Injuries panel reads nerve damage and the tail, the server's injuries dialog wins over the `health` text, AutoLog rolls over at midnight, and Cross-Zone Connections loads again.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.9.1** as a delta from beta.9.9.
 
 - **Tail in the Injuries panel** — DragonRealms' injuries dialog never reports the tail, so Genie reads it from the `health` summary. The panel has a Tail cell in both the grid and figure layouts (placeholder sprite for now).
 - **Nerve damage shows in the Injuries panel** — the ten current `health` phrases ("some minor twitching", "slight numbness in your arms and legs", "difficulty controlling actions", …) are now read; a line with several keeps the worst.
