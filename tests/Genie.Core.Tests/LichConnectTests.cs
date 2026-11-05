@@ -78,6 +78,15 @@ public class LichConnectTests : IDisposable
     }
 
     [Fact]
+    public void Rubypath_is_alias_for_lichruby()
+    {
+        _config.SetSetting("rubypath", @"C:\Ruby\bin\ruby.exe", showException: false);
+
+        Assert.Equal(@"C:\Ruby\bin\ruby.exe", _config.LichRubyPath);
+        Assert.Equal(@"C:\Ruby\bin\ruby.exe", _config.GetSetting("rubypath"));
+    }
+
+    [Fact]
     public void AutoLaunch_keys_round_trip_through_config()
     {
         _config.SetSetting("lichautolaunch", "on", showException: false);
