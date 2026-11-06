@@ -1424,7 +1424,7 @@ public sealed partial class DrXmlParser : IDisposable
         "crtrstatus", "d", "dialogdata", "dir", "endsetup", "exposedialog",
         "exposestream", "image", "indicator", "inv", "opendialog",
         "left", "nav", "openwindow", "output", "popbold", "popstream",
-        "preset", "progressbar", "prompt", "pushbold", "pushstream",
+        "preset", "progressbar", "prompt", "pulse", "pushbold", "pushstream",
         "resource", "right", "roundtime", "settingsinfo", "spell", "spelltime",
         "streamwindow", "style",
     };
@@ -1542,6 +1542,16 @@ public sealed partial class DrXmlParser : IDisposable
             {
                 if (long.TryParse(r["value"], out var st) && st > 0)
                     _events.OnNext(new SpellTimeEvent(DateTimeOffset.FromUnixTimeSeconds(st)));
+                break;
+            }
+
+            // <pulse mana="1"/> — mana-pulse tick marker (public #379). In no
+            // recorded session and unhandled by Genie 4 and Lich 5; consumed
+            // as a typed event so `#audit xmlhunting` stops flagging it.
+            case "pulse":
+            {
+                int.TryParse(r["mana"], out var pulseMana);
+                _events.OnNext(new PulseEvent(pulseMana));
                 break;
             }
 

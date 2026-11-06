@@ -168,6 +168,13 @@ public sealed record CastTimeEvent(DateTimeOffset ExpiresAt) : GameEvent;
 /// (e.g. logging in with a spell already held).</summary>
 public sealed record SpellTimeEvent(DateTimeOffset StartsAt) : GameEvent;
 
+/// <summary>&lt;pulse mana="1"/&gt; — the server's mana-pulse tick marker (public
+/// #379). First seen live on beta.9.7; it is in no recorded session and neither
+/// Genie 4 nor Lich 5 handles it. Consumed as a typed event so the coverage audit
+/// stops reporting it; <see cref="Mana"/> is the attribute as sent (1 on every
+/// observed pulse). Nothing in game state reads it yet.</summary>
+public sealed record PulseEvent(int Mana) : GameEvent;
+
 // ── Named components ─────────────────────────────────────────────────────────
 
 /// <summary>
