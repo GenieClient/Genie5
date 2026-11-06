@@ -2,10 +2,20 @@
 
 **"Second Pass"** — a small fixes release. Right-click in the Healing window now transfers
 outside wounds and scars as well as inside ones, the Mobs panel's ignore list scrolls
-instead of pushing its controls off the panel, and the game's mana pulse no longer
-shows up as an unknown tag.
+instead of pushing its controls off the panel, the game's mana pulse no longer shows up
+as an unknown tag, and on the experimental editor renderer Find opens the editor's own
+search panel.
 
 ## ✨ New
+- **Find on editor-renderer windows opens the editor's search panel** — on a game or
+  stream window drawn by the experimental editor renderer (`#config useeditorgamewindow`
+  or `useeditorstreamwindow`), Ctrl+F, Cmd+F on macOS and the window menu's **Find…**
+  all open the editor's own search panel, with live match highlighting through the
+  scrollback, a match count and regex / match-case / whole-word toggles, instead of the
+  plain in-window Find bar. Windows on the standard renderer keep the Find bar, and a
+  macro bound to Ctrl+F still takes precedence. **If you use the editor renderer on
+  Windows or Linux:** Ctrl+F on those windows now opens the panel rather than the bar.
+  Thanks @simtel12 ([#258](https://github.com/GenieClient/Genie5/pull/258)).
 - **Right-click transfers outside wounds too** — in the Healing window, right-click on a
   wounded part of a patient sends DragonRealms' `transfer` for that figure's wound type:
   `transfer <patient> <part>` for an outside wound, `transfer <patient> internal <part>`

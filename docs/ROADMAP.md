@@ -82,8 +82,9 @@ indexing, base-10 `log()`).
 map link on a wrong room match, `#mapper reset` reloads the zone from disk,
 and a coloured `#echo >window` keeps its colour.
 **beta.9.10.1** is a small fixes release: Healing-window right-click transfers outside
-wounds and scars too, the Mobs ignore list scrolls, and the mana pulse is a typed event
-instead of an unknown tag. **beta.9.10** is an Empath release: the Healing window draws the Injuries window's body as four figures or one overlay, with bulk-take options, partial takes and patient link messages, and AutoLog falls back to a numbered file when another copy holds the day's log. **beta.9.9.1** is a small fixes release: the Injuries panel reads nerve damage and the
+wounds and scars too, the Mobs ignore list scrolls, the mana pulse is a typed event
+instead of an unknown tag, and Find on the experimental editor renderer opens the
+editor's own search panel (a contributor change). **beta.9.10** is an Empath release: the Healing window draws the Injuries window's body as four figures or one overlay, with bulk-take options, partial takes and patient link messages, and AutoLog falls back to a numbered file when another copy holds the day's log. **beta.9.9.1** is a small fixes release: the Injuries panel reads nerve damage and the
 tail from `health` with the server dialog winning on conflicts, AutoLog rolls to the new
 day's file at midnight, and Cross-Zone Connections loads again. **beta.9.9** is a mapper release: return portals (Fang Cove's EXIT portal) route back to
 where you entered, the map editor gains **Add Room Here** and **Link to…**, the

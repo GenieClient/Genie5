@@ -6,10 +6,11 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 ## Latest: v5.0.0-beta.9.10.1 — Second Pass
 
-A small fixes release: right-click in the Healing window transfers outside wounds and scars too, the Mobs panel's ignore list scrolls, and the game's mana pulse is no longer reported as an unknown tag.
+A small fixes release: right-click in the Healing window transfers outside wounds and scars too, the Mobs panel's ignore list scrolls, the game's mana pulse is no longer reported as an unknown tag, and on the experimental editor renderer Find opens the editor's own search panel.
 
 > **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.10.1** as a delta from beta.9.10.
 
+- **Find on editor-renderer windows opens the editor's search panel** — on a game or stream window drawn by the experimental editor renderer (`#config useeditorgamewindow` / `useeditorstreamwindow`), Ctrl+F, Cmd+F on macOS and the window menu's **Find…** open the editor's own search panel (live match highlighting, match count, regex / match-case / whole-word) instead of the in-window Find bar. Standard-renderer windows keep the bar; a macro bound to Ctrl+F still wins. On Windows and Linux, Ctrl+F on an editor-renderer window now opens the panel rather than the bar. Thanks @simtel12 ([#258](https://github.com/GenieClient/Genie5/pull/258)).
 - **Right-click transfers outside wounds too** — right-click on a patient's wounded part sends the game's `transfer` for that figure's wound type (`transfer <patient> <part>`, `… internal <part> [scar]`, or `… <part> external scar`); in the Overlay that is the part's worst wound, and the wound card's **Transfer** button covers every axis. Where the game's own injuries dialog marked the part, its command still wins. See [the Healing window](The-Interface#the-healing-window).
 - **Mobs panel: the ignore list scrolls** — a long pattern list no longer pushes the Add box and **Restore defaults** off the panel.
 - **Mana pulse is no longer an unknown tag** — `<pulse mana="1"/>` is read as a typed event, so **Report XML Gap** stops drafting an issue for it ([#379](https://github.com/GenieClient/Genie5/issues/379)).
