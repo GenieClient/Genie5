@@ -335,8 +335,11 @@ public static class ScriptParser
                     // Relative names — including sub-paths like lib\x.js, which used
                     // to resolve against the process working directory — resolve
                     // against the scripts dir, as .cmd/.inc includes always have.
-                    // Path.Combine keeps a rooted name as-is.
-                    var jsPath = Path.Combine(scriptsDir, incName);
+                    // Path.Combine keeps a rooted name as-is. The probe matches
+                    // case-insensitively (#392); on a miss keep the exact path
+                    // so the not-found echo names what the script asked for.
+                    var jsPath = ScriptFileProbe.Find(scriptsDir, incName)
+                              ?? Path.Combine(scriptsDir, incName);
                     output.Add((origin, i + 1,
                         !File.Exists(jsPath)          ? $"echo [script] include not found: {incName}"
                         : !IsUnderAnyRoot(jsPath, roots) ? RefusedInclude(incName)
@@ -417,10 +420,10 @@ public static class ScriptParser
 
     private static string? ResolveIncludePath(string dir, string name)
     {
+        // Case-insensitive, like every other script lookup (#392).
         foreach (var ext in new[] { "", ".inc", ".cmd" })
         {
-            var p = Path.Combine(dir, name + ext);
-            if (File.Exists(p)) return p;
+            if (ScriptFileProbe.Find(dir, name + ext) is { } p) return p;
         }
         return null;
     }

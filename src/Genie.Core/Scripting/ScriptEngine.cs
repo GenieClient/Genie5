@@ -649,12 +649,12 @@ public sealed class ScriptEngine
             if (!exts.Contains(e, StringComparer.OrdinalIgnoreCase)) exts.Add(e);
         // Directory-major: every extension is tried in the user's Scripts dir
         // before the repo dir is consulted at all, so a local copy shadows the
-        // repo copy regardless of extension (issue #221).
+        // repo copy regardless of extension (issue #221). The probe matches
+        // case-insensitively so `.script` finds Script.cmd on Linux too (#392).
         foreach (var dir in SearchDirs())
             foreach (var ext in exts)
             {
-                var p = Path.Combine(dir, name + ext);
-                if (File.Exists(p)) return p;
+                if (ScriptFileProbe.Find(dir, name + ext) is { } p) return p;
             }
         return null;
     }
