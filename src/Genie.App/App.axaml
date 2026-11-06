@@ -636,24 +636,32 @@
                        Foreground="{DynamicResource Theme.SectionHeader}" FontWeight="SemiBold"/>
             <TextBlock FontSize="10" Foreground="{DynamicResource Theme.TextMuted}" TextWrapping="Wrap"
                        Text="Creatures matching any pattern are hidden here and excluded from $monstercount. Patterns are case-insensitive regexes — right-click a mob above to ignore it exactly."/>
-            <ItemsControl ItemsSource="{Binding ViewModel.IgnorePatterns}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="vm:IgnorePatternItem">
-                  <Grid ColumnDefinitions="*,Auto" Margin="0,1">
-                    <SelectableTextBlock Grid.Column="0" Text="{Binding Pattern}"
-                                         FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}"
-                                         TextWrapping="Wrap" VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Content="✕" FontSize="10"
-                            Padding="4,0" MinHeight="0" MinWidth="0"
-                            Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Theme.Danger}"
-                            AutomationProperties.Name="Remove pattern"
-                            AutomationProperties.HelpText="Remove this pattern"
-                            Command="{Binding RemoveCommand}"
-                            ToolTip.Tip="Remove this pattern"/>
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <!-- The pattern list scrolls past ~8 rows. The editor sits in the
+                 panel's Auto row, so without a bound a long list (a dozen
+                 Riverhaven NPCs plus the defaults) swallowed the whole panel
+                 and pushed the Add box and Restore defaults off-screen with
+                 no way to reach them. -->
+            <ScrollViewer x:Name="IgnoreListScroll" MaxHeight="180"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <ItemsControl ItemsSource="{Binding ViewModel.IgnorePatterns}" Margin="0,0,4,0">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:IgnorePatternItem">
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                      <SelectableTextBlock Grid.Column="0" Text="{Binding Pattern}"
+                                           FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}"
+                                           TextWrapping="Wrap" VerticalAlignment="Center"/>
+                      <Button Grid.Column="1" Content="✕" FontSize="10"
+                              Padding="4,0" MinHeight="0" MinWidth="0"
+                              Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Theme.Danger}"
+                              AutomationProperties.Name="Remove pattern"
+                              AutomationProperties.HelpText="Remove this pattern"
+                              Command="{Binding RemoveCommand}"
+                              ToolTip.Tip="Remove this pattern"/>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
             <Grid ColumnDefinitions="*,Auto">
               <TextBox Grid.Column="0" Text="{Binding ViewModel.NewPattern}"
                        Watermark="Add pattern…" FontSize="11" MinHeight="0" Padding="6,3">
