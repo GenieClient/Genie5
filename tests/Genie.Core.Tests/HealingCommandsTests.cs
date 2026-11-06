@@ -88,26 +88,30 @@ public class HealingCommandsTests
     public void A_patient_region_click_takes_that_wound_on_that_axis(InjuryAxis axis, string expected)
         => Assert.Equal(new[] { expected }, Builder().HealRegion("Naper", "leftArm", axis).Lines);
 
-    /// <summary>Public #375: DR's own word order, as its injuries dialog writes
-    /// it (<c>transfer Renucci internal left leg</c>) and as typed in the
-    /// 2026-09-28 session (<c>transfer Renucci internal chest scar</c>, which
-    /// DR answered with "internal chest scars are fully healed").</summary>
+    /// <summary>Public #375: internal axes use DR's own word order, as its
+    /// injuries dialog writes it (<c>transfer Renucci internal left leg</c>)
+    /// and as typed in the 2026-09-28 session (<c>transfer Renucci internal
+    /// chest scar</c>, which DR answered with "internal chest scars are fully
+    /// healed"). External axes use the plain form — external is DR's default
+    /// (Elanthipedia's <c>TAKE MELETE HEAD</c>; TAKE and TRANSFER are
+    /// synonyms there) — and for a scar the explicit <c>external scar</c>
+    /// that Lich 5's smarttransfer.lic sends live.</summary>
     [Theory]
     [InlineData(InjuryAxis.FreshInternal, "leftLeg", "transfer Renucci internal left leg")]
     [InlineData(InjuryAxis.ScarInternal,  "chest",   "transfer Renucci internal chest scar")]
     [InlineData(InjuryAxis.FreshInternal, "nsys",    "transfer Renucci internal nerves")]
-    public void A_transfer_uses_DRs_internal_wording(InjuryAxis axis, string region, string expected)
+    [InlineData(InjuryAxis.FreshExternal, "head",    "transfer Renucci head")]
+    [InlineData(InjuryAxis.ScarExternal,  "leftArm", "transfer Renucci left arm external scar")]
+    public void A_transfer_uses_DRs_wording_for_each_axis(InjuryAxis axis, string region, string expected)
         => Assert.Equal(new[] { expected }, Builder().Transfer("Renucci", region, axis).Lines);
 
-    /// <summary>No external transfer line has been seen yet, so none is
-    /// guessed; and there is nothing to transfer from yourself.</summary>
+    /// <summary>There is nothing to transfer from yourself.</summary>
     [Fact]
-    public void No_transfer_for_an_external_axis_or_for_yourself()
+    public void No_transfer_for_yourself()
     {
-        Assert.True(Builder().Transfer("Renucci", "chest", InjuryAxis.FreshExternal).IsEmpty);
-        Assert.True(Builder().Transfer("Renucci", "chest", InjuryAxis.ScarExternal).IsEmpty);
         Assert.True(Builder().Transfer("", "chest", InjuryAxis.FreshInternal).IsEmpty);
-        Assert.True(Builder().Transfer("self", "chest", InjuryAxis.FreshInternal).IsEmpty);
+        Assert.True(Builder().Transfer("self", "chest", InjuryAxis.FreshExternal).IsEmpty);
+        Assert.True(Builder().Transfer("me", "chest", InjuryAxis.ScarExternal).IsEmpty);
     }
 
     [Fact]

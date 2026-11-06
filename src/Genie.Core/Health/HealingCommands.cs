@@ -178,28 +178,32 @@ public sealed class HealingCommandBuilder
 
     /// <summary>
     /// Transfer one wound DR's dialog did not mark (public #375): the
-    /// <c>transfer</c> verb, with DR's own word order
-    /// (<c>transfer &lt;patient&gt; internal &lt;part&gt; [scar]</c>, as DR's
-    /// injuries dialog writes it and as typed in the 2026-09-28 session).
+    /// <c>transfer</c> verb, which DR takes as a synonym of <c>take</c>
+    /// (Elanthipedia, Take command: <c>{TAKE/TRANSFER} {patient} {body part}
+    /// … [EXTERNAL|INTERNAL] [WOUND|SCAR]</c>).
     ///
-    /// <para>Internal axes only. No external <c>transfer</c> line has been seen
-    /// from DR or a community script yet, so an external axis returns nothing
-    /// rather than a guessed wording (left-click <c>take</c> covers it). Nothing
-    /// for the player's own body.</para>
+    /// <para>Internal axes use DR's own word order (<c>transfer &lt;patient&gt;
+    /// internal &lt;part&gt; [scar]</c>, as its injuries dialog writes it and
+    /// as typed in the 2026-09-28 session). External axes use the plain form
+    /// (<c>transfer &lt;patient&gt; &lt;part&gt;</c> — external is DR's
+    /// default, the wiki's own <c>TAKE MELETE HEAD</c> example) and, for a
+    /// scar, the explicit <c>&lt;part&gt; external scar</c> that Lich 5's
+    /// smarttransfer.lic sends live. Nothing for the player's own body.</para>
     /// </summary>
     public HealingAction Transfer(string? patient, string regionId, InjuryAxis axis)
     {
-        if (IsSelf(patient) || !CanTransfer(axis)) return HealingAction.None;
+        if (IsSelf(patient)) return HealingAction.None;
         var part = PartWords(regionId);
         var p    = CleanPatient(patient);
         if (part.Length == 0 || p.Length == 0) return HealingAction.None;
-        return HealingAction.Of($"transfer {p} internal {part}{(IsScar(axis) ? " scar" : "")}");
+        return HealingAction.Of(axis switch
+        {
+            InjuryAxis.FreshInternal => $"transfer {p} internal {part}",
+            InjuryAxis.ScarInternal  => $"transfer {p} internal {part} scar",
+            InjuryAxis.ScarExternal  => $"transfer {p} {part} external scar",
+            _                        => $"transfer {p} {part}",
+        });
     }
-
-    /// <summary>True for the axes <see cref="Transfer"/> has a confirmed
-    /// wording for: the two internal ones.</summary>
-    public static bool CanTransfer(InjuryAxis axis)
-        => axis is InjuryAxis.FreshInternal or InjuryAxis.ScarInternal;
 
     /// <summary>
     /// Take every wound on <paramref name="chart"/>, one queued <c>take</c> per

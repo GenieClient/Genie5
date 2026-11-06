@@ -223,26 +223,26 @@ public class HealingDialogMergeTests
     }
 
     /// <summary>Public #375: a part DR didn't mark, on another patient, sends
-    /// the internal-axis transfer. External wording is unconfirmed, so an
-    /// external axis stays inert; so does a healthy tile.</summary>
+    /// the builder's transfer for the selected axis — the plain form on the
+    /// external view, DR's <c>internal</c> order on the internal one. A
+    /// healthy tile stays inert.</summary>
     [Fact]
-    public void An_unmarked_wounded_part_transfers_on_an_internal_axis_only()
+    public void An_unmarked_wounded_part_transfers_on_the_selected_axis()
     {
         var r = Build(RecordedOpen, MarkedParts);
         r.Healing.Apply(RenucciTouch());
         var chest = Cell(r.Healing, "chest");
 
-        r.Healing.TransferRegion(chest);                   // Fresh External: no confirmed wording
-        Assert.Empty(r.Sent);
-        Assert.DoesNotContain("right-click", chest.Tip);
+        Assert.False(chest.DrTransfer);
+        Assert.Contains("right-click: transfer Renucci chest", chest.Tip);
+        r.Healing.TransferRegion(chest);                   // Fresh External (the default view)
 
         Axis(r.Healing, InjuryAxis.FreshInternal);
-        Assert.False(chest.DrTransfer);
         Assert.Contains("right-click: transfer Renucci internal chest", chest.Tip);
         r.Healing.TransferRegion(chest);
         r.Healing.TransferRegion(Cell(r.Healing, "head")); // healthy: nothing
 
-        Assert.Equal(new[] { "transfer Renucci internal chest" }, r.Sent);
+        Assert.Equal(new[] { "transfer Renucci chest", "transfer Renucci internal chest" }, r.Sent);
         Assert.Empty(r.HostSent);
     }
 

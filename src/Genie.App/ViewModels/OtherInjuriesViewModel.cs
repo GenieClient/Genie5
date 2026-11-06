@@ -184,7 +184,7 @@ public sealed partial class OtherInjuriesViewModel : ReactiveObject, IServerDial
             part.Tip = part.CanTransfer
                 ? $"{part.Cell.Tip} — click to {(string.IsNullOrWhiteSpace(d.Tooltip) ? d.Cmd : d.Tooltip)}"
                 : fromReading
-                    ? $"{part.Cell.Tip} — from your last touch; not transferable in this view"
+                    ? $"{part.Cell.Tip} — from your last touch; right-click it in the Healing window to transfer"
                     : part.Cell.Tip;
         }
 

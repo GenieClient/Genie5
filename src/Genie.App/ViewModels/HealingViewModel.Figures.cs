@@ -282,20 +282,19 @@ public sealed partial class HealingViewModel
 
     /// <summary>
     /// Right-click on a figure: transfer the part. DR's own marked transfer
-    /// wins; otherwise the figure's axis, or in the overlay the worst inside
-    /// wound (only inside wounds have a transfer wording).
+    /// wins; otherwise the figure's axis, or in the overlay the part's worst
+    /// wound on any axis.
     /// </summary>
     public void FigureRightClicked(BodyFigure figure, Point point)
     {
         if (PartAt(figure, point) is not { } part) return;
         var axis = figure.Axis
-                   ?? part.Wounds.Where(w => HealingCommandBuilder.CanTransfer(w.Key))
-                                 .OrderByDescending(w => w.Value)
+                   ?? part.Wounds.OrderByDescending(w => w.Value)
                                  .Select(w => (InjuryAxis?)w.Key)
                                  .FirstOrDefault();
         if (axis is null)
         {
-            // Nothing transferable by the builder; DR's own may still apply.
+            // A healthy part: DR's own marked transfer may still apply.
             if (!IsSelf && DrDialog is { } dialog) dialog.TransferRegion(part.RegionId);
             return;
         }
@@ -315,7 +314,7 @@ public sealed partial class HealingViewModel
                 o.Axis, o.Label, $"{PerceiveHealthParser.SeverityName((WoundSeverity)rung)} ({rung}/13)",
                 new SolidColorBrush(HealingSprites.ColourFor(o.Axis, rung)),
                 Striped: HealingSprites.IsScar(o.Axis),
-                CanTransfer: !IsSelf && HealingCommandBuilder.CanTransfer(o.Axis)));
+                CanTransfer: !IsSelf));
         }
     }
 

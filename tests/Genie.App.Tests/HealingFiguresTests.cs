@@ -170,8 +170,7 @@ public class HealingFiguresTests
                      vm.SelectedPartWounds.Select(w => w.Axis));
         Assert.False(vm.SelectedPartWounds[0].Striped);
         Assert.True(vm.SelectedPartWounds[1].Striped);
-        Assert.False(vm.SelectedPartWounds[0].CanTransfer);   // outside: no transfer wording
-        Assert.True(vm.SelectedPartWounds[1].CanTransfer);
+        Assert.All(vm.SelectedPartWounds, w => Assert.True(w.CanTransfer)); // both axes, public #375
     }
 
     [Fact]

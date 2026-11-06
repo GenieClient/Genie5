@@ -626,8 +626,8 @@ public sealed partial class HealingViewModel : ReactiveObject
     /// <summary>
     /// What a right-click on each tile would send: DR's own transfer where its
     /// dialog marked the part, else (for another patient, on a wounded tile)
-    /// the internal-axis <c>transfer</c> the builder has a confirmed wording
-    /// for (public #375). Nothing on yourself.
+    /// the builder's <c>transfer</c> for the selected axis (public #375).
+    /// Nothing on yourself.
     /// </summary>
     private void RenderTransfers()
     {
@@ -746,7 +746,7 @@ public sealed partial class HealingViewModel : ReactiveObject
     /// the part, DR's own command goes through the dialog host (resolved and
     /// separator-escaped like any dialog click). Otherwise a wounded tile on
     /// another patient sends the builder's <c>transfer</c> for the selected
-    /// axis (internal axes only, public #375). Nothing on yourself.
+    /// axis (public #375). Nothing on yourself.
     /// </summary>
     public void TransferRegion(RegionCell cell)
     {
@@ -765,8 +765,8 @@ public sealed partial class HealingViewModel : ReactiveObject
     }
 
     /// <summary>Transfer a part: DR's own marked transfer when its dialog
-    /// offers one, else the builder's internal-axis transfer. Nothing on
-    /// yourself or for an external axis.</summary>
+    /// offers one, else the builder's transfer for that axis. Nothing on
+    /// yourself.</summary>
     public void TransferPart(string regionId, InjuryAxis axis)
     {
         if (string.IsNullOrEmpty(regionId) || IsSelf) return;
