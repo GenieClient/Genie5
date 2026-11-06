@@ -262,7 +262,7 @@
                       <Button Grid.Column="3" Classes="heal" Content="Transfer" Margin="4,0,0,0"
                               Tag="{Binding}" Click="OnTransferWound" VerticalAlignment="Center"
                               IsVisible="{Binding CanTransfer}"
-                              ToolTip.Tip="transfer &lt;patient&gt; internal &lt;part&gt; [scar]"/>
+                              ToolTip.Tip="Transfer this wound to yourself with DR's own wording for its type: transfer &lt;patient&gt; &lt;part&gt; (inside: … internal &lt;part&gt;; scars add scar / external scar)."/>
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
