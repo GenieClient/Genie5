@@ -21,7 +21,7 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.9.10 "Bedside Manner"
+## Where we are — v5.0.0-beta.9.10.1 "Second Pass"
 
 Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
 experience is feature-complete; beta is about soak, polish, and closing the
@@ -81,7 +81,9 @@ indexing, base-10 `log()`).
 **beta.9.8** is a fixes-only follow-up: the mapper no longer overwrites a good
 map link on a wrong room match, `#mapper reset` reloads the zone from disk,
 and a coloured `#echo >window` keeps its colour.
-**beta.9.10** is an Empath release: the Healing window draws the Injuries window's body as four figures or one overlay, with bulk-take options, partial takes and patient link messages, and AutoLog falls back to a numbered file when another copy holds the day's log. **beta.9.9.1** is a small fixes release: the Injuries panel reads nerve damage and the
+**beta.9.10.1** is a small fixes release: Healing-window right-click transfers outside
+wounds and scars too, the Mobs ignore list scrolls, and the mana pulse is a typed event
+instead of an unknown tag. **beta.9.10** is an Empath release: the Healing window draws the Injuries window's body as four figures or one overlay, with bulk-take options, partial takes and patient link messages, and AutoLog falls back to a numbered file when another copy holds the day's log. **beta.9.9.1** is a small fixes release: the Injuries panel reads nerve damage and the
 tail from `health` with the server dialog winning on conflicts, AutoLog rolls to the new
 day's file at midnight, and Cross-Zone Connections loads again. **beta.9.9** is a mapper release: return portals (Fang Cove's EXIT portal) route back to
 where you entered, the map editor gains **Add Room Here** and **Link to…**, the
@@ -235,7 +237,8 @@ in beta.8):
 
 - Astral Plane: seven missing Map999 conduit nodes, plus a pathfinder guard so
   the built-in walker never routes through `script X` arcs it can't execute
-  ([#253](https://github.com/GenieClient/Genie5/issues/253)).
+  (tracked in the Maps repository as
+  [Maps #267](https://github.com/GenieClient/Maps/issues/267)).
 
 ### Track E — In-app script editor ✅ *shipped in beta.9.7*
 
@@ -302,9 +305,11 @@ window, and the largest of them), SpellInfo
 ([#267](https://github.com/GenieClient/Genie5/issues/267), as `/spellinfo`) and
 per-window logging
 ([#270](https://github.com/GenieClient/Genie5/issues/270), as `#windowlog`).
-Still open are Bank Tracker
-([#266](https://github.com/GenieClient/Genie5/issues/266)) and BestiaryQuery
-([#269](https://github.com/GenieClient/Genie5/issues/269)).
+Bank Tracker and BestiaryQuery are still to come; their rows on the
+[#271](https://github.com/GenieClient/Genie5/issues/271) tracker carry the
+decisions (Bank Tracker is sequenced behind the structured bank dialog from
+[#156](https://github.com/GenieClient/Genie5/issues/156); BestiaryQuery's
+original wiki query is dead and needs a replacement source).
 
 Two are retired rather than pending. ExpEcho's behaviour shipped built-in with
 the beta.7 Experience window. Combat Tracker

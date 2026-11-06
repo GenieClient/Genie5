@@ -4,11 +4,21 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` or `v5.0.0-beta.N.M` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.9.10 — Bedside Manner
+## Latest: v5.0.0-beta.9.10.1 — Second Pass
+
+A small fixes release: right-click in the Healing window transfers outside wounds and scars too, the Mobs panel's ignore list scrolls, and the game's mana pulse is no longer reported as an unknown tag.
+
+> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.10.1** as a delta from beta.9.10.
+
+- **Right-click transfers outside wounds too** — right-click on a patient's wounded part sends the game's `transfer` for that figure's wound type (`transfer <patient> <part>`, `… internal <part> [scar]`, or `… <part> external scar`); in the Overlay that is the part's worst wound, and the wound card's **Transfer** button covers every axis. Where the game's own injuries dialog marked the part, its command still wins. See [the Healing window](The-Interface#the-healing-window).
+- **Mobs panel: the ignore list scrolls** — a long pattern list no longer pushes the Add box and **Restore defaults** off the panel.
+- **Mana pulse is no longer an unknown tag** — `<pulse mana="1"/>` is read as a typed event, so **Report XML Gap** stops drafting an issue for it ([#379](https://github.com/GenieClient/Genie5/issues/379)).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-beta.9.10.1)
+
+## v5.0.0-beta.9.10 — Bedside Manner
 
 An Empath release: the Healing window draws the same body as the Injuries window, as four figures or one overlaid figure, with bulk-take options, partial takes and patient link messages.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.10** as a delta from beta.9.9.1.
 
 - **Body figures in the Healing window** — **Four figures** (fresh outside, fresh inside, scar outside, scar inside) or **Overlay** (every wound on one body: outside wounds on a part's edge, inside wounds in its centre, scars striped). In Overlay, clicking a part lists its wounds with a **Take** button for each. See [the Healing window](The-Interface#the-healing-window).
 - **Bulk-take options** — **Take Minor**, plus **Include internal**, **Include scars**, **Half on major** and **Leave bleeders** for Take All and Take Minor.

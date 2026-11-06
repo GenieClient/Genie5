@@ -1,3 +1,31 @@
+# Genie 5 — v5.0.0-beta.9.10.1
+
+**"Second Pass"** — a small fixes release. Right-click in the Healing window now transfers
+outside wounds and scars as well as inside ones, the Mobs panel's ignore list scrolls
+instead of pushing its controls off the panel, and the game's mana pulse no longer
+shows up as an unknown tag.
+
+## ✨ New
+- **Right-click transfers outside wounds too** — in the Healing window, right-click on a
+  wounded part of a patient sends DragonRealms' `transfer` for that figure's wound type:
+  `transfer <patient> <part>` for an outside wound, `transfer <patient> internal <part>`
+  (plus `scar`) for an inside one, and `transfer <patient> <part> external scar` for an
+  outside scar. In the Overlay, the part's worst wound on any axis is the one transferred,
+  and the wound card's **Transfer** button and its tooltip now cover every axis. Where the
+  game's own injuries dialog marked the part transferable, its command still wins.
+  ([#375](https://github.com/GenieClient/Genie5/issues/375) follow-up)
+
+## 🐛 Fixes
+- **Mobs panel: the ignore list scrolls** — once the list grew past a handful of patterns
+  it took the whole panel, pushing the Add box and **Restore defaults** below the window.
+  The list now scrolls in place (about eight rows) and the editor's controls stay reachable.
+- **Mana pulse is no longer an unknown tag** — DragonRealms sends a `<pulse mana="1"/>`
+  that no client handled, so **Report XML Gap** (`#audit xmlhunting`) drafted a
+  coverage-gap issue on every pulse. It is now read as a typed event and leaks no text
+  ([#379](https://github.com/GenieClient/Genie5/issues/379)).
+
+---
+
 # Genie 5 — v5.0.0-beta.9.10
 
 **"Bedside Manner"** — an Empath release. The Healing window now draws the same body as the
