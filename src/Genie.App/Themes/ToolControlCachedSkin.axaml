@@ -148,7 +148,7 @@
                                     Command="{Binding WindowMenu.SaveAsCommand}"
                                     IsVisible="{Binding WindowMenu.ShowSaveAs}" />
                           <MenuItem Header="Find…"
-                                    InputGesture="Ctrl+F"
+                                    InputGesture="{x:Static docking:WindowMenuBehavior.FindGesture}"
                                     Command="{Binding WindowMenu.FindCommand}"
                                     IsVisible="{Binding WindowMenu.ShowFind}" />
                           <MenuItem Header="Clear"
