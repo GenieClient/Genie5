@@ -82,7 +82,7 @@
         <MenuItem Header="Master _Toggles"
                   ToolTip.Tip="Turn whole features on or off without touching their rules or data — rules stay loaded and editable, they just stop applying. Genie 4 File-menu parity. Saved to settings.cfg; same as `#config triggers off` etc. Rule toggles apply to new lines — already-rendered text is unchanged.">
           <MenuItem Header="_Highlights"  ToggleType="CheckBox" IsChecked="{Binding HighlightsEnabled, Mode=TwoWay}"
-                    ToolTip.Tip="User highlight rules — colours and highlight sounds (built-in default highlights and Names are unaffected)."/>
+                    ToolTip.Tip="User highlight rules — colours and highlight sounds (presets and Names are unaffected)."/>
           <MenuItem Header="_Triggers"    ToggleType="CheckBox" IsChecked="{Binding TriggersEnabled, Mode=TwoWay}"
                     ToolTip.Tip="User triggers — no trigger fires while off."/>
           <MenuItem Header="_Substitutes" ToggleType="CheckBox" IsChecked="{Binding SubstitutesEnabled, Mode=TwoWay}"

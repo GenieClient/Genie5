@@ -75,9 +75,9 @@ A rule can also be **scoped to specific windows**: the Highlights tab's **Window
 
 *Substring highlights in action — six rules coloring an inventory list.*
 
-Two built-in colorings live alongside your own rules:
+Genie colors game text only from what the game styles and what you configure — there are no hidden built-in color rules, as in Genie 4. Two colorings you can adjust live alongside your own rules:
 
-- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
+- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. Clickable links use the `link` preset (game-command links) and the `url` preset (web links); set either to `Default` to show links in the normal text color, still underlined. (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
 - **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it on the **Edit → Configuration… → Presets** tab or with `#config monsterbold on|off`.
 
 ### Substitutes — rewriting text
