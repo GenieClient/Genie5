@@ -67,7 +67,15 @@ Make important lines jump out:
 
 The pattern comes first, then the colour. (Genie 4's order, with the match type in front, works too: `#highlight {string} {red} {You are bleeding}`.)
 
-Highlights support foreground and background colors, whole-line vs. substring matching, and case sensitivity — all editable in the Highlights tab. They paint in **every window** — the game window, the stream tabs, and the Room / Mobs / Players panels.
+Highlights support foreground and background colors, whole-line vs. substring matching, and case sensitivity — all editable in the Highlights tab. The match type decides what gets colored, as in Genie 4:
+
+| Match type | Colors |
+| --- | --- |
+| **String** | the text, wherever it appears in the line |
+| **Line** | the whole line, when the text appears anywhere in it |
+| **BeginsWith** | the whole line, when it starts with the text |
+| **Regex** | only the text inside the `( )` capture groups; the whole match if the pattern has no groups. Use `(?: )` for grouping that shouldn't narrow the color — `(?:north\|south) gate` colors the whole phrase, `(north\|south) gate` only the direction. |
+ They paint in **every window** — the game window, the stream tabs, and the Room / Mobs / Players panels.
 
 A rule can also be **scoped to specific windows**: the Highlights tab's **Windows** field takes a comma-separated list of window ids (`main`, `room`, `mobs`, `players`, `backpack`, `experience`, a tracker panel by name like `Active Spells`, or a stream tab like `thoughts`); leave it blank for everywhere, which is the default for every existing and imported rule. Ids are case-insensitive. The same list works as the last argument of `#highlight add`.
 
