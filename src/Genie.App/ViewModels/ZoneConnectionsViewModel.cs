@@ -36,8 +36,14 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
 
     private readonly ZoneConnectionsRepository _repo;
     private readonly string? _mapsDir;
-    private readonly Dictionary<string, IReadOnlyList<RoomChoice>> _roomCache =
+    // One load per zone, shared by every caller. RefreshRoomsAsync is fired
+    // and forgotten from the zone setters and can also be awaited directly, so
+    // two calls can be in flight at once; off the UI thread (tests) their
+    // continuations run in parallel. Caching the Task under a lock means no
+    // write to the dictionary ever happens after an await.
+    private readonly Dictionary<string, Task<IReadOnlyList<RoomChoice>>> _roomCache =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _roomCacheLock = new();
     private bool _syncing;
     private bool _addingForFrom;
 
@@ -263,13 +269,17 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
         IReadOnlyList<RoomChoice> rooms = Array.Empty<RoomChoice>();
         if (!string.IsNullOrWhiteSpace(zone) && zone != AddZoneItem && !string.IsNullOrEmpty(_mapsDir))
         {
-            if (!_roomCache.TryGetValue(zone, out var cached))
+            Task<IReadOnlyList<RoomChoice>> load;
+            lock (_roomCacheLock)
             {
-                var path = Path.Combine(_mapsDir, zone + ".xml");
-                cached = await Task.Run(() => LoadRooms(path));
-                _roomCache[zone] = cached;
+                if (!_roomCache.TryGetValue(zone, out load!))
+                {
+                    var path = Path.Combine(_mapsDir, zone + ".xml");
+                    load = Task.Run(() => LoadRooms(path));
+                    _roomCache[zone] = load;
+                }
             }
-            rooms = cached;
+            rooms = await load;
         }
 
         // Ignore a result that is stale because the user picked another zone meanwhile.
