@@ -30,3 +30,17 @@ public static class EchoKindPresets
         _                      => ScriptEcho,
     };
 }
+
+/// <summary>The Genie 4 presets that colour the vitals bars (public #406):
+/// foreground = the bar's fill, background = its track and border, as in Genie 4
+/// (<c>FormMain.cs</c>, <c>ComponentBarsHealth.ForegroundColor = PresetList["health"]…</c>).</summary>
+public static class VitalsPresets
+{
+    public const string Health        = "health";
+    public const string Mana          = "mana";
+    public const string Stamina       = "stamina";
+    public const string Spirit        = "spirit";
+    public const string Concentration = "concentration";
+
+    public static readonly string[] All = { Health, Mana, Stamina, Spirit, Concentration };
+}

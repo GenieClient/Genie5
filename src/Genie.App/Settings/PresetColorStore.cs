@@ -6,8 +6,8 @@ using Genie.Core.Presets;
 namespace Genie.App.Settings;
 
 /// <summary>
-/// Reads and writes individual preset foreground colours for editors outside
-/// the Presets tab — Display Settings and the theme editor (public #406). The
+/// Reads and writes individual preset colours for editors outside the Presets
+/// tab — Display Settings and the theme editor (public #406). The
 /// preset stays the ONE source of the colour: these editors change the preset
 /// itself rather than keeping a second setting.
 ///
@@ -45,28 +45,47 @@ public sealed class PresetColorStore
     public string GetForeground(string id)
     {
         if (Connected) return _engine.GetForeground(id);
-        var disk = Load(GlobalPath).FirstOrDefault(m => m.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
-        return disk?.ForegroundColor ?? new PresetEngine().GetForeground(id);
+        return DiskShared(id)?.ForegroundColor ?? new PresetEngine().GetForeground(id);
     }
+
+    /// <summary>The preset's effective background ("" = none), read like
+    /// <see cref="GetForeground"/>.</summary>
+    public string GetBackground(string id)
+    {
+        if (Connected) return _engine.GetBackground(id);
+        return DiskShared(id)?.BackgroundColor ?? new PresetEngine().GetBackground(id);
+    }
+
+    private PresetPersistenceModel? DiskShared(string id) =>
+        Load(GlobalPath).FirstOrDefault(m => m.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Show <paramref name="foreground"/> live without saving — for a
     /// dialog's preview. Undo by previewing the original value.</summary>
-    public void Preview(string id, string foreground)
+    public void Preview(string id, string foreground) => Preview(id, foreground, null);
+
+    /// <summary>Show colours live without saving. A null colour is left as it is;
+    /// an empty background means none.</summary>
+    public void Preview(string id, string? foreground, string? background)
     {
         var rule = _engine.Get(id);
         _engine.Apply(new PresetRule
         {
             Id              = rule?.Id ?? id,
-            ForegroundColor = foreground,
-            BackgroundColor = rule?.BackgroundColor ?? string.Empty,
+            ForegroundColor = foreground ?? rule?.ForegroundColor ?? "Default",
+            BackgroundColor = background ?? rule?.BackgroundColor ?? string.Empty,
             HighlightLine   = rule?.HighlightLine ?? false,
             Scope           = rule?.Scope ?? RuleScope.Global,
         });
-        UserHighlights.NotifyRulesChanged();   // repaint visible lines
+        UserHighlights.NotifyRulesChanged();   // repaint visible lines and bars
     }
 
     /// <summary>Set the preset's foreground live and save it to its layer's file.</summary>
-    public void SetForeground(string id, string foreground)
+    public void SetForeground(string id, string foreground) => Set(id, foreground, null);
+
+    /// <summary>Set the preset's colours live and save them to its layer's file.
+    /// A null colour is left as it is (live and on disk); an empty background
+    /// means none.</summary>
+    public void Set(string id, string? foreground, string? background)
     {
         var rule  = _engine.Get(id);
         var scope = Connected ? rule?.Scope ?? RuleScope.Global : RuleScope.Global;
@@ -78,7 +97,7 @@ public sealed class PresetColorStore
         // Offline, the live engine may still hold a character override from the
         // last session; only touch it when the shared value is what it shows.
         if (Connected || rule is null || rule.Scope == RuleScope.Global)
-            Preview(id, foreground);
+            Preview(id, foreground, background);
 
         var models = Load(path);
         var model  = models.FirstOrDefault(m => m.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
@@ -87,12 +106,14 @@ public sealed class PresetColorStore
             model = new PresetPersistenceModel
             {
                 Id              = rule?.Id ?? id,
+                ForegroundColor = rule?.ForegroundColor ?? new PresetEngine().GetForeground(id),
                 BackgroundColor = rule?.BackgroundColor ?? string.Empty,
                 HighlightLine   = rule?.HighlightLine ?? false,
             };
             models.Add(model);
         }
-        model.ForegroundColor = foreground;
+        if (foreground is not null) model.ForegroundColor = foreground;
+        if (background is not null) model.BackgroundColor = background;
 
         try
         {

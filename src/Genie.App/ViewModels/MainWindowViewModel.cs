@@ -4181,6 +4181,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         LoadLayeredNames(core, p, profileDir, globalDir, single);
         LoadLayeredPresets(core, p, profileDir, globalDir, single);
+        // Preset-coloured UI (the vitals bars, #406) repaints from the loaded set.
+        Avalonia.Threading.Dispatcher.UIThread.Post(UserHighlights.NotifyRulesChanged);
 
         var hadAnyMacros = glob.Macros.Rules.Count > 0 || (prof?.Macros.Rules.Count ?? 0) > 0;
         if (hadAnyMacros)

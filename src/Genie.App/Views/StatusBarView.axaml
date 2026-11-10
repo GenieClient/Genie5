@@ -5,10 +5,14 @@
      Placement and visibility belong to the host. The Magic Panels column flip
      moved into this control's own code-behind: with the strip declared twice,
      a single by-name lookup from MainWindow would find one instance or the
-     other depending on which slot was realized. -->
+     other depending on which slot was realized.
+
+     Bar colours are the Genie 4 vitals presets (public #406): fill = the
+     preset's foreground, track = its background (Controls/PresetBar.cs). -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Genie.App.ViewModels"
+             xmlns:ctl="using:Genie.App.Controls"
              x:Class="Genie.App.Views.StatusBarView"
              x:DataType="vm:MainWindowViewModel">
 
@@ -19,7 +23,7 @@
   <Grid Grid.Column="0" Margin="0,0,2,0">
     <ProgressBar Value="{Binding Vitals.Health}" Maximum="100"
                  AutomationProperties.Name="Health"
-                 Foreground="#C04040" Background="#3a1010" Height="18"
+                 ctl:PresetBar.Preset="health" Height="18"
                  CornerRadius="3"/>
     <TextBlock Text="{Binding Vitals.Health, StringFormat='health {0}%'}"
                HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -30,7 +34,7 @@
         IsVisible="{Binding Display.ShowMagicPanels}">
     <ProgressBar Value="{Binding Vitals.Mana}" Maximum="100"
                  AutomationProperties.Name="Mana"
-                 Foreground="#4060C0" Background="#172040" Height="18"
+                 ctl:PresetBar.Preset="mana" Height="18"
                  CornerRadius="3"/>
     <TextBlock Text="{Binding Vitals.Mana, StringFormat='mana {0}%'}"
                HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -40,7 +44,7 @@
   <Grid Grid.Column="2" Margin="2,0">
     <ProgressBar Value="{Binding Vitals.Stamina}" Maximum="100"
                  AutomationProperties.Name="Fatigue"
-                 Foreground="#C09040" Background="#4a3818" Height="18"
+                 ctl:PresetBar.Preset="stamina" Height="18"
                  CornerRadius="3"/>
     <TextBlock Text="{Binding Vitals.Stamina, StringFormat='fatigue {0}%'}"
                HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -50,7 +54,7 @@
   <Grid Grid.Column="3" Margin="2,0">
     <ProgressBar Value="{Binding Vitals.Spirit}" Maximum="100"
                  AutomationProperties.Name="Spirit"
-                 Foreground="#40A040" Background="#143a14" Height="18"
+                 ctl:PresetBar.Preset="spirit" Height="18"
                  CornerRadius="3"/>
     <TextBlock Text="{Binding Vitals.Spirit, StringFormat='spirit {0}%'}"
                HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -60,7 +64,7 @@
   <Grid Grid.Column="4" Margin="2,0,0,0">
     <ProgressBar Value="{Binding Vitals.Concentration}" Maximum="100"
                  AutomationProperties.Name="Concentration"
-                 Foreground="#8040C0" Background="#2a1444" Height="18"
+                 ctl:PresetBar.Preset="concentration" Height="18"
                  CornerRadius="3"/>
     <TextBlock Text="{Binding Vitals.Concentration, StringFormat='concentration {0}%'}"
                HorizontalAlignment="Center" VerticalAlignment="Center"

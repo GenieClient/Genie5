@@ -44,6 +44,17 @@ public sealed class ThemeEditorViewModel : ReactiveObject
     /// Cancel puts back exactly what was there (public #406).</summary>
     private readonly Dictionary<string, string> _originalEcho = new();
 
+    /// <summary>The vitals presets' raw fill and track at open (public #406).</summary>
+    private readonly Dictionary<string, (string Fill, string Track)> _originalVitals = new();
+
+    /// <summary>Theme keys whose colour is a vitals preset's fill / track. A fully
+    /// transparent colour there means "none": Default for a fill, no background
+    /// (the bar's normal track) for a track.</summary>
+    private static readonly HashSet<string> VitalsFillKeys =
+        ThemeKeys.VitalsPresetKeys.Select(k => k.FillKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> VitalsTrackKeys =
+        ThemeKeys.VitalsPresetKeys.Select(k => k.TrackKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Editor labels for the game-text roles — named for the Display
     /// Settings field and preset they share a value with (public #304, #406).</summary>
     public const string GameTextLabel   = "Game text (same as Display Settings → Game text)";
@@ -80,6 +91,9 @@ public sealed class ThemeEditorViewModel : ReactiveObject
         var stock = new Genie.Core.Presets.PresetEngine();
         foreach (var (_, id) in ThemeKeys.EchoPresetKeys)
             _originalEcho[id] = service.Presets?.GetForeground(id) ?? stock.GetForeground(id);
+        foreach (var (_, _, id) in ThemeKeys.VitalsPresetKeys)
+            _originalVitals[id] = (service.Presets?.GetForeground(id) ?? stock.GetForeground(id),
+                                   service.Presets?.GetBackground(id) ?? stock.GetBackground(id));
 
         IsEditingBuiltIn = _original.IsBuiltIn;
         ThemeName        = _original.IsBuiltIn ? $"My {_original.Name}" : _original.Name;
@@ -118,11 +132,16 @@ public sealed class ThemeEditorViewModel : ReactiveObject
         Add(Accents, ThemeKeys.Danger,       "Danger (errors, destructive)",       FromTheme(ThemeKeys.Danger));
         Add(Accents, ThemeKeys.DangerBg,     "Danger background",                  FromTheme(ThemeKeys.DangerBg));
 
-        Add(Vitals, ThemeKeys.HealthBar,  "Health bar",        FromTheme(ThemeKeys.HealthBar));
-        Add(Vitals, ThemeKeys.ManaBar,    "Mana bar",          FromTheme(ThemeKeys.ManaBar));
-        Add(Vitals, ThemeKeys.SpiritBar,  "Spirit bar",        FromTheme(ThemeKeys.SpiritBar));
-        Add(Vitals, ThemeKeys.StaminaBar, "Stamina bar",       FromTheme(ThemeKeys.StaminaBar));
-        Add(Vitals, ThemeKeys.ConcBar,    "Concentration bar", FromTheme(ThemeKeys.ConcBar));
+        // The vitals bars ARE the Genie 4 presets (#406): fill = foreground,
+        // track = background. Seeded from the live presets, like the echo
+        // colours; "none" shows as fully transparent.
+        static Color OrNone(string value) => Color.TryParse(value, out var c) ? c : Colors.Transparent;
+        foreach (var (fillKey, trackKey, id) in ThemeKeys.VitalsPresetKeys)
+        {
+            var name = VitalsBarName(id);
+            Add(Vitals, fillKey,  $"{name} fill",  OrNone(_originalVitals[id].Fill));
+            Add(Vitals, trackKey, $"{name} track", OrNone(_originalVitals[id].Track));
+        }
 
         // Seed from the LIVE values, not the theme file — "edit what I'm looking
         // at", including any Display Settings / Presets tweaks. Game text IS
@@ -167,9 +186,18 @@ public sealed class ThemeEditorViewModel : ReactiveObject
             BaseVariant = IsLightVariant ? "Light" : "Dark",
         };
         foreach (var e in AllEntries())
-            theme.Colors[e.Key] = ToHex(e.Value);
+            theme.Colors[e.Key] =
+                e.Value.A == 0 && VitalsFillKeys.Contains(e.Key)  ? "Default" :
+                e.Value.A == 0 && VitalsTrackKeys.Contains(e.Key) ? ""        :
+                ToHex(e.Value);
         return theme;
     }
+
+    private static string VitalsBarName(string presetId) => presetId switch
+    {
+        Genie.Core.VitalsPresets.Concentration => "Concentration",
+        _ => char.ToUpperInvariant(presetId[0]) + presetId[1..],
+    };
 
     /// <summary>Cancel path: repaint the pre-edit theme and put back the
     /// pre-edit game/echo colours (they may have been user-tweaked, so the
@@ -181,8 +209,12 @@ public sealed class ThemeEditorViewModel : ReactiveObject
         // Preview changed the echo presets live only — never saved — so
         // putting the engine back is enough.
         if (_service.Presets is { } presets)
+        {
             foreach (var (id, raw) in _originalEcho)
                 presets.Preview(id, raw);
+            foreach (var (id, (fill, track)) in _originalVitals)
+                presets.Preview(id, fill, track);
+        }
     }
 
     private static string ToHex(Color c)

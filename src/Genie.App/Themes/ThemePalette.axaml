@@ -33,10 +33,5 @@
 
   <SolidColorBrush x:Key="Theme.Selection"     Color="#553A6EA5"/>
 
-  <SolidColorBrush x:Key="Theme.HealthBar"     Color="#E05050"/>
-  <SolidColorBrush x:Key="Theme.ManaBar"       Color="#5090E0"/>
-  <SolidColorBrush x:Key="Theme.SpiritBar"     Color="#50E0A0"/>
-  <SolidColorBrush x:Key="Theme.StaminaBar"    Color="#E0C050"/>
-  <SolidColorBrush x:Key="Theme.ConcBar"       Color="#C050E0"/>
-
+  <!-- No vitals bar keys: the bars take the health / mana / … presets (#406). -->
 </ResourceDictionary>

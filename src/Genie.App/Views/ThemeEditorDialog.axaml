@@ -74,6 +74,9 @@
 
         <TextBlock Classes="section" Text="VITALS BARS"/>
         <ItemsControl ItemsSource="{Binding Vitals}"/>
+        <TextBlock Text="These are the health, mana, stamina, spirit and concentration presets on Configuration → Presets: the fill is the preset's colour and the track its background. Changing one here or there changes the same value. Fully transparent means none (Default for a fill, the normal track for a track)."
+                   FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
+                   TextWrapping="Wrap"/>
 
         <TextBlock Classes="section" Text="GAME TEXT"/>
         <ItemsControl ItemsSource="{Binding GameRoles}"/>
