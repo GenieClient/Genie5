@@ -220,7 +220,7 @@ Rearrange the panels however you like, then keep the arrangement — the **Layou
 
 ## Themes
 
-Genie ships **seven built-in themes** under **Edit → Theme** — **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light**, and **Wrayth-style** — plus a theme editor for making your own, saved as JSON in `Config/Themes`. See [Configuration & Rules](Configuration#themes).
+Genie ships **seven built-in themes** under **Edit → Theme** — **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light**, and **Wrayth-style** — plus a theme editor for making your own, saved as JSON in `Config/Themes`. A theme always sets the window chrome. It sets the game text and the three echo colours only when you pick it; after that they're yours to change until you pick a theme again. See [Configuration & Rules](Configuration#themes) for the full guide: what a theme contains, the echo presets, the theme editor, and the theme file format.
 
 ## Display settings
 
