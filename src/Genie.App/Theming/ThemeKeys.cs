@@ -71,17 +71,37 @@ public static class ThemeKeys
     public const string ConcBar      = "Theme.ConcBar";
 
     // ── Game-text defaults (routed to DisplaySettings, not resources) ─────
-    // Applying a theme seeds GameColorHex / EchoColorHex from these; the
+    // Applying a theme seeds GameColorHex from this; the
     // user's later Display Settings tweaks (and per-stream presets) always
     // win — a theme only writes them at explicit apply time, never at
     // startup re-apply (#20 "per-stream color overrides win").
     public const string GameText     = "Theme.GameText";
+
+    // ── Echo colours (routed to the Genie 4 presets, public #406) ──────────
+    // Applying a theme writes these into the inputuser / inputother /
+    // scriptecho presets, which colour echo lines. Same apply-time-only rule
+    // as GameText.
+    public const string InputUser    = "Theme.InputUser";
+    public const string InputOther   = "Theme.InputOther";
+    public const string ScriptEcho   = "Theme.ScriptEcho";
+
+    /// <summary>Legacy single echo colour (before #406). Read only: a custom
+    /// theme file that has it but none of the three echo keys applies it to
+    /// all three presets, so the theme keeps its look.</summary>
     public const string GameEcho     = "Theme.GameEcho";
+
+    /// <summary>The echo theme keys and the preset each one sets.</summary>
+    public static readonly (string Key, string PresetId)[] EchoPresetKeys =
+    {
+        (InputUser,  Genie.Core.EchoKindPresets.InputUser),
+        (InputOther, Genie.Core.EchoKindPresets.InputOther),
+        (ScriptEcho, Genie.Core.EchoKindPresets.ScriptEcho),
+    };
 
     /// <summary>
     /// Every key that maps to an <c>Application.Resources</c> brush, in
-    /// display order for editors. <see cref="GameText"/>/<see cref="GameEcho"/>
-    /// are excluded — they route through <c>DisplaySettings</c>.
+    /// display order for editors. <see cref="GameText"/> and the echo keys are
+    /// excluded — they route through <c>DisplaySettings</c> and the presets.
     /// </summary>
     public static readonly string[] BrushKeys =
     {

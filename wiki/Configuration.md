@@ -77,7 +77,7 @@ A rule can also be **scoped to specific windows**: the Highlights tab's **Window
 
 Two built-in colorings live alongside your own rules:
 
-- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
+- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. The `familiar` preset is the base color of the Familiar window's text, and the `inputuser`, `inputother` and `scriptecho` presets color typed commands, script commands, and script output / Genie messages. (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
 - **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it on the **Edit → Configuration… → Presets** tab or with `#config monsterbold on|off`.
 
 ### Substitutes — rewriting text
@@ -216,7 +216,7 @@ From the command bar, `#dialogs` (or `#dialogs list`) lists the dialogs seen thi
 
 The whole client is themeable from the **Edit → Theme** submenu. Seven themes are built in — **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light**, and **Wrayth-style** — and a **theme editor** lets you tweak any of them into your own. Custom themes are saved as JSON files in `Config/Themes`, so they're easy to back up or share.
 
-**Game text and Echoes colors have one home.** They show up both in **Edit → Display Settings…** and in the theme editor, but it's the same two settings: changing either one in either place changes the same value. A theme carries its own game-text and echo colors, and picking that theme sets both to the theme's colors. After that, a tweak in Display Settings sticks until you pick a theme again. Display Settings' **Reset** puts back the active theme's colors. Per-window colors (Layout tab) and presets still win over both.
+**Game text and echo colors have one home.** They show up both in **Edit → Display Settings…** and in the theme editor, and each is one setting: changing it in either place changes the same value. The three echo colors are Genie 4's presets — **Typed commands** is `inputuser`, **Script commands** (commands a script sends) is `inputother`, and **Echoes & messages** (script output, `#echo`, Genie's own messages) is `scriptecho` — so the Presets tab edits them too. A theme carries its own game-text and echo colors, and picking that theme sets them to the theme's colors. After that, a tweak in Display Settings or Presets sticks until you pick a theme again. Display Settings' **Reset** puts back the active theme's colors. Per-window colors (Layout tab) and presets still win over the game-text color.
 
 ## Where rules are stored
 
