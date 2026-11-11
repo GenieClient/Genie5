@@ -83,7 +83,7 @@
                  Foreground="{DynamicResource Theme.Warning}"/>
     </Border>
 
-    <TabControl Grid.Row="2" TabStripPlacement="Top">
+    <TabControl Grid.Row="2" Name="Tabs" TabStripPlacement="Top">
 
       <!-- ════════════════════════════════════════════════════════════════
            Layout — per-window display settings (title, font, fg/bg, redirect).
@@ -161,6 +161,11 @@
 
     </TabControl>
 
+    <!-- The window shows first and the tabs fill just after (#402); the
+         tabs stay disabled with this note up until they are filled. -->
+    <TextBlock Grid.Row="3" Name="LoadingText" Text="Loading…"
+               VerticalAlignment="Center" Margin="4,8,0,0"
+               Foreground="{DynamicResource Theme.TextMuted}"/>
     <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right"
                 Spacing="8" Margin="0,8,4,0">
       <Button Content="Close" Command="{Binding CloseCommand}" MinWidth="80"/>

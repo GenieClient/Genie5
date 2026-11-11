@@ -43,7 +43,7 @@
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Pattern:" VerticalAlignment="Center" Margin="0,0,8,4"/>
         <TextBox   Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3"
                    Name="PatternBox" Margin="0,0,0,4"
-                   FontFamily="Consolas,Courier New,monospace"/>
+                   FontFamily="{DynamicResource Genie.EditorMonoFont}"/>
 
         <TextBlock Grid.Row="1" Grid.Column="0" Text="Window:" VerticalAlignment="Center" Margin="0,0,8,4"/>
         <TextBox   Grid.Row="1" Grid.Column="1" Name="WindowBox" Margin="0,0,8,4"

@@ -1,4 +1,8 @@
+using System;
+using System.Reactive.Linq;
 using Avalonia.ReactiveUI;
+using Avalonia.Threading;
+using Genie.App.Controls;
 using Genie.App.ViewModels;
 using ReactiveUI;
 
@@ -6,8 +10,15 @@ namespace Genie.App.Views;
 
 public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel>
 {
+    /// <summary>How long to wait for the first frame before filling anyway, so
+    /// a window that never renders (minimised, no compositor) still fills.</summary>
+    private static readonly TimeSpan FillFallback = TimeSpan.FromMilliseconds(250);
+
+    private ConfigurationViewModel? _pendingFill;
+
     public ConfigurationDialog()
     {
+        EditorFonts.EnsureRegistered();   // #402: resolve the rule editors' monospace font once
         InitializeComponent();
         DataContextChanged += (_, _) =>
         {
@@ -15,16 +26,45 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
 
             vm.RequestClose += () => Close();
 
-            // Initial pass.
-            InitializePanels(vm);
-
-            // Re-bind every panel whenever the user picks a different profile.
-            // The VM swaps live engines for drafts (or vice versa) under the hood;
-            // each panel needs its `Initialize(engine, callback)` re-invoked to
-            // pick up the new instance, repopulate its DataGrid, and clear its form.
-            vm.WhenAnyValue(x => x.SelectedProfile)
-              .Subscribe(_ => InitializePanels(vm));
+            // Show the window first, then fill it (public #402): filling every
+            // tab takes about a second on a slow machine, and doing it before
+            // the first frame left Genie frozen with no window to show for it.
+            // The tabs stay disabled until they are filled.
+            Tabs.IsEnabled = false;
+            LoadingText.IsVisible = true;
+            _pendingFill = vm;
+            if (IsVisible) ScheduleFill();
         };
+        Opened += (_, _) => ScheduleFill();
+    }
+
+    /// <summary>Fill the panels just after the first frame is drawn, with a
+    /// timer as the fallback; whichever comes first fills, once.</summary>
+    private void ScheduleFill()
+    {
+        if (_pendingFill is null) return;
+        RequestAnimationFrame(_ => Dispatcher.UIThread.Post(FillPending, DispatcherPriority.Background));
+        DispatcherTimer.RunOnce(FillPending, FillFallback, DispatcherPriority.Background);
+    }
+
+    private void FillPending()
+    {
+        if (_pendingFill is not { } vm) return;
+        _pendingFill = null;
+
+        InitializePanels(vm);
+        Tabs.IsEnabled = true;
+        LoadingText.IsVisible = false;
+
+        // Re-bind every panel whenever the user picks a different profile.
+        // The VM swaps live engines for drafts (or vice versa) under the hood;
+        // each panel needs its `Initialize(engine, callback)` re-invoked to
+        // pick up the new instance, repopulate its DataGrid, and clear its form.
+        // Skip(1): WhenAnyValue replays the current profile on subscribe, and
+        // the panels were just filled for it (public #402).
+        vm.WhenAnyValue(x => x.SelectedProfile)
+          .Skip(1)
+          .Subscribe(_ => InitializePanels(vm));
     }
 
     /// <summary>

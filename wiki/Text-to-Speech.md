@@ -146,7 +146,9 @@ settings load with the session.
   streams** takes custom or plugin stream ids, comma-separated.
 - **Voice** — pick any installed voice, downloaded or system. **Test** speaks a
   sample line with it; **Install voice…** downloads the default voice, the same
-  as `#tts install`, with progress in the game window.
+  as `#tts install`, with progress in the game window. The list of system
+  voices is read in the background each time the dialog opens, so the box
+  says *Looking for voices…* for a moment first.
 - **Voice folder** — where downloaded voices live (`ttsvoicedir`). **Browse…**
   points it at another folder of Piper voices; **Default** goes back to
   `Voices`.

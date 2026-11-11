@@ -201,9 +201,24 @@ public partial class TtsPanel : UserControl
         finally { _loading = false; }
     }
 
-    private void LoadVoices(GenieConfig c)
+    /// <summary>Bumped on every voice load, so only the latest one is shown.</summary>
+    private int _voiceLoadGen;
+
+    private async void LoadVoices(GenieConfig c)
     {
         string voiceDir = c.TtsVoiceDir;
+        VoiceDirBox.Text = voiceDir;
+        InstallButton.IsEnabled = _installVoice is not null;
+
+        // Listing the system voices runs spd-say / espeak-ng (or SAPI), which
+        // takes up to a second; it was on the UI thread every time the
+        // Configuration dialog opened (public #402). It runs in the background
+        // now, and the voice box waits for it.
+        int gen = ++_voiceLoadGen;
+        var listVoices = _listVoices;
+        VoiceCombo.IsEnabled = false;
+        TestButton.IsEnabled = false;
+        VoiceHint.Text = "Looking for voices…";
 
         // One list for both sources (public #368): Piper voices from the voice
         // folder (catalog voices, then hand-installed folders — what #tts use
@@ -211,11 +226,24 @@ public partial class TtsPanel : UserControl
         IReadOnlyList<(string Value, string Label)> choices;
         try
         {
-            choices = _listVoices?.Invoke()
+            choices = await System.Threading.Tasks.Task.Run(() => listVoices?.Invoke()
                 ?? Services.PiperTextToSpeech.ListVoices(voiceDir)
-                       .Select(v => (v.SettingValue, $"{v.Display} (Piper)")).ToList();
+                       .Select(v => (v.SettingValue, $"{v.Display} (Piper)")).ToList());
         }
         catch { choices = Array.Empty<(string, string)>(); }
+
+        // A newer load (profile switch, voice installed) or a different config
+        // took over while this one ran.
+        if (gen != _voiceLoadGen || !ReferenceEquals(_config, c)) return;
+
+        bool wasLoading = _loading;
+        _loading = true;   // setting the selection must not write config back
+        try { ShowVoices(c, choices); }
+        finally { _loading = wasLoading; }
+    }
+
+    private void ShowVoices(GenieConfig c, IReadOnlyList<(string Value, string Label)> choices)
+    {
         var items = choices.Select(ch => new VoiceItem(ch.Value, ch.Label)).ToList();
 
         VoiceCombo.ItemsSource = items;
@@ -227,8 +255,6 @@ public partial class TtsPanel : UserControl
         bool anyPiper = items.Any(i => Services.TtsVoiceSetting.Parse(i.Id).Backend == Services.TtsVoiceSetting.PiperBackend);
         VoiceCombo.IsEnabled = any;
         TestButton.IsEnabled = any && _speakSample is not null;
-        InstallButton.IsEnabled = _installVoice is not null;
-        VoiceDirBox.Text = voiceDir;
         VoiceHint.Text = !any
             ? "No voices installed yet — use Install voice… (or #tts install) to download a free offline voice."
             : !anyPiper
@@ -237,13 +263,12 @@ public partial class TtsPanel : UserControl
     }
 
     /// <summary>Re-read the voice list after the folder or the installed set
-    /// changed, without the combo's selection handler writing config back.</summary>
+    /// changed. LoadVoices keeps the combo's selection handler from writing
+    /// config back.</summary>
     private void ReloadVoices()
     {
         if (_config is null) return;
-        _loading = true;
-        try { LoadVoices(_config); }
-        finally { _loading = false; }
+        LoadVoices(_config);
     }
 
     private async void OnInstall(object? sender, RoutedEventArgs e)
