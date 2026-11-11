@@ -77,7 +77,7 @@ A rule can also be **scoped to specific windows**: the Highlights tab's **Window
 
 Two built-in colorings live alongside your own rules:
 
-- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. The `familiar` preset is the base color of the Familiar window's text, and the `inputuser`, `inputother` and `scriptecho` presets color typed commands, script commands, and script output / Genie messages. The `health`, `mana`, `stamina`, `spirit` and `concentration` presets color the vitals bars: the color is the bar's fill and the background its track. The seven `automapper.*` presets color the map: lines, rooms, labels and the map background (see [Mapper → Map colours](Mapper#map-colours)). (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
+- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. The `familiar` preset is the base color of the Familiar window's text, and the `inputuser`, `inputother` and `scriptecho` presets color typed commands, script commands, and script output / Genie messages. The `health`, `mana`, `stamina`, `spirit` and `concentration` presets color the vitals bars: the color is the bar's fill and the background its track. The seven `automapper.*` presets color the map: lines, rooms, labels and the map background (see [Mapper → Map colours](Mapper#map-colours)). The seven `ui.*` presets color the menu bar, command input, status strip and AutoMapper Settings window over the theme (see [The menu, command input and status strip](#the-menu-command-input-and-status-strip)). (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
 - **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it on the **Edit → Configuration… → Presets** tab or with `#config monsterbold on|off`.
 
 ### Substitutes — rewriting text
@@ -239,7 +239,7 @@ The active theme is shared by every character, and Genie remembers it between la
 
 The difference in the last column is the important one:
 
-- **Chrome colours always come from the theme.** To change them, edit the theme (or make a copy and edit that).
+- **Chrome colours always come from the theme.** To change them, edit the theme (or make a copy and edit that). The exception is the handful of surfaces Genie 4's `ui.*` presets cover (see [The menu, command input and status strip](#the-menu-command-input-and-status-strip)): a colour set in one of those presets paints over the theme.
 - **Game text, echo and vitals colours are copied from the theme when you pick it**, and after that they're your own settings. Change them in Display Settings, the theme editor or the Presets tab, and your change stays — across launches and reconnects — until you pick a theme again.
 
 ### The game text and echo colours
@@ -289,6 +289,25 @@ The five vitals bars are coloured by Genie 4's presets, in both the **Vitals** p
 - **Edit them** on **Configuration → Presets**, or as the **Vitals bars** fill and track rows in the theme editor. Either way it's the same preset, and the bars repaint straight away.
 - **A theme carries a fill and a track for each bar** and writes both into the presets when you pick it, like the echo colours: they're saved the same way, and the same actions set them back to the theme's colours. Dark and Genie 4 Classic use Genie 4's stock colours with no track; the other built-in themes have tracks shaded to suit their background.
 - A preset you import from Genie 4 keeps its colours until you pick a theme.
+
+### The menu, command input and status strip
+
+Genie 4 coloured its window chrome with seven `ui.*` presets. They do the same in Genie 5, on the same surfaces:
+
+| Preset | Colours (colour / background) | Genie 4's stock |
+| --- | --- | --- |
+| `ui.menu` | The menu bar and its menus: text / background | Black / #EEEEEE |
+| `ui.menu.highlight` | The menu item under the mouse | LightBlue |
+| `ui.menu.checked` | The box behind a ticked menu item | LightBlue |
+| `ui.textbox` | The command input: text / background | Black / White |
+| `ui.status` | The `#statusbar` strip: text / background | Black / #EEEEEE |
+| `ui.window` | The AutoMapper Settings window: text / background | Black / #EEEEEE |
+| `ui.button` | The AutoMapper Settings window's buttons: text / background | Black / Silver |
+
+- **Genie 5's stock value is `Default`: the theme colours the surface.** Genie 4's stock colours were Windows' own grey chrome, so `Default` (your theme's chrome) is the Genie 5 equivalent.
+- **Set a colour** on **Configuration → Presets** or with `#preset`, for example `#preset ui.status Black #EEEEEE`, and it paints that surface over the theme, straight away. Only that surface changes. Hover, focus and pressed states use the same colour, as in Genie 4.
+- **Picking a theme sets them back to `Default`**, as it resets the echo and vitals colours. Cancelling Display Settings after trying a theme puts your colours back.
+- A `ui.*` colour imported from Genie 4 applies until you pick a theme.
 
 ### Making your own theme
 

@@ -24,7 +24,16 @@
   <DockPanel>
 
     <!-- ── Menu bar ──────────────────────────────────────────────────────── -->
-    <Menu DockPanel.Dock="Top">
+    <!-- Colours: the theme, unless the Genie 4 ui.menu / ui.menu.highlight /  -->
+    <!-- ui.menu.checked presets set one (public #406, PresetChrome).         -->
+    <Menu DockPanel.Dock="Top" controls:PresetChrome.Surface="menu">
+      <Menu.Styles>
+        <!-- ui.menu.checked: the box behind a ticked item's tick, as Genie 4's -->
+        <!-- MenuRenderer painted it. Unset (Default) = no box, the theme's look. -->
+        <Style Selector="MenuItem /template/ ContentControl#PART_ToggleIconPresenter">
+          <Setter Property="Background" Value="{DynamicResource Genie.UiMenuChecked}"/>
+        </Style>
+      </Menu.Styles>
       <MenuItem Header="_File">
         <MenuItem Header="_Connect..."    Command="{Binding ConnectCommand}"/>
         <MenuItem Header="_Disconnect"    Command="{Binding DisconnectCommand}"/>
@@ -1251,7 +1260,10 @@
     <!-- cell clipped it to nothing) and ellipsizes at that cap, so a huge    -->
     <!-- line can never push slots 2-10 off screen. Empty slots — slot 1     -->
     <!-- included — take no space at all.                                     -->
+    <!-- Colours: the theme, unless the Genie 4 ui.status preset sets one     -->
+    <!-- (public #406, PresetChrome).                                          -->
     <Border DockPanel.Dock="Bottom"
+            controls:PresetChrome.Surface="status"
             Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
             ToolTip.Tip="Script status slots — written with #statusbar [N] text; a bare #statusbar N clears slot N, #statusbar clearall empties all ten.">
       <Border.IsVisible>
@@ -1747,6 +1759,7 @@
 
       <TextBox Grid.Column="2"
                x:Name="CommandInput"
+               controls:PresetChrome.Surface="textbox"
                AutomationProperties.Name="Command input"
                AutomationProperties.AutomationId="CommandInput"
                AutomationProperties.HelpText="Type game commands here and press Enter to send them to the game."

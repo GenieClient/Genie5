@@ -1412,6 +1412,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             try { Display.Save(_displayPath); } catch { /* best effort: retried next launch */ }
         }
         Mapper.PresetStore = startupPresets;
+        Controls.PresetChrome.Store = startupPresets;   // ui.* chrome presets (#406)
 
         // ── Themes (#20) ──────────────────────────────────────────────────
         // Re-apply the persisted theme's chrome + Fluent variant on top of
@@ -5551,6 +5552,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             () => IsConnected ? GetProfileConfigDir(ConnectedProfile) : null);
         Themes.Presets = PresetColors;
         Mapper.PresetStore = PresetColors;   // the map's automapper.* presets (#406)
+        Controls.PresetChrome.Store = PresetColors;    // ui.* chrome presets (#406)
+        Highlighting.UserHighlights.NotifyRulesChanged();
         Highlighting.DefaultHighlights.NameEngine   = _core.NameHighlights; // name colours (#154)
 
         // ── Performance / safety ──────────────────────────────────────────────

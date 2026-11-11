@@ -44,3 +44,23 @@ public static class VitalsPresets
 
     public static readonly string[] All = { Health, Mana, Stamina, Spirit, Concentration };
 }
+
+/// <summary>
+/// Genie 4's window-chrome presets (public #406). In Genie 4 they coloured the
+/// menu bar and its menus, the command input, the status strip and the
+/// AutoMapper Settings window. In Genie 5 the theme colours those surfaces; a
+/// <c>ui.*</c> preset set to a colour paints its surface over the theme, and
+/// "Default" (the stock value) leaves the theme's look.
+/// </summary>
+public static class UiPresets
+{
+    public const string Menu          = "ui.menu";
+    public const string MenuHighlight = "ui.menu.highlight";
+    public const string MenuChecked   = "ui.menu.checked";
+    public const string TextBox       = "ui.textbox";
+    public const string Status        = "ui.status";
+    public const string Window        = "ui.window";
+    public const string Button        = "ui.button";
+
+    public static readonly string[] All = { Menu, MenuHighlight, MenuChecked, TextBox, Status, Window, Button };
+}
