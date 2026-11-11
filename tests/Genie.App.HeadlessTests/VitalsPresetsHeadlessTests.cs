@@ -181,6 +181,22 @@ public class VitalsPresetsHeadlessTests
         Assert.Equal("",    saved.BackgroundColor);
     }
 
+    [AvaloniaFact]
+    public void Cancelling_Display_Settings_after_trying_a_theme_puts_the_vitals_back()
+    {
+        var (themes, presets, _, _) = Rig();
+        presets.Set("mana", "#123456", "#000011");
+        var vm = new DisplaySettingsViewModel(new DisplaySettings(), themes, presets);
+
+        vm.SelectedThemeName = BuiltInThemes.Light.Name;     // tries the theme: writes its bar colours
+        Assert.NotEqual("#123456", presets.GetForeground("mana"));
+
+        vm.RestoreOriginalTheme();
+
+        Assert.Equal("#123456", presets.GetForeground("mana"));
+        Assert.Equal("#000011", presets.GetBackground("mana"));
+    }
+
     // ── Theme editor ───────────────────────────────────────────────────────
 
     [AvaloniaFact]

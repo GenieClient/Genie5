@@ -36,6 +36,9 @@ public class DisplaySettingsViewModel : ReactiveObject
     /// the raw preset value at open (may be "Default") and the colour shown
     /// for it, so OK only writes a preset whose colour was actually changed.</summary>
     private readonly Dictionary<string, (string Raw, Color Shown)> _echoAtOpen = new();
+    /// <summary>The vitals presets at open (public #406). Picking a theme on the
+    /// Theme tab writes the theme's bar colours into them; Cancel puts these back.</summary>
+    private readonly Dictionary<string, (string Fill, string Track)> _vitalsAtOpen = new();
     private bool _themeTouched;
     private bool _suppressThemeApply;
 
@@ -122,6 +125,9 @@ public class DisplaySettingsViewModel : ReactiveObject
             _echoAtOpen[id] = (raw, TryParseColor(raw, GameColor));   // "Default" → the text colour
         }
         LoadEchoColours(id => _echoAtOpen[id].Shown);
+        if (_presets is not null)
+            foreach (var id in Genie.Core.VitalsPresets.All)
+                _vitalsAtOpen[id] = (_presets.GetForeground(id), _presets.GetBackground(id));
         EchoItalic = live.EchoItalic;
         AlwaysShowScrollbars = live.AlwaysShowScrollbars;
         FontFamily = currentFont;
@@ -181,8 +187,13 @@ public class DisplaySettingsViewModel : ReactiveObject
         // back exactly what was live when the dialog opened.
         _live.GameColorHex = _originalGameHex;
         if (_presets is not null)
+        {
             foreach (var (id, (raw, _)) in _echoAtOpen)
                 _presets.SetForeground(id, raw);
+            foreach (var (id, (fill, track)) in _vitalsAtOpen)
+                if (_presets.GetForeground(id) != fill || _presets.GetBackground(id) != track)
+                    _presets.Set(id, fill, track);
+        }
     }
 
     private static string Hex(Color c) => "#" + c.ToString().Substring(3); // drop alpha → #RRGGBB
