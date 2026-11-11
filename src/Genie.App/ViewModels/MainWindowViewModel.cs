@@ -1412,6 +1412,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             try { Display.Save(_displayPath); } catch { /* best effort: retried next launch */ }
         }
         Mapper.PresetStore = startupPresets;
+        UpgradeUiPresets();
         Controls.PresetChrome.Store = startupPresets;   // ui.* chrome presets (#406)
 
         // ── Themes (#20) ──────────────────────────────────────────────────
@@ -4269,6 +4270,55 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     /// <summary>Layered presets.json load (#257/#149): each saved token
     /// overrides the seeded default; a profile token overrides a global one.</summary>
+    /// <summary>
+    /// One-time upgrade (public #406). Genie 5 saves every preset, stock values
+    /// included, so a presets.json written by an earlier Genie 5 holds Genie 4's
+    /// stock ui.* chrome colours (its Windows greys) that nobody chose. Now that
+    /// the ui.* presets paint the chrome, those would turn the menu bar, command
+    /// input and status strip light grey under any theme. Each presets.json (the
+    /// shared one and every profile's) has such entries set to Default, once; a
+    /// colour set afterwards, even the same grey, is left alone.
+    /// </summary>
+    private void UpgradeUiPresets()
+    {
+        if (Display.UiPresetsUpgraded) return;
+        var p    = new PersistenceService();
+        var dirs = new List<string> { _configDir };
+        foreach (var profile in Profiles.Profiles)
+        {
+            try { dirs.Add(GetProfileConfigDir(profile)); } catch { /* unreadable profile: skip */ }
+        }
+
+        foreach (var path in dirs.Select(d => Path.Combine(d, "presets.json"))
+                                 .Distinct(StringComparer.OrdinalIgnoreCase)
+                                 .Where(File.Exists))
+        {
+            try
+            {
+                var models  = p.LoadPresets(path);
+                var changed = false;
+                foreach (var m in models)
+                    if (Genie.Core.UiPresets.IsGenie4Stock(m.Id, m.ForegroundColor, m.BackgroundColor))
+                    {
+                        m.ForegroundColor = "Default";
+                        m.BackgroundColor = "";
+                        changed = true;
+                    }
+                if (!changed) continue;
+                RuleFileWatcher.MarkAppWrite(path);
+                p.SavePresets(path, models.Select(m => new Genie.Core.Presets.PresetRule
+                {
+                    Id = m.Id, ForegroundColor = m.ForegroundColor,
+                    BackgroundColor = m.BackgroundColor, HighlightLine = m.HighlightLine,
+                }));
+            }
+            catch { /* best effort: an unreadable file keeps its values */ }
+        }
+
+        Display.UiPresetsUpgraded = true;
+        try { Display.Save(_displayPath); } catch { /* retried next launch */ }
+    }
+
     private void LoadLayeredPresets(GenieCore core, PersistenceService p,
                                     string profileDir, string globalDir, bool single)
     {

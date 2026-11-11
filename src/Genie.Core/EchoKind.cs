@@ -63,4 +63,46 @@ public static class UiPresets
     public const string Button        = "ui.button";
 
     public static readonly string[] All = { Menu, MenuHighlight, MenuChecked, TextBox, Status, Window, Button };
+
+    /// <summary>Genie 4's stock values (Globals.SetDefaultPresets): the Windows
+    /// system chrome colours. Genie 5 saved these into presets.json and exports
+    /// them in presets.cfg, so they show up in files nobody edited.</summary>
+    public static readonly IReadOnlyDictionary<string, (string Fg, string Bg)> Genie4Stock =
+        new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase)
+        {
+            [Button]        = ("Black",     "Silver"),
+            [Menu]          = ("Black",     "#EEEEEE"),
+            [MenuChecked]   = ("LightBlue", ""),
+            [MenuHighlight] = ("LightBlue", ""),
+            [Status]        = ("Black",     "#EEEEEE"),
+            [TextBox]       = ("Black",     "White"),
+            [Window]        = ("Black",     "#EEEEEE"),
+        };
+
+    /// <summary>True when <paramref name="fg"/>/<paramref name="bg"/> are Genie 4's
+    /// stock colours for <paramref name="id"/> (names or hex, any case). Such a
+    /// value wasn't chosen by anyone, so Genie 5 reads it as Default: follow the
+    /// theme (public #406).</summary>
+    public static bool IsGenie4Stock(string id, string? fg, string? bg)
+    {
+        if (!Genie4Stock.TryGetValue(id, out var stock)) return false;
+        return Same(fg, stock.Fg) && Same(bg, stock.Bg);
+    }
+
+    private static bool Same(string? a, string b) =>
+        string.Equals(Normalise(a), Normalise(b), StringComparison.OrdinalIgnoreCase);
+
+    private static string Normalise(string? c)
+    {
+        var v = (c ?? "").Trim();
+        return v.ToLowerInvariant() switch
+        {
+            "#000000" or "#ff000000" => "black",
+            "#ffffff" or "#ffffffff" => "white",
+            "#c0c0c0" or "#ffc0c0c0" => "silver",
+            "#add8e6" or "#ffadd8e6" => "lightblue",
+            "#ffeeeeee"              => "#eeeeee",
+            _                        => v,
+        };
+    }
 }

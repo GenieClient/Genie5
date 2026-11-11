@@ -222,6 +222,40 @@ public class UiPresetsHeadlessTests : IDisposable
         Assert.Contains("controls:PresetChrome.Surface=\"window\"", dialog);
     }
 
+    // ── Upgrade: saved Genie 4 stock values become Default ─────────────────
+
+    private static void WritePresets(string configDir, params (string Id, string Fg, string Bg)[] rows) =>
+        new Genie.Core.Persistence.PersistenceService().SavePresets(Path.Combine(configDir, "presets.json"),
+            rows.Select(r => new PresetRule { Id = r.Id, ForegroundColor = r.Fg, BackgroundColor = r.Bg }));
+
+    private static Genie.Core.Persistence.PresetPersistenceModel SavedPreset(string configDir, string id) =>
+        new Genie.Core.Persistence.PersistenceService().LoadPresets(Path.Combine(configDir, "presets.json")).Single(m => m.Id == id);
+
+    [AvaloniaFact]
+    public void Starting_Genie_turns_saved_Genie_4_stock_chrome_into_Default_once()
+    {
+        // An earlier Genie 5 saved every preset, stock ui.* values included.
+        var config = Directory.CreateDirectory(Path.Combine(_dir, "Config")).FullName;
+        WritePresets(config,
+            (UiPresets.Menu,    "Black",  "#EEEEEE"),
+            (UiPresets.TextBox, "Black",  "White"),
+            (UiPresets.Status,  "Yellow", "Navy"),        // a colour someone chose
+            ("health",          "Maroon", "#400000"));
+
+        _ = new MainWindowViewModel(startup: null, dataDirectoryOverride: _dir);
+
+        Assert.Equal("Default", SavedPreset(config, UiPresets.Menu).ForegroundColor);
+        Assert.Equal("",        SavedPreset(config, UiPresets.Menu).BackgroundColor);
+        Assert.Equal("Default", SavedPreset(config, UiPresets.TextBox).ForegroundColor);
+        Assert.Equal("Yellow",  SavedPreset(config, UiPresets.Status).ForegroundColor);
+        Assert.Equal("#400000", SavedPreset(config, "health").BackgroundColor);
+
+        // Once only: the same grey set on purpose afterwards is kept.
+        WritePresets(config, (UiPresets.Menu, "Black", "#EEEEEE"));
+        _ = new MainWindowViewModel(startup: null, dataDirectoryOverride: _dir);
+        Assert.Equal("#EEEEEE", SavedPreset(config, UiPresets.Menu).BackgroundColor);
+    }
+
     // ── Themes ─────────────────────────────────────────────────────────────
 
     private ThemeService Themes() =>

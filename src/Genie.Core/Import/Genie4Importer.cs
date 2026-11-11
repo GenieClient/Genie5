@@ -696,6 +696,9 @@ public static class Genie4Importer
             if (mode == ImportMode.AddOnly && existing.Contains(id)) { log.ByDesign(lineNo, line, "already present (Add-only mode)"); continue; }
 
             var (fg, bg) = ParseColorPair(m.Groups["colors"].Value);
+            // Genie 4's untouched ui.* chrome values (its Windows greys) become
+            // Default, so importing keeps the Genie 5 theme's chrome (#406).
+            if (UiPresets.IsGenie4Stock(id, fg, bg)) (fg, bg) = ("Default", "");
             bool highlightLine = false;
             if (m.Groups["hl"].Success)
             {

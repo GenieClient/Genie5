@@ -61,6 +61,11 @@ public sealed class DisplaySettings : ReactiveObject
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? MapTextHex { get; set; }
 
+    /// <summary>The one-time ui.* preset upgrade has run (public #406): saved
+    /// presets holding Genie 4's stock chrome colours were set to Default. See
+    /// <c>MainWindowViewModel.UpgradeUiPresets</c>.</summary>
+    public bool UiPresetsUpgraded { get; set; }
+
     /// <summary>Show the on-map colour legend (#157). Default on.</summary>
     [Reactive] public bool   ShowMapLegend { get; set; } = true;
 

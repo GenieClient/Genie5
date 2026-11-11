@@ -307,7 +307,8 @@ Genie 4 coloured its window chrome with seven `ui.*` presets. They do the same i
 - **Genie 5's stock value is `Default`: the theme colours the surface.** Genie 4's stock colours were Windows' own grey chrome, so `Default` (your theme's chrome) is the Genie 5 equivalent.
 - **Set a colour** on **Configuration → Presets** or with `#preset`, for example `#preset ui.status Black #EEEEEE`, and it paints that surface over the theme, straight away. Only that surface changes. Hover, focus and pressed states use the same colour, as in Genie 4.
 - **Picking a theme sets them back to `Default`**, as it resets the echo and vitals colours. Cancelling Display Settings after trying a theme puts your colours back.
-- A `ui.*` colour imported from Genie 4 applies until you pick a theme.
+- **Genie 4's stock values count as `Default`.** Importing from Genie 4 brings over a `ui.*` colour you chose there (it applies until you pick a theme), but Genie 4's untouched greys come in as `Default`, so the theme's chrome stays.
+- **Coming from an earlier Genie 5:** it saved every preset, stock values included, so your `presets.json` may hold Genie 4's greys for `ui.*`. The first time this version starts, those exact values are set to `Default` in the shared presets and each character's, once. A colour you set afterwards, even the same grey, is kept.
 
 ### Making your own theme
 
