@@ -295,10 +295,25 @@
                 <Border x:Name="PART_ContentBorder"
                         Margin="4,0,4,4"
                         Background="{TemplateBinding Background}">
+                  <!-- Right-click anywhere inside the window opens the Genie 4
+                       per-window menu, as in docked mode (public #403): the same
+                       shared menu (Themes/WindowContextMenu.axaml), bound to this
+                       window's dockable. SelectableTextBlock's built-in Copy
+                       flyout is nulled so a right-click on text reaches it too
+                       (Ctrl+C still copies). The title bar keeps the docking
+                       library's window-management menu. -->
                   <ContentControl x:Name="PART_ContentPresenter"
                                   Content="{Binding}"
                                   HorizontalAlignment="Stretch"
-                                  VerticalAlignment="Stretch">
+                                  VerticalAlignment="Stretch"
+                                  ContextMenu="{DynamicResource GenieWindowContextMenu}">
+                    <ContentControl.Styles>
+                      <!-- :not(:disabled) is needed: Fluent sets the flyout from a
+                           style trigger, which outranks a plain style setter. -->
+                      <Style Selector="SelectableTextBlock:not(:disabled)">
+                        <Setter Property="ContextFlyout" Value="{x:Null}" />
+                      </Style>
+                    </ContentControl.Styles>
                     <ContentControl.ContentTemplate>
                       <ControlRecyclingDataTemplate Parent="{Binding #PART_ContentPresenter}" />
                     </ContentControl.ContentTemplate>

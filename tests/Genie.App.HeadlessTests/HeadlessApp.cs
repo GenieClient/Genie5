@@ -72,6 +72,16 @@ public class HeadlessApp : Application
         // how #331 (a panel re-opened into a dock emptied by a float never
         // re-expands) could ship: the collapse behaviour it hinges on lives in
         // ProportionalDockCollapseSkin, which the harness never loaded.
+        // #403: the per-window right-click menu both frames share, and the
+        // windowed-mode (MDI) frame itself, as App.axaml loads them.
+        Resources.MergedDictionaries.Add(new ResourceInclude(new Uri("avares://Genie.App"))
+        {
+            Source = new Uri("avares://Genie5/Themes/WindowContextMenu.axaml")
+        });
+        Resources.MergedDictionaries.Add(new ResourceInclude(new Uri("avares://Genie.App"))
+        {
+            Source = new Uri("avares://Genie5/Themes/MdiDocumentWindowSkin.axaml")
+        });
         Resources.MergedDictionaries.Add(new ResourceInclude(new Uri("avares://Genie.App"))
         {
             Source = new Uri("avares://Genie5/Themes/ToolControlCachedSkin.axaml")

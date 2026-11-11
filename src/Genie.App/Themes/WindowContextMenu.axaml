@@ -1,0 +1,78 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:docking="using:Genie.App.Docking">
+
+  <!-- Genie 4-style per-window right-click menu (Clear, Time Stamp, Name List
+       Only, Close Window, plus Genie 5's extras). One definition for both window
+       frames: the docked/tabbed frame (ToolControlCachedSkin.axaml) and the
+       windowed-mode (MDI) frame (MdiDocumentWindowSkin.axaml, public #403), so
+       the two can't drift apart. One instance serves every window: a
+       ContextMenu can be attached to many controls, and when it opens it takes
+       the DataContext (the window's dockable) of the control it opened on.
+
+       Bound to the window's dockable through its WindowMenu (IWindowMenuHost);
+       reflection bindings (x:CompileBindings=False) because the frames' data
+       types (core:IDockable) have no WindowMenu. Each item hides itself when the
+       window doesn't support it, so a Vitals window shows only "Close Window"
+       while a stream window shows all of them. -->
+  <ContextMenu x:Key="GenieWindowContextMenu"
+               x:CompileBindings="False"
+               docking:WindowMenuBehavior.RefreshOnOpen="True">
+    <MenuItem Header="Copy"
+              InputGesture="Ctrl+C"
+              Command="{x:Static docking:WindowMenuBehavior.CopySelectionCommand}"
+              IsVisible="{Binding WindowMenu.ShowCopyAll}" />
+    <MenuItem Header="Copy All"
+              Command="{Binding WindowMenu.CopyAllCommand}"
+              IsVisible="{Binding WindowMenu.ShowCopyAll}" />
+    <MenuItem Header="Save As…"
+              Command="{Binding WindowMenu.SaveAsCommand}"
+              IsVisible="{Binding WindowMenu.ShowSaveAs}" />
+    <MenuItem Header="Find…"
+              InputGesture="{x:Static docking:WindowMenuBehavior.FindGesture}"
+              Command="{Binding WindowMenu.FindCommand}"
+              IsVisible="{Binding WindowMenu.ShowFind}" />
+    <MenuItem Header="Clear"
+              Command="{Binding WindowMenu.ClearCommand}"
+              IsVisible="{Binding WindowMenu.ShowClear}" />
+    <MenuItem Header="Time Stamp"
+              ToggleType="CheckBox"
+              IsChecked="{Binding WindowMenu.IsTimestampOn, Mode=TwoWay}"
+              IsVisible="{Binding WindowMenu.ShowTimestamp}" />
+    <MenuItem Header="Name List Only"
+              ToggleType="CheckBox"
+              IsChecked="{Binding WindowMenu.IsNameListOnlyOn, Mode=TwoWay}"
+              IsVisible="{Binding WindowMenu.ShowNameListOnly}" />
+    <MenuItem Header="Show in Main Window"
+              ToggleType="CheckBox"
+              IsChecked="{Binding WindowMenu.IsEchoToMainOn, Mode=TwoWay}"
+              IsVisible="{Binding WindowMenu.ShowEchoToMain}" />
+    <MenuItem Header="Word Wrap"
+              ToggleType="CheckBox"
+              IsChecked="{Binding WindowMenu.IsWordWrapOn, Mode=TwoWay}"
+              IsVisible="{Binding WindowMenu.ShowWordWrap}" />
+    <MenuItem Header="Flash on Activity"
+              ToggleType="CheckBox"
+              IsChecked="{Binding WindowMenu.IsFlashOn, Mode=TwoWay}"
+              IsVisible="{Binding WindowMenu.ShowFlash}" />
+    <MenuItem Header="Show Config Bar"
+              ToggleType="CheckBox"
+              IsChecked="{Binding WindowMenu.IsConfigBarOn, Mode=TwoWay}"
+              IsVisible="{Binding WindowMenu.ShowConfigBar}" />
+    <MenuItem Header="Pause Scrolling"
+              ToggleType="CheckBox"
+              IsChecked="{Binding WindowMenu.IsScrollPaused, Mode=TwoWay}"
+              IsVisible="{Binding WindowMenu.ShowPauseScroll}" />
+    <MenuItem Header="{Binding WindowMenu.FloatHeader}"
+              Command="{Binding WindowMenu.ToggleFloatCommand}"
+              IsVisible="{Binding WindowMenu.ShowFloat}" />
+    <MenuItem Header="{Binding WindowMenu.TitleBarHeader}"
+              Command="{Binding WindowMenu.ToggleTitleBarCommand}"
+              IsVisible="{Binding WindowMenu.ShowHideTitleBar}" />
+    <Separator IsVisible="{Binding WindowMenu.ShowCloseSeparator}" />
+    <MenuItem Header="Close Window"
+              Command="{Binding WindowMenu.CloseCommand}"
+              IsVisible="{Binding WindowMenu.ShowClose}" />
+  </ContextMenu>
+
+</ResourceDictionary>
