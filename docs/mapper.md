@@ -105,6 +105,21 @@ For a cross-zone hop with a known wait window (boats, ferries), `AutoWalkService
 
 Zone XML stores room and label positions in **Genie 4 map pixels**, and the canvas draws them through [MapProjection](../src/Genie.Core/Mapper/MapProjection.cs) — one transform shared by paint, hit-testing, drag and layout. Genie 4 draws every room as a 9px box centred on its raw pixel and its snap-to-grid step is 10px, so the community maps are authored on a **10px grid** (the Crossing has 623 rooms on an odd ten). Genie 5 scales that space by 1.1 per zoom unit (a 20px pitch becomes 22px) and keeps Genie 4's ratios: boxes are 9 map-px, label text is Genie 4's default font size, label rectangles are 15 map-px tall, and labels are anchored top-left at their raw pixel in the *same* space as the rooms. The canvas is sized from the rooms **and** the visible labels' measured rectangles, so label text past the outermost room is never clipped. Dragging a room in edit mode writes `MapNode.PixelX/PixelY` back with the 10px snap ("Snap" toggle) or to the pixel; the derived 20px grid cell `MapNode.X/Y` is only what the automapper *places* new rooms on. `MapProjectionTests` pins the ratios and sweeps every installed zone for stacked rooms and clipped labels.
 
+### Colours
+
+The canvas draws from Genie 4's `automapper.*` presets through
+`MapPalette` (built by `MapperViewModel.RefreshPalette`, bound to
+`MapCanvas.Palette`): each preset's foreground on the current floor and its
+background on the ghost floors (faded by `AutoMapperAlpha`), matching
+Genie 4's `MapForm`. A preset change fires `UserHighlights.RulesChanged`,
+which rebuilds the palette. The preset is the only store for these colours:
+the Details pickers, `#mapper color bg|text` and `ApplyLayout` all write
+`automapper.panel` through `PresetColorStore`, and the old
+`DisplaySettings.MapBackgroundHex` / `MapTextHex` are read once by
+`MapperViewModel.MigrateLegacyColours` and cleared. `automapper.path` is in
+the palette but unused until the map shows a walk path. Tests:
+`MapPresetsHeadlessTests`.
+
 ### Legend
 
 `MapCanvas.BuildLegend` builds the key per render from what the current level

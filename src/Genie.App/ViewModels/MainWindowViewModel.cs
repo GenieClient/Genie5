@@ -1402,6 +1402,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.Apply();  // push values into Application.Resources
         Mapper.AttachDisplay(Display, _displayPath);
 
+        // The map's colours are the automapper.* presets (public #406). Until
+        // Genie's engine is built (first connect / command) they're read from the
+        // shared presets file; a map colour an earlier Genie 5 kept in
+        // display.json moves into the preset here, once.
+        var startupPresets = new Settings.PresetColorStore(new Genie.Core.Presets.PresetEngine(), _configDir, () => null);
+        if (MapperViewModel.MigrateLegacyColours(Display, startupPresets))
+        {
+            try { Display.Save(_displayPath); } catch { /* best effort: retried next launch */ }
+        }
+        Mapper.PresetStore = startupPresets;
+
         // ── Themes (#20) ──────────────────────────────────────────────────
         // Re-apply the persisted theme's chrome + Fluent variant on top of
         // the design-time Dark defaults. Chrome only: game-text colours come
@@ -5539,6 +5550,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         PresetColors = new Settings.PresetColorStore(_core.Presets, _configDir,
             () => IsConnected ? GetProfileConfigDir(ConnectedProfile) : null);
         Themes.Presets = PresetColors;
+        Mapper.PresetStore = PresetColors;   // the map's automapper.* presets (#406)
         Highlighting.DefaultHighlights.NameEngine   = _core.NameHighlights; // name colours (#154)
 
         // ── Performance / safety ──────────────────────────────────────────────
@@ -6342,7 +6354,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             ShowGameText          = Display.ShowGameText,
             ShowEchoText          = Display.ShowEchoText,
             ShowScriptText        = Display.ShowScriptText,
-            MapBackgroundHex      = Display.MapBackgroundHex,
+            MapBackgroundHex      = Controls.MapPalette.Hex(Mapper.Palette.Background),   // automapper.panel (#406)
             WindowedMode          = Display.WindowedMode,
         };
 
@@ -6418,8 +6430,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.ShowGameText           = layout.ShowGameText;
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;
-        if (!string.IsNullOrWhiteSpace(layout.MapBackgroundHex))
-            Display.MapBackgroundHex   = layout.MapBackgroundHex;
+        // A layout's map background goes into the automapper.panel preset (the
+        // one place it's kept, #406) and shows straight away. None, or the old
+        // dark default an older layout carries without having chosen it, leaves
+        // the map as it is.
+        if (Controls.MapPalette.Parse(layout.MapBackgroundHex) is { } mapBg &&
+            !string.Equals(layout.MapBackgroundHex!.Trim(), "#1A1A1A", StringComparison.OrdinalIgnoreCase))
+            Mapper.MapBackground = mapBg;
         // Switch document mode to match the saved layout BEFORE rebuilding the
         // dock, so a layout saved in windowed mode reopens windowed (not tabbed).
         Display.WindowedMode           = layout.WindowedMode;

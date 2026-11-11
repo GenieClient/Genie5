@@ -1169,8 +1169,7 @@
                                     RenderTick="{Binding ViewModel.RenderTick}"
                                     ShowSpoilers="{Binding ViewModel.ShowMapSpoilers}"
                                     Zoom="{Binding ViewModel.ZoomLevel}"
-                                    MapBackgroundBrush="{Binding ViewModel.MapBackgroundBrush}"
-                                    LabelTextBrush="{Binding ViewModel.MapTextBrush}"
+                                    Palette="{Binding ViewModel.Palette}"
                                     AutoMapperAlpha="{Binding ViewModel.AutoMapperAlpha}"
                                     ShowLegend="{Binding ViewModel.ShowMapLegend}"
                                     NodeClickedCommand="{Binding ViewModel.GotoNodeCommand}"
@@ -1400,12 +1399,12 @@
                   <ColorPicker Color="{Binding ViewModel.MapBackground, Mode=TwoWay}"
                                IsAlphaEnabled="False"
                                HorizontalAlignment="Left"
-                               ToolTip.Tip="Pick any colour for the map canvas. Cream/tan (e.g. #F5EFD8) matches the Genie 4 AutoMapper look."/>
+                               ToolTip.Tip="The map canvas colour: the automapper.panel preset's background (also on Configuration → Presets). PaleGoldenrod is the Genie 4 AutoMapper look."/>
                   <TextBlock Text="Map text:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                   <ColorPicker Color="{Binding ViewModel.MapTextColor, Mode=TwoWay}"
                                IsAlphaEnabled="False"
                                HorizontalAlignment="Left"
-                               ToolTip.Tip="Colour of the map's label text (landmark names). Black matches the Genie 4 AutoMapper look on a tan canvas."/>
+                               ToolTip.Tip="Colour of the map's label text (landmark names): the automapper.panel preset's colour (also on Configuration → Presets)."/>
                 </StackPanel>
 
                 <TextBlock Text="Tip: hover a room for details, right-click for a context menu, mouse-wheel to zoom."

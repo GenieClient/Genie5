@@ -56,6 +56,20 @@ public sealed class PresetColorStore
         return DiskShared(id)?.BackgroundColor ?? new PresetEngine().GetBackground(id);
     }
 
+    /// <summary>Foreground and background lookups for reading many presets at
+    /// once (the map's palette), read like <see cref="GetForeground"/> /
+    /// <see cref="GetBackground"/> but with the shared file loaded only once.</summary>
+    public (Func<string, string> Foreground, Func<string, string> Background) Reader()
+    {
+        if (Connected) return (_engine.GetForeground, _engine.GetBackground);
+        var shared = Load(GlobalPath)
+            .GroupBy(m => m.Id, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        var stock = new PresetEngine();
+        return (id => shared.TryGetValue(id, out var m) ? m.ForegroundColor : stock.GetForeground(id),
+                id => shared.TryGetValue(id, out var m) ? m.BackgroundColor : stock.GetBackground(id));
+    }
+
     private PresetPersistenceModel? DiskShared(string id) =>
         Load(GlobalPath).FirstOrDefault(m => m.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 

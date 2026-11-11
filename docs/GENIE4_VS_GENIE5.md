@@ -260,7 +260,7 @@ Re-verified against beta.3 source (2026-08-02): most of this table has shipped s
 - `RoundTimeOnHandsStrip` — RT badge position
 - `ShowGameText` / `ShowEchoText` / `ShowScriptText` — per-tag visibility
 - `EditorPath` — external editor for `#edit`
-- `MapBackgroundHex` — Mapper canvas background
+- `MapBackgroundHex` / `MapTextHex` — removed (#406). The map background and label text are Genie 4's `automapper.panel` preset again; values in an older `display.json` are migrated into it once.
 
 ---
 

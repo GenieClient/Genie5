@@ -45,22 +45,21 @@ public sealed class DisplaySettings : ReactiveObject
     [Reactive] public double FontSize      { get; set; } = 13d;
 
     /// <summary>
-    /// Background colour of the Mapper canvas. User-editable via a
-    /// ColorPickerButton in the Mapper panel's Details expander. Defaults to
-    /// PaleGoldenrod (#EEE8AA) — the cream/tan Genie 4 AutoMapper canvas the
-    /// map palette (black cardinal lines, blue cross-zone borders) is designed
-    /// for. The old dark default (#1A1A1A) is migrated to this on load (see
-    /// <c>MapperViewModel.AttachDisplay</c>) so existing users get the look
-    /// without losing a genuinely custom colour.
+    /// Legacy: the Mapper canvas background before it moved into the
+    /// <c>automapper.panel</c> preset (public #406). Read once on upgrade: a
+    /// colour the user picked is copied into the preset, then this is cleared
+    /// and no longer written. Null in a current display.json.
     /// </summary>
-    [Reactive] public string MapBackgroundHex { get; set; } = "#EEE8AA";
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MapBackgroundHex { get; set; }
 
     /// <summary>
-    /// Colour of the map's on-canvas <c>&lt;label&gt;</c> text (landmark names).
-    /// User-editable via a ColorPickerButton in the Mapper panel's Details
-    /// expander. Defaults to black — Genie 4's label colour on the tan canvas.
+    /// Legacy: the map's label text colour before it moved into the
+    /// <c>automapper.panel</c> preset (public #406). Migrated and cleared like
+    /// <see cref="MapBackgroundHex"/>.
     /// </summary>
-    [Reactive] public string MapTextHex { get; set; } = "#000000";
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MapTextHex { get; set; }
 
     /// <summary>Show the on-map colour legend (#157). Default on.</summary>
     [Reactive] public bool   ShowMapLegend { get; set; } = true;
