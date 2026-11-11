@@ -158,11 +158,10 @@ public class RuleScopePanelsHeadlessTests
             Assert.Contains("Presets", headers);
             Assert.Equal(headers.IndexOf("Highlights") - 1, headers.IndexOf("Presets"));
 
-            var highlights = dialog.FindControl<HighlightsPanel>("HighlightsPanelCtrl");
-            Assert.NotNull(highlights);
-            var sub = highlights!.GetLogicalDescendants().OfType<TabControl>().First();
+            var highlights = dialog.Panel<HighlightsPanel>();
+            var sub = highlights.GetLogicalDescendants().OfType<TabControl>().First();
             Assert.Equal(new[] { "Strings", "Names" }, Headers(sub));
-            Assert.NotNull(dialog.FindControl<PresetsPanel>("PresetsPanelCtrl"));
+            Assert.NotNull(dialog.Panel<PresetsPanel>());
         }
         finally { dialog.Close(); }
     }

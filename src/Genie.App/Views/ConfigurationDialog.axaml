@@ -1,7 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Genie.App.ViewModels"
-        xmlns:views="using:Genie.App.Views"
         xmlns:profiles="using:Genie.Core.Profiles"
         x:Class="Genie.App.Views.ConfigurationDialog"
         x:DataType="vm:ConfigurationViewModel"
@@ -83,6 +82,9 @@
                  Foreground="{DynamicResource Theme.Warning}"/>
     </Border>
 
+    <!-- Each tab holds an empty host; ConfigurationDialog builds and fills
+         its panel the first time the tab is shown, and the rest in the
+         background once the window is up (public #402). -->
     <TabControl Grid.Row="2" Name="Tabs" TabStripPlacement="Top">
 
       <!-- ════════════════════════════════════════════════════════════════
@@ -94,13 +96,13 @@
       <TabItem Header="Layout">
         <TabControl>
           <TabItem Header="Windows">
-            <views:LayoutPanel Name="LayoutPanelCtrl"/>
+            <ContentControl Name="LayoutPanelHost"/>
           </TabItem>
           <TabItem Header="Settings">
-            <views:LayoutSettingsPanel Name="LayoutSettingsPanelCtrl"/>
+            <ContentControl Name="LayoutSettingsPanelHost"/>
           </TabItem>
           <TabItem Header="Server Dialogs">
-            <views:ServerDialogsPanel Name="ServerDialogsPanelCtrl"/>
+            <ContentControl Name="ServerDialogsPanelHost"/>
           </TabItem>
         </TabControl>
       </TabItem>
@@ -112,51 +114,51 @@
            for a panel colour thought to look.
            ════════════════════════════════════════════════════════════════ -->
       <TabItem Header="Presets">
-        <views:PresetsPanel Name="PresetsPanelCtrl"/>
+        <ContentControl Name="PresetsPanelHost"/>
       </TabItem>
 
       <!-- ════════════════════════════════════════════════════════════════
            Highlights — two nested sub-tabs: Strings / Names
            ════════════════════════════════════════════════════════════════ -->
       <TabItem Header="Highlights">
-        <views:HighlightsPanel Name="HighlightsPanelCtrl"/>
+        <ContentControl Name="HighlightsPanelHost"/>
       </TabItem>
 
       <!-- ════════════════════════════════════════════════════════════════
            Phase 2 tabs — ported from dylb0t/Genie5
            ════════════════════════════════════════════════════════════════ -->
       <TabItem Header="Triggers">
-        <views:TriggersPanel    Name="TriggersPanelCtrl"/>
+        <ContentControl Name="TriggersPanelHost"/>
       </TabItem>
       <TabItem Header="Substitutes">
-        <views:SubstitutesPanel Name="SubstitutesPanelCtrl"/>
+        <ContentControl Name="SubstitutesPanelHost"/>
       </TabItem>
       <TabItem Header="Gags">
-        <views:GagsPanel        Name="GagsPanelCtrl"/>
+        <ContentControl Name="GagsPanelHost"/>
       </TabItem>
       <TabItem Header="Shunts">
-        <views:ShuntsPanel      Name="ShuntsPanelCtrl"/>
+        <ContentControl Name="ShuntsPanelHost"/>
       </TabItem>
       <TabItem Header="Aliases">
-        <views:AliasesPanel     Name="AliasesPanelCtrl"/>
+        <ContentControl Name="AliasesPanelHost"/>
       </TabItem>
 
       <TabItem Header="Scripts">
-        <views:ScriptsPanel   Name="ScriptsPanelCtrl"/>
+        <ContentControl Name="ScriptsPanelHost"/>
       </TabItem>
 
       <TabItem Header="Text-to-Speech">
-        <views:TtsPanel       Name="TtsPanelCtrl"/>
+        <ContentControl Name="TtsPanelHost"/>
       </TabItem>
 
       <TabItem Header="Macros">
-        <views:MacrosPanel    Name="MacrosPanelCtrl"/>
+        <ContentControl Name="MacrosPanelHost"/>
       </TabItem>
       <TabItem Header="Variables">
-        <views:VariablesPanel Name="VariablesPanelCtrl"/>
+        <ContentControl Name="VariablesPanelHost"/>
       </TabItem>
       <TabItem Header="Classes">
-        <views:ClassesPanel   Name="ClassesPanelCtrl"/>
+        <ContentControl Name="ClassesPanelHost"/>
       </TabItem>
 
     </TabControl>
