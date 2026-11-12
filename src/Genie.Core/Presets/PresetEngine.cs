@@ -34,7 +34,9 @@ public sealed class PresetEngine
         Set("stamina",          "Green");
         Set("spirit",           "Purple");
         Set("concentration",    "Navy");
-        Set("roundtime",        "Aqua",     "#00004B");
+        // Roundtime countdown bar (public #404): Genie 4's stock MediumBlue fill,
+        // no track.
+        Set("roundtime",        "MediumBlue");
         Set("castbar",          "Magenta");
 
         // ── AutoMapper overlay ──────────────────────────────────────────────

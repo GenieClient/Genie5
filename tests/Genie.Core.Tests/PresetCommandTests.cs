@@ -58,11 +58,11 @@ public class PresetCommandTests : IDisposable
     public void Set_with_only_foreground_preserves_the_existing_background()
     {
         var (_, engine) = Make();
-        // roundtime defaults to Aqua / #00004B.
-        engine.ProcessInput("#preset roundtime Orange");
+        // automapper.line defaults to Black / White.
+        engine.ProcessInput("#preset automapper.line Orange");
 
-        Assert.Equal("Orange",  _presets.GetForeground("roundtime"));
-        Assert.Equal("#00004B", _presets.GetBackground("roundtime"));
+        Assert.Equal("Orange", _presets.GetForeground("automapper.line"));
+        Assert.Equal("White",  _presets.GetBackground("automapper.line"));
     }
 
     [Fact]

@@ -271,10 +271,22 @@ public sealed class DisplaySettings : ReactiveObject
     /// during ordinary play. <c>true</c> = the badge stays in whichever
     /// position <see cref="RoundTimeOnHandsStrip"/> picks, dimmed and
     /// reading 0.0s when idle, so the input row never jumps sideways as RT
-    /// starts and ends. Toggle via Layout → Roundtime Position → Keep Visible.
+    /// starts and ends. Toggle via Layout → Roundtime → Keep Visible.
     /// Also rides on saved layouts (<c>SavedLayout.KeepRoundTimeVisible</c>).
     /// </summary>
     [Reactive] public bool   KeepRoundTimeVisible { get; set; }
+
+    /// <summary>
+    /// Draw roundtime as Genie 4's countdown bar instead of the text badge
+    /// (#404): a bar whose fill shrinks from full to empty over the RT, with the
+    /// seconds left drawn on it, coloured by the <c>roundtime</c> preset
+    /// (foreground = fill, background = track). <c>false</c> (default) keeps
+    /// the "⏱ N.Ns" / "R N.Ns" badge. Applies to whichever position
+    /// <see cref="RoundTimeOnHandsStrip"/> picks. Toggle via Layout → Roundtime
+    /// → Countdown Bar. Also rides on saved layouts
+    /// (<c>SavedLayout.RoundTimeCountdownBar</c>).
+    /// </summary>
+    [Reactive] public bool   RoundTimeCountdownBar { get; set; }
 
     /// <summary>
     /// Where the Script Bar (the running-script chip strip) docks.

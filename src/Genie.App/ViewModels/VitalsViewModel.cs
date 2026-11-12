@@ -20,6 +20,16 @@ public class VitalsViewModel : ReactiveObject
     [Reactive] public double RoundTimeSeconds { get; private set; }
     [Reactive] public bool   InRoundTime      { get; private set; }
 
+    /// <summary>The roundtime the countdown bar started from (#404), so its fill
+    /// is remaining ÷ starting RT, as in Genie 4's <c>ComponentRoundtime</c>
+    /// (<c>width / StartRT * RT</c>). Reset by <see cref="SeedRoundTimeTotal"/>.</summary>
+    [Reactive] public double RoundTimeTotalSeconds { get; private set; } = 1;
+
+    /// <summary>The number drawn on the countdown bar (#404): whole seconds left,
+    /// rounded up so it reads N at the start and 1 in the last second, and blank
+    /// with no roundtime, like Genie 4's <c>LabelRT</c>.</summary>
+    [Reactive] public string RoundTimeLabel { get; private set; } = "";
+
     /// <summary>Commands currently typed ahead of the game (sent, awaiting a
     /// prompt). Drives the filled pips in the command-bar type-ahead counter.</summary>
     [Reactive] public int    TypeAheadInFlight { get; private set; }
@@ -200,9 +210,7 @@ public class VitalsViewModel : ReactiveObject
                 // Ordering is safe: the engine applies events synchronously on
                 // the pipeline thread; this handler runs after the
                 // MainThreadScheduler hop.
-                _rtExpiresAt = core.State.Combat.RoundTimeEnd;
-                RecomputeRt();
-                StartTickerIfNeeded();
+                ApplyRoundTimeEnd(core.State.Combat.RoundTimeEnd);
             });
 
         // ── Spell preparation bar ─────────────────────────────────────────
@@ -417,10 +425,38 @@ public class VitalsViewModel : ReactiveObject
         {
             RoundTimeSeconds = 0;
             InRoundTime      = false;
+            RoundTimeLabel   = "";
             return;
         }
         RoundTimeSeconds = remaining;
         InRoundTime      = true;
+        RoundTimeLabel   = ((int)Math.Ceiling(remaining)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>A roundtime ending at <paramref name="expiresAt"/> (local clock,
+    /// already offset-corrected) arrived: reseed the bar if needed, update the
+    /// countdown and start the ticker. Internal so tests can drive it.</summary>
+    internal void ApplyRoundTimeEnd(DateTimeOffset expiresAt)
+    {
+        _rtExpiresAt = expiresAt;
+        SeedRoundTimeTotal();
+        RecomputeRt();
+        StartTickerIfNeeded();
+    }
+
+    /// <summary>
+    /// A new roundtime arrived: decide whether the countdown bar starts again
+    /// from full (#404). Genie 4 (<c>FormMain.cs</c> L6488) restarts the bar only
+    /// when there is no roundtime running or the new one is more than a second
+    /// longer than what is left, so a re-sent or shorter RT keeps the bar's
+    /// current scale instead of jumping back to full.
+    /// </summary>
+    private void SeedRoundTimeTotal()
+    {
+        var remaining = (_rtExpiresAt - DateTimeOffset.UtcNow).TotalSeconds;
+        if (remaining <= 0) return;
+        if (!InRoundTime || remaining > RoundTimeSeconds + 1 || remaining > RoundTimeTotalSeconds)
+            RoundTimeTotalSeconds = remaining;
     }
 
     /// <summary>

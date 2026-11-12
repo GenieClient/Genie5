@@ -460,11 +460,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>Window → Enhanced Hands Strip. Toggles the dylb0t-derived icon widgets (compass / body / status icons) into / out of the strip.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleEnhancedHandsStripCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleRestedExpBarCommand { get; }
-    /// <summary>Window → Roundtime Position → Command Bar. Keeps the "⏱ N.Ns" badge inline with the input row.</summary>
+    /// <summary>Layout → Roundtime → Command Bar. Keeps the RT indicator inline with the input row.</summary>
     public ReactiveCommand<Unit, Unit>                    RoundTimeToCommandBarCommand { get; }
-    /// <summary>Window → Roundtime Position → Hands Strip. Moves the RT badge onto the L/R/S row.</summary>
+    /// <summary>Layout → Roundtime → Hands Strip. Moves the RT indicator onto the L/R/S row.</summary>
     public ReactiveCommand<Unit, Unit>                    RoundTimeToHandsStripCommand { get; }
-    /// <summary>Window → Roundtime Position → Keep Visible. Stops the RT badge collapsing between roundtimes, in either position.</summary>
+    /// <summary>Layout → Roundtime → Countdown Bar. Draws RT as Genie 4's shrinking bar instead of the text badge (#404).</summary>
+    public ReactiveCommand<Unit, Unit>                    ToggleRoundTimeCountdownBarCommand { get; }
+    /// <summary>Layout → Roundtime → Keep Visible. Stops the RT indicator collapsing between roundtimes, in either position.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleKeepRoundTimeVisibleCommand { get; }
     /// <summary>Layout → Script Bar Position → Top. Docks the running-script strip under the menu — Genie 4's default (#357).</summary>
     public ReactiveCommand<Unit, Unit>                    ScriptBarToTopCommand    { get; }
@@ -2101,6 +2103,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         RoundTimeToHandsStripCommand = ReactiveCommand.Create(() =>
         {
             Display.RoundTimeOnHandsStrip = true;
+            Display.Save(_displayPath);
+        });
+
+        ToggleRoundTimeCountdownBarCommand = ReactiveCommand.Create(() =>
+        {
+            Display.RoundTimeCountdownBar = !Display.RoundTimeCountdownBar;
             Display.Save(_displayPath);
         });
 
@@ -6339,6 +6347,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             ScriptBarVisible      = Display.ShowScriptBar,
             MagicPanels           = Display.ShowMagicPanels,
             KeepRoundTimeVisible  = Display.KeepRoundTimeVisible,
+            RoundTimeCountdownBar = Display.RoundTimeCountdownBar,
             ShowGameText          = Display.ShowGameText,
             ShowEchoText          = Display.ShowEchoText,
             ShowScriptText        = Display.ShowScriptText,
@@ -6415,6 +6424,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         if (layout.ScriptBarVisible  is { } barShown)   Display.ShowScriptBar     = barShown;
         if (layout.MagicPanels       is { } magic)      Display.ShowMagicPanels   = magic;
         if (layout.KeepRoundTimeVisible is { } keepRt)  Display.KeepRoundTimeVisible = keepRt;
+        if (layout.RoundTimeCountdownBar is { } rtBar)  Display.RoundTimeCountdownBar = rtBar;
         Display.ShowGameText           = layout.ShowGameText;
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;
