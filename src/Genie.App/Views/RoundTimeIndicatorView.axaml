@@ -4,7 +4,9 @@
      and the Keep Visible dimming; this view draws the style chosen under
      Layout → Roundtime (DisplaySettings.RoundTimeStyle):
 
-     - Badge: the red badge with its timer.
+     - Badge: the red badge with its timer. Its colours come from the
+       roundtime.badge preset (foreground = countdown fill, background = badge;
+       MainWindowViewModel.RtBadge*), stock = the original reds.
      - Countdown Badge: the same badge, with a brighter fill behind the timer
        that shrinks from full to empty over the RT.
      - Countdown Bar (Genie 4): Genie 4's ComponentRoundtime bar, coloured by
@@ -22,7 +24,7 @@
     <!-- Badge / Countdown Badge. The padding sits on the text, not the Border,
          so the fill reaches the edges. -->
     <Border IsVisible="{Binding Display.RoundTimeStyleAnyBadge}"
-            Background="#5a1a1a" BorderBrush="#8a2a2a" BorderThickness="1"
+            Background="{Binding RtBadgeBackground}" BorderBrush="{Binding RtBadgeBorder}" BorderThickness="1"
             CornerRadius="3" ClipToBounds="True"
             VerticalAlignment="Stretch"
             ToolTip.Tip="Roundtime — your character can't act until this expires. Layout → Roundtime to move it or change its style."
@@ -32,7 +34,7 @@
                      Minimum="0"
                      Maximum="{Binding Vitals.RoundTimeTotalSeconds}"
                      Value="{Binding Vitals.RoundTimeSeconds}"
-                     Background="Transparent" Foreground="#a03030"
+                     Background="Transparent" Foreground="{Binding RtBadgeFill}"
                      BorderThickness="0" Padding="0" CornerRadius="0"
                      MinWidth="0" MinHeight="0"
                      HorizontalAlignment="Stretch" VerticalAlignment="Stretch"

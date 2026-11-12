@@ -211,7 +211,7 @@ Rearrange the panels however you like, then keep the arrangement — the **Layou
 - **Layout → Script Bar** shows or hides the running-script strip; even when shown, it only appears while a script is running.
 - **Layout → Script Bar Position**, **Icon Bar Position** and **Health Bar Position** each dock that bar at the **Top** or **Bottom** of the window, as Genie 4 allowed. (Icon Bar Position needs the Icon Bar shown, and Health Bar Position needs the Status Bar shown.)
 - **Layout → Roundtime** also picks how roundtime is drawn. The command bar and the hands strip show the same indicator, and the choice is saved with layouts:
-  - **Badge** (default): the red badge with its timer.
+  - **Badge** (default): the red badge with its timer. Its colours come from the `roundtime.badge` preset: the background is the badge, and the colour is the Countdown Badge fill.
   - **Countdown Badge**: the same red badge and timer, with a brighter fill behind the timer that shrinks from full to empty over the roundtime.
   - **Countdown Bar (Genie 4)**: Genie 4's bar, which shrinks from full to empty with the seconds left drawn on it. Its colours come from the `roundtime` preset (foreground = fill, background = track), so changing the preset changes the bar straight away.
 - **Layout → Roundtime ▸ Keep Visible** keeps the roundtime indicator on screen between roundtimes (dimmed: the badge at 0.0s, or an empty bar or badge) instead of collapsing it, so the command bar or hands strip doesn't shift each time RT starts and ends.

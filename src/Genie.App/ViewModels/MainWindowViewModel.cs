@@ -1,6 +1,7 @@
 ﻿using System.Reactive;
 using System.Reactive.Linq;
 using Avalonia;
+using Avalonia.Media;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using Dock.Model.Controls;
@@ -503,6 +504,41 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// badge is only showing because <see cref="DisplaySettings.KeepRoundTimeVisible"/>
     /// keeps it on screen between roundtimes.</summary>
     [Reactive] public double RtBadgeOpacity    { get; private set; } = 0.45;
+
+    /// <summary>Roundtime badge colours from the <c>roundtime.badge</c> preset
+    /// (#404): foreground = the Countdown Badge fill, background = the badge,
+    /// border = 70 % fill + 30 % background. Fall back to the badge's original
+    /// reds when no preset engine is loaded or the preset leaves a colour unset.</summary>
+    [Reactive] public IBrush RtBadgeFill       { get; private set; } = RtBadgeStockFill;
+    [Reactive] public IBrush RtBadgeBackground { get; private set; } = RtBadgeStockBackground;
+    [Reactive] public IBrush RtBadgeBorder     { get; private set; } = new SolidColorBrush(Color.Parse("#8B2929"));
+
+    internal const string RtBadgePreset = "roundtime.badge";
+    private static readonly IBrush RtBadgeStockFill       = new SolidColorBrush(Color.Parse("#A03030"));
+    private static readonly IBrush RtBadgeStockBackground = new SolidColorBrush(Color.Parse("#5A1A1A"));
+
+    /// <summary>Re-read the <c>roundtime.badge</c> preset into the badge brushes.</summary>
+    internal void RefreshRtBadgeColors()
+    {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(RefreshRtBadgeColors);
+            return;
+        }
+        var fill = Highlighting.DefaultHighlights.PresetForeground(RtBadgePreset) ?? RtBadgeStockFill;
+        var back = Highlighting.DefaultHighlights.PresetBackground(RtBadgePreset) ?? RtBadgeStockBackground;
+        RtBadgeFill       = fill;
+        RtBadgeBackground = back;
+        RtBadgeBorder     = fill is ISolidColorBrush f && back is ISolidColorBrush b
+            ? new SolidColorBrush(Mix(f.Color, b.Color, 0.7))
+            : fill;
+
+        static Color Mix(Color a, Color b, double t) => Color.FromArgb(
+            (byte)Math.Round(a.A * t + b.A * (1 - t)),
+            (byte)Math.Round(a.R * t + b.R * (1 - t)),
+            (byte)Math.Round(a.G * t + b.G * (1 - t)),
+            (byte)Math.Round(a.B * t + b.B * (1 - t)));
+    }
 
     /// <summary>True iff the Script Bar should render in its TOP slot — i.e. a
     /// script is running AND the user picked the top position (#357). The strip
@@ -2112,6 +2148,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Display.RoundTimeStyle = DisplaySettings.RoundTimeStyles.Normalize(style);
             Display.Save(_displayPath);
         });
+
+        // The RT badge repaints whenever presets change or load (#404).
+        Highlighting.UserHighlights.RulesChanged += RefreshRtBadgeColors;
+        RefreshRtBadgeColors();
 
         ToggleKeepRoundTimeVisibleCommand = ReactiveCommand.Create(() =>
         {

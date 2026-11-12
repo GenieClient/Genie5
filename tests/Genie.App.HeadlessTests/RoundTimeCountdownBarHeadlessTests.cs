@@ -169,4 +169,63 @@ public class RoundTimeCountdownBarHeadlessTests : IDisposable
         }
         finally { DefaultHighlights.PresetEngine = prev; }
     }
+
+    private static Color C(IBrush b) => Assert.IsAssignableFrom<ISolidColorBrush>(b).Color;
+
+    [AvaloniaFact]
+    public void Badge_uses_its_original_reds_with_no_preset_engine()
+    {
+        var prev = DefaultHighlights.PresetEngine;
+        DefaultHighlights.PresetEngine = null;
+        try
+        {
+            var vm = NewVm();
+            vm.RefreshRtBadgeColors();
+
+            Assert.Equal(Color.Parse("#A03030"), C(vm.RtBadgeFill));
+            Assert.Equal(Color.Parse("#5A1A1A"), C(vm.RtBadgeBackground));
+            Assert.Equal(Color.Parse("#8B2929"), C(vm.RtBadgeBorder));
+        }
+        finally { DefaultHighlights.PresetEngine = prev; }
+    }
+
+    [AvaloniaFact]
+    public void Stock_roundtime_badge_preset_keeps_the_original_reds()
+    {
+        var prev   = DefaultHighlights.PresetEngine;
+        DefaultHighlights.PresetEngine = new PresetEngine();
+        try
+        {
+            var vm = NewVm();
+            vm.RefreshRtBadgeColors();
+
+            Assert.Equal(Color.Parse("#A03030"), C(vm.RtBadgeFill));
+            Assert.Equal(Color.Parse("#5A1A1A"), C(vm.RtBadgeBackground));
+            Assert.Equal(Color.Parse("#8B2929"), C(vm.RtBadgeBorder));   // 70 % fill + 30 % background
+        }
+        finally { DefaultHighlights.PresetEngine = prev; }
+    }
+
+    [AvaloniaFact]
+    public void Changing_the_roundtime_badge_preset_recolours_the_badge()
+    {
+        var prev   = DefaultHighlights.PresetEngine;
+        var engine = new PresetEngine();
+        DefaultHighlights.PresetEngine = engine;
+        try
+        {
+            var vm = NewVm();
+            engine.Apply(new PresetRule { Id = "roundtime.badge", ForegroundColor = "#0000FF", BackgroundColor = "#000000" });
+            vm.RefreshRtBadgeColors();
+
+            Assert.Equal(Color.Parse("#0000FF"), C(vm.RtBadgeFill));
+            Assert.Equal(Color.Parse("#000000"), C(vm.RtBadgeBackground));
+
+            // A colour the preset leaves unset falls back to the original.
+            engine.Apply(new PresetRule { Id = "roundtime.badge", ForegroundColor = "#0000FF", BackgroundColor = "" });
+            vm.RefreshRtBadgeColors();
+            Assert.Equal(Color.Parse("#5A1A1A"), C(vm.RtBadgeBackground));
+        }
+        finally { DefaultHighlights.PresetEngine = prev; }
+    }
 }

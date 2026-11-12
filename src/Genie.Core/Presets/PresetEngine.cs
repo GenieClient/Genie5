@@ -37,6 +37,10 @@ public sealed class PresetEngine
         // Roundtime countdown bar (public #404): Genie 4's stock MediumBlue fill,
         // no track.
         Set("roundtime",        "MediumBlue");
+        // Roundtime badge (Genie 5, #404): the red Badge / Countdown Badge.
+        // Foreground = the countdown fill, background = the badge. The border
+        // is drawn between the two. Stock = the badge's original reds.
+        Set("roundtime.badge",  "#A03030",  "#5A1A1A");
         Set("castbar",          "Magenta");
 
         // ── AutoMapper overlay ──────────────────────────────────────────────
