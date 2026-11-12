@@ -279,7 +279,7 @@ public sealed class DisplaySettings : ReactiveObject
     /// <summary>The <see cref="RoundTimeStyle"/> values (#404).</summary>
     public static class RoundTimeStyles
     {
-        /// <summary>The red text badge ("⏱ N.Ns" / "R N.Ns"), no fill — the default.</summary>
+        /// <summary>The red "⏱ N.Ns" badge, no fill — the default.</summary>
         public const string Badge          = "Badge";
         /// <summary>The same red badge with a fill behind the timer that shrinks
         /// from full to empty over the RT.</summary>
