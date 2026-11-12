@@ -1747,18 +1747,33 @@
              IsVisible="{Binding ShowRtInCommandBar}"
              Opacity="{Binding RtBadgeOpacity}"
              Margin="0,0,4,0">
+        <!-- The badge counts down too (#404): a brighter red fill behind the
+             text shrinks from full to empty over the RT (remaining ÷ starting
+             RT, same rule as the Countdown Bar). Same size as before: the
+             padding moved from the Border onto the text so the fill can reach
+             the edges. MinWidth/MinHeight override Fluent's ProgressBar minimums. -->
         <Border IsVisible="{Binding !Display.RoundTimeCountdownBar}"
                 Background="#5a1a1a" BorderBrush="#8a2a2a" BorderThickness="1"
-                CornerRadius="3" Padding="6,2"
+                CornerRadius="3" ClipToBounds="True"
                 VerticalAlignment="Stretch"
                 ToolTip.Tip="Roundtime — your character can't act until this expires. Layout → Roundtime to relocate it or switch to the countdown bar."
                 MinWidth="64">
-          <TextBlock Foreground="#ffd0d0" FontWeight="SemiBold"
-                     AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
-                     HorizontalAlignment="Center" VerticalAlignment="Center"
-                     FontSize="12">
-            <Run Text="⏱ "/><Run Text="{Binding Vitals.RoundTimeSeconds, StringFormat={}{0:F1}s}"/>
-          </TextBlock>
+          <Grid>
+            <ProgressBar Minimum="0"
+                         Maximum="{Binding Vitals.RoundTimeTotalSeconds}"
+                         Value="{Binding Vitals.RoundTimeSeconds}"
+                         Background="Transparent" Foreground="#a03030"
+                         BorderThickness="0" Padding="0" CornerRadius="0"
+                         MinWidth="0" MinHeight="0"
+                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                         IsHitTestVisible="False"/>
+            <TextBlock Foreground="#ffd0d0" FontWeight="SemiBold"
+                       AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Margin="6,2" FontSize="12">
+              <Run Text="⏱ "/><Run Text="{Binding Vitals.RoundTimeSeconds, StringFormat={}{0:F1}s}"/>
+            </TextBlock>
+          </Grid>
         </Border>
         <!-- Countdown Bar (Genie 4, #404): fill = remaining ÷ starting RT,
              coloured by the roundtime preset (Controls/PresetBar.cs). -->

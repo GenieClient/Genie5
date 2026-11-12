@@ -210,6 +210,7 @@ Rearrange the panels however you like, then keep the arrangement — the **Layou
 - **Layout → Icon Bar** shows or hides the status-chip strip.
 - **Layout → Script Bar** shows or hides the running-script strip; even when shown, it only appears while a script is running.
 - **Layout → Script Bar Position**, **Icon Bar Position** and **Health Bar Position** each dock that bar at the **Top** or **Bottom** of the window, as Genie 4 allowed. (Icon Bar Position needs the Icon Bar shown, and Health Bar Position needs the Status Bar shown.)
+- On the command bar, the red roundtime badge counts down as well: a brighter red fill behind the timer shrinks from full to empty over the roundtime.
 - **Layout → Roundtime ▸ Countdown Bar (Genie 4)** draws roundtime as Genie 4's bar instead of the text badge: it shrinks from full to empty over the roundtime, with the seconds left drawn on it. Its colours come from the `roundtime` preset (foreground = fill, background = track), so changing the preset changes the bar straight away. It works in either position and is saved with layouts.
 - **Layout → Roundtime ▸ Keep Visible** keeps the roundtime indicator on screen between roundtimes (dimmed: the badge at 0.0s, or an empty bar) instead of collapsing it, so the command bar or hands strip doesn't shift each time RT starts and ends.
 - **Layout → Window Banners** shows or hides the name bar above each docked panel group. The tab strip already names every panel, so turning it off gives that height back to the text.
