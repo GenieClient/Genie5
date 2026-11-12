@@ -113,7 +113,7 @@ Everything V1 tagged 🔧 FIX BEFORE ALPHA is done, verified against beta.3 sour
 |---|---|---|---|---|
 | Show/hide each dockable | ✅ | ✅ | ✅ | Same set: Game / Vitals / Room / Backpack / Mapper / Logons / Talk / Whispers / Thoughts / Combat |
 | Hands Strip toggle + position | n/a | ✅ | 🆕 | Genie 5 addition (Top/Bottom) |
-| Roundtime (Command Bar / Hands Strip, Countdown Bar, Keep Visible) | n/a | ✅ | 🆕 | Countdown Bar draws Genie 4's RT bar (#404) |
+| Roundtime (Command Bar / Hands Strip; Badge / Countdown Badge / Countdown Bar; Keep Visible) | n/a | ✅ | 🆕 | Countdown Bar draws Genie 4's RT bar (#404) |
 | Script Bar Position (Top / Bottom) | ✅ Dock Top / Dock Bottom | ✅ | ✅ | Under Layout, beside the other two position submenus (#357) |
 | Status Bar toggle | ✅ | ✅ | ✅ | |
 | Game Window → per-tag toggle (Game / Echo / Script) | n/a | ✅ | 🆕 | Genie 5 addition |
@@ -549,7 +549,7 @@ Both clients support flexible dockable layouts; the tech differs (WinForms MDI v
 |---|---|---|---|
 | Health / Mana / Spirit / Stamina / Concentration bars | ✅ | ✅ | ✅ |
 | Bar colors configurable | ✅ via preset | ✅ via DisplaySettings | ✅ |
-| Roundtime countdown | ✅ ComponentRoundtime | ✅ inline RT badge, or Genie 4's bar via Layout → Roundtime → Countdown Bar (`roundtime` preset) | ✅ |
+| Roundtime countdown | ✅ ComponentRoundtime | ✅ inline RT badge (optionally with a shrinking fill), or Genie 4's bar via Layout → Roundtime → Countdown Bar (`roundtime` preset) | ✅ |
 | RT badge position (command bar vs hands strip) | ❌ | 🆕 toggleable | 🆕 |
 | Spell-cast countdown | ❌ | 🆕 magenta bar with (N) prefix | 🆕 |
 | Posture: STAND/KNEEL/PRONE/SIT | ✅ | ✅ | ✅ |

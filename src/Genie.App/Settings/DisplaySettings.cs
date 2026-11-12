@@ -276,17 +276,45 @@ public sealed class DisplaySettings : ReactiveObject
     /// </summary>
     [Reactive] public bool   KeepRoundTimeVisible { get; set; }
 
+    /// <summary>The <see cref="RoundTimeStyle"/> values (#404).</summary>
+    public static class RoundTimeStyles
+    {
+        /// <summary>The red text badge ("⏱ N.Ns" / "R N.Ns"), no fill — the default.</summary>
+        public const string Badge          = "Badge";
+        /// <summary>The same red badge with a fill behind the timer that shrinks
+        /// from full to empty over the RT.</summary>
+        public const string CountdownBadge = "CountdownBadge";
+        /// <summary>Genie 4's bar: shrinking fill with the seconds left on it,
+        /// coloured by the <c>roundtime</c> preset.</summary>
+        public const string CountdownBar   = "CountdownBar";
+
+        /// <summary>A known style, or <see cref="Badge"/> for anything else.</summary>
+        public static string Normalize(string? s) => s switch
+        {
+            CountdownBadge => CountdownBadge,
+            CountdownBar   => CountdownBar,
+            _              => Badge,
+        };
+    }
+
     /// <summary>
-    /// Draw roundtime as Genie 4's countdown bar instead of the text badge
-    /// (#404): a bar whose fill shrinks from full to empty over the RT, with the
-    /// seconds left drawn on it, coloured by the <c>roundtime</c> preset
-    /// (foreground = fill, background = track). <c>false</c> (default) keeps
-    /// the "⏱ N.Ns" / "R N.Ns" badge. Applies to whichever position
-    /// <see cref="RoundTimeOnHandsStrip"/> picks. Toggle via Layout → Roundtime
-    /// → Countdown Bar. Also rides on saved layouts
-    /// (<c>SavedLayout.RoundTimeCountdownBar</c>).
+    /// How the roundtime indicator is drawn (#404), in whichever position
+    /// <see cref="RoundTimeOnHandsStrip"/> picks. One of
+    /// <see cref="RoundTimeStyles"/>: <c>Badge</c> (default, the red text
+    /// badge), <c>CountdownBadge</c> (that badge with a fill that shrinks over
+    /// the RT) or <c>CountdownBar</c> (Genie 4's bar, coloured by the
+    /// <c>roundtime</c> preset: foreground = fill, background = track). Pick via
+    /// Layout → Roundtime. Also rides on saved layouts
+    /// (<c>SavedLayout.RoundTimeStyle</c>).
     /// </summary>
-    [Reactive] public bool   RoundTimeCountdownBar { get; set; }
+    [Reactive] public string RoundTimeStyle { get; set; } = RoundTimeStyles.Badge;
+
+    /// <summary>Menu radio / visibility helpers for <see cref="RoundTimeStyle"/>.</summary>
+    [JsonIgnore] public bool RoundTimeStyleBadge          => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.Badge;
+    [JsonIgnore] public bool RoundTimeStyleCountdownBadge => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.CountdownBadge;
+    [JsonIgnore] public bool RoundTimeStyleCountdownBar   => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.CountdownBar;
+    /// <summary>Either badge style (the red badge is shown, with or without fill).</summary>
+    [JsonIgnore] public bool RoundTimeStyleAnyBadge       => !RoundTimeStyleCountdownBar;
 
     /// <summary>
     /// Where the Script Bar (the running-script chip strip) docks.
@@ -461,6 +489,16 @@ public sealed class DisplaySettings : ReactiveObject
         // refreshes too.
         this.WhenAnyValue(x => x.RoundTimeOnHandsStrip)
             .Subscribe(_ => this.RaisePropertyChanged(nameof(RoundTimeOnCommandBar)));
+
+        // Same for the derived RoundTimeStyle flags (#404).
+        this.WhenAnyValue(x => x.RoundTimeStyle)
+            .Subscribe(_ =>
+            {
+                this.RaisePropertyChanged(nameof(RoundTimeStyleBadge));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleCountdownBadge));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleCountdownBar));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleAnyBadge));
+            });
 
         // Same for ScriptBarAtTop (JsonIgnore + derived) so the Layout menu's
         // Top radio button refreshes when the position flips (#357).

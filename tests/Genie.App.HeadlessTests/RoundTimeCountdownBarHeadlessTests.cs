@@ -14,10 +14,10 @@ using Xunit;
 namespace Genie.App.HeadlessTests;
 
 /// <summary>
-/// Layout → Roundtime → Countdown Bar (public #404): Genie 4's roundtime bar
-/// (<c>ComponentRoundtime</c>) as an option beside today's text badge. Fill =
-/// remaining ÷ starting RT, the whole seconds left drawn on it, coloured by the
-/// <c>roundtime</c> preset. Off by default.
+/// Layout → Roundtime styles (public #404): Badge (default, the red text
+/// badge), Countdown Badge (that badge with a shrinking fill) and Countdown Bar
+/// (Genie 4's <c>ComponentRoundtime</c>: fill = remaining ÷ starting RT, whole
+/// seconds drawn on it, coloured by the <c>roundtime</c> preset).
 /// </summary>
 public class RoundTimeCountdownBarHeadlessTests : IDisposable
 {
@@ -41,17 +41,40 @@ public class RoundTimeCountdownBarHeadlessTests : IDisposable
 
     private static DateTimeOffset In(double seconds) => DateTimeOffset.UtcNow.AddSeconds(seconds);
 
+    private static void Run(ReactiveUI.ReactiveCommand<string, System.Reactive.Unit> cmd, string arg)
+        => cmd.Execute(arg).Subscribe();
+
     [AvaloniaFact]
-    public void Off_by_default_and_the_menu_toggle_saves_it()
+    public void Default_is_the_plain_badge_and_the_menu_choice_is_saved()
     {
         var vm = NewVm();
-        Assert.False(vm.Display.RoundTimeCountdownBar);
+        Assert.Equal(DisplaySettings.RoundTimeStyles.Badge, vm.Display.RoundTimeStyle);
+        Assert.True(vm.Display.RoundTimeStyleBadge);
+        Assert.True(vm.Display.RoundTimeStyleAnyBadge);
 
-        Run(vm.ToggleRoundTimeCountdownBarCommand);
+        Run(vm.SetRoundTimeStyleCommand, "CountdownBadge");
 
-        Assert.True(vm.Display.RoundTimeCountdownBar);
+        Assert.True(vm.Display.RoundTimeStyleCountdownBadge);
+        Assert.True(vm.Display.RoundTimeStyleAnyBadge);
+        Assert.False(vm.Display.RoundTimeStyleBadge);
         var path = Directory.EnumerateFiles(_dir, "display.json", SearchOption.AllDirectories).Single();
-        Assert.True(DisplaySettings.Load(path).RoundTimeCountdownBar);
+        Assert.Equal("CountdownBadge", DisplaySettings.Load(path).RoundTimeStyle);
+
+        Run(vm.SetRoundTimeStyleCommand, "CountdownBar");
+
+        Assert.True(vm.Display.RoundTimeStyleCountdownBar);
+        Assert.False(vm.Display.RoundTimeStyleAnyBadge);
+    }
+
+    [AvaloniaFact]
+    public void An_unknown_style_falls_back_to_the_plain_badge()
+    {
+        var vm = NewVm();
+        Run(vm.SetRoundTimeStyleCommand, "Sparkly");
+        Assert.Equal(DisplaySettings.RoundTimeStyles.Badge, vm.Display.RoundTimeStyle);
+
+        vm.Display.RoundTimeStyle = "Sparkly";   // e.g. hand-edited display.json
+        Assert.True(vm.Display.RoundTimeStyleBadge);
     }
 
     [AvaloniaFact]
@@ -110,17 +133,17 @@ public class RoundTimeCountdownBarHeadlessTests : IDisposable
     public void Layout_carries_the_style_and_an_older_layout_leaves_it_alone()
     {
         var vm = NewVm();
-        Run(vm.ToggleRoundTimeCountdownBarCommand);
+        Run(vm.SetRoundTimeStyleCommand, "CountdownBadge");
 
         var saved = SavedLayout.FromJson(vm.CaptureCurrentLayout().ToJson());   // through disk form
-        Assert.True(saved!.RoundTimeCountdownBar);
+        Assert.Equal("CountdownBadge", saved!.RoundTimeStyle);
 
-        Run(vm.ToggleRoundTimeCountdownBarCommand);          // off again
+        Run(vm.SetRoundTimeStyleCommand, "Badge");
         vm.ApplyLayout(saved);
-        Assert.True(vm.Display.RoundTimeCountdownBar);
+        Assert.True(vm.Display.RoundTimeStyleCountdownBadge);
 
         vm.ApplyLayout(new SavedLayout());                    // pre-#404 layout: null
-        Assert.True(vm.Display.RoundTimeCountdownBar);
+        Assert.True(vm.Display.RoundTimeStyleCountdownBadge);
     }
 
     [AvaloniaFact]

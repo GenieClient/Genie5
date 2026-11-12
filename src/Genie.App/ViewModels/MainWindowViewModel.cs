@@ -464,8 +464,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit>                    RoundTimeToCommandBarCommand { get; }
     /// <summary>Layout → Roundtime → Hands Strip. Moves the RT indicator onto the L/R/S row.</summary>
     public ReactiveCommand<Unit, Unit>                    RoundTimeToHandsStripCommand { get; }
-    /// <summary>Layout → Roundtime → Countdown Bar. Draws RT as Genie 4's shrinking bar instead of the text badge (#404).</summary>
-    public ReactiveCommand<Unit, Unit>                    ToggleRoundTimeCountdownBarCommand { get; }
+    /// <summary>Layout → Roundtime → Badge / Countdown Badge / Countdown Bar (#404).
+    /// Parameter: a <see cref="DisplaySettings.RoundTimeStyles"/> value.</summary>
+    public ReactiveCommand<string, Unit>                  SetRoundTimeStyleCommand { get; }
     /// <summary>Layout → Roundtime → Keep Visible. Stops the RT indicator collapsing between roundtimes, in either position.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleKeepRoundTimeVisibleCommand { get; }
     /// <summary>Layout → Script Bar Position → Top. Docks the running-script strip under the menu — Genie 4's default (#357).</summary>
@@ -2106,9 +2107,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Display.Save(_displayPath);
         });
 
-        ToggleRoundTimeCountdownBarCommand = ReactiveCommand.Create(() =>
+        SetRoundTimeStyleCommand = ReactiveCommand.Create<string>(style =>
         {
-            Display.RoundTimeCountdownBar = !Display.RoundTimeCountdownBar;
+            Display.RoundTimeStyle = DisplaySettings.RoundTimeStyles.Normalize(style);
             Display.Save(_displayPath);
         });
 
@@ -6347,7 +6348,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             ScriptBarVisible      = Display.ShowScriptBar,
             MagicPanels           = Display.ShowMagicPanels,
             KeepRoundTimeVisible  = Display.KeepRoundTimeVisible,
-            RoundTimeCountdownBar = Display.RoundTimeCountdownBar,
+            RoundTimeStyle        = Display.RoundTimeStyle,
             ShowGameText          = Display.ShowGameText,
             ShowEchoText          = Display.ShowEchoText,
             ShowScriptText        = Display.ShowScriptText,
@@ -6424,7 +6425,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         if (layout.ScriptBarVisible  is { } barShown)   Display.ShowScriptBar     = barShown;
         if (layout.MagicPanels       is { } magic)      Display.ShowMagicPanels   = magic;
         if (layout.KeepRoundTimeVisible is { } keepRt)  Display.KeepRoundTimeVisible = keepRt;
-        if (layout.RoundTimeCountdownBar is { } rtBar)  Display.RoundTimeCountdownBar = rtBar;
+        if (layout.RoundTimeStyle is { } rtStyle)       Display.RoundTimeStyle = DisplaySettings.RoundTimeStyles.Normalize(rtStyle);
         Display.ShowGameText           = layout.ShowGameText;
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;
