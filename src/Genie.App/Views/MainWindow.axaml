@@ -976,9 +976,10 @@
              MainWindowViewModel as (Vitals.InRoundTime AND
              Display.RoundTimeOnHandsStrip), or KeepRoundTimeVisible pins it
              on (dimmed) between roundtimes. -->
+        <!-- Stretches to the strip's height like the L/R/S boxes, so it
+             matches them and the command-bar badge. -->
         <views:RoundTimeIndicatorView IsVisible="{Binding ShowRtOnHandsStrip}"
-                                      Opacity="{Binding RtBadgeOpacity}"
-                                      VerticalAlignment="Center"/>
+                                      Opacity="{Binding RtBadgeOpacity}"/>
 
         <!-- ── Enhanced (dylb0t-derived) icon widgets ─────────────────
              Collapsed by default; toggled on via Window → Enhanced Hands
@@ -1418,9 +1419,10 @@
              MainWindowViewModel as (Vitals.InRoundTime AND
              Display.RoundTimeOnHandsStrip), or KeepRoundTimeVisible pins it
              on (dimmed) between roundtimes. -->
+        <!-- Stretches to the strip's height like the L/R/S boxes, so it
+             matches them and the command-bar badge. -->
         <views:RoundTimeIndicatorView IsVisible="{Binding ShowRtOnHandsStrip}"
-                                      Opacity="{Binding RtBadgeOpacity}"
-                                      VerticalAlignment="Center"/>
+                                      Opacity="{Binding RtBadgeOpacity}"/>
 
         <!-- ── Enhanced (dylb0t-derived) icon widgets ─────────────────
              Collapsed by default; toggled on via Window → Enhanced Hands
