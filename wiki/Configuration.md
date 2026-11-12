@@ -77,7 +77,7 @@ A rule can also be **scoped to specific windows**: the Highlights tab's **Window
 
 Two built-in colorings live alongside your own rules:
 
-- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. The `familiar` preset is the base color of the Familiar window's text, and the `inputuser`, `inputother` and `scriptecho` presets color typed commands, script commands, and script output / Genie messages. The `health`, `mana`, `stamina`, `spirit` and `concentration` presets color the vitals bars: the color is the bar's fill and the background its track. The `roundtime` preset colors the Genie 4 roundtime Countdown Bar the same way, and the `roundtime.badge` preset colors the red roundtime badge: its color is the Countdown Badge fill and its background the badge (a Genie 5 preset; stock = the badge's original reds). (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
+- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. The `familiar` preset is the base color of the Familiar window's text, and the `inputuser`, `inputother` and `scriptecho` presets color typed commands, script commands, and script output / Genie messages. The `health`, `mana`, `stamina`, `spirit` and `concentration` presets color the vitals bars: the color is the bar's fill and the background its track. (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
 - **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it on the **Edit → Configuration… → Presets** tab or with `#config monsterbold on|off`.
 
 ### Substitutes — rewriting text
@@ -272,6 +272,18 @@ The three echo colours are Genie 4's presets of the same names, so they also app
 Launching Genie, connecting, and changing a theme's chrome don't touch them.
 
 **To keep your own colours with a theme,** use **Edit → Theme → Save Current As…** (below). The new theme stores the colours you have now, so picking it later puts them back.
+
+### The roundtime indicator
+
+The roundtime indicator (**Layout → Roundtime**, see [The Interface](The-Interface)) takes its colours from two presets:
+
+| Style | Preset | Colour | Background | Stock |
+| --- | --- | --- | --- | --- |
+| Badge, Countdown Badge | `roundtime.badge` | the Countdown Badge fill | the badge | `#A03030` on `#5A1A1A` |
+| Countdown Bar (Genie 4) | `roundtime` | the bar's fill | the track | MediumBlue, no track (Genie 4's) |
+
+- `roundtime` is Genie 4's preset. `roundtime.badge` is new in Genie 5; its stock colours are the badge's original reds. The badge border is drawn between its two colours.
+- **Edit them** on **Configuration → Presets** or with `#preset`; the indicator repaints straight away.
 
 ### The vitals bars
 
