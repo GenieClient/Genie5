@@ -1095,17 +1095,17 @@
              name and the bar. IsVisible collapses the whole strip when no
              prep is active, so the layout doesn't reserve dead space. -->
         <!-- Margin gives extra breathing room on both sides so the bar reads
-             as its own widget — the track's dark plum (#2a1024) sits in the
-             same value range as the status-badge backgrounds (#2a2a2a) and
-             the strip background (#1c1c1c), so without explicit padding the
-             bar visually blurs into KNEEL/HIDE/etc. on the right and into
-             the spell name on the left. A faint BorderBrush draws the edge
-             so even when the bar is mostly empty (low remaining seconds) the
-             outline is clearly demarcated. -->
+             as its own widget next to the spell name and the status badges.
+             Sizing (#405): the frame stretches to the strip's height like the
+             S / L / R boxes, and the ProgressBar's MinWidth/MinHeight override
+             Fluent's 200 px minimum so the bar stays inside its 100 px frame.
+             Colours (#406): the castbar preset, as in Genie 4 (FormMain.cs:
+             Castbar.ForegroundColor / BackgroundColorRT = PresetList["castbar"]):
+             foreground = fill, background = track and frame
+             (Controls/PresetBar.cs). -->
         <Border MinWidth="90" Width="100"
                 Margin="6,0,6,0"
-                VerticalAlignment="Center"
-                BorderBrush="#7a3580" BorderThickness="1" CornerRadius="3"
+                ClipToBounds="True" CornerRadius="3"
                 ToolTip.Tip="Seconds remaining until the prepared spell is fully harnessed.">
           <!-- Genie 4's SetMagicPanels hides the Castbar too — AND-ed with
                the only-while-prepping collapse. -->
@@ -1119,8 +1119,9 @@
             <ProgressBar Value="{Binding Vitals.CastBarSecondsRemaining}"
                          Maximum="{Binding Vitals.CastBarSecondsTotal}"
                          AutomationProperties.Name="Spell preparation"
-                         Foreground="#D040C0" Background="#2a1024"
-                         Height="14" CornerRadius="2"/>
+                         controls:PresetBar.Preset="castbar"
+                         MinWidth="0" MinHeight="0"
+                         VerticalAlignment="Stretch" CornerRadius="3"/>
             <TextBlock Text="{Binding Vitals.CastBarSecondsRemaining}"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        FontSize="10" Foreground="#fff" FontWeight="SemiBold"/>
@@ -1548,17 +1549,17 @@
              name and the bar. IsVisible collapses the whole strip when no
              prep is active, so the layout doesn't reserve dead space. -->
         <!-- Margin gives extra breathing room on both sides so the bar reads
-             as its own widget — the track's dark plum (#2a1024) sits in the
-             same value range as the status-badge backgrounds (#2a2a2a) and
-             the strip background (#1c1c1c), so without explicit padding the
-             bar visually blurs into KNEEL/HIDE/etc. on the right and into
-             the spell name on the left. A faint BorderBrush draws the edge
-             so even when the bar is mostly empty (low remaining seconds) the
-             outline is clearly demarcated. -->
+             as its own widget next to the spell name and the status badges.
+             Sizing (#405): the frame stretches to the strip's height like the
+             S / L / R boxes, and the ProgressBar's MinWidth/MinHeight override
+             Fluent's 200 px minimum so the bar stays inside its 100 px frame.
+             Colours (#406): the castbar preset, as in Genie 4 (FormMain.cs:
+             Castbar.ForegroundColor / BackgroundColorRT = PresetList["castbar"]):
+             foreground = fill, background = track and frame
+             (Controls/PresetBar.cs). -->
         <Border MinWidth="90" Width="100"
                 Margin="6,0,6,0"
-                VerticalAlignment="Center"
-                BorderBrush="#7a3580" BorderThickness="1" CornerRadius="3"
+                ClipToBounds="True" CornerRadius="3"
                 ToolTip.Tip="Seconds remaining until the prepared spell is fully harnessed.">
           <!-- Genie 4's SetMagicPanels hides the Castbar too — AND-ed with
                the only-while-prepping collapse. -->
@@ -1572,8 +1573,9 @@
             <ProgressBar Value="{Binding Vitals.CastBarSecondsRemaining}"
                          Maximum="{Binding Vitals.CastBarSecondsTotal}"
                          AutomationProperties.Name="Spell preparation"
-                         Foreground="#D040C0" Background="#2a1024"
-                         Height="14" CornerRadius="2"/>
+                         controls:PresetBar.Preset="castbar"
+                         MinWidth="0" MinHeight="0"
+                         VerticalAlignment="Stretch" CornerRadius="3"/>
             <TextBlock Text="{Binding Vitals.CastBarSecondsRemaining}"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        FontSize="10" Foreground="#fff" FontWeight="SemiBold"/>
