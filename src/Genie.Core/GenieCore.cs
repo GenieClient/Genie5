@@ -349,6 +349,20 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         remove => _typeAhead.Changed -= value;
     }
 
+    /// <summary>
+    /// Genie 4's disconnect-verb rule (<c>Game.SendText</c>, which every send went
+    /// through): a command starting with <c>qui</c> or <c>exi</c>, any case, ends
+    /// the session on purpose, so the drop that follows must not auto-reconnect.
+    /// Leading spaces are ignored. The App checks each of <see cref="SentCommands"/>
+    /// with it (#419).
+    /// </summary>
+    public static bool IsDisconnectVerb(string command)
+    {
+        var t = command.AsSpan().TrimStart();
+        return t.StartsWith("qui", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("exi", StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Timed connect-progress sink (TLS attempt, per-step SGE timings,
     /// fallback, game-server connect) surfaced to the game window so a stall can
     /// be isolated to an exact step. Set once by the host; persisted on the core
