@@ -226,6 +226,9 @@ Genie ships **seven built-in themes** under **Edit → Theme** — **Dark** (the
 
 **Edit → Display Settings…** controls fonts, game-text and echo colors, theme selection, and the external editor `#edit` uses when `#config externaleditor` is on. (The roundtime indicator's position and the hands-strip position are set from the **Layout** menu.) Two checkboxes sit alongside the colors: **Italicize local echoes** (on by default — your typed commands, `#echo` and script output in italics) and **Always show scrollbars**, which keeps scrollbars full width instead of shrinking them to a thin line when idle (also `#config alwaysshowscrollbars on|off`, default off). The theme editor shows the same Game text and Echoes colors. They're one setting each, not two copies; see [Themes](Configuration#themes). Panel and category colors, such as the creature color used by the Mobs panel, are on the **Configuration → Presets** tab.
 
+- **Mono font** (Genie 4's Mono Font) is the font for the game's column-aligned output (`EXP`, maps, appraisals and other `<output class="mono">` blocks) and `#echo mono`, so their columns line up whatever your game font is. **Mono font size** of 0 (the default) uses the window's font size. The default, `Consolas,Courier New,monospace`, gives Consolas on Windows, Courier New on macOS and the system monospace font on Linux.
+- **A font setting can be a list**, such as `Cascadia Mono,Consolas,Courier New,monospace`. Genie uses the first font in it that's installed, and `monospace` asks the system for its monospace font. The font pickers show the font the list actually uses; pressing OK keeps the list unless you pick a different font. Per-window fonts (Configuration → Windows) work the same way.
+
 A few more odds and ends:
 
 - **File → Open Log In Editor** opens the current (or most recent) Auto Log text file in your editor — Genie 4 parity.

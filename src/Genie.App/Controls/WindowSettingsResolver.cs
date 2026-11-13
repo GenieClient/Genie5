@@ -55,16 +55,16 @@ internal static class WindowSettingsResolver
     public static FontFamily ResolveFontFamily(string raw)
     {
         if (!string.IsNullOrWhiteSpace(raw))
-            return new FontFamily(raw);
+            return FontChain.Resolve(raw);   // first installed font in the list (#395)
 
         if (Application.Current?.Resources[DisplaySettings.GameFontFamilyKey]
                 is FontFamily resourceFamily)
-            return resourceFamily;
+            return FontChain.Resolve(string.Join(",", resourceFamily.FamilyNames));   // #395
 
         // Hard fallback if resources haven't been pushed yet (shouldn't
         // happen in practice — Display.Apply() runs before tools build —
         // but defensive against init-order surprises).
-        return new FontFamily("Cascadia Mono,Consolas,Courier New,monospace");
+        return FontChain.Resolve("Cascadia Mono,Consolas,Courier New,monospace");
     }
 
     /// <summary>
