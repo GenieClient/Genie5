@@ -551,7 +551,7 @@ Both clients support flexible dockable layouts; the tech differs (WinForms MDI v
 | Bar colors configurable | ✅ via preset | ✅ via DisplaySettings | ✅ |
 | Roundtime countdown | ✅ ComponentRoundtime | ✅ inline RT badge | ✅ |
 | RT badge position (command bar vs hands strip) | ❌ | 🆕 toggleable | 🆕 |
-| Spell-cast countdown | ✅ Castbar (`castbar` preset) | ✅ cast bar on the hands strip, coloured by the `castbar` preset | ✅ |
+| Spell-cast countdown | ✅ Castbar (`castbar` preset) | ✅ cast bar on the hands strip, coloured by the `castbar` preset; optional Combined Spell Timer works it into the spell box, `(N) Spell (M)` | ✅ |
 | Posture: STAND/KNEEL/PRONE/SIT | ✅ | ✅ | ✅ |
 | Stealth: HIDE | ✅ | ✅ | ✅ |
 | Stealth: INVISIBLE | ✅ | ✅ Icon Bar chip (fed by IndicatorEvent) | ✅ |

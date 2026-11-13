@@ -289,6 +289,12 @@
                   IsChecked="{Binding Display.ShowMagicPanels}"
                   Command="{Binding ToggleMagicPanelsCommand}"
                   ToolTip.Tip="Show the magic widgets (Genie 4 parity): the mana bar on the status bar plus the prepared-spell label and cast bar on the hands strip. Turn off to reclaim the space on a non-caster."/>
+        <MenuItem Header="Combined Spell Timer"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.CombinedSpellTimer, Mode=OneWay}"
+                  Command="{Binding ToggleCombinedSpellTimerCommand}"
+                  IsEnabled="{Binding Display.ShowMagicPanels}"
+                  ToolTip.Tip="Work the cast bar into the spell box: the box fills and empties over the prep time, and the seconds left go on the end of the spell name, (N) Spell (M). Off keeps Genie 4's separate spell label and cast bar."/>
         <MenuItem Header="_Zone / Room ID"
                   ToggleType="CheckBox"
                   IsChecked="{Binding Display.ShowZoneRoomId}"
@@ -1084,10 +1090,32 @@
                Field", "Whole Displacement") so the bar (in the next sub-group)
                doesn't crowd against the trailing letter. -->
           <TextBlock Text="{Binding Vitals.PreparedSpellLabel}"
+                     IsVisible="{Binding !Display.CombinedSpellTimer}"
                      AutomationProperties.Name="{Binding Vitals.PreparedSpellLabel, StringFormat='Prepared spell: {0}'}"
                      AutomationProperties.LiveSetting="Polite"
                      Foreground="#c8a8e0" FontSize="12" MinWidth="170"
                      VerticalAlignment="Center"/>
+          <!-- Layout → Combined Spell Timer: the spell box is the cast bar.
+               The castbar fill empties over the prep time behind the label,
+               and the seconds left go on the end: "(N) Spell (M)". Sized like
+               the #405 bars: stretches to the strip height, ProgressBar
+               minimums overridden so it stays inside the box. -->
+          <Grid MinWidth="170" ClipToBounds="True"
+                IsVisible="{Binding Display.CombinedSpellTimer}"
+                ToolTip.Tip="Prepared spell. (N) is seconds since prep started; the fill and the number on the end are the seconds until it is fully prepared.">
+            <ProgressBar Value="{Binding Vitals.CastBarSecondsExact}"
+                         Maximum="{Binding Vitals.CastBarSecondsTotal}"
+                         IsVisible="{Binding Vitals.IsPrepping}"
+                         AutomationProperties.Name="Spell preparation"
+                         controls:PresetBar.Preset="castbar"
+                         MinWidth="0" MinHeight="0"
+                         VerticalAlignment="Stretch" CornerRadius="3"/>
+            <TextBlock Text="{Binding Vitals.PreparedSpellCountdownLabel}"
+                       AutomationProperties.Name="{Binding Vitals.PreparedSpellCountdownLabel, StringFormat='Prepared spell: {0}'}"
+                       AutomationProperties.LiveSetting="Polite"
+                       Foreground="#fff" FontSize="12" FontWeight="SemiBold"
+                       Margin="6,0" VerticalAlignment="Center"/>
+          </Grid>
         </StackPanel>
 
         <!-- Magenta prep-countdown bar — separate StackPanel sibling so the
@@ -1113,6 +1141,7 @@
             <MultiBinding Converter="{x:Static BoolConverters.And}">
               <Binding Path="Vitals.IsPrepping"/>
               <Binding Path="Display.ShowMagicPanels"/>
+              <Binding Path="!Display.CombinedSpellTimer"/>
             </MultiBinding>
           </Border.IsVisible>
           <Grid>
@@ -1538,10 +1567,32 @@
                Field", "Whole Displacement") so the bar (in the next sub-group)
                doesn't crowd against the trailing letter. -->
           <TextBlock Text="{Binding Vitals.PreparedSpellLabel}"
+                     IsVisible="{Binding !Display.CombinedSpellTimer}"
                      AutomationProperties.Name="{Binding Vitals.PreparedSpellLabel, StringFormat='Prepared spell: {0}'}"
                      AutomationProperties.LiveSetting="Polite"
                      Foreground="#c8a8e0" FontSize="12" MinWidth="170"
                      VerticalAlignment="Center"/>
+          <!-- Layout → Combined Spell Timer: the spell box is the cast bar.
+               The castbar fill empties over the prep time behind the label,
+               and the seconds left go on the end: "(N) Spell (M)". Sized like
+               the #405 bars: stretches to the strip height, ProgressBar
+               minimums overridden so it stays inside the box. -->
+          <Grid MinWidth="170" ClipToBounds="True"
+                IsVisible="{Binding Display.CombinedSpellTimer}"
+                ToolTip.Tip="Prepared spell. (N) is seconds since prep started; the fill and the number on the end are the seconds until it is fully prepared.">
+            <ProgressBar Value="{Binding Vitals.CastBarSecondsExact}"
+                         Maximum="{Binding Vitals.CastBarSecondsTotal}"
+                         IsVisible="{Binding Vitals.IsPrepping}"
+                         AutomationProperties.Name="Spell preparation"
+                         controls:PresetBar.Preset="castbar"
+                         MinWidth="0" MinHeight="0"
+                         VerticalAlignment="Stretch" CornerRadius="3"/>
+            <TextBlock Text="{Binding Vitals.PreparedSpellCountdownLabel}"
+                       AutomationProperties.Name="{Binding Vitals.PreparedSpellCountdownLabel, StringFormat='Prepared spell: {0}'}"
+                       AutomationProperties.LiveSetting="Polite"
+                       Foreground="#fff" FontSize="12" FontWeight="SemiBold"
+                       Margin="6,0" VerticalAlignment="Center"/>
+          </Grid>
         </StackPanel>
 
         <!-- Magenta prep-countdown bar — separate StackPanel sibling so the
@@ -1567,6 +1618,7 @@
             <MultiBinding Converter="{x:Static BoolConverters.And}">
               <Binding Path="Vitals.IsPrepping"/>
               <Binding Path="Display.ShowMagicPanels"/>
+              <Binding Path="!Display.CombinedSpellTimer"/>
             </MultiBinding>
           </Border.IsVisible>
           <Grid>

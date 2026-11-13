@@ -126,6 +126,16 @@ public sealed class DisplaySettings : ReactiveObject
     [Reactive] public bool   ShowMagicPanels { get; set; } = true;
 
     /// <summary>
+    /// Combined spell timer: off (default) keeps Genie 4's two widgets, the
+    /// "(N) Spell" label counting up and the separate cast bar counting down.
+    /// On, the spell box itself is the cast bar: it fills with the
+    /// <c>castbar</c> preset and empties over the prep time, and the seconds
+    /// left go on the end of the label, "(N) Spell (M)". Toggle via
+    /// Layout → Combined Spell Timer; rides on saved layouts.
+    /// </summary>
+    [Reactive] public bool   CombinedSpellTimer { get; set; }
+
+    /// <summary>
     /// Whether the optional zone/room location line (the mapper's current zone
     /// + <c>$roomid</c>) is shown at the bottom of the window (#66). Opt-in (off
     /// by default) — handy for travel/scripting so you can always see where you

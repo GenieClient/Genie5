@@ -444,6 +444,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// the vitals Status Bar (Genie 4 StatusStrip parity, #111).</summary>
     public StatusSlotsViewModel StatusSlots { get; } = new();
     public ReactiveCommand<Unit, Unit>                    ToggleMagicPanelsCommand { get; }
+    /// <summary>Layout → Combined Spell Timer: the spell box counts down in place of the separate cast bar.</summary>
+    public ReactiveCommand<Unit, Unit>                    ToggleCombinedSpellTimerCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomIdCommand  { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomNumberCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleWindowedModeCommand{ get; }
@@ -1978,6 +1980,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleMagicPanelsCommand = ReactiveCommand.Create(() =>
         {
             Display.ShowMagicPanels = !Display.ShowMagicPanels;
+            Display.Save(_displayPath);
+        });
+
+        ToggleCombinedSpellTimerCommand = ReactiveCommand.Create(() =>
+        {
+            Display.CombinedSpellTimer = !Display.CombinedSpellTimer;
             Display.Save(_displayPath);
         });
 
@@ -6336,6 +6344,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             IconBarVisible        = Display.ShowIconBar,
             IconBarAtBottom       = Display.IconBarAtBottom,
             HealthBarAtBottom     = Display.StatusBarAtBottom,
+            CombinedSpellTimer    = Display.CombinedSpellTimer,
             ScriptBarVisible      = Display.ShowScriptBar,
             MagicPanels           = Display.ShowMagicPanels,
             KeepRoundTimeVisible  = Display.KeepRoundTimeVisible,
@@ -6412,6 +6421,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         if (layout.IconBarVisible    is { } iconShown)  Display.ShowIconBar       = iconShown;
         if (layout.IconBarAtBottom   is { } iconBottom) Display.IconBarAtBottom   = iconBottom;
         if (layout.HealthBarAtBottom is { } hpBottom)   Display.StatusBarAtBottom = hpBottom;
+        if (layout.CombinedSpellTimer is { } combined)  Display.CombinedSpellTimer = combined;
         if (layout.ScriptBarVisible  is { } barShown)   Display.ShowScriptBar     = barShown;
         if (layout.MagicPanels       is { } magic)      Display.ShowMagicPanels   = magic;
         if (layout.KeepRoundTimeVisible is { } keepRt)  Display.KeepRoundTimeVisible = keepRt;

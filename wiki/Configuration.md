@@ -285,7 +285,7 @@ The five vitals bars are coloured by Genie 4's presets, in both the **Vitals** p
 | Spirit | `spirit` | Purple |
 | Concentration | `concentration` | Navy |
 
-The spell preparation (cast) bar on the hands strip uses Genie 4's `castbar` preset the same way (stock fill Magenta, no track).
+The spell preparation (cast) bar on the hands strip uses Genie 4's `castbar` preset the same way (stock fill Magenta, no track), and so does the spell box's fill with **Layout → Combined Spell Timer** on.
 
 - **The preset's colour is the bar's fill; its background is the track** (the empty part) and the border. With no background, the bar shows its normal track. The stock presets have none, as in Genie 4.
 - **Edit them** on **Configuration → Presets**, or as the **Vitals bars** fill and track rows in the theme editor. Either way it's the same preset, and the bars repaint straight away.
