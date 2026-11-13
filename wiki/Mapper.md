@@ -8,7 +8,7 @@ The mapper knows where you are, draws the zone you're in, and can walk you to an
 
 The Mapper panel (**floating** in its own window by default; dock it by dragging, or toggle it via **Maps ▸ Show Mapper**) shows the current zone with your room highlighted. Rooms are drawn as nodes connected by their exits, color-coded by exit type (compass directions, vertical moves, and special exits like `go gate` or `climb wall`). Scroll to zoom; drag to pan.
 
-As you walk, Genie matches each new room to a node and re-centers on you. When you enter a room it doesn't recognize in the current zone, it can auto-switch to the zone that contains it.
+As you walk, Genie matches each new room to a node and re-centers on you. When you enter a room it doesn't recognize in the current zone, it can auto-switch to the zone that contains it. When you step onto a zone's border room (one whose note names the next map, like Shard's East Bridge), Genie switches to that map as you arrive, so `$zoneid` and `$roomid` already name the new zone when your script checks them.
 
 ### Zones, floors, and the legend
 
