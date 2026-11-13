@@ -103,7 +103,7 @@ Listed by category. For exact semantics, read the `case` arms in [ScriptEngine.c
 | --- | --- |
 | `match label literal` / `matchre label regex` | Register a pattern; `matchwait [N]` then blocks until a line matches (first match wins), with optional N-second timeout. |
 | `waitfor text` / `waitforre regex` | Block until a line contains the substring / matches the regex (single-shot). |
-| `waiteval expr` | Block until a [ScriptExpression](../src/Genie.Core/Scripting/ScriptExpression.cs) evaluates true; re-evaluated each tick so state changes (vitals, indicators) unblock it. |
+| `waiteval expr` | Block until a [ScriptExpression](../src/Genie.Core/Scripting/ScriptExpression.cs) becomes true. Checked each tick, but released only when a variable it names changed and it is then true, or when it turns from false to true (#428, `WaitEvalReleases`). A condition already true on arming waits for a change, as in Genie 4 — automapper.cmd's `if (%depth > 1) then waiteval ((1 <= %depth) …)` relies on that. Clock variables (`$unixtime` …) are masked from change detection; a bare `waiteval $var` releases on any change. |
 
 Regex captures from `matchre`/`waitforre`/actions land in the current `$0..$9` frame, not in the `%N` script args.
 

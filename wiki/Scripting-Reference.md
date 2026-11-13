@@ -71,7 +71,7 @@ When a script loads, it's transformed in a few passes: `include foo` is expanded
 | --- | --- |
 | `match label literal` / `matchre label regex` | Register a pattern; `matchwait [N]` then blocks until a line matches (first match wins), with optional N-second timeout. |
 | `waitfor text` / `waitforre regex` | Block until a line contains the substring / matches the regex (single-shot). |
-| `waiteval expr` | Block until an expression evaluates true; re-checked each tick, so changing state (vitals, indicators) unblocks it. |
+| `waiteval expr` | Block until an expression becomes true. As in Genie 4, a condition that is already true when the script reaches it does not continue at once: it waits for a variable in the condition to change (guard with `if` when you want to skip the wait). Clock variables like `$unixtime` don't count as a change, but a condition that turns true because of one (a timeout) does continue. `waiteval $var` alone continues on any change of `$var`. |
 
 Matching is **case-sensitive**, Genie 4 style — `match` / `waitfor` look for the exact substring, and `matchre` / `waitforre` / action patterns are case-sensitive regexes unless the pattern says otherwise (e.g. `(?i)`). Regex captures from `matchre` / `waitforre` / actions land in the current `$0..$9` frame.
 

@@ -151,11 +151,84 @@ public class WaitEvalLiveVarTests : IDisposable
         Assert.True(Echoed("PASSED"), string.Join(" | ", _echoed));
     }
 
+    // ── #428: release on a change, not on a condition already true ─────────
+    // Genie 4 never checks a waiteval when the script reaches it; it re-checks
+    // when a variable named in the condition changes (Script.cs EvalWaitEval,
+    // TriggerVariableChanged). Scripts guard for that themselves:
+    // `if (%depth > 1) then waiteval ((1 <= %depth) || …)` in automapper.cmd.
+
     [Fact]
-    public void Waiteval_that_is_already_true_falls_straight_through()
+    public void Waiteval_that_is_already_true_waits_for_a_change()
     {
         _engine.Globals["mana"] = "90";
         Start("s", "waiteval $mana > 80\necho PASSED\n");
+        Pump();
+        Assert.False(Echoed("PASSED"));
+
+        // A change that leaves it true releases it.
+        _engine.Globals["mana"] = "95";
+        Pump();
+        Assert.True(Echoed("PASSED"), string.Join(" | ", _echoed));
+    }
+
+    [Fact]
+    public void Automapper_waits_for_the_move_in_flight_to_land()
+    {
+        // automapper.cmd MOVE.ICE: two moves out (depth 2), wait until one
+        // lands (an action drops depth to 1), then carry on.
+        Start("s",
+            "action math depth subtract 1 when ^Obvious paths\n" +
+            "var depth 2\n" +
+            "var depthtimeout 0\n" +
+            "eval depthtimeout $unixtime + 300\n" +
+            "if (%depth > 1) then waiteval ((1 <= %depth) || ($unixtime >= %depthtimeout))\n" +
+            "echo PASSED\n");
+        Pump();
+        Assert.False(Echoed("PASSED"));
+
+        _engine.OnGameLine("Obvious paths: east, northwest.");
+        Pump();
+        Assert.True(Echoed("PASSED"), string.Join(" | ", _echoed));
+    }
+
+    [Fact]
+    public void A_change_that_leaves_it_false_keeps_waiting()
+    {
+        _engine.Globals["mana"] = "50";
+        Start("s", "waiteval $mana > 80\necho PASSED\n");
+        Pump();
+        _engine.Globals["mana"] = "60";
+        Pump();
+        Assert.False(Echoed("PASSED"));
+    }
+
+    [Fact]
+    public void A_clock_ticking_does_not_release_a_condition_already_true()
+    {
+        // $unixtime changes every second; it is not a "change" (Genie 4's
+        // clock variables are computed on read and never fire one).
+        _engine.Globals["mana"] = "90";
+        Start("s", "waiteval ($mana > 80) && ($unixtime > 0)\necho PASSED\n");
+
+        var second = DateTimeOffset.Now.ToUnixTimeSeconds();
+        var giveUp = DateTime.UtcNow.AddSeconds(3);
+        while (DateTimeOffset.Now.ToUnixTimeSeconds() <= second + 1 && DateTime.UtcNow < giveUp)
+        {
+            System.Threading.Thread.Sleep(25);
+            _engine.Tick();
+        }
+        Assert.False(Echoed("PASSED"));
+    }
+
+    [Fact]
+    public void A_bare_variable_releases_on_any_change()
+    {
+        _engine.Globals["standing"] = "0";
+        Start("s", "waiteval $standing\necho PASSED\n");
+        Pump();
+        Assert.False(Echoed("PASSED"));
+
+        _engine.Globals["standing"] = "1";
         Pump();
         Assert.True(Echoed("PASSED"), string.Join(" | ", _echoed));
     }
