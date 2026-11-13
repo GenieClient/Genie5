@@ -1095,27 +1095,8 @@
                      AutomationProperties.LiveSetting="Polite"
                      Foreground="#c8a8e0" FontSize="12" MinWidth="170"
                      VerticalAlignment="Center"/>
-          <!-- Layout → Combined Spell Timer: the spell box is the cast bar.
-               The castbar fill empties over the prep time behind the label,
-               and the seconds left go on the end: "(N) Spell (M)". Sized like
-               the #405 bars: stretches to the strip height, ProgressBar
-               minimums overridden so it stays inside the box. -->
-          <Grid MinWidth="170" ClipToBounds="True"
-                IsVisible="{Binding Display.CombinedSpellTimer}"
-                ToolTip.Tip="Prepared spell. (N) is seconds since prep started; the fill and the number on the end are the seconds until it is fully prepared.">
-            <ProgressBar Value="{Binding Vitals.CastBarSecondsExact}"
-                         Maximum="{Binding Vitals.CastBarSecondsTotal}"
-                         IsVisible="{Binding Vitals.IsPrepping}"
-                         AutomationProperties.Name="Spell preparation"
-                         controls:PresetBar.Preset="castbar"
-                         MinWidth="0" MinHeight="0"
-                         VerticalAlignment="Stretch" CornerRadius="3"/>
-            <TextBlock Text="{Binding Vitals.PreparedSpellCountdownLabel}"
-                       AutomationProperties.Name="{Binding Vitals.PreparedSpellCountdownLabel, StringFormat='Prepared spell: {0}'}"
-                       AutomationProperties.LiveSetting="Polite"
-                       Foreground="#c8a8e0" FontSize="12"
-                       Margin="6,0" VerticalAlignment="Center"/>
-          </Grid>
+          <!-- Layout → Combined Spell Timer: the spell box is the cast bar (#405). -->
+          <views:SpellCountdownBoxView IsVisible="{Binding Display.CombinedSpellTimer}"/>
         </StackPanel>
 
         <!-- Magenta prep-countdown bar — separate StackPanel sibling so the
@@ -1572,27 +1553,8 @@
                      AutomationProperties.LiveSetting="Polite"
                      Foreground="#c8a8e0" FontSize="12" MinWidth="170"
                      VerticalAlignment="Center"/>
-          <!-- Layout → Combined Spell Timer: the spell box is the cast bar.
-               The castbar fill empties over the prep time behind the label,
-               and the seconds left go on the end: "(N) Spell (M)". Sized like
-               the #405 bars: stretches to the strip height, ProgressBar
-               minimums overridden so it stays inside the box. -->
-          <Grid MinWidth="170" ClipToBounds="True"
-                IsVisible="{Binding Display.CombinedSpellTimer}"
-                ToolTip.Tip="Prepared spell. (N) is seconds since prep started; the fill and the number on the end are the seconds until it is fully prepared.">
-            <ProgressBar Value="{Binding Vitals.CastBarSecondsExact}"
-                         Maximum="{Binding Vitals.CastBarSecondsTotal}"
-                         IsVisible="{Binding Vitals.IsPrepping}"
-                         AutomationProperties.Name="Spell preparation"
-                         controls:PresetBar.Preset="castbar"
-                         MinWidth="0" MinHeight="0"
-                         VerticalAlignment="Stretch" CornerRadius="3"/>
-            <TextBlock Text="{Binding Vitals.PreparedSpellCountdownLabel}"
-                       AutomationProperties.Name="{Binding Vitals.PreparedSpellCountdownLabel, StringFormat='Prepared spell: {0}'}"
-                       AutomationProperties.LiveSetting="Polite"
-                       Foreground="#c8a8e0" FontSize="12"
-                       Margin="6,0" VerticalAlignment="Center"/>
-          </Grid>
+          <!-- Layout → Combined Spell Timer: the spell box is the cast bar (#405). -->
+          <views:SpellCountdownBoxView IsVisible="{Binding Display.CombinedSpellTimer}"/>
         </StackPanel>
 
         <!-- Magenta prep-countdown bar — separate StackPanel sibling so the

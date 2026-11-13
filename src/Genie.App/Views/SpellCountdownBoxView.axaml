@@ -1,0 +1,44 @@
+<!-- The combined spell box (Layout → Combined Spell Timer, #405), hosted in
+     both the top and bottom hands strip. The box is the cast bar: the castbar
+     preset's fill empties over the prep time behind the label, and the label
+     reads "(N) Spell (M)", seconds since prep started in front and seconds
+     until fully prepared on the end.
+
+     The label is drawn twice on top of itself so it reads on both parts of the
+     bar: white over the fill, the spell label's purple over the track. The
+     code-behind clips each copy at the fill's edge as it moves.
+
+     Sized like the #405 bars: stretches to the strip's height, and the
+     ProgressBar's MinWidth/MinHeight override Fluent's 200 px minimum so it
+     stays inside the box. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Genie.App.ViewModels"
+             xmlns:controls="using:Genie.App.Controls"
+             x:Class="Genie.App.Views.SpellCountdownBoxView"
+             x:DataType="vm:MainWindowViewModel">
+  <Grid MinWidth="170" ClipToBounds="True"
+        ToolTip.Tip="Prepared spell. (N) is seconds since prep started; the fill and the number on the end are the seconds until it is fully prepared.">
+    <ProgressBar x:Name="Bar"
+                 Value="{Binding Vitals.CastBarSecondsExact}"
+                 Maximum="{Binding Vitals.CastBarSecondsTotal}"
+                 IsVisible="{Binding Vitals.IsPrepping}"
+                 AutomationProperties.Name="Spell preparation"
+                 controls:PresetBar.Preset="castbar"
+                 MinWidth="0" MinHeight="0"
+                 VerticalAlignment="Stretch" CornerRadius="3"/>
+    <!-- Over the track: the spell label's own colour. -->
+    <TextBlock x:Name="TrackText"
+               Text="{Binding Vitals.PreparedSpellCountdownLabel}"
+               AutomationProperties.Name="{Binding Vitals.PreparedSpellCountdownLabel, StringFormat='Prepared spell: {0}'}"
+               AutomationProperties.LiveSetting="Polite"
+               Foreground="#c8a8e0" FontSize="12"
+               Margin="6,0" VerticalAlignment="Center"/>
+    <!-- Over the fill: white, like Genie 4's cast bar text. -->
+    <TextBlock x:Name="FillText"
+               Text="{Binding Vitals.PreparedSpellCountdownLabel}"
+               AutomationProperties.AccessibilityView="Raw"
+               Foreground="#fff" FontSize="12"
+               Margin="6,0" VerticalAlignment="Center"/>
+  </Grid>
+</UserControl>

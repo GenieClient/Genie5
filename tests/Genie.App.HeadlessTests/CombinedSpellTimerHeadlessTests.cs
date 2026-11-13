@@ -1,7 +1,10 @@
 using System;
 using System.IO;
 using System.Linq;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.LogicalTree;
+using Genie.App.Views;
 using Genie.App.Settings;
 using Genie.App.ViewModels;
 using Xunit;
@@ -105,5 +108,45 @@ public class CombinedSpellTimerHeadlessTests : IDisposable
 
         vm.ApplyLayout(new SavedLayout());                                    // older layout: null
         Assert.True(vm.Display.CombinedSpellTimer);
+    }
+
+    [AvaloniaFact]
+    public void Label_is_white_over_the_fill_and_purple_over_the_track()
+    {
+        var vm = NewVm();
+        vm.Display.CombinedSpellTimer = true;
+        vm.Vitals.ApplyPreparedSpell("Swirling Winds");
+        vm.Vitals.ApplyCastTimeEnd(In(10));
+
+        // A 30 px row, like a hands strip with the Enhanced icons on.
+        var view = new SpellCountdownBoxView { DataContext = vm, Width = 200, Height = 30 };
+        using var host = new Hosted<StackPanel>(new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Children    = { view },
+        });
+
+        var bar   = view.GetLogicalDescendants().OfType<ProgressBar>().Single();
+        var texts = view.GetLogicalDescendants().OfType<TextBlock>().ToList();
+        var track = texts.Single(t => t.Name == "TrackText");
+        var fill  = texts.Single(t => t.Name == "FillText");
+
+        Assert.True(bar.IsVisible);
+        Assert.True(bar.Bounds.Width <= 200, $"bar {bar.Bounds.Width} px is wider than its 200 px box");
+        Assert.True(bar.Bounds.Height >= 26, $"bar is {bar.Bounds.Height} px tall in a 30 px row; it should stretch");
+
+        // Half the prep time left: the split sits at the middle of the box,
+        // in the labels' coordinates (they start 6 px in).
+        bar.Maximum = 10;
+        bar.Value   = 5;
+        Assert.Equal(bar.Bounds.Width / 2 - track.Bounds.X, view.SplitX, 3);
+        Assert.Equal(view.SplitX, fill.Clip!.Bounds.Right, 3);
+        Assert.Equal(view.SplitX, track.Clip!.Bounds.Left, 3);
+
+        // Prepared: no fill, the whole label is the track colour.
+        vm.Vitals.ApplyCastTimeEnd(In(-1));
+        host.Pump();
+        Assert.False(bar.IsVisible);
+        Assert.Equal(0, view.SplitX);
     }
 }
