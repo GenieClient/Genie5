@@ -1113,7 +1113,7 @@
             <TextBlock Text="{Binding Vitals.PreparedSpellCountdownLabel}"
                        AutomationProperties.Name="{Binding Vitals.PreparedSpellCountdownLabel, StringFormat='Prepared spell: {0}'}"
                        AutomationProperties.LiveSetting="Polite"
-                       Foreground="#fff" FontSize="12" FontWeight="SemiBold"
+                       Foreground="#c8a8e0" FontSize="12"
                        Margin="6,0" VerticalAlignment="Center"/>
           </Grid>
         </StackPanel>
@@ -1590,7 +1590,7 @@
             <TextBlock Text="{Binding Vitals.PreparedSpellCountdownLabel}"
                        AutomationProperties.Name="{Binding Vitals.PreparedSpellCountdownLabel, StringFormat='Prepared spell: {0}'}"
                        AutomationProperties.LiveSetting="Polite"
-                       Foreground="#fff" FontSize="12" FontWeight="SemiBold"
+                       Foreground="#c8a8e0" FontSize="12"
                        Margin="6,0" VerticalAlignment="Center"/>
           </Grid>
         </StackPanel>
