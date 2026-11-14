@@ -154,6 +154,8 @@ setting; only `frontend` appears in `settings.cfg` and `#config list`).
 | --- | --- | --- |
 | `autoupdate` | `False` | Automatically apply found updates. |
 | `checkforupdates` | `True` | Check for updates at startup. |
+| `mapfestivals` | `False` | Also pull the Maps repo's "Festivals" subfolder (Hollow Eve, Guild Fest, faires…) into your Maps folder, flat beside the regular zones. A zone that is also at the repo root is taken from the root. Flips the **Festivals** checkbox on every Maps row of the Updates dialog; stored in `update-feeds.json`, not `settings.cfg`. |
+| `mapquests` | `False` | Also pull the Maps repo's "Quests" subfolder. These maps give away quest solutions, so this is a separate switch from `mapfestivals`. Flips the **Quests (spoilers)** checkbox on every Maps row; stored in `update-feeds.json`, not `settings.cfg`. |
 
 ## Directories
 

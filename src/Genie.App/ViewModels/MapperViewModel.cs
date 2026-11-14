@@ -2681,6 +2681,33 @@ public partial class MapperViewModel : ReactiveObject
     // ── UpdateMaps implementation ─────────────────────────────────────────
     private Task UpdateMapsAsync() => UpdateMapsAsync(repair: false);
 
+    /// <summary>Config folder holding <c>update-feeds.json</c>; set by the host.
+    /// Null (designer / tests) falls back to the hardwired official repo.</summary>
+    public string? FeedConfigDir { get; set; }
+
+    /// <summary>
+    /// The sources Maps ▸ Update Maps pulls from: every ENABLED Maps feed in
+    /// update-feeds.json, each materialised through <see cref="MapsFeedSources"/>
+    /// so a row's Festivals / Quests toggles apply here exactly as they do on
+    /// the Updates dialog's Update button and the startup check. Until the
+    /// feed config is wired (or when no Maps row is enabled) this is the
+    /// official GenieClient/Maps root — the menu never silently does nothing.
+    /// </summary>
+    private IReadOnlyList<IFileListSource> ResolveMapsSources()
+    {
+        if (!string.IsNullOrWhiteSpace(FeedConfigDir))
+        {
+            try
+            {
+                var feeds   = new FeedConfigStore(FeedConfigDir).Load().Maps.Where(f => f.Enabled);
+                var sources = feeds.SelectMany(f => MapsFeedSources.Create(f)).ToList();
+                if (sources.Count > 0) return sources;
+            }
+            catch (Exception ex) { Genie.App.Diagnostics.ErrorLog.Log("ResolveMapsSources", ex); }
+        }
+        return MapsFeedSources.Create(FeedEntry.OfficialMaps());
+    }
+
     /// <summary>
     /// Pull the latest zone XMLs. With <paramref name="repair"/> the installed-
     /// revision manifest is cleared first, so EVERY zone is rewritten from
@@ -2698,21 +2725,12 @@ public partial class MapperViewModel : ReactiveObject
             return;
 
         IsUpdating    = true;
-        UpdateStatus  = "Contacting github.com/GenieClient/Maps...";
+        UpdateStatus  = "Contacting the map repositories...";
         UpdateSummary = "";
 
         try
         {
-            // Phase 1 of the update system: hardwire the default GenieClient/Maps
-            // source here so this menu entry keeps working unchanged. The Updates
-            // dialog (Phase 3) will load enabled feeds from update-feeds.json and
-            // pass them all in; at that point this method becomes a thin shortcut
-            // to the same dialog's Maps tab.
-            var source  = new GithubContentsSource(
-                owner:     "GenieClient",
-                repo:      "Maps",
-                extension: ".xml");
-            var updater = new MapsUpdater(_zoneRepo, MapsDirectory, new[] { source });
+            var updater = new MapsUpdater(_zoneRepo, MapsDirectory, ResolveMapsSources());
 
             // Count BEFORE the rewrite so the summary can state what was
             // actually wrong rather than asking the user to take a full

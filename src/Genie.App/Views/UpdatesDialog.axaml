@@ -25,6 +25,22 @@
         <StackPanel Grid.Column="1" VerticalAlignment="Center">
           <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
           <TextBlock Text="{Binding Source}" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}"/>
+          <!-- Maps rows only: also pull the repo's festival / quest subfolders
+               (flat, into the Maps folder). Both default off; quests are
+               spoilers, so they are a separate switch from festivals. -->
+          <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,3,0,0"
+                      IsVisible="{Binding HasMapFolderOptions}">
+            <CheckBox IsChecked="{Binding IncludeFestivalMaps}"
+                      Content="Festivals" FontSize="11" MinHeight="0" Padding="4,0,0,0"
+                      AutomationProperties.Name="Include festival maps"
+                      AutomationProperties.HelpText="Also pull the repo's festival-maps folder into your Maps folder. A zone that is also at the repo root is taken from the root."
+                      ToolTip.Tip="Also pull the repo's festival-maps folder (Hollow Eve, Guild Fest, faires…) into your Maps folder, flat beside the regular zones. A zone that is also at the repo root is taken from the root."/>
+            <CheckBox IsChecked="{Binding IncludeQuestMaps}"
+                      Content="Quests (spoilers)" FontSize="11" MinHeight="0" Padding="4,0,0,0"
+                      AutomationProperties.Name="Include quest maps"
+                      AutomationProperties.HelpText="Also pull the repo's quest-maps folder. These maps give away quest solutions."
+                      ToolTip.Tip="Also pull the repo's quest-maps folder into your Maps folder. These maps give away quest solutions — leave this off unless you want them."/>
+          </StackPanel>
         </StackPanel>
 
         <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0" Spacing="3">

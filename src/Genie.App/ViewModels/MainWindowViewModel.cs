@@ -1382,6 +1382,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Mapper.MapsDirectory = string.IsNullOrWhiteSpace(Paths.MapsDirectory)
             ? _defaultMapsDir
             : Paths.MapsDirectory;
+        // Maps ▸ Update Maps reads the enabled Maps feeds (and their festival /
+        // quest subfolder toggles) from the same update-feeds.json the Updates
+        // dialog and the startup check use.
+        Mapper.FeedConfigDir = _configDir;
 
         Profiles.Load(_profilesPath);
         if (Profiles.LastLoadError is { } profileFault)
@@ -2613,10 +2617,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 {
                     try
                     {
-                        var src = new Genie.Core.Update.Sources.GithubContentsSource(
-                            feed.Owner, feed.Repo, feed.Path, feed.Extension);
+                        // Root folder plus any festival / quest subfolder the
+                        // row opted into — same sources the Updates dialog
+                        // row builds, so the startup check sees what it sees.
                         var u = new Genie.Core.Update.Updaters.MapsUpdater(
-                            zoneRepo, mapsDir, new[] { (Genie.Core.Update.Sources.IFileListSource)src });
+                            zoneRepo, mapsDir, Genie.Core.Update.MapsFeedSources.Create(feed));
                         if (!(await u.CheckAsync()).UpdateAvailable) continue;
                         if (cfg.MapsPolicy.AutoApply && (await u.ApplyAsync()).Succeeded)
                             applied.Add("Maps");

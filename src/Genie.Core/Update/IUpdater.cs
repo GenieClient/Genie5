@@ -70,10 +70,14 @@ public sealed record ScriptFileChange(string Name, bool IsNew, bool Ignored);
 /// <param name="Succeeded">True if the apply completed without any per-item failures.</param>
 /// <param name="Summary">One-line human-readable summary (e.g. "Updated 42 zones (3 new, 39 merged)").</param>
 /// <param name="Errors">Per-item errors collected during the pass; empty on success.</param>
+/// <param name="Notes">Per-item remarks that are not failures — e.g. a Maps
+///   zone listed by two sources, where the later copy was skipped. Null or
+///   empty when there is nothing to say.</param>
 public sealed record UpdateApplyResult(
-    bool                  Succeeded,
-    string                Summary,
-    IReadOnlyList<string> Errors);
+    bool                   Succeeded,
+    string                 Summary,
+    IReadOnlyList<string>  Errors,
+    IReadOnlyList<string>? Notes = null);
 
 /// <summary>
 /// One unit of work in an apply pass — file N of M, with a short status word.

@@ -135,6 +135,39 @@ public sealed class FeedEntry
     /// case-insensitively.</summary>
     public List<string> IgnoredFiles { get; set; } = new();
 
+    // ── Maps-only: optional repo subfolders ──────────────────────────────
+    // GenieClient/Maps keeps the always-on zones at the repo root and parks
+    // the seasonal / spoiler ones in two subfolders the README tells users
+    // to copy into their Maps folder by hand. A github-contents feed lists
+    // ONE folder, so without these toggles a festival map only reaches
+    // Genie 5 users when someone also commits a temporary copy at the root
+    // (Hollow Eve 2026, Maps PR #268 — to be deleted after the festival).
+    // With a toggle on, MapsFeedSources adds the subfolder as a second
+    // source behind the root one; files land FLAT in the Maps folder (the
+    // game only needs the zone file, not the folder) and MapsUpdater lets
+    // the root copy win when both carry the same filename.
+
+    /// <summary>Also pull <see cref="FestivalMapsFolder"/> (festival and faire
+    /// zones, e.g. <c>Map612f_Hollow_Eve_Festival_2026.xml</c>). Off by
+    /// default: most of these maps are for events that are not running, and
+    /// each one is another zone in the dropdown. Only consulted for
+    /// <c>github-contents</c> Maps feeds.</summary>
+    public bool IncludeFestivalMaps { get; set; }
+
+    /// <summary>Also pull <see cref="QuestMapsFolder"/>. Off by default and
+    /// deliberately a separate switch: quest maps give away puzzle solutions,
+    /// so a player who wants festival maps must not get spoilers along with
+    /// them. Only consulted for <c>github-contents</c> Maps feeds.</summary>
+    public bool IncludeQuestMaps { get; set; }
+
+    /// <summary>Subfolder of the maps repo holding festival zones (literal,
+    /// un-encoded name as it appears in GenieClient/Maps).</summary>
+    public const string FestivalMapsFolder = "Festivals Copy to the Maps Folder";
+
+    /// <summary>Subfolder of the maps repo holding quest zones (literal,
+    /// un-encoded name as it appears in GenieClient/Maps).</summary>
+    public const string QuestMapsFolder = "Quests (Spoiler Alert) Copy to the Maps Folder";
+
     /// <summary>The default GenieClient/Maps repo (XML-files-in-root, .xml-filtered).</summary>
     public static FeedEntry OfficialMaps() => new()
     {
