@@ -58,6 +58,23 @@ public class DisplaySettingsViewModel : ReactiveObject
     [Reactive] public string FontFamily { get; set; }
     [Reactive] public double FontSize   { get; set; }
 
+    /// <summary>Mono Font (Genie 4): the font for DR's column-aligned
+    /// <c>mono</c> blocks (EXP, maps, appraisals) and <c>#echo mono</c> (#395).</summary>
+    [Reactive] public string MonoFontFamily { get; set; }
+    /// <summary>Mono font size; 0 = the window's size.</summary>
+    [Reactive] public double MonoFontSize   { get; set; }
+
+    // A font setting may be a fallback list ("Consolas,Courier New,monospace"),
+    // but a dropdown holds one name. The dropdown shows the font the list
+    // actually resolves to, and OK keeps the whole list unless the user picked
+    // a different font: saving only the shown name used to cut the fallbacks
+    // off (on Linux, the default list became just "Consolas", not installed).
+    private string _fontChain = "", _fontShown = "";
+    private string _monoChain = "", _monoShown = "";
+
+    private static string Shown(string chain)
+        => Controls.FontChain.ResolvedName(chain) ?? chain.Split(',')[0].Trim();
+
     /// <summary>
     /// Path to the user's external editor for "Edit Script" (the pencil
     /// icon on the Script Bar, plus <c>#edit foo</c>). Empty means "use
@@ -95,12 +112,16 @@ public class DisplaySettingsViewModel : ReactiveObject
         _live   = live;
         _themes = themes;
 
-        // The stored value may be a comma-separated fallback chain ("Consolas,
-        // Courier New,monospace"). Picking from a dropdown only sets one name,
-        // so take the head of the chain as the current selection.
-        var currentFont = live.FontFamily.Split(',')[0].Trim();
+        // The stored value may be a comma-separated fallback chain; the dropdown
+        // shows the font it resolves to (see _fontChain above).
+        _fontChain = live.FontFamily;
+        _fontShown = Shown(_fontChain);
+        _monoChain = string.IsNullOrWhiteSpace(live.MonoFontFamily)
+            ? DisplaySettings.DefaultMonoFontFamily : live.MonoFontFamily;
+        _monoShown = Shown(_monoChain);
+        var currentFont = _fontShown;
 
-        SystemFonts = LoadSystemFonts(currentFont);
+        SystemFonts = LoadSystemFonts(currentFont, _monoShown);
 
         GameColor  = TryParseColor(live.GameColorHex, Avalonia.Media.Color.FromRgb(0xCC, 0xCC, 0xCC));
         EchoColor  = TryParseColor(live.EchoColorHex, Avalonia.Media.Color.FromRgb(0x88, 0xBB, 0xCC));
@@ -108,6 +129,8 @@ public class DisplaySettingsViewModel : ReactiveObject
         AlwaysShowScrollbars = live.AlwaysShowScrollbars;
         FontFamily = currentFont;
         FontSize   = live.FontSize;
+        MonoFontFamily = _monoShown;
+        MonoFontSize   = live.MonoFontSize;
         EditorPath = live.EditorPath;
 
         if (_themes is not null)
@@ -135,8 +158,10 @@ public class DisplaySettingsViewModel : ReactiveObject
         _live.EchoColorHex = "#" + EchoColor.ToString().Substring(3);
         _live.EchoItalic   = EchoItalic;
         _live.AlwaysShowScrollbars = AlwaysShowScrollbars;
-        _live.FontFamily   = FontFamily;
+        _live.FontFamily   = FontFamily == _fontShown ? _fontChain : FontFamily;
         _live.FontSize     = FontSize;
+        _live.MonoFontFamily = MonoFontFamily == _monoShown ? _monoChain : MonoFontFamily;
+        _live.MonoFontSize   = MonoFontSize;
         _live.EditorPath   = EditorPath ?? "";
         return true;
     }
@@ -270,14 +295,20 @@ public class DisplaySettingsViewModel : ReactiveObject
                                    Avalonia.Media.Color.FromRgb(0x88, 0xBB, 0xCC));
         EchoItalic = d.EchoItalic;
         AlwaysShowScrollbars = d.AlwaysShowScrollbars;
-        FontFamily = d.FontFamily.Split(',')[0].Trim();
+        _fontChain = d.FontFamily;
+        _fontShown = Shown(_fontChain);
+        FontFamily = _fontShown;
         FontSize   = d.FontSize;
+        _monoChain = d.MonoFontFamily;
+        _monoShown = Shown(_monoChain);
+        MonoFontFamily = _monoShown;
+        MonoFontSize   = d.MonoFontSize;
         EditorPath = d.EditorPath;
     }
 
     // ── System font enumeration (cross-platform via FontManager) ──────────────
 
-    private static IReadOnlyList<string> LoadSystemFonts(string includeIfMissing)
+    private static IReadOnlyList<string> LoadSystemFonts(params string[] includeIfMissing)
     {
         // FontManager.Current.SystemFonts uses the platform's font enumerator:
         //   Windows → DirectWrite, macOS → CoreText, Linux → FontConfig.
@@ -288,11 +319,10 @@ public class DisplaySettingsViewModel : ReactiveObject
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (!string.IsNullOrWhiteSpace(includeIfMissing) &&
-            !fonts.Contains(includeIfMissing, StringComparer.OrdinalIgnoreCase))
-        {
-            fonts.Add(includeIfMissing);
-        }
+        foreach (var extra in includeIfMissing)
+            if (!string.IsNullOrWhiteSpace(extra) &&
+                !fonts.Contains(extra, StringComparer.OrdinalIgnoreCase))
+                fonts.Add(extra);
 
         fonts.Sort(StringComparer.OrdinalIgnoreCase);
         return fonts;

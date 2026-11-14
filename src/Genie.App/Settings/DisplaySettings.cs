@@ -360,6 +360,25 @@ public sealed class DisplaySettings : ReactiveObject
     [Reactive] public string EditorPath { get; set; } = "";
 
     /// <summary>
+    /// Genie 4's Mono Font (<c>Config.MonoFont</c>, <c>Genie/Windows/MonoFont</c>):
+    /// the font for DR's <c>&lt;output class="mono"&gt;</c> blocks (EXP, maps,
+    /// appraisals, stat tables) and <c>#echo mono</c>, so their columns line up
+    /// whatever the window font is (#395). A comma list; the first installed font
+    /// wins, and <c>monospace</c> asks the system for its monospace font.
+    /// Set in Edit → Display Settings.
+    /// </summary>
+    [Reactive] public string MonoFontFamily { get; set; } = DefaultMonoFontFamily;
+
+    /// <summary>The <see cref="MonoFontFamily"/> default: Consolas on Windows,
+    /// Courier New on macOS, the system monospace font (fontconfig) on Linux.</summary>
+    public const string DefaultMonoFontFamily = "Consolas,Courier New,monospace";
+
+    /// <summary>Size of the mono font. 0 (the default) draws mono blocks at the
+    /// window's own font size, as Genie 5 always has; Genie 4 gave the mono font
+    /// its own size.</summary>
+    [Reactive] public double MonoFontSize   { get; set; }
+
+    /// <summary>
     /// True once the user has clicked "Don't ask again" on the Mapper's
     /// "Fetch your skills?" prompt. The prompt suggests running `skills`
     /// so the skill-weighted pathfinder has data to filter exits with;
@@ -395,7 +414,9 @@ public sealed class DisplaySettings : ReactiveObject
                 x => x.EchoColorHex,
                 x => x.EchoItalic,
                 x => x.FontFamily,
-                x => x.FontSize)
+                x => x.FontSize,
+                x => x.MonoFontFamily,
+                x => x.MonoFontSize)
             .Subscribe(_ =>
             {
                 PushAll();
@@ -488,6 +509,10 @@ public sealed class DisplaySettings : ReactiveObject
         res[GameFontFamilyKey] = new FontFamily(FontFamily);
         res[GameFontSizeKey]   = FontSize;
         res[EchoFontStyleKey]  = EchoItalic ? Avalonia.Media.FontStyle.Italic : Avalonia.Media.FontStyle.Normal;
+
+        ViewModels.TextLine.MonoFont = Controls.FontChain.Resolve(
+            string.IsNullOrWhiteSpace(MonoFontFamily) ? DefaultMonoFontFamily : MonoFontFamily);
+        ViewModels.TextLine.MonoFontSize = MonoFontSize > 0 ? MonoFontSize : null;
     }
 
     private static IBrush MakeBrush(string hex, Color fallback)

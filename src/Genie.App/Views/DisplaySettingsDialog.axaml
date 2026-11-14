@@ -1,10 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Genie.App.ViewModels"
+        xmlns:controls="using:Genie.App.Controls"
         x:Class="Genie.App.Views.DisplaySettingsDialog"
         x:DataType="vm:DisplaySettingsViewModel"
         Title="Display Settings"
-        Width="500" Height="560"
+        Width="500" Height="640"
         CanResize="False"
         WindowStartupLocation="CenterOwner">
 
@@ -17,7 +18,7 @@
         <StackPanel Spacing="10" Margin="0,8,0,0">
 
           <!-- ── Font family / size ──────────────────────────────────── -->
-          <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto">
+          <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto">
 
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Font family" VerticalAlignment="Center"/>
             <ComboBox  Grid.Row="0" Grid.Column="1"
@@ -30,7 +31,7 @@
                 <DataTemplate x:DataType="x:String">
                   <!-- Render each entry in the font it represents so the user
                        can preview the typeface as they scroll the list. -->
-                  <TextBlock Text="{Binding}" FontFamily="{Binding}" FontSize="13"/>
+                  <TextBlock Text="{Binding}" FontFamily="{Binding Converter={x:Static controls:FontChain.NameToFamily}}" FontSize="13"/>
                 </DataTemplate>
               </ComboBox.ItemTemplate>
             </ComboBox>
@@ -40,6 +41,33 @@
                            AutomationProperties.Name="Font size"
                            Value="{Binding FontSize}"
                            Minimum="8" Maximum="48" Increment="1"
+                           FormatString="0"
+                           Margin="0,8,0,0"/>
+
+            <!-- Genie 4's Mono Font (#395): DR's column-aligned blocks (EXP,
+                 maps, appraisals) and #echo mono. -->
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Mono font" VerticalAlignment="Center" Margin="0,8,0,0"
+                       ToolTip.Tip="Used for the game's column-aligned output (EXP, maps, appraisals) and #echo mono, so the columns line up whatever the font above is."/>
+            <ComboBox  Grid.Row="2" Grid.Column="1"
+                       AutomationProperties.Name="Mono font"
+                       ItemsSource="{Binding SystemFonts}"
+                       SelectedItem="{Binding MonoFontFamily}"
+                       HorizontalAlignment="Stretch"
+                       MaxDropDownHeight="300"
+                       Margin="0,8,0,0">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <TextBlock Text="{Binding}" FontFamily="{Binding Converter={x:Static controls:FontChain.NameToFamily}}" FontSize="13"/>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Mono font size" VerticalAlignment="Center" Margin="0,8,0,0"/>
+            <NumericUpDown Grid.Row="3" Grid.Column="1"
+                           AutomationProperties.Name="Mono font size"
+                           ToolTip.Tip="0 uses the window's font size."
+                           Value="{Binding MonoFontSize}"
+                           Minimum="0" Maximum="48" Increment="1"
                            FormatString="0"
                            Margin="0,8,0,0"/>
           </Grid>
