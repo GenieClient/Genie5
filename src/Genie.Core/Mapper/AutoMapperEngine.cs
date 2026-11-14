@@ -208,6 +208,29 @@ public sealed class AutoMapperEngine
     /// </summary>
     public Func<string, string, IReadOnlyCollection<string>, bool>? ForeignRoomProbe { get; set; }
 
+    /// <summary>
+    /// Host-supplied (#426): zone file name (no extension, e.g.
+    /// <c>Map66_Shard_to_Gondola_Area</c>) → that zone, or null to stay put
+    /// (missing file, or it is already the active zone). When set, a room
+    /// update that lands on a boundary stub (<see cref="MapNode.IsCrossZone"/>)
+    /// loads the stub's zone and re-resolves there in the same update, so
+    /// <c>$zoneid</c>/<c>$roomid</c> already name the new zone when a script
+    /// reacts to the arrival. Called on the thread that delivers room updates.
+    /// </summary>
+    public Func<string, MapZone?>? LinkedZoneLoader { get; set; }
+
+    /// <summary>
+    /// Raised just before the engine switches to a stub's zone
+    /// (see <see cref="LinkedZoneLoader"/>), with the zone file name and the
+    /// zone it is about to load, so the host's view can follow without
+    /// loading the file again.
+    /// </summary>
+    public event Action<string, MapZone>? LinkedZoneFollowing;
+
+    // True while FollowLinkedZone's own LoadZone re-resolves, so a stub in the
+    // new zone can't bounce the engine straight back.
+    private bool _followingLink;
+
     public AutoMapperEngine(MapZone zone)
     {
         _zone = zone;
@@ -669,6 +692,40 @@ public sealed class AutoMapperEngine
         _lastServerRoomId = serverRoomId;
 
         OnRoomChanged(title, description, exits);
+        FollowLinkedZone();
+    }
+
+    /// <summary>
+    /// #426: when the room just resolved is a boundary stub, switch to the
+    /// zone its note names and re-resolve there, before this update returns.
+    /// Skipped while the view is browsing another map (the character's room
+    /// must not drag the view), and while already following.
+    /// </summary>
+    private void FollowLinkedZone()
+    {
+        if (_followingLink || ViewIsBrowsing || LinkedZoneLoader is null) return;
+        if (CurrentNode is not { IsCrossZone: true } stub) return;
+
+        string? file = null;
+        foreach (var token in stub.Notes.Split('|'))
+        {
+            var t = token.Trim();
+            if (t.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+            {
+                file = Path.GetFileNameWithoutExtension(t);
+                break;
+            }
+        }
+        if (string.IsNullOrEmpty(file)) return;
+
+        var zone = LinkedZoneLoader(file);
+        if (zone is null) return;
+
+        Diagnostics?.Invoke($"[mapper]   -> stub #{stub.Id} links to '{file}'; switching zones");
+        LinkedZoneFollowing?.Invoke(file, zone);
+        _followingLink = true;
+        try { LoadZone(zone, stub); }
+        finally { _followingLink = false; }
     }
 
     private string DescribePending() =>
