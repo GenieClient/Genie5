@@ -77,7 +77,7 @@ A rule can also be **scoped to specific windows**: the Highlights tab's **Window
 
 Two built-in colorings live alongside your own rules:
 
-- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
+- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. The `familiar` preset is the base color of the Familiar window's text, and the `inputuser`, `inputother` and `scriptecho` presets color typed commands, script commands, and script output / Genie messages. (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
 - **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it on the **Edit → Configuration… → Presets** tab or with `#config monsterbold on|off`.
 
 ### Substitutes — rewriting text
@@ -214,9 +214,148 @@ From the command bar, `#dialogs` (or `#dialogs list`) lists the dialogs seen thi
 
 ## Themes
 
-The whole client is themeable from the **Edit → Theme** submenu. Seven themes are built in — **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light**, and **Wrayth-style** — and a **theme editor** lets you tweak any of them into your own. Custom themes are saved as JSON files in `Config/Themes`, so they're easy to back up or share.
+A theme sets the colours of the whole client: the window chrome (backgrounds, borders, labels, accents, vitals bars) and the starting colours of the game text and your echoes. Seven themes are built in: **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light** and **Wrayth-style**. You can also make your own, and share them as files.
 
-**Game text and Echoes colors have one home.** They show up both in **Edit → Display Settings…** and in the theme editor, but it's the same two settings: changing either one in either place changes the same value. A theme carries its own game-text and echo colors, and picking that theme sets both to the theme's colors. After that, a tweak in Display Settings sticks until you pick a theme again. Display Settings' **Reset** puts back the active theme's colors. Per-window colors (Layout tab) and presets still win over both.
+A theme changes colours only. For Genie 4 title bars, use windowed mode (**Layout → Windowed Mode (MDI)**) or the built-in **Heirloom** layout; see [Docking Windows](Docking-Windows#windowed-mode-mdi).
+
+### Picking a theme
+
+There are two places to pick one:
+
+- **Edit → Theme** lists every theme (yours are marked *(Custom)*). Clicking one applies it straight away. The same menu has **Edit Theme…**, **Save Current As…** and **Reset to Dark**.
+- **Edit → Display Settings… → Theme** has the same list. Picking a theme there applies it behind the dialog so you can see it. **OK** keeps it; **Cancel** (or closing the dialog) puts back the previous theme *and* the game and echo colours you had when you opened it.
+
+The active theme is shared by every character, and Genie remembers it between launches.
+
+### What a theme contains
+
+| Part | What it colours | When the theme sets it |
+| --- | --- | --- |
+| **Base variant** (Dark or Light) | The standard controls: menus, buttons, text boxes, scrollbars | Every launch |
+| **Surfaces, text, accents, vitals bars** | Window and panel backgrounds, toolbars, borders, labels, hints, section headers, links, badges, the five vitals bars | Every launch |
+| **Game text** | The main window's text colour | Only when you pick the theme |
+| **Echo colours** (three) | Commands you type, commands scripts send, and script output / Genie's messages | Only when you pick the theme |
+
+The difference in the last column is the important one:
+
+- **Chrome colours always come from the theme.** To change them, edit the theme (or make a copy and edit that).
+- **Game text and echo colours are copied from the theme when you pick it**, and after that they're your own settings. Change them in Display Settings, the theme editor or the Presets tab, and your change stays — across launches and reconnects — until you pick a theme again.
+
+### The game text and echo colours
+
+These four colours each have **one** value, which you can change from three places. They are the same setting, not copies:
+
+| Display Settings / theme editor | Where else | Colours | Stock default |
+| --- | --- | --- | --- |
+| **Game text** | — | Game text in the main window that nothing else colours | `#CCCCCC` |
+| **Typed commands** | the `inputuser` preset | Commands you type at the command bar | Yellow |
+| **Script commands** | the `inputother` preset | Commands a script sends (`put`, `move`, …) | GreenYellow |
+| **Echoes & messages** | the `scriptecho` preset | Script `echo` lines, `#echo`, and Genie's own messages such as `[theme] reset to Dark` | Cyan |
+
+The three echo colours are Genie 4's presets of the same names, so they also appear on **Edit → Configuration… → Presets**. A preset you import from Genie 4 keeps its colour until you pick a theme.
+
+**What wins on an echo line.** A colour given in the command, such as `#echo red Danger!`, beats the preset. A preset set to `Default` has no colour of its own, so the line uses the game text colour. **Italicize local echoes** (Display Settings) is separate and only changes the style.
+
+**Which file the echo colours are saved to.** They are saved like any other preset:
+
+- To the **shared** presets (`Config/presets.json`), normally.
+- To **this character's** presets, if you're connected and that character has its own override of the preset (Presets tab, Scope = This character). A theme you pick while connected updates that override too.
+
+**What sets these colours back to a theme's colours:**
+
+- Picking any theme, from the menu or Display Settings — including the one already active.
+- **Edit → Theme → Reset to Dark**.
+- **Reset** in Display Settings, which puts back the *active* theme's colours (or the stock defaults when no theme sets them).
+- **Import…** in Display Settings, which picks the imported theme.
+
+Launching Genie, connecting, and changing a theme's chrome don't touch them.
+
+**To keep your own colours with a theme,** use **Edit → Theme → Save Current As…** (below). The new theme stores the colours you have now, so picking it later puts them back.
+
+### Making your own theme
+
+**Edit → Theme → Edit Theme…** opens the theme editor on the active theme:
+
+- **Theme name** — the name to save under. A built-in theme can't be overwritten, so editing one suggests a name like *My Dark* and saves a copy.
+- **Base variant** — Dark or Light styling for the standard controls.
+- **Colour rows** in five groups: **Surfaces**, **Text**, **Accents**, **Vitals bars** and **Game text**. Each row has a colour picker, with transparency (alpha) supported.
+- The game text group starts with the colours you're using now (Display Settings and Presets), not the theme file's, so you edit what you see.
+- **Every change previews live** in the window behind the editor.
+- **Save** writes the theme to `Config/Themes` and makes it active, game and echo colours included. **Cancel** puts everything back the way it was when you opened the editor.
+
+Other ways to make or manage themes:
+
+| Where | Action | What it does |
+| --- | --- | --- |
+| Edit → Theme | **Save Current As…** | Saves the active theme under a new name, with your current game text and echo colours. Picking an existing custom name overwrites it. |
+| Display Settings → Theme | **Duplicate…** | Copies the selected theme to a new custom theme without switching to it. The usual way to start from a built-in. |
+| Display Settings → Theme | **Import…** | Adds a theme `.json` file to `Config/Themes` and picks it. It never overwrites a theme: a name that's taken gets `(2)`, `(3)`, … |
+| Display Settings → Theme | **Export…** | Saves the selected theme (built-in or custom) as a `.json` file to share or edit. |
+| Display Settings → Theme | **Delete** | Deletes the selected custom theme's file. Built-in themes can't be deleted. |
+
+### Theme files
+
+Each custom theme is a JSON file in `Config/Themes` (see [Application Folders](Application-Folders)). You can write or edit one by hand; Genie re-reads the folder each time you open the **Edit → Theme** menu.
+
+```json
+{
+  "Name": "Midnight",
+  "BaseVariant": "Dark",
+  "Colors": {
+    "Theme.WindowBg":   "#0B0F1A",
+    "Theme.Accent":     "#7FB2FF",
+    "Theme.Selection":  "#447FB2FF",
+    "Theme.GameText":   "#D0D0D0",
+    "Theme.InputUser":  "#FFD75F",
+    "Theme.InputOther": "#9FE870",
+    "Theme.ScriptEcho": "#5FD7D7"
+  }
+}
+```
+
+- Colours are `#RRGGBB`, or `#AARRGGBB` with transparency.
+- **List only the colours you want to change.** A missing chrome colour comes from the Dark theme. A missing game text or echo colour is left as it is when the theme is picked.
+- A file whose `Name` matches a built-in theme is skipped. If `Name` is empty, the file name is used.
+- Comments and trailing commas are allowed.
+- **Older theme files** (from before the three echo colours) have a single `Theme.GameEcho` colour. If a theme has that and none of the three echo keys, picking it sets all three echo colours to it. **Save Current As…** and the theme editor write the three keys instead.
+
+All the keys, with their names in the theme editor:
+
+| Key | Theme editor | Key | Theme editor |
+| --- | --- | --- | --- |
+| `Theme.WindowBg` | Window background | `Theme.Accent` | Accent (links, exits, compass) |
+| `Theme.PanelBg` | Panel background | `Theme.AccentBg` | Accent background |
+| `Theme.PanelBgDeep` | Log / output wells | `Theme.AccentBorder` | Accent border |
+| `Theme.ToolbarBg` | Toolbars | `Theme.Success` | Success (players, ok badges) |
+| `Theme.StripBg` | Strips (hands / status bars) | `Theme.SuccessBg` | Success background |
+| `Theme.Border` | Borders & separators | `Theme.Warning` | Warning (stale) |
+| `Theme.Selection` | Text selection | `Theme.WarningBg` | Warning background |
+| `Theme.TextPrimary` | Text — primary | `Theme.Danger` | Danger (errors, destructive) |
+| `Theme.TextSecondary` | Text — secondary | `Theme.DangerBg` | Danger background |
+| `Theme.TextMuted` | Text — muted / hints | `Theme.HealthBar` | Health bar |
+| `Theme.SectionHeader` | Section headers | `Theme.ManaBar` | Mana bar |
+| `Theme.GameText` | Game text | `Theme.SpiritBar` | Spirit bar |
+| `Theme.InputUser` | Typed commands (`inputuser`) | `Theme.StaminaBar` | Stamina bar |
+| `Theme.InputOther` | Script commands (`inputother`) | `Theme.ConcBar` | Concentration bar |
+| `Theme.ScriptEcho` | Echoes & messages (`scriptecho`) | | |
+
+### Built-in game text and echo colours
+
+| Theme | Game text | Typed commands | Script commands | Echoes & messages |
+| --- | --- | --- | --- | --- |
+| Dark | `#CCCCCC` | `#FFFF00` | `#ADFF2F` | `#00FFFF` |
+| Light | `#202020` | `#806000` | `#3C7800` | `#00708A` |
+| Genie 4 Classic | `#C0C0C0` | `#FFFF00` | `#ADFF2F` | `#00FFFF` |
+| High Contrast | `#FFFFFF` | `#FFFF00` | `#ADFF2F` | `#00FFFF` |
+| Solarized Dark | `#839496` | `#B58900` | `#859900` | `#2AA198` |
+| Solarized Light | `#657B83` | `#B58900` | `#859900` | `#2AA198` |
+| Wrayth-style | `#F0F0F0` | `#FFFF00` | `#ADFF2F` | `#00FFFF` |
+
+The dark themes use Genie 4's own defaults (Yellow, GreenYellow, Cyan). Light and Solarized use darker or matching shades so the text stays readable on their backgrounds.
+
+### Coming from an earlier Genie 5
+
+Earlier versions had a single **Echoes** colour in Display Settings, used for every echo line. It's been replaced by the three presets above, so typed commands, script commands and messages can differ, as in Genie 4. Your old Echoes colour isn't carried over. Echo lines use your `inputuser` / `inputother` / `scriptecho` presets — your Genie 4 values if you imported them, otherwise the stock defaults. Custom themes you saved before still work (see *Older theme files* above).
 
 ## Where rules are stored
 
