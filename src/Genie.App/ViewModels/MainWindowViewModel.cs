@@ -186,6 +186,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <see cref="Display"/> loads; startup-applies the persisted theme.</summary>
     public Theming.ThemeService Themes { get; }
 
+    /// <summary>Preset colour reads/writes for editors outside the Presets tab
+    /// (public #406). Null until the core exists.</summary>
+    public Settings.PresetColorStore? PresetColors { get; private set; }
+
     // ── Help menu (Updates) ─────────────────────────────────────────────────
     public ReactiveCommand<Unit, Unit>                    ShowUpdatesCommand       { get; }
     public Interaction<UpdatesDialogViewModel, Unit>      ShowUpdatesDialog        { get; } = new();
@@ -440,6 +444,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// the vitals Status Bar (Genie 4 StatusStrip parity, #111).</summary>
     public StatusSlotsViewModel StatusSlots { get; } = new();
     public ReactiveCommand<Unit, Unit>                    ToggleMagicPanelsCommand { get; }
+    /// <summary>Layout → Combined Spell Timer: the spell box counts down in place of the separate cast bar.</summary>
+    public ReactiveCommand<Unit, Unit>                    ToggleCombinedSpellTimerCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomIdCommand  { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomNumberCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleWindowedModeCommand{ get; }
@@ -1465,7 +1471,6 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // pushed the seeded values; nothing to repaint yet at construct).
         Display.WhenAnyValue(
                 x => x.GameColorHex,
-                x => x.EchoColorHex,
                 x => x.FontFamily,
                 x => x.FontSize)
             .Skip(1)
@@ -1979,6 +1984,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleMagicPanelsCommand = ReactiveCommand.Create(() =>
         {
             Display.ShowMagicPanels = !Display.ShowMagicPanels;
+            Display.Save(_displayPath);
+        });
+
+        ToggleCombinedSpellTimerCommand = ReactiveCommand.Create(() =>
+        {
+            Display.CombinedSpellTimer = !Display.CombinedSpellTimer;
             Display.Save(_displayPath);
         });
 
@@ -4183,6 +4194,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         LoadLayeredNames(core, p, profileDir, globalDir, single);
         LoadLayeredPresets(core, p, profileDir, globalDir, single);
+        // Preset-coloured UI (the vitals bars, #406) repaints from the loaded set.
+        Avalonia.Threading.Dispatcher.UIThread.Post(UserHighlights.NotifyRulesChanged);
 
         var hadAnyMacros = glob.Macros.Rules.Count > 0 || (prof?.Macros.Rules.Count ?? 0) > 0;
         if (hadAnyMacros)
@@ -5534,6 +5547,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // persist, so the renderer holds them for the whole session.
         UserHighlights.Engine  = _core.Highlights;
         Highlighting.DefaultHighlights.PresetEngine = _core.Presets;      // preset colours (#19)
+        // Display Settings / theme editor / theme apply edit the echo presets
+        // through this (public #406) — the preset stays the one source.
+        PresetColors = new Settings.PresetColorStore(_core.Presets, _configDir,
+            () => IsConnected ? GetProfileConfigDir(ConnectedProfile) : null);
+        Themes.Presets = PresetColors;
         Highlighting.DefaultHighlights.NameEngine   = _core.NameHighlights; // name colours (#154)
 
         // ── Performance / safety ──────────────────────────────────────────────
@@ -6331,6 +6349,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             IconBarVisible        = Display.ShowIconBar,
             IconBarAtBottom       = Display.IconBarAtBottom,
             HealthBarAtBottom     = Display.StatusBarAtBottom,
+            CombinedSpellTimer    = Display.CombinedSpellTimer,
             ScriptBarVisible      = Display.ShowScriptBar,
             MagicPanels           = Display.ShowMagicPanels,
             KeepRoundTimeVisible  = Display.KeepRoundTimeVisible,
@@ -6407,6 +6426,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         if (layout.IconBarVisible    is { } iconShown)  Display.ShowIconBar       = iconShown;
         if (layout.IconBarAtBottom   is { } iconBottom) Display.IconBarAtBottom   = iconBottom;
         if (layout.HealthBarAtBottom is { } hpBottom)   Display.StatusBarAtBottom = hpBottom;
+        if (layout.CombinedSpellTimer is { } combined)  Display.CombinedSpellTimer = combined;
         if (layout.ScriptBarVisible  is { } barShown)   Display.ShowScriptBar     = barShown;
         if (layout.MagicPanels       is { } magic)      Display.ShowMagicPanels   = magic;
         if (layout.KeepRoundTimeVisible is { } keepRt)  Display.KeepRoundTimeVisible = keepRt;

@@ -74,10 +74,13 @@
 
         <TextBlock Classes="section" Text="VITALS BARS"/>
         <ItemsControl ItemsSource="{Binding Vitals}"/>
+        <TextBlock Text="These are the health, mana, stamina, spirit and concentration presets on Configuration → Presets: the fill is the preset's colour and the track its background. Changing one here or there changes the same value. Fully transparent means none (Default for a fill, the normal track for a track)."
+                   FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
+                   TextWrapping="Wrap"/>
 
         <TextBlock Classes="section" Text="GAME TEXT"/>
         <ItemsControl ItemsSource="{Binding GameRoles}"/>
-        <TextBlock Text="These two are the same Game text and Echoes colours as Display Settings: changing them here or there changes one value. Saving the theme also stores them as this theme's colours, so picking the theme again restores them. Per-window and per-stream (preset) colour overrides still win."
+        <TextBlock Text="These four are the same colours as Display Settings, and the three echo colours are the inputuser, inputother and scriptecho presets on Configuration → Presets: changing one anywhere changes the same value. Saving stores them in this theme too, so picking the theme again puts them back. Per-window colours and other presets still win over Game text."
                    FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
                    TextWrapping="Wrap"/>
       </StackPanel>

@@ -8,8 +8,11 @@
              xmlns:vm="using:Genie.App.ViewModels"
              x:Class="Genie.App.Views.RestedExpBarView"
              x:DataType="vm:MainWindowViewModel">
-  <Border MinWidth="100" Width="110" VerticalAlignment="Center"
-          BorderBrush="#444" BorderThickness="1" CornerRadius="3"
+  <!-- Sizing (#405): stretches to the strip's height like the S / L / R
+       boxes; the ProgressBar's MinWidth/MinHeight override Fluent's 200 px
+       minimum so the gauge stays inside its frame. -->
+  <Border MinWidth="100" Width="110"
+          BorderBrush="#444" BorderThickness="1" CornerRadius="3" ClipToBounds="True"
           ToolTip.Tip="{Binding Vitals.RestedTip}">
     <Border.IsVisible>
       <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -22,7 +25,8 @@
                    AutomationProperties.Name="Rested experience, spendable time"
                    Foreground="{Binding Vitals.RestedBarBrush}"
                    Background="{Binding Vitals.RestedTrackBrush}"
-                   Height="14" CornerRadius="2"/>
+                   MinWidth="0" MinHeight="0"
+                   VerticalAlignment="Stretch" CornerRadius="2"/>
       <TextBlock Text="{Binding Vitals.RestedLabel}"
                  AutomationProperties.LiveSetting="Off"
                  HorizontalAlignment="Center" VerticalAlignment="Center"

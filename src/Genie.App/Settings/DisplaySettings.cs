@@ -40,7 +40,6 @@ public sealed class DisplaySettings : ReactiveObject
     /// survive relaunches). Empty/unknown falls back to "Dark".
     /// </summary>
     [Reactive] public string ThemeName { get; set; } = "Dark";
-    [Reactive] public string EchoColorHex  { get; set; } = "#88BBCC";
     [Reactive] public bool   EchoItalic    { get; set; } = true;
     [Reactive] public string FontFamily    { get; set; } = "Consolas,Courier New,monospace";
     [Reactive] public double FontSize      { get; set; } = 13d;
@@ -125,6 +124,16 @@ public sealed class DisplaySettings : ReactiveObject
     /// View → Magic Panels.
     /// </summary>
     [Reactive] public bool   ShowMagicPanels { get; set; } = true;
+
+    /// <summary>
+    /// Combined spell timer: off (default) keeps Genie 4's two widgets, the
+    /// "(N) Spell" label counting up and the separate cast bar counting down.
+    /// On, the spell box itself is the cast bar: it fills with the
+    /// <c>castbar</c> preset and empties over the prep time, and the seconds
+    /// left go on the end of the label, "(N) Spell (M)". Toggle via
+    /// Layout → Combined Spell Timer; rides on saved layouts.
+    /// </summary>
+    [Reactive] public bool   CombinedSpellTimer { get; set; }
 
     /// <summary>
     /// Whether the optional zone/room location line (the mapper's current zone
@@ -392,7 +401,6 @@ public sealed class DisplaySettings : ReactiveObject
         PushAll();
         this.WhenAnyValue(
                 x => x.GameColorHex,
-                x => x.EchoColorHex,
                 x => x.EchoItalic,
                 x => x.FontFamily,
                 x => x.FontSize)
@@ -484,7 +492,10 @@ public sealed class DisplaySettings : ReactiveObject
         if (res is null) return;
 
         res[GameBrushKey]      = MakeBrush(GameColorHex, fallback: Colors.LightGray);
-        res[EchoBrushKey]      = MakeBrush(EchoColorHex, fallback: Color.FromRgb(0x88, 0xbb, 0xcc));
+        // Echo lines are coloured by their preset (inputuser / inputother /
+        // scriptecho, public #406); this is only the colour for a preset set to
+        // "Default", which — as for every preset — is the normal text colour.
+        res[EchoBrushKey]      = MakeBrush(GameColorHex, fallback: Colors.LightGray);
         res[GameFontFamilyKey] = new FontFamily(FontFamily);
         res[GameFontSizeKey]   = FontSize;
         res[EchoFontStyleKey]  = EchoItalic ? Avalonia.Media.FontStyle.Italic : Avalonia.Media.FontStyle.Normal;
