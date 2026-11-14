@@ -130,6 +130,12 @@ public sealed class ScriptInstance
     // waiteval state — block until expression becomes true
     public string?  WaitEvalExpr;
     public DateTime WaitEvalDeadline = DateTime.MaxValue;
+    // #428: what the condition's variables (clocks masked) read at the last
+    // check, and whether the condition was true then. waiteval releases on a
+    // change of one of its variables while the condition is true, or when the
+    // condition turns true — never on a condition that was already true.
+    public string?  WaitEvalKey;
+    public bool     WaitEvalWasTrue;
 
     // Send-gate replay buffer (public #309). SendGateBlocked is true while the
     // last StepOne attempt ended parked in an ENGINE-imposed send gate (the
