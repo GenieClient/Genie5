@@ -186,6 +186,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <see cref="Display"/> loads; startup-applies the persisted theme.</summary>
     public Theming.ThemeService Themes { get; }
 
+    /// <summary>Preset colour reads/writes for editors outside the Presets tab
+    /// (public #406). Null until the core exists.</summary>
+    public Settings.PresetColorStore? PresetColors { get; private set; }
+
     // ── Help menu (Updates) ─────────────────────────────────────────────────
     public ReactiveCommand<Unit, Unit>                    ShowUpdatesCommand       { get; }
     public Interaction<UpdatesDialogViewModel, Unit>      ShowUpdatesDialog        { get; } = new();
@@ -1465,7 +1469,6 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // pushed the seeded values; nothing to repaint yet at construct).
         Display.WhenAnyValue(
                 x => x.GameColorHex,
-                x => x.EchoColorHex,
                 x => x.FontFamily,
                 x => x.FontSize)
             .Skip(1)
@@ -4183,6 +4186,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         LoadLayeredNames(core, p, profileDir, globalDir, single);
         LoadLayeredPresets(core, p, profileDir, globalDir, single);
+        // Preset-coloured UI (the vitals bars, #406) repaints from the loaded set.
+        Avalonia.Threading.Dispatcher.UIThread.Post(UserHighlights.NotifyRulesChanged);
 
         var hadAnyMacros = glob.Macros.Rules.Count > 0 || (prof?.Macros.Rules.Count ?? 0) > 0;
         if (hadAnyMacros)
@@ -5534,6 +5539,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // persist, so the renderer holds them for the whole session.
         UserHighlights.Engine  = _core.Highlights;
         Highlighting.DefaultHighlights.PresetEngine = _core.Presets;      // preset colours (#19)
+        // Display Settings / theme editor / theme apply edit the echo presets
+        // through this (public #406) — the preset stays the one source.
+        PresetColors = new Settings.PresetColorStore(_core.Presets, _configDir,
+            () => IsConnected ? GetProfileConfigDir(ConnectedProfile) : null);
+        Themes.Presets = PresetColors;
         Highlighting.DefaultHighlights.NameEngine   = _core.NameHighlights; // name colours (#154)
 
         // ── Performance / safety ──────────────────────────────────────────────

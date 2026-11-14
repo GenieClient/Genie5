@@ -404,6 +404,16 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     public event Action<string>?                   ScriptOutputLine;
 
     /// <summary>
+    /// Every line raised on <see cref="EchoLine"/> or <see cref="ScriptOutputLine"/>,
+    /// with what produced it (public #406), so the game window can colour it
+    /// with the matching Genie 4 preset: <c>inputuser</c> for a typed command,
+    /// <c>inputother</c> for a command a script sent, <c>scriptecho</c> for script
+    /// output and Genie's own messages. Fires right after the untyped event,
+    /// with the same (plugin-processed) text.
+    /// </summary>
+    public event Action<string, EchoKind>?         ClassifiedEchoLine;
+
+    /// <summary>
     /// Raised by directed <c>#echo &gt;window #color</c>. Args: (text, windowName?, hexColor?).
     /// Null window/color means fall back to main window / default colour.
     /// </summary>
@@ -424,10 +434,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     // (null return suppresses the event). Plugin echoes emitted from inside
     // OnEcho pass through undispatched (PluginManager re-entrancy guard).
 
-    private void RaiseEchoLine(string text)
+    private void RaiseEchoLine(string text, EchoKind kind = EchoKind.Message)
     {
         var t = Plugins is null ? text : Plugins.DispatchEcho(text, "main");
-        if (t is not null) EchoLine?.Invoke(t);
+        if (t is null) return;
+        EchoLine?.Invoke(t);
+        ClassifiedEchoLine?.Invoke(t, kind);
     }
 
     // ── Pipeline fault containment (2026-08-31 stability review) ─────────────────────────────
@@ -486,10 +498,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         catch (Exception ex) { ReportPipelineFault(stage, ex); }
     }
 
-    private void RaiseScriptOutput(string text)
+    private void RaiseScriptOutput(string text, EchoKind kind = EchoKind.ScriptEcho)
     {
         var t = Plugins is null ? text : Plugins.DispatchEcho(text, "main");
-        if (t is not null) ScriptOutputLine?.Invoke(t);
+        if (t is null) return;
+        ScriptOutputLine?.Invoke(t);
+        ClassifiedEchoLine?.Invoke(t, kind);
     }
 
     private void RaiseEchoToWindow(string text, string? window, string? color)
@@ -736,7 +750,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                                if (Config?.TraceSends == true)
                                    RaiseEchoLine($"[send:script] {cmd}");
 
-                               RaiseScriptOutput(cmd);
+                               RaiseScriptOutput(cmd, EchoKind.ScriptCommand);
                                _typeAhead.NotifySent();
                                // The mapper must see script sends exactly as it sees
                                // SendToGame's (below, :1508). It keeps the LAST sent
@@ -1462,7 +1476,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // display name), use it instead of the raw text so the user sees
         // "get a tapered cutlass" instead of "get #49489411 in #49489410".
         if (userInput)
-            RaiseEchoLine(echoOverride ?? text);
+            RaiseEchoLine(echoOverride ?? text, EchoKind.Command);
 
         // Genie 4 mycommandchar (Game.cs SendText: `!sText.StartsWith(
         // cMyCommandChar)` gates the socket write, lastcommand, and activity
@@ -2512,7 +2526,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// </summary>
     private void SyncMapperDebug()
     {
-        AutoMapper.Diagnostics = Config.MapperDebug ? RaiseEchoLine : null;
+        AutoMapper.Diagnostics = Config.MapperDebug ? msg => RaiseEchoLine(msg) : null;
         if (Config.MapperDebug)
             RaiseEchoLine("[mapper] Room-resolution trace ON. `#config mapperdebug off` to stop.");
     }

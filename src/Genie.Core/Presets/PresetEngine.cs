@@ -26,11 +26,14 @@ public sealed class PresetEngine
         Set("scriptecho",       "Cyan");
 
         // ── Status bars ─────────────────────────────────────────────────────
-        Set("health",           "Red",      "#400000");
-        Set("mana",             "Aqua",     "#000040");
-        Set("stamina",          "Green",    "#004000");
-        Set("spirit",           "Purple",   "#400040");
-        Set("concentration",    "White",    "#000040");
+        // Vitals bars (public #406): Genie 4's stock values (Lists/Globals.cs
+        // SetDefaultPresets). Foreground = fill; background = track and border,
+        // none by default so the bar's normal track shows.
+        Set("health",           "Maroon");
+        Set("mana",             "Navy");
+        Set("stamina",          "Green");
+        Set("spirit",           "Purple");
+        Set("concentration",    "Navy");
         Set("roundtime",        "Aqua",     "#00004B");
         Set("castbar",          "Magenta");
 
