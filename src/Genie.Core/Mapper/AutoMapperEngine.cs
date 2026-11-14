@@ -703,8 +703,18 @@ public sealed class AutoMapperEngine
     /// </summary>
     private void FollowLinkedZone()
     {
-        if (_followingLink || ViewIsBrowsing || LinkedZoneLoader is null) return;
-        if (CurrentNode is not { IsCrossZone: true } stub) return;
+        if (CurrentNode is { IsCrossZone: true } stub) TryFollowStub(stub);
+    }
+
+    /// <summary>
+    /// Switch to the zone <paramref name="stub"/>'s note names and re-resolve
+    /// there, with the stub as the arrival hint. False when there is nothing
+    /// to follow: browsing, already following, no loader, no <c>.xml</c> note,
+    /// or the host can't supply the zone.
+    /// </summary>
+    private bool TryFollowStub(MapNode stub)
+    {
+        if (_followingLink || ViewIsBrowsing || LinkedZoneLoader is null) return false;
 
         string? file = null;
         foreach (var token in stub.Notes.Split('|'))
@@ -716,16 +726,39 @@ public sealed class AutoMapperEngine
                 break;
             }
         }
-        if (string.IsNullOrEmpty(file)) return;
+        if (string.IsNullOrEmpty(file)) return false;
 
         var zone = LinkedZoneLoader(file);
-        if (zone is null) return;
+        if (zone is null) return false;
 
         Diagnostics?.Invoke($"[mapper]   -> stub #{stub.Id} links to '{file}'; switching zones");
         LinkedZoneFollowing?.Invoke(file, zone);
         _followingLink = true;
         try { LoadZone(zone, stub); }
         finally { _followingLink = false; }
+        return true;
+    }
+
+    /// <summary>
+    /// The room couldn't be placed in the active zone. Walking through a gate
+    /// with no arc onto its boundary stub ends here rather than on the stub,
+    /// so a stub with this title is tried first: its note names the zone the
+    /// room belongs to, and following it now keeps <c>$zoneid</c> right for
+    /// the script's next line, as landing on the stub does (#426). With no
+    /// such stub the placement is cleared and the host is asked for a zone.
+    /// </summary>
+    private void SignalRoomNotFound(string serverRoomId, string title, IReadOnlyCollection<string> exits)
+    {
+        if (!string.IsNullOrWhiteSpace(title))
+            foreach (var n in _zone.Nodes.Values)
+                if (n.IsCrossZone &&
+                    string.Equals(n.Title, title, StringComparison.OrdinalIgnoreCase) &&
+                    TryFollowStub(n))
+                    return;
+
+        CurrentNode = null;
+        CurrentNodeChanged?.Invoke();
+        RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
     }
 
     private string DescribePending() =>
@@ -1093,9 +1126,7 @@ public sealed class AutoMapperEngine
             Diagnostics?.Invoke(
                 $"[mapper]   -> NO MATCH in zone '{_zone.Name}' (was {DescribeCurrent()}, " +
                 $"moved '{DescribePending()}'); asking host to find a zone for this room");
-            CurrentNode = null;
-            CurrentNodeChanged?.Invoke();
-            RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
+            SignalRoomNotFound(serverRoomId, title, exits);
             return;
         }
         else if (!_zoneEverLoaded)
@@ -1113,9 +1144,7 @@ public sealed class AutoMapperEngine
             // (called on a successful auto-detect, a manual pick, or "New
             // Zone") flips _zoneEverLoaded permanently, so this only ever
             // gates the very first, otherwise-orphaned room of a session.
-            CurrentNode = null;
-            CurrentNodeChanged?.Invoke();
-            RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
+            SignalRoomNotFound(serverRoomId, title, exits);
             return;
         }
         else if (_zone.Nodes.Count > 0 &&
@@ -1149,9 +1178,7 @@ public sealed class AutoMapperEngine
             Diagnostics?.Invoke(
                 $"[mapper]   -> NO MATCH in zone '{_zone.Name}' and no walk evidence " +
                 $"(was {DescribeCurrent()}); deferring record, asking host for a zone");
-            CurrentNode = null;
-            CurrentNodeChanged?.Invoke();
-            RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
+            SignalRoomNotFound(serverRoomId, title, exits);
             return;
         }
         else
