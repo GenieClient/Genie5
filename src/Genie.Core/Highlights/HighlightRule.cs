@@ -97,8 +97,18 @@ public sealed class HighlightRule
 
     /// <summary>
     /// Returns the (start, length) of every span in <paramref name="line"/>
-    /// this rule highlights. Empty if no match. The renderer uses this to
-    /// paint only the matched portion of a line rather than the whole line.
+    /// this rule highlights. Empty if no match. Per match type (Genie 4 semantics):
+    /// <list type="bullet">
+    /// <item><c>String</c> — each occurrence of the text.</item>
+    /// <item><c>Line</c> — the whole line when the text appears anywhere in it.</item>
+    /// <item><c>BeginsWith</c> — the whole line when it starts with the text (public #400).</item>
+    /// <item><c>Regex</c> — with capture groups, only the text each group 1..n
+    /// matched; with none, the whole match (public #397). Use <c>(?:…)</c> for
+    /// grouping that should not narrow the colour.</item>
+    /// </list>
+    /// A regex match whose groups all captured nothing yields one zero-length
+    /// span, so callers still see that the rule matched (highlight sound / TTS)
+    /// while no characters are painted.
     /// </summary>
     public IEnumerable<(int Start, int Length)> GetMatchPositions(string line)
     {
@@ -118,8 +128,28 @@ public sealed class HighlightRule
                 try
                 {
                     foreach (Match m in _regex.Matches(line))
-                        if (m.Success && m.Length > 0)
+                    {
+                        if (!m.Success) continue;
+                        if (m.Groups.Count > 1)
+                        {
+                            // Genie 4 (#397): colour only what the capture groups
+                            // matched. An optional group that didn't take part has
+                            // Success == false; skip it and empty captures.
+                            var any = false;
+                            for (int g = 1; g < m.Groups.Count; g++)
+                            {
+                                var grp = m.Groups[g];
+                                if (!grp.Success || grp.Length == 0) continue;
+                                (spans ??= new()).Add((grp.Index, grp.Length));
+                                any = true;
+                            }
+                            if (!any) (spans ??= new()).Add((m.Index, 0));   // matched, nothing to paint
+                        }
+                        else if (m.Length > 0)
+                        {
                             (spans ??= new()).Add((m.Index, m.Length));
+                        }
+                    }
                 }
                 catch (RegexMatchTimeoutException) { RegexSafety.ReportTimeout(PipelineStage.Highlights); yield break; }
                 if (spans is not null)
@@ -133,8 +163,10 @@ public sealed class HighlightRule
                 yield break;
 
             case HighlightMatchType.BeginsWith:
+                // Genie 4 (#400): a line that starts with the text is coloured
+                // whole, not just the prefix.
                 if (line.StartsWith(Pattern, cmp))
-                    yield return (0, Pattern.Length);
+                    yield return (0, line.Length);
                 yield break;
 
             case HighlightMatchType.String:
