@@ -182,6 +182,8 @@ public class StreamTabsViewModel : ReactiveObject
                     return;
                 }
 
+                e = WithStreamPresetBase(e);
+
                 // #187: pass the parser's span metadata (bold / link / preset)
                 // through so the stream panel renders monster-bold, clickable
                 // links and preset colours just like the main window does.
@@ -230,6 +232,16 @@ public class StreamTabsViewModel : ReactiveObject
     /// closed-panel → Main behaviour, so a line can never vanish.
     /// </para>
     /// </summary>
+    /// <summary>Genie 4 (#406): familiar-stream text takes the <c>familiar</c>
+    /// preset as its base colour, in its own window and wherever it is routed.
+    /// The whole-line span is appended LAST so the game's own preset spans inside
+    /// the line still win (presets fill first-come), and user highlights paint
+    /// over it as usual. Other streams pass through unchanged.</summary>
+    internal static TextEvent WithStreamPresetBase(TextEvent e) =>
+        e.Stream == "familiar" && e.Text.Length > 0
+            ? e with { PresetSpans = [.. e.PresetSpans ?? [], new PresetSpan(0, e.Text.Length, "familiar")] }
+            : e;
+
     private void RouteToMain(StreamBuffer buf, TextEvent e)
     {
         // buf.Settings is the same WindowSettings instance the Layout tab

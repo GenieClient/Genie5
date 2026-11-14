@@ -186,6 +186,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <see cref="Display"/> loads; startup-applies the persisted theme.</summary>
     public Theming.ThemeService Themes { get; }
 
+    /// <summary>Preset colour reads/writes for editors outside the Presets tab
+    /// (public #406). Null until the core exists.</summary>
+    public Settings.PresetColorStore? PresetColors { get; private set; }
+
     // ── Help menu (Updates) ─────────────────────────────────────────────────
     public ReactiveCommand<Unit, Unit>                    ShowUpdatesCommand       { get; }
     public Interaction<UpdatesDialogViewModel, Unit>      ShowUpdatesDialog        { get; } = new();
@@ -1402,6 +1406,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.Apply();  // push values into Application.Resources
         Mapper.AttachDisplay(Display, _displayPath);
 
+        // The map's colours are the automapper.* presets (public #406). Until
+        // Genie's engine is built (first connect / command) they're read from the
+        // shared presets file; a map colour an earlier Genie 5 kept in
+        // display.json moves into the preset here, once.
+        var startupPresets = new Settings.PresetColorStore(new Genie.Core.Presets.PresetEngine(), _configDir, () => null);
+        if (MapperViewModel.MigrateLegacyColours(Display, startupPresets))
+        {
+            try { Display.Save(_displayPath); } catch { /* best effort: retried next launch */ }
+        }
+        Mapper.PresetStore = startupPresets;
+
         // ── Themes (#20) ──────────────────────────────────────────────────
         // Re-apply the persisted theme's chrome + Fluent variant on top of
         // the design-time Dark defaults. Chrome only: game-text colours come
@@ -1465,7 +1480,6 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // pushed the seeded values; nothing to repaint yet at construct).
         Display.WhenAnyValue(
                 x => x.GameColorHex,
-                x => x.EchoColorHex,
                 x => x.FontFamily,
                 x => x.FontSize)
             .Skip(1)
@@ -4183,6 +4197,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         LoadLayeredNames(core, p, profileDir, globalDir, single);
         LoadLayeredPresets(core, p, profileDir, globalDir, single);
+        // Preset-coloured UI (the vitals bars, #406) repaints from the loaded set.
+        Avalonia.Threading.Dispatcher.UIThread.Post(UserHighlights.NotifyRulesChanged);
 
         var hadAnyMacros = glob.Macros.Rules.Count > 0 || (prof?.Macros.Rules.Count ?? 0) > 0;
         if (hadAnyMacros)
@@ -5534,6 +5550,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // persist, so the renderer holds them for the whole session.
         UserHighlights.Engine  = _core.Highlights;
         Highlighting.DefaultHighlights.PresetEngine = _core.Presets;      // preset colours (#19)
+        // Display Settings / theme editor / theme apply edit the echo presets
+        // through this (public #406) — the preset stays the one source.
+        PresetColors = new Settings.PresetColorStore(_core.Presets, _configDir,
+            () => IsConnected ? GetProfileConfigDir(ConnectedProfile) : null);
+        Themes.Presets = PresetColors;
+        Mapper.PresetStore = PresetColors;   // the map's automapper.* presets (#406)
         Highlighting.DefaultHighlights.NameEngine   = _core.NameHighlights; // name colours (#154)
 
         // ── Performance / safety ──────────────────────────────────────────────
@@ -6337,7 +6359,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             ShowGameText          = Display.ShowGameText,
             ShowEchoText          = Display.ShowEchoText,
             ShowScriptText        = Display.ShowScriptText,
-            MapBackgroundHex      = Display.MapBackgroundHex,
+            MapBackgroundHex      = Controls.MapPalette.Hex(Mapper.Palette.Background),   // automapper.panel (#406)
             WindowedMode          = Display.WindowedMode,
         };
 
@@ -6413,8 +6435,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.ShowGameText           = layout.ShowGameText;
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;
-        if (!string.IsNullOrWhiteSpace(layout.MapBackgroundHex))
-            Display.MapBackgroundHex   = layout.MapBackgroundHex;
+        // A layout's map background goes into the automapper.panel preset (the
+        // one place it's kept, #406) and shows straight away. None, or the old
+        // dark default an older layout carries without having chosen it, leaves
+        // the map as it is.
+        if (Controls.MapPalette.Parse(layout.MapBackgroundHex) is { } mapBg &&
+            !string.Equals(layout.MapBackgroundHex!.Trim(), "#1A1A1A", StringComparison.OrdinalIgnoreCase))
+            Mapper.MapBackground = mapBg;
         // Switch document mode to match the saved layout BEFORE rebuilding the
         // dock, so a layout saved in windowed mode reopens windowed (not tabbed).
         Display.WindowedMode           = layout.WindowedMode;

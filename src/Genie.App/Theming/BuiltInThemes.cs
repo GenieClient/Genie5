@@ -35,13 +35,20 @@ public static class BuiltInThemes
         [Danger]        = "#E06060",
         [DangerBg]      = "#3A2424",
         [Selection]     = "#553A6EA5",
-        [HealthBar]     = "#E05050",
-        [ManaBar]       = "#5090E0",
-        [SpiritBar]     = "#50E0A0",
-        [StaminaBar]    = "#E0C050",
-        [ConcBar]       = "#C050E0",
+        [HealthBar]     = "#800000",
+        [HealthTrack]   = "",
+        [ManaBar]       = "#000080",
+        [ManaTrack]     = "",
+        [SpiritBar]     = "#800080",
+        [SpiritTrack]   = "",
+        [StaminaBar]    = "#008000",
+        [StaminaTrack]  = "",
+        [ConcBar]       = "#000080",
+        [ConcTrack]     = "",
         [GameText]      = "#CCCCCC",
-        [GameEcho]      = "#88BBCC",
+        [InputUser]     = "#FFFF00",
+        [InputOther]    = "#ADFF2F",
+        [ScriptEcho]    = "#00FFFF",
     });
 
     public static Theme Light { get; } = Make("Light", "Light", new()
@@ -67,17 +74,24 @@ public static class BuiltInThemes
         [DangerBg]      = "#F5DCDC",
         [Selection]     = "#553A6EA5",
         [HealthBar]     = "#C03030",
+        [HealthTrack]   = "#F4DADA",
         [ManaBar]       = "#3070C0",
+        [ManaTrack]     = "#DAE5F4",
         [SpiritBar]     = "#2E9A6E",
+        [SpiritTrack]   = "#D9EDE5",
         [StaminaBar]    = "#B08A20",
+        [StaminaTrack]  = "#F1EAD7",
         [ConcBar]       = "#8F30B0",
+        [ConcTrack]     = "#EBDAF1",
         [GameText]      = "#202020",
-        [GameEcho]      = "#336688",
+        [InputUser]     = "#806000",
+        [InputOther]    = "#3C7800",
+        [ScriptEcho]    = "#00708A",
     });
 
     /// <summary>
-    /// Genie 4's look: pure black game surfaces, silver text, yellow echo
-    /// (Genie 4's <c>inputuser</c> preset), and its classic vitals colours
+    /// Genie 4's look: pure black game surfaces, silver text, Genie 4's echo
+    /// preset colours (yellow typed commands), and its classic vitals colours
     /// (red health, aqua mana, purple spirit, green stamina, white conc).
     /// </summary>
     public static Theme Genie4Classic { get; } = Make("Genie 4 Classic", "Dark", new()
@@ -102,13 +116,20 @@ public static class BuiltInThemes
         [Danger]        = "#F06060",
         [DangerBg]      = "#300E0E",
         [Selection]     = "#553A6EA5",
-        [HealthBar]     = "#FF0000",
-        [ManaBar]       = "#00FFFF",
-        [SpiritBar]     = "#B040B0",
-        [StaminaBar]    = "#00A000",
-        [ConcBar]       = "#E8E8E8",
+        [HealthBar]     = "#800000",
+        [HealthTrack]   = "",
+        [ManaBar]       = "#000080",
+        [ManaTrack]     = "",
+        [SpiritBar]     = "#800080",
+        [SpiritTrack]   = "",
+        [StaminaBar]    = "#008000",
+        [StaminaTrack]  = "",
+        [ConcBar]       = "#000080",
+        [ConcTrack]     = "",
         [GameText]      = "#C0C0C0",
-        [GameEcho]      = "#FFFF00",
+        [InputUser]     = "#FFFF00",
+        [InputOther]    = "#ADFF2F",
+        [ScriptEcho]    = "#00FFFF",
     });
 
     public static Theme HighContrast { get; } = Make("High Contrast", "Dark", new()
@@ -134,12 +155,19 @@ public static class BuiltInThemes
         [DangerBg]      = "#400000",
         [Selection]     = "#5500FFFF",
         [HealthBar]     = "#FF4040",
+        [HealthTrack]   = "#401010",
         [ManaBar]       = "#4090FF",
+        [ManaTrack]     = "#102440",
         [SpiritBar]     = "#40FF90",
+        [SpiritTrack]   = "#104024",
         [StaminaBar]    = "#FFE040",
+        [StaminaTrack]  = "#403810",
         [ConcBar]       = "#FF40FF",
+        [ConcTrack]     = "#401040",
         [GameText]      = "#FFFFFF",
-        [GameEcho]      = "#FFFF00",
+        [InputUser]     = "#FFFF00",
+        [InputOther]    = "#ADFF2F",
+        [ScriptEcho]    = "#00FFFF",
     });
 
     public static Theme SolarizedDark { get; } = Make("Solarized Dark", "Dark", new()
@@ -165,12 +193,19 @@ public static class BuiltInThemes
         [DangerBg]      = "#3B1615",
         [Selection]     = "#55268BD2",
         [HealthBar]     = "#DC322F",
+        [HealthTrack]   = "#370C0C",
         [ManaBar]       = "#268BD2",
+        [ManaTrack]     = "#0A2334",
         [SpiritBar]     = "#2AA198",
+        [SpiritTrack]   = "#0A2826",
         [StaminaBar]    = "#B58900",
+        [StaminaTrack]  = "#2D2200",
         [ConcBar]       = "#6C71C4",
+        [ConcTrack]     = "#1B1C31",
         [GameText]      = "#839496",
-        [GameEcho]      = "#2AA198",
+        [InputUser]     = "#B58900",
+        [InputOther]    = "#859900",
+        [ScriptEcho]    = "#2AA198",
     });
 
     public static Theme SolarizedLight { get; } = Make("Solarized Light", "Light", new()
@@ -196,12 +231,19 @@ public static class BuiltInThemes
         [DangerBg]      = "#F8DFDA",
         [Selection]     = "#55268BD2",
         [HealthBar]     = "#DC322F",
+        [HealthTrack]   = "#F9DADA",
         [ManaBar]       = "#268BD2",
+        [ManaTrack]     = "#D8EAF7",
         [SpiritBar]     = "#2AA198",
+        [SpiritTrack]   = "#D9EEEC",
         [StaminaBar]    = "#B58900",
+        [StaminaTrack]  = "#F2EAD1",
         [ConcBar]       = "#6C71C4",
+        [ConcTrack]     = "#E5E5F4",
         [GameText]      = "#657B83",
-        [GameEcho]      = "#268BD2",
+        [InputUser]     = "#B58900",
+        [InputOther]    = "#859900",
+        [ScriptEcho]    = "#2AA198",
     });
 
     /// <summary>
@@ -231,12 +273,19 @@ public static class BuiltInThemes
         [DangerBg]      = "#381C1C",
         [Selection]     = "#554060A0",
         [HealthBar]     = "#E03030",
+        [HealthTrack]   = "#380C0C",
         [ManaBar]       = "#30A0E0",
+        [ManaTrack]     = "#0C2838",
         [SpiritBar]     = "#40D090",
+        [SpiritTrack]   = "#103424",
         [StaminaBar]    = "#E0C040",
+        [StaminaTrack]  = "#383010",
         [ConcBar]       = "#C060E0",
+        [ConcTrack]     = "#301838",
         [GameText]      = "#F0F0F0",
-        [GameEcho]      = "#C8C864",
+        [InputUser]     = "#FFFF00",
+        [InputOther]    = "#ADFF2F",
+        [ScriptEcho]    = "#00FFFF",
     });
 
     /// <summary>All built-ins in menu order.</summary>

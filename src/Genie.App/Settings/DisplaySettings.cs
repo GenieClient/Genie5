@@ -40,28 +40,26 @@ public sealed class DisplaySettings : ReactiveObject
     /// survive relaunches). Empty/unknown falls back to "Dark".
     /// </summary>
     [Reactive] public string ThemeName { get; set; } = "Dark";
-    [Reactive] public string EchoColorHex  { get; set; } = "#88BBCC";
     [Reactive] public bool   EchoItalic    { get; set; } = true;
     [Reactive] public string FontFamily    { get; set; } = "Consolas,Courier New,monospace";
     [Reactive] public double FontSize      { get; set; } = 13d;
 
     /// <summary>
-    /// Background colour of the Mapper canvas. User-editable via a
-    /// ColorPickerButton in the Mapper panel's Details expander. Defaults to
-    /// PaleGoldenrod (#EEE8AA) — the cream/tan Genie 4 AutoMapper canvas the
-    /// map palette (black cardinal lines, blue cross-zone borders) is designed
-    /// for. The old dark default (#1A1A1A) is migrated to this on load (see
-    /// <c>MapperViewModel.AttachDisplay</c>) so existing users get the look
-    /// without losing a genuinely custom colour.
+    /// Legacy: the Mapper canvas background before it moved into the
+    /// <c>automapper.panel</c> preset (public #406). Read once on upgrade: a
+    /// colour the user picked is copied into the preset, then this is cleared
+    /// and no longer written. Null in a current display.json.
     /// </summary>
-    [Reactive] public string MapBackgroundHex { get; set; } = "#EEE8AA";
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MapBackgroundHex { get; set; }
 
     /// <summary>
-    /// Colour of the map's on-canvas <c>&lt;label&gt;</c> text (landmark names).
-    /// User-editable via a ColorPickerButton in the Mapper panel's Details
-    /// expander. Defaults to black — Genie 4's label colour on the tan canvas.
+    /// Legacy: the map's label text colour before it moved into the
+    /// <c>automapper.panel</c> preset (public #406). Migrated and cleared like
+    /// <see cref="MapBackgroundHex"/>.
     /// </summary>
-    [Reactive] public string MapTextHex { get; set; } = "#000000";
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MapTextHex { get; set; }
 
     /// <summary>Show the on-map colour legend (#157). Default on.</summary>
     [Reactive] public bool   ShowMapLegend { get; set; } = true;
@@ -392,7 +390,6 @@ public sealed class DisplaySettings : ReactiveObject
         PushAll();
         this.WhenAnyValue(
                 x => x.GameColorHex,
-                x => x.EchoColorHex,
                 x => x.EchoItalic,
                 x => x.FontFamily,
                 x => x.FontSize)
@@ -484,7 +481,10 @@ public sealed class DisplaySettings : ReactiveObject
         if (res is null) return;
 
         res[GameBrushKey]      = MakeBrush(GameColorHex, fallback: Colors.LightGray);
-        res[EchoBrushKey]      = MakeBrush(EchoColorHex, fallback: Color.FromRgb(0x88, 0xbb, 0xcc));
+        // Echo lines are coloured by their preset (inputuser / inputother /
+        // scriptecho, public #406); this is only the colour for a preset set to
+        // "Default", which — as for every preset — is the normal text colour.
+        res[EchoBrushKey]      = MakeBrush(GameColorHex, fallback: Colors.LightGray);
         res[GameFontFamilyKey] = new FontFamily(FontFamily);
         res[GameFontSizeKey]   = FontSize;
         res[EchoFontStyleKey]  = EchoItalic ? Avalonia.Media.FontStyle.Italic : Avalonia.Media.FontStyle.Normal;
