@@ -36,14 +36,15 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
 
     private readonly ZoneConnectionsRepository _repo;
     private readonly string? _mapsDir;
-    // One load per zone, shared by every caller. RefreshRoomsAsync is fired
-    // and forgotten from the zone setters and can also be awaited directly, so
-    // two calls can be in flight at once; off the UI thread (tests) their
-    // continuations run in parallel. Caching the Task under a lock means no
-    // write to the dictionary ever happens after an await.
-    private readonly Dictionary<string, Task<IReadOnlyList<RoomChoice>>> _roomCache =
+    // Keyed on the zone name; the VALUE is the in-flight or completed load, so
+    // two refreshes of the same zone share one read. Picking a zone starts a
+    // fire-and-forget refresh, and Load / a test start another for the same
+    // end; with a plain Dictionary of results both missed the cache, both
+    // loaded, and both wrote the entry from thread-pool continuations — a
+    // concurrent-write corruption that failed CI on ubuntu (the dialog itself
+    // was shielded only by the UI thread's SynchronizationContext).
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Task<IReadOnlyList<RoomChoice>>> _roomCache =
         new(StringComparer.OrdinalIgnoreCase);
-    private readonly object _roomCacheLock = new();
     private bool _syncing;
     private bool _addingForFrom;
 
@@ -269,17 +270,20 @@ public sealed class ZoneConnectionsViewModel : ReactiveObject
         IReadOnlyList<RoomChoice> rooms = Array.Empty<RoomChoice>();
         if (!string.IsNullOrWhiteSpace(zone) && zone != AddZoneItem && !string.IsNullOrEmpty(_mapsDir))
         {
-            Task<IReadOnlyList<RoomChoice>> load;
-            lock (_roomCacheLock)
+            var load = _roomCache.GetOrAdd(zone,
+                z => Task.Run(() => LoadRooms(Path.Combine(_mapsDir, z + ".xml"))));
+            try
             {
-                if (!_roomCache.TryGetValue(zone, out load!))
-                {
-                    var path = Path.Combine(_mapsDir, zone + ".xml");
-                    load = Task.Run(() => LoadRooms(path));
-                    _roomCache[zone] = load;
-                }
+                rooms = await load;
             }
-            rooms = await load;
+            catch
+            {
+                // A read that failed is not a result worth keeping: forget it
+                // so the next pick retries, then let the error propagate as
+                // it did before the entry was ever written.
+                _roomCache.TryRemove(zone, out _);
+                throw;
+            }
         }
 
         // Ignore a result that is stale because the user picked another zone meanwhile.
