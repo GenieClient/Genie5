@@ -26,12 +26,21 @@ public sealed class PresetEngine
         Set("scriptecho",       "Cyan");
 
         // ── Status bars ─────────────────────────────────────────────────────
-        Set("health",           "Red",      "#400000");
-        Set("mana",             "Aqua",     "#000040");
-        Set("stamina",          "Green",    "#004000");
-        Set("spirit",           "Purple",   "#400040");
-        Set("concentration",    "White",    "#000040");
-        Set("roundtime",        "Aqua",     "#00004B");
+        // Vitals bars (public #406): Genie 4's stock values (Lists/Globals.cs
+        // SetDefaultPresets). Foreground = fill; background = track and border,
+        // none by default so the bar's normal track shows.
+        Set("health",           "Maroon");
+        Set("mana",             "Navy");
+        Set("stamina",          "Green");
+        Set("spirit",           "Purple");
+        Set("concentration",    "Navy");
+        // Roundtime countdown bar (public #404): Genie 4's stock MediumBlue fill,
+        // no track.
+        Set("roundtime",        "MediumBlue");
+        // Roundtime badge (Genie 5, #404): the red Badge / Countdown Badge.
+        // Foreground = the countdown fill, background = the badge. The border
+        // is drawn between the two. Stock = the badge's original reds.
+        Set("roundtime.badge",  "#A03030",  "#5A1A1A");
         Set("castbar",          "Magenta");
 
         // ── AutoMapper overlay ──────────────────────────────────────────────

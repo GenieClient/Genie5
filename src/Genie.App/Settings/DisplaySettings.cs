@@ -40,7 +40,6 @@ public sealed class DisplaySettings : ReactiveObject
     /// survive relaunches). Empty/unknown falls back to "Dark".
     /// </summary>
     [Reactive] public string ThemeName { get; set; } = "Dark";
-    [Reactive] public string EchoColorHex  { get; set; } = "#88BBCC";
     [Reactive] public bool   EchoItalic    { get; set; } = true;
     [Reactive] public string FontFamily    { get; set; } = "Consolas,Courier New,monospace";
     [Reactive] public double FontSize      { get; set; } = 13d;
@@ -272,10 +271,50 @@ public sealed class DisplaySettings : ReactiveObject
     /// during ordinary play. <c>true</c> = the badge stays in whichever
     /// position <see cref="RoundTimeOnHandsStrip"/> picks, dimmed and
     /// reading 0.0s when idle, so the input row never jumps sideways as RT
-    /// starts and ends. Toggle via Layout → Roundtime Position → Keep Visible.
+    /// starts and ends. Toggle via Layout → Roundtime → Keep Visible.
     /// Also rides on saved layouts (<c>SavedLayout.KeepRoundTimeVisible</c>).
     /// </summary>
     [Reactive] public bool   KeepRoundTimeVisible { get; set; }
+
+    /// <summary>The <see cref="RoundTimeStyle"/> values (#404).</summary>
+    public static class RoundTimeStyles
+    {
+        /// <summary>The red "⏱ N.Ns" badge, no fill — the default.</summary>
+        public const string Badge          = "Badge";
+        /// <summary>The same red badge with a fill behind the timer that shrinks
+        /// from full to empty over the RT.</summary>
+        public const string CountdownBadge = "CountdownBadge";
+        /// <summary>Genie 4's bar: shrinking fill with the seconds left on it,
+        /// coloured by the <c>roundtime</c> preset.</summary>
+        public const string CountdownBar   = "CountdownBar";
+
+        /// <summary>A known style, or <see cref="Badge"/> for anything else.</summary>
+        public static string Normalize(string? s) => s switch
+        {
+            CountdownBadge => CountdownBadge,
+            CountdownBar   => CountdownBar,
+            _              => Badge,
+        };
+    }
+
+    /// <summary>
+    /// How the roundtime indicator is drawn (#404), in whichever position
+    /// <see cref="RoundTimeOnHandsStrip"/> picks. One of
+    /// <see cref="RoundTimeStyles"/>: <c>Badge</c> (default, the red text
+    /// badge), <c>CountdownBadge</c> (that badge with a fill that shrinks over
+    /// the RT) or <c>CountdownBar</c> (Genie 4's bar, coloured by the
+    /// <c>roundtime</c> preset: foreground = fill, background = track). Pick via
+    /// Layout → Roundtime. Also rides on saved layouts
+    /// (<c>SavedLayout.RoundTimeStyle</c>).
+    /// </summary>
+    [Reactive] public string RoundTimeStyle { get; set; } = RoundTimeStyles.Badge;
+
+    /// <summary>Menu radio / visibility helpers for <see cref="RoundTimeStyle"/>.</summary>
+    [JsonIgnore] public bool RoundTimeStyleBadge          => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.Badge;
+    [JsonIgnore] public bool RoundTimeStyleCountdownBadge => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.CountdownBadge;
+    [JsonIgnore] public bool RoundTimeStyleCountdownBar   => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.CountdownBar;
+    /// <summary>Either badge style (the red badge is shown, with or without fill).</summary>
+    [JsonIgnore] public bool RoundTimeStyleAnyBadge       => !RoundTimeStyleCountdownBar;
 
     /// <summary>
     /// Where the Script Bar (the running-script chip strip) docks.
@@ -392,7 +431,6 @@ public sealed class DisplaySettings : ReactiveObject
         PushAll();
         this.WhenAnyValue(
                 x => x.GameColorHex,
-                x => x.EchoColorHex,
                 x => x.EchoItalic,
                 x => x.FontFamily,
                 x => x.FontSize)
@@ -452,6 +490,16 @@ public sealed class DisplaySettings : ReactiveObject
         this.WhenAnyValue(x => x.RoundTimeOnHandsStrip)
             .Subscribe(_ => this.RaisePropertyChanged(nameof(RoundTimeOnCommandBar)));
 
+        // Same for the derived RoundTimeStyle flags (#404).
+        this.WhenAnyValue(x => x.RoundTimeStyle)
+            .Subscribe(_ =>
+            {
+                this.RaisePropertyChanged(nameof(RoundTimeStyleBadge));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleCountdownBadge));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleCountdownBar));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleAnyBadge));
+            });
+
         // Same for ScriptBarAtTop (JsonIgnore + derived) so the Layout menu's
         // Top radio button refreshes when the position flips (#357).
         // #349: the Icon Bar / vitals strip compound slot flags are computed,
@@ -484,7 +532,10 @@ public sealed class DisplaySettings : ReactiveObject
         if (res is null) return;
 
         res[GameBrushKey]      = MakeBrush(GameColorHex, fallback: Colors.LightGray);
-        res[EchoBrushKey]      = MakeBrush(EchoColorHex, fallback: Color.FromRgb(0x88, 0xbb, 0xcc));
+        // Echo lines are coloured by their preset (inputuser / inputother /
+        // scriptecho, public #406); this is only the colour for a preset set to
+        // "Default", which — as for every preset — is the normal text colour.
+        res[EchoBrushKey]      = MakeBrush(GameColorHex, fallback: Colors.LightGray);
         res[GameFontFamilyKey] = new FontFamily(FontFamily);
         res[GameFontSizeKey]   = FontSize;
         res[EchoFontStyleKey]  = EchoItalic ? Avalonia.Media.FontStyle.Italic : Avalonia.Media.FontStyle.Normal;

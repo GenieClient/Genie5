@@ -430,20 +430,21 @@
     </DataTemplate>
 
     <!-- ── Vitals ─────────────────────────────────────────────────────────── -->
+    <!-- Bar colours: the Genie 4 vitals presets (#406), via PresetBar. -->
     <DataTemplate DataType="docking:VitalsTool">
       <ScrollViewer>
         <StackPanel Spacing="6" Margin="8">
           <Grid ColumnDefinitions="55,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Health"  Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="0" Grid.Column="1" Value="{Binding ViewModel.Health}"        Maximum="100" Foreground="{DynamicResource Theme.HealthBar}" Height="10" AutomationProperties.Name="Health"/>
+            <ProgressBar Grid.Row="0" Grid.Column="1" Value="{Binding ViewModel.Health}"        Maximum="100" controls:PresetBar.Preset="health" Height="10" AutomationProperties.Name="Health"/>
             <TextBlock Grid.Row="1" Grid.Column="0" Text="Mana"    Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="1" Grid.Column="1" Value="{Binding ViewModel.Mana}"          Maximum="100" Foreground="{DynamicResource Theme.ManaBar}" Height="10" AutomationProperties.Name="Mana"/>
+            <ProgressBar Grid.Row="1" Grid.Column="1" Value="{Binding ViewModel.Mana}"          Maximum="100" controls:PresetBar.Preset="mana" Height="10" AutomationProperties.Name="Mana"/>
             <TextBlock Grid.Row="2" Grid.Column="0" Text="Spirit"  Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding ViewModel.Spirit}"        Maximum="100" Foreground="{DynamicResource Theme.SpiritBar}" Height="10" AutomationProperties.Name="Spirit"/>
+            <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding ViewModel.Spirit}"        Maximum="100" controls:PresetBar.Preset="spirit" Height="10" AutomationProperties.Name="Spirit"/>
             <TextBlock Grid.Row="3" Grid.Column="0" Text="Stamina" Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="3" Grid.Column="1" Value="{Binding ViewModel.Stamina}"       Maximum="100" Foreground="{DynamicResource Theme.StaminaBar}" Height="10" AutomationProperties.Name="Stamina"/>
+            <ProgressBar Grid.Row="3" Grid.Column="1" Value="{Binding ViewModel.Stamina}"       Maximum="100" controls:PresetBar.Preset="stamina" Height="10" AutomationProperties.Name="Stamina"/>
             <TextBlock Grid.Row="4" Grid.Column="0" Text="Conc"    Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="4" Grid.Column="1" Value="{Binding ViewModel.Concentration}" Maximum="100" Foreground="{DynamicResource Theme.ConcBar}" Height="10" AutomationProperties.Name="Concentration"/>
+            <ProgressBar Grid.Row="4" Grid.Column="1" Value="{Binding ViewModel.Concentration}" Maximum="100" controls:PresetBar.Preset="concentration" Height="10" AutomationProperties.Name="Concentration"/>
           </Grid>
           <Separator/>
           <TextBlock Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11"

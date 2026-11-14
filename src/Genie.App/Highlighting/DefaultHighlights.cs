@@ -180,6 +180,18 @@ public static partial class DefaultHighlights
     public static IBrush? CreaturesPresetBrush =>
         PresetEngine is { } p ? GetUserBrush(p.GetForeground("creatures")) : null;
 
+    /// <summary>A preset's foreground as a brush, or null when there is no preset
+    /// engine yet or the preset is "Default"/unparseable (caller keeps its own
+    /// default colour). Used for whole-line preset colours such as the echo
+    /// presets <c>inputuser</c> / <c>inputother</c> / <c>scriptecho</c> (#406).</summary>
+    public static IBrush? PresetForeground(string presetId) =>
+        PresetEngine is { } p ? GetUserBrush(p.GetForeground(presetId)) : null;
+
+    /// <summary>The preset's background as a brush, or null when it has none
+    /// (or no session engine is set). Used for the vitals bars' track (#406).</summary>
+    public static IBrush? PresetBackground(string presetId) =>
+        PresetEngine is { } p ? GetUserBrush(p.GetBackground(presetId)) : null;
+
     /// <summary>
     /// Active session's player-name highlight engine (#154). Set by
     /// <c>MainWindowViewModel</c> at connect, like <see cref="PresetEngine"/>.

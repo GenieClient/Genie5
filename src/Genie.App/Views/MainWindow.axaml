@@ -189,8 +189,8 @@
                     Command="{Binding HandsBarToBottomCommand}"
                     ToolTip.Tip="Dock the hands strip at the bottom of the window, just above the vitals strip — Genie 4 layout."/>
         </MenuItem>
-        <MenuItem Header="_Roundtime Position"
-                  ToolTip.Tip="Where the &quot;⏱ N.Ns&quot; roundtime badge appears while you're locked in RT.">
+        <MenuItem Header="_Roundtime"
+                  ToolTip.Tip="Where the roundtime indicator appears while you're locked in RT, and how it looks.">
           <MenuItem Header="_Command Bar"
                     ToggleType="Radio" GroupName="RtPos"
                     IsChecked="{Binding Display.RoundTimeOnCommandBar, Mode=OneWay}"
@@ -200,7 +200,23 @@
                     ToggleType="Radio" GroupName="RtPos"
                     IsChecked="{Binding Display.RoundTimeOnHandsStrip, Mode=OneWay}"
                     Command="{Binding RoundTimeToHandsStripCommand}"
-                    ToolTip.Tip="Show the RT badge as an inline R-badge on the L/R/S hands strip, so the &quot;what's locked&quot; indicators all live together."/>
+                    ToolTip.Tip="Show the roundtime indicator on the L/R/S hands strip, so the &quot;what's locked&quot; indicators all live together."/>
+          <Separator/>
+          <MenuItem Header="_Badge"
+                    ToggleType="Radio" GroupName="RtStyle"
+                    IsChecked="{Binding Display.RoundTimeStyleBadge, Mode=OneWay}"
+                    Command="{Binding SetRoundTimeStyleCommand}" CommandParameter="Badge"
+                    ToolTip.Tip="The red roundtime badge with its timer."/>
+          <MenuItem Header="Countdown B_adge"
+                    ToggleType="Radio" GroupName="RtStyle"
+                    IsChecked="{Binding Display.RoundTimeStyleCountdownBadge, Mode=OneWay}"
+                    Command="{Binding SetRoundTimeStyleCommand}" CommandParameter="CountdownBadge"
+                    ToolTip.Tip="The same red badge and timer, with a brighter fill behind the timer that shrinks from full to empty over the roundtime."/>
+          <MenuItem Header="Countdown Ba_r (Genie 4)"
+                    ToggleType="Radio" GroupName="RtStyle"
+                    IsChecked="{Binding Display.RoundTimeStyleCountdownBar, Mode=OneWay}"
+                    Command="{Binding SetRoundTimeStyleCommand}" CommandParameter="CountdownBar"
+                    ToolTip.Tip="Genie 4's roundtime bar: it shrinks from full to empty over the RT, with the seconds left drawn on it. Coloured by the roundtime preset (foreground = fill, background = track)."/>
           <Separator/>
           <MenuItem Header="_Keep Visible"
                     ToggleType="CheckBox"
@@ -954,26 +970,16 @@
       <StackPanel Orientation="Horizontal" Spacing="24">
 
         <!-- ── Roundtime (optional position) ─────────────────────────
-             Inline RT badge — visible only when the user chose "Hands Strip"
+             RT indicator (Views/RoundTimeIndicatorView, the same one the
+             command bar uses, #404) — visible only when the user chose "Hands Strip"
              for the roundtime position. ShowRtOnHandsStrip is computed on
              MainWindowViewModel as (Vitals.InRoundTime AND
              Display.RoundTimeOnHandsStrip), or KeepRoundTimeVisible pins it
-             on (dimmed) between roundtimes. Red palette matches the command-
-             bar version so the indicator means the same thing wherever it
-             sits. -->
-        <StackPanel Orientation="Horizontal" Spacing="6"
-                    IsVisible="{Binding ShowRtOnHandsStrip}"
-                    Opacity="{Binding RtBadgeOpacity}">
-          <Border Background="#5a1a1a" BorderBrush="#8a2a2a" BorderThickness="1"
-                  CornerRadius="2" Padding="6,1">
-            <TextBlock Text="R" Foreground="#ffd0d0" FontWeight="SemiBold" FontSize="11"
-                       ToolTip.Tip="Roundtime — your character can't act until this expires"/>
-          </Border>
-          <TextBlock Text="{Binding Vitals.RoundTimeSeconds, StringFormat='{}{0:F1}s'}"
-                     AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
-                     Foreground="#ffd0d0" FontSize="12" MinWidth="40"
-                     VerticalAlignment="Center"/>
-        </StackPanel>
+             on (dimmed) between roundtimes. -->
+        <!-- Stretches to the strip's height like the L/R/S boxes, so it
+             matches them and the command-bar badge. -->
+        <views:RoundTimeIndicatorView IsVisible="{Binding ShowRtOnHandsStrip}"
+                                      Opacity="{Binding RtBadgeOpacity}"/>
 
         <!-- ── Enhanced (dylb0t-derived) icon widgets ─────────────────
              Collapsed by default; toggled on via Window → Enhanced Hands
@@ -1407,26 +1413,16 @@
       <StackPanel Orientation="Horizontal" Spacing="24">
 
         <!-- ── Roundtime (optional position) ─────────────────────────
-             Inline RT badge — visible only when the user chose "Hands Strip"
+             RT indicator (Views/RoundTimeIndicatorView, the same one the
+             command bar uses, #404) — visible only when the user chose "Hands Strip"
              for the roundtime position. ShowRtOnHandsStrip is computed on
              MainWindowViewModel as (Vitals.InRoundTime AND
              Display.RoundTimeOnHandsStrip), or KeepRoundTimeVisible pins it
-             on (dimmed) between roundtimes. Red palette matches the command-
-             bar version so the indicator means the same thing wherever it
-             sits. -->
-        <StackPanel Orientation="Horizontal" Spacing="6"
-                    IsVisible="{Binding ShowRtOnHandsStrip}"
-                    Opacity="{Binding RtBadgeOpacity}">
-          <Border Background="#5a1a1a" BorderBrush="#8a2a2a" BorderThickness="1"
-                  CornerRadius="2" Padding="6,1">
-            <TextBlock Text="R" Foreground="#ffd0d0" FontWeight="SemiBold" FontSize="11"
-                       ToolTip.Tip="Roundtime — your character can't act until this expires"/>
-          </Border>
-          <TextBlock Text="{Binding Vitals.RoundTimeSeconds, StringFormat='{}{0:F1}s'}"
-                     AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
-                     Foreground="#ffd0d0" FontSize="12" MinWidth="40"
-                     VerticalAlignment="Center"/>
-        </StackPanel>
+             on (dimmed) between roundtimes. -->
+        <!-- Stretches to the strip's height like the L/R/S boxes, so it
+             matches them and the command-bar badge. -->
+        <views:RoundTimeIndicatorView IsVisible="{Binding ShowRtOnHandsStrip}"
+                                      Opacity="{Binding RtBadgeOpacity}"/>
 
         <!-- ── Enhanced (dylb0t-derived) icon widgets ─────────────────
              Collapsed by default; toggled on via Window → Enhanced Hands
@@ -1698,21 +1694,10 @@
          between RT and the input and is always visible (dim when idle). -->
     <Grid x:Name="CommandBarGrid" DockPanel.Dock="Bottom" ColumnDefinitions="Auto,Auto,*,Auto" Margin="4,2">
 
-      <Border Grid.Column="0"
-              IsVisible="{Binding ShowRtInCommandBar}"
-              Opacity="{Binding RtBadgeOpacity}"
-              Background="#5a1a1a" BorderBrush="#8a2a2a" BorderThickness="1"
-              CornerRadius="3" Padding="6,2" Margin="0,0,4,0"
-              VerticalAlignment="Stretch"
-              ToolTip.Tip="Roundtime — your character can't act until this expires. Right-click Window → Roundtime Position to relocate."
-              MinWidth="64">
-        <TextBlock Foreground="#ffd0d0" FontWeight="SemiBold"
-                   AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontSize="12">
-          <Run Text="⏱ "/><Run Text="{Binding Vitals.RoundTimeSeconds, StringFormat={}{0:F1}s}"/>
-        </TextBlock>
-      </Border>
+      <views:RoundTimeIndicatorView Grid.Column="0"
+                                    IsVisible="{Binding ShowRtInCommandBar}"
+                                    Opacity="{Binding RtBadgeOpacity}"
+                                    Margin="0,0,4,0"/>
 
       <!-- ── Type-ahead counter ──────────────────────────────────────────
            Pips show the type-ahead buffer: filled = commands queued ahead of

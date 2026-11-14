@@ -1,0 +1,67 @@
+<!-- Roundtime indicator (#404). One view for both positions (command bar and
+     hands strip), so the indicator looks the same wherever it sits. The slot in
+     MainWindow.axaml owns visibility (ShowRtInCommandBar / ShowRtOnHandsStrip)
+     and the Keep Visible dimming; this view draws the style chosen under
+     Layout → Roundtime (DisplaySettings.RoundTimeStyle):
+
+     - Badge: the red badge with its timer. Its colours come from the
+       roundtime.badge preset (foreground = countdown fill, background = badge;
+       MainWindowViewModel.RtBadge*), stock = the original reds.
+     - Countdown Badge: the same badge, with a brighter fill behind the timer
+       that shrinks from full to empty over the RT.
+     - Countdown Bar (Genie 4): Genie 4's ComponentRoundtime bar, coloured by
+       the roundtime preset (Controls/PresetBar.cs).
+
+     Both fills are remaining ÷ starting RT (VitalsViewModel.RoundTimeTotalSeconds).
+     MinWidth/MinHeight override Fluent's ProgressBar minimums (200 px wide). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Genie.App.ViewModels"
+             xmlns:controls="using:Genie.App.Controls"
+             x:Class="Genie.App.Views.RoundTimeIndicatorView"
+             x:DataType="vm:MainWindowViewModel">
+  <Panel>
+    <!-- Badge / Countdown Badge. The padding sits on the text, not the Border,
+         so the fill reaches the edges. -->
+    <Border IsVisible="{Binding Display.RoundTimeStyleAnyBadge}"
+            Background="{Binding RtBadgeBackground}" BorderBrush="{Binding RtBadgeBorder}" BorderThickness="1"
+            CornerRadius="3" ClipToBounds="True"
+            VerticalAlignment="Stretch"
+            ToolTip.Tip="Roundtime — your character can't act until this expires. Layout → Roundtime to move it or change its style."
+            MinWidth="64">
+      <Grid>
+        <ProgressBar IsVisible="{Binding Display.RoundTimeStyleCountdownBadge}"
+                     Minimum="0"
+                     Maximum="{Binding Vitals.RoundTimeTotalSeconds}"
+                     Value="{Binding Vitals.RoundTimeSeconds}"
+                     Background="Transparent" Foreground="{Binding RtBadgeFill}"
+                     BorderThickness="0" Padding="0" CornerRadius="0"
+                     MinWidth="0" MinHeight="0"
+                     HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                     IsHitTestVisible="False"/>
+        <TextBlock Foreground="#ffd0d0" FontWeight="SemiBold"
+                   AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Margin="6,2" FontSize="12">
+          <Run Text="⏱ "/><Run Text="{Binding Vitals.RoundTimeSeconds, StringFormat={}{0:F1}s}"/>
+        </TextBlock>
+      </Grid>
+    </Border>
+
+    <!-- Countdown Bar (Genie 4). -->
+    <Grid Width="120"
+          IsVisible="{Binding Display.RoundTimeStyleCountdownBar}"
+          ToolTip.Tip="Roundtime — your character can't act until this expires. Layout → Roundtime to move it or change its style.">
+      <ProgressBar Minimum="0"
+                   Maximum="{Binding Vitals.RoundTimeTotalSeconds}"
+                   Value="{Binding Vitals.RoundTimeSeconds}"
+                   controls:PresetBar.Preset="roundtime"
+                   MinWidth="0" MinHeight="0"
+                   VerticalAlignment="Stretch" CornerRadius="3"
+                   AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"/>
+      <TextBlock Text="{Binding Vitals.RoundTimeLabel}"
+                 Foreground="White" FontSize="14" FontWeight="SemiBold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    </Grid>
+  </Panel>
+</UserControl>
