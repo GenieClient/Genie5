@@ -1,6 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Genie.App.Controls"
         x:Class="Genie.App.Views.MapperSettingsDialog"
+        controls:PresetChrome.Surface="window"
         Title="AutoMapper Settings"
         Width="440" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"

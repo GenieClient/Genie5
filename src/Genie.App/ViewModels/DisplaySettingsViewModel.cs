@@ -23,14 +23,25 @@ namespace Genie.App.ViewModels;
 /// </summary>
 public class DisplaySettingsViewModel : ReactiveObject
 {
-    private readonly DisplaySettings _live;
-    private readonly ThemeService?   _themes;
+    private readonly DisplaySettings   _live;
+    private readonly ThemeService?     _themes;
+    private readonly PresetColorStore? _presets;
 
-    // Captured at open for Cancel: applying a theme seeds the live
-    // game/echo colours, so restoring the theme alone isn't enough.
+    // Captured at open for Cancel: applying a theme seeds the live game
+    // colour and the echo presets, so restoring the theme alone isn't enough.
     private readonly string _originalThemeName = "";
     private readonly string _originalGameHex   = "";
-    private readonly string _originalEchoHex   = "";
+
+    /// <summary>The echo presets this dialog edits (public #406), each with
+    /// the raw preset value at open (may be "Default") and the colour shown
+    /// for it, so OK only writes a preset whose colour was actually changed.</summary>
+    private readonly Dictionary<string, (string Raw, Color Shown)> _echoAtOpen = new();
+    /// <summary>The vitals presets at open (public #406). Picking a theme on the
+    /// Theme tab writes the theme's bar colours into them; Cancel puts these back.</summary>
+    private readonly Dictionary<string, (string Fill, string Track)> _vitalsAtOpen = new();
+    /// <summary>The ui.* chrome presets at open (public #406). Picking a theme on
+    /// the Theme tab sets them back to Default; Cancel puts these back.</summary>
+    private readonly Dictionary<string, (string Fg, string Bg)> _uiAtOpen = new();
     private bool _themeTouched;
     private bool _suppressThemeApply;
 
@@ -41,18 +52,24 @@ public class DisplaySettingsViewModel : ReactiveObject
     public IReadOnlyList<string> SystemFonts { get; }
 
     /// <summary>
-    /// Hint under the Game text / Echoes pickers (public #304). The theme
-    /// editor shows the same two colours; both dialogs edit ONE value each
-    /// (<see cref="DisplaySettings.GameColorHex"/> / <see cref="DisplaySettings.EchoColorHex"/>),
-    /// and a theme only seeds them when it is picked.
+    /// Hint under the colour pickers (public #304, #406). The theme editor shows
+    /// the same colours; Game text is one setting, and the three echo colours ARE
+    /// the Genie 4 presets, so the Presets tab edits them too.
     /// </summary>
     public const string GameColorsNote =
-        "Game text and Echoes are the same two colours the theme editor shows " +
-        "(Edit → Theme → Edit Theme…): one setting each, editable in either place. " +
-        "Picking a theme sets them to that theme's colours; Reset puts back the active theme's colours.";
+        "These are the same colours the theme editor shows (Edit → Theme → Edit Theme…). " +
+        "The three echo colours are the inputuser, inputother and scriptecho presets, " +
+        "also on Configuration → Presets. Picking a theme sets them all to that theme's " +
+        "colours; Reset puts back the active theme's colours.";
 
     [Reactive] public Color  GameColor  { get; set; }
-    [Reactive] public Color  EchoColor  { get; set; }
+
+    /// <summary>Typed commands — the <c>inputuser</c> preset (#406).</summary>
+    [Reactive] public Color  InputUserColor  { get; set; }
+    /// <summary>Commands sent by scripts — the <c>inputother</c> preset (#406).</summary>
+    [Reactive] public Color  InputOtherColor { get; set; }
+    /// <summary>Script output and Genie messages — the <c>scriptecho</c> preset (#406).</summary>
+    [Reactive] public Color  ScriptEchoColor { get; set; }
     [Reactive] public bool   EchoItalic { get; set; }
     [Reactive] public bool   AlwaysShowScrollbars { get; set; }
     [Reactive] public string FontFamily { get; set; }
@@ -90,10 +107,12 @@ public class DisplaySettingsViewModel : ReactiveObject
 
     public DisplaySettingsViewModel() : this(new DisplaySettings()) { }
 
-    public DisplaySettingsViewModel(DisplaySettings live, ThemeService? themes = null)
+    public DisplaySettingsViewModel(DisplaySettings live, ThemeService? themes = null,
+                                    PresetColorStore? presets = null)
     {
-        _live   = live;
-        _themes = themes;
+        _live    = live;
+        _themes  = themes;
+        _presets = presets ?? themes?.Presets;
 
         // The stored value may be a comma-separated fallback chain ("Consolas,
         // Courier New,monospace"). Picking from a dropdown only sets one name,
@@ -103,7 +122,19 @@ public class DisplaySettingsViewModel : ReactiveObject
         SystemFonts = LoadSystemFonts(currentFont);
 
         GameColor  = TryParseColor(live.GameColorHex, Avalonia.Media.Color.FromRgb(0xCC, 0xCC, 0xCC));
-        EchoColor  = TryParseColor(live.EchoColorHex, Avalonia.Media.Color.FromRgb(0x88, 0xBB, 0xCC));
+        foreach (var (_, id) in ThemeKeys.EchoPresetKeys)
+        {
+            var raw = _presets?.GetForeground(id) ?? new Genie.Core.Presets.PresetEngine().GetForeground(id);
+            _echoAtOpen[id] = (raw, TryParseColor(raw, GameColor));   // "Default" → the text colour
+        }
+        LoadEchoColours(id => _echoAtOpen[id].Shown);
+        if (_presets is not null)
+        {
+            foreach (var id in Genie.Core.VitalsPresets.All)
+                _vitalsAtOpen[id] = (_presets.GetForeground(id), _presets.GetBackground(id));
+            foreach (var id in Genie.Core.UiPresets.All)
+                _uiAtOpen[id] = (_presets.GetForeground(id), _presets.GetBackground(id));
+        }
         EchoItalic = live.EchoItalic;
         AlwaysShowScrollbars = live.AlwaysShowScrollbars;
         FontFamily = currentFont;
@@ -114,7 +145,6 @@ public class DisplaySettingsViewModel : ReactiveObject
         {
             _originalThemeName = _themes.CurrentName;
             _originalGameHex   = live.GameColorHex;
-            _originalEchoHex   = live.EchoColorHex;
             RefreshThemeNames(select: _themes.CurrentName);
 
             // Skip(1): the initial selection above must not re-apply.
@@ -131,8 +161,13 @@ public class DisplaySettingsViewModel : ReactiveObject
 
     private bool Commit()
     {
-        _live.GameColorHex = "#" + GameColor.ToString().Substring(3); // drop alpha → #RRGGBB
-        _live.EchoColorHex = "#" + EchoColor.ToString().Substring(3);
+        _live.GameColorHex = Hex(GameColor);
+        // Echo colours are presets (#406): write only the ones the user changed,
+        // so a preset left at "Default" isn't silently turned into a fixed colour.
+        if (_presets is not null)
+            foreach (var (id, colour) in EchoColours())
+                if (colour != _echoAtOpen[id].Shown)
+                    _presets.SetForeground(id, Hex(colour));
         _live.EchoItalic   = EchoItalic;
         _live.AlwaysShowScrollbars = AlwaysShowScrollbars;
         _live.FontFamily   = FontFamily;
@@ -158,7 +193,33 @@ public class DisplaySettingsViewModel : ReactiveObject
         // have tweaked them since that theme was last applied — put
         // back exactly what was live when the dialog opened.
         _live.GameColorHex = _originalGameHex;
-        _live.EchoColorHex = _originalEchoHex;
+        if (_presets is not null)
+        {
+            foreach (var (id, (raw, _)) in _echoAtOpen)
+                _presets.SetForeground(id, raw);
+            foreach (var (id, (fill, track)) in _vitalsAtOpen)
+                if (_presets.GetForeground(id) != fill || _presets.GetBackground(id) != track)
+                    _presets.Set(id, fill, track);
+            foreach (var (id, (fg, bg)) in _uiAtOpen)
+                if (_presets.GetForeground(id) != fg || _presets.GetBackground(id) != bg)
+                    _presets.Set(id, fg, bg);
+        }
+    }
+
+    private static string Hex(Color c) => "#" + c.ToString().Substring(3); // drop alpha → #RRGGBB
+
+    private IEnumerable<(string Id, Color Colour)> EchoColours() =>
+    [
+        (Genie.Core.EchoKindPresets.InputUser,  InputUserColor),
+        (Genie.Core.EchoKindPresets.InputOther, InputOtherColor),
+        (Genie.Core.EchoKindPresets.ScriptEcho, ScriptEchoColor),
+    ];
+
+    private void LoadEchoColours(Func<string, Color> colourOf)
+    {
+        InputUserColor  = colourOf(Genie.Core.EchoKindPresets.InputUser);
+        InputOtherColor = colourOf(Genie.Core.EchoKindPresets.InputOther);
+        ScriptEchoColor = colourOf(Genie.Core.EchoKindPresets.ScriptEcho);
     }
 
     // ── Theme tab (#20) ────────────────────────────────────────────────────
@@ -192,7 +253,14 @@ public class DisplaySettingsViewModel : ReactiveObject
         // Apply seeded the LIVE game/echo hexes from the theme; sync the
         // dialog's local copies so OK doesn't commit stale pre-theme values.
         GameColor = TryParseColor(_live.GameColorHex, GameColor);
-        EchoColor = TryParseColor(_live.EchoColorHex, EchoColor);
+        if (_presets is not null)
+        {
+            LoadEchoColours(id => TryParseColor(_presets.GetForeground(id), GameColor));
+            // The theme wrote the presets already: they are the new baseline,
+            // so OK must not treat them as user edits.
+            foreach (var (id, colour) in EchoColours())
+                _echoAtOpen[id] = (_echoAtOpen[id].Raw, colour);
+        }
     }
 
     /// <summary>Import a theme JSON file into Config/Themes and apply it.</summary>
@@ -266,8 +334,10 @@ public class DisplaySettingsViewModel : ReactiveObject
         // light theme meant Reset painted light-grey text on a white window.
         var theme = _themes?.Current;
         GameColor  = TryParseColor(theme?.Get(ThemeKeys.GameText) ?? d.GameColorHex, Colors.LightGray);
-        EchoColor  = TryParseColor(theme?.Get(ThemeKeys.GameEcho) ?? d.EchoColorHex,
-                                   Avalonia.Media.Color.FromRgb(0x88, 0xBB, 0xCC));
+        // Echo colours: the active theme's, else the stock preset defaults (#406).
+        var themeEcho = theme is null ? new() : ThemeService.EchoColours(theme).ToDictionary(x => x.PresetId, x => x.Colour);
+        var stock     = new Genie.Core.Presets.PresetEngine();
+        LoadEchoColours(id => TryParseColor(themeEcho.GetValueOrDefault(id) ?? stock.GetForeground(id), GameColor));
         EchoItalic = d.EchoItalic;
         AlwaysShowScrollbars = d.AlwaysShowScrollbars;
         FontFamily = d.FontFamily.Split(',')[0].Trim();

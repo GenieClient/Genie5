@@ -14,9 +14,36 @@ As you walk, Genie matches each new room to a node and re-centers on you. When y
 
 - **Zone picker** — the dropdown at the top lists every zone in your Maps folder; auto-detect normally picks for you as you walk. A sort control beside it orders the list by **Name**, **Recently Changed**, or **Map Number** (special event/quest maps are badged *SPECIAL* and sort to the bottom by number).
 - **Return to Current Zone** — while you're browsing a zone your character isn't in, tracking pauses and a **⌖ Return to Current Zone** button appears; click it to jump back and resume following.
-- **Floors** — **▲ / ▼** step the map up and down a level (the `L0` readout shows which). The floors directly above and below yours draw as a faint white "ghost" map under the current one, the way Genie 4 grays out other levels. The **Map overlay opacity** slider in **Maps ▸ AutoMapper Settings…** (`#config automapperalpha`, 0–255) fades them; 0 hides them for a pure single-floor view.
+- **Floors** — **▲ / ▼** step the map up and down a level (the `L0` readout shows which). The floors directly above and below yours draw as a faint "ghost" map under the current one (white by default), the way Genie 4 grays out other levels; see [Map colours](#map-colours). The **Map overlay opacity** slider in **Maps ▸ AutoMapper Settings…** (`#config automapperalpha`, 0–255) fades them; 0 hides them for a pure single-floor view.
 - **Legend** — **Maps ▸ Show Map Legend** (on by default) draws a colour key in the map's top-left corner. It lists only what the current floor actually draws — room colours named from the community Maps colour key, cross-zone rooms, ghost floors, and each kind of path — so an entry you see always means something on screen.
 - **Labels** — the **Labels** toggle shows or hides the zone's landmark labels (the map's own text, like "East Gate").
+
+### Map colours
+
+The map is coloured by Genie 4's seven `automapper.*` presets, as in Genie 4. Each preset's colour is used on your floor, and its background on the ghost floors above and below:
+
+| Preset | Colour (your floor) | Background (other floors) | Stock |
+| --- | --- | --- | --- |
+| `automapper.panel` | Label text | **Map background** | Black / PaleGoldenrod |
+| `automapper.line` | Compass lines and room borders | Compass lines and room borders | Black / White |
+| `automapper.linego` | Go, up, down and out lines | Same | Blue / White |
+| `automapper.lineclimb` | Climb lines | Same | Green / White |
+| `automapper.linestump` | Exit stubs (the neighbour isn't on the map) | Same | Cyan / White |
+| `automapper.node` | Rooms with no colour of their own | Rooms | White / White |
+| `automapper.path` | Walk destination | Rooms on the walk path | Green / LightGreen |
+
+Rooms that have their own colour (shops, banks, …) keep it. The ghost floors are faded by the **Map overlay opacity** slider as before. The legend shows the same colours. Genie 5 doesn't highlight a walk path on the map yet, so `automapper.path` has no effect for now.
+
+**The map background and label text** are `automapper.panel`, and there are several ways to set them. All of them change that one preset, and the map repaints straight away:
+
+- **Configuration → Presets**, `automapper.panel`.
+- **Map background** and **Map text** in the map's **Details** panel.
+- `#mapper color bg <colour>` and `#mapper color text <colour>`.
+- **Loading a layout.** A layout saves the map background, so a town layout and a hunting layout can each bring their own. Loading one writes its background into the preset. Layouts saved before they recorded a map background leave the map as it is.
+
+Themes don't change the map's colours.
+
+**Coming from an earlier Genie 5:** the map background and text colours used to be kept in `display.json`, separately from the preset. A colour you picked there is moved into `automapper.panel` the first time you start this version, so your map looks the same. If you never changed them, your `automapper.panel` preset is used as it is, including one imported from Genie 4. The exit stubs now use the `automapper.linestump` colour (stock Cyan, as in Genie 4) instead of the slightly darker cyan Genie 5 drew before.
 
 ### Map spoilers
 
@@ -107,7 +134,7 @@ The toolbar under the zone picker carries Genie 4's AutoMapper edit tools:
 - In edit mode, right-click an empty spot for **Add Room Here** (an unlinked room at the click, for a room you cannot walk to; fill in its title and server id in Details). Right-click a room for **Link to…**: click the room it leads to, then give the command (`west`, `go oak door`) and choose whether to add the way back — a compass command fills in its opposite. **Save** keeps the result; links stay within the open zone (use [Cross-Zone Travel](Cross-Zone-Travel) for links between maps).
 - In edit mode: **Remove** deletes the selected room or label, **+ Label** adds a landmark label beside your room (or right-click ▸ **Add Label Here**), **Reset IDs** renumbers rooms 1..N, **Snap** snaps dragged rooms to Genie 4's 10px grid, **Lock** stops rooms being dragged, and **Dup** allows duplicate rooms while recording.
 
-The **Details** panel slides out from the map's right edge when you hover the **DETAILS** strip (or click it to keep it open); the **📌** pin holds it open until you release it. It shows the current room's server id and notes, an **Edit Room** form for the selected room (title, notes, colour, server id, tags — **Apply**, then **Save** the zone), an **Edit Label** form for a selected label, the zone's room count and last update, and the map's background and text colours.
+The **Details** panel slides out from the map's right edge when you hover the **DETAILS** strip (or click it to keep it open); the **📌** pin holds it open until you release it. It shows the current room's server id and notes, an **Edit Room** form for the selected room (title, notes, colour, server id, tags — **Apply**, then **Save** the zone), an **Edit Label** form for a selected label, the zone's room count and last update, and the map's background and text colours (the `automapper.panel` preset — see [Map colours](#map-colours)).
 
 ## Where maps live
 

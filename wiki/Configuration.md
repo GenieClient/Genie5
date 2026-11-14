@@ -77,7 +77,7 @@ A rule can also be **scoped to specific windows**: the Highlights tab's **Window
 
 Two built-in colorings live alongside your own rules:
 
-- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
+- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. The `familiar` preset is the base color of the Familiar window's text, and the `inputuser`, `inputother` and `scriptecho` presets color typed commands, script commands, and script output / Genie messages. The `health`, `mana`, `stamina`, `spirit` and `concentration` presets color the vitals bars: the color is the bar's fill and the background its track. The seven `automapper.*` presets color the map: lines, rooms, labels and the map background (see [Mapper → Map colours](Mapper#map-colours)). The seven `ui.*` presets color the menu bar, command input, status strip and AutoMapper Settings window over the theme (see [The menu, command input and status strip](#the-menu-command-input-and-status-strip)). (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
 - **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it on the **Edit → Configuration… → Presets** tab or with `#config monsterbold on|off`.
 
 ### Substitutes — rewriting text
@@ -214,9 +214,198 @@ From the command bar, `#dialogs` (or `#dialogs list`) lists the dialogs seen thi
 
 ## Themes
 
-The whole client is themeable from the **Edit → Theme** submenu. Seven themes are built in — **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light**, and **Wrayth-style** — and a **theme editor** lets you tweak any of them into your own. Custom themes are saved as JSON files in `Config/Themes`, so they're easy to back up or share.
+A theme sets the colours of the whole client: the window chrome (backgrounds, borders, labels, accents) and the starting colours of the game text, your echoes and the vitals bars. Seven themes are built in: **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light** and **Wrayth-style**. You can also make your own, and share them as files.
 
-**Game text and Echoes colors have one home.** They show up both in **Edit → Display Settings…** and in the theme editor, but it's the same two settings: changing either one in either place changes the same value. A theme carries its own game-text and echo colors, and picking that theme sets both to the theme's colors. After that, a tweak in Display Settings sticks until you pick a theme again. Display Settings' **Reset** puts back the active theme's colors. Per-window colors (Layout tab) and presets still win over both.
+A theme changes colours only. For Genie 4 title bars, use windowed mode (**Layout → Windowed Mode (MDI)**) or the built-in **Heirloom** layout; see [Docking Windows](Docking-Windows#windowed-mode-mdi).
+
+### Picking a theme
+
+There are two places to pick one:
+
+- **Edit → Theme** lists every theme (yours are marked *(Custom)*). Clicking one applies it straight away. The same menu has **Edit Theme…**, **Save Current As…** and **Reset to Dark**.
+- **Edit → Display Settings… → Theme** has the same list. Picking a theme there applies it behind the dialog so you can see it. **OK** keeps it; **Cancel** (or closing the dialog) puts back the previous theme *and* the game and echo colours you had when you opened it.
+
+The active theme is shared by every character, and Genie remembers it between launches.
+
+### What a theme contains
+
+| Part | What it colours | When the theme sets it |
+| --- | --- | --- |
+| **Base variant** (Dark or Light) | The standard controls: menus, buttons, text boxes, scrollbars | Every launch |
+| **Surfaces, text, accents** | Window and panel backgrounds, toolbars, borders, labels, hints, section headers, links, badges | Every launch |
+| **Game text** | The main window's text colour | Only when you pick the theme |
+| **Echo colours** (three) | Commands you type, commands scripts send, and script output / Genie's messages | Only when you pick the theme |
+| **Vitals bars** (a fill and a track for each of five) | The health, mana, stamina, spirit and concentration bars, in the Vitals panel and the status strip | Only when you pick the theme |
+
+The difference in the last column is the important one:
+
+- **Chrome colours always come from the theme.** To change them, edit the theme (or make a copy and edit that). The exception is the handful of surfaces Genie 4's `ui.*` presets cover (see [The menu, command input and status strip](#the-menu-command-input-and-status-strip)): a colour set in one of those presets paints over the theme.
+- **Game text, echo and vitals colours are copied from the theme when you pick it**, and after that they're your own settings. Change them in Display Settings, the theme editor or the Presets tab, and your change stays — across launches and reconnects — until you pick a theme again.
+
+### The game text and echo colours
+
+These four colours each have **one** value, which you can change from three places. They are the same setting, not copies:
+
+| Display Settings / theme editor | Where else | Colours | Stock default |
+| --- | --- | --- | --- |
+| **Game text** | — | Game text in the main window that nothing else colours | `#CCCCCC` |
+| **Typed commands** | the `inputuser` preset | Commands you type at the command bar | Yellow |
+| **Script commands** | the `inputother` preset | Commands a script sends (`put`, `move`, …) | GreenYellow |
+| **Echoes & messages** | the `scriptecho` preset | Script `echo` lines, `#echo`, and Genie's own messages such as `[theme] reset to Dark` | Cyan |
+
+The three echo colours are Genie 4's presets of the same names, so they also appear on **Edit → Configuration… → Presets**. A preset you import from Genie 4 keeps its colour until you pick a theme.
+
+**What wins on an echo line.** A colour given in the command, such as `#echo red Danger!`, beats the preset. A preset set to `Default` has no colour of its own, so the line uses the game text colour. **Italicize local echoes** (Display Settings) is separate and only changes the style.
+
+**Which file the echo colours are saved to.** They are saved like any other preset:
+
+- To the **shared** presets (`Config/presets.json`), normally.
+- To **this character's** presets, if you're connected and that character has its own override of the preset (Presets tab, Scope = This character). A theme you pick while connected updates that override too.
+
+**What sets these colours back to a theme's colours:**
+
+- Picking any theme, from the menu or Display Settings — including the one already active.
+- **Edit → Theme → Reset to Dark**.
+- **Reset** in Display Settings, which puts back the *active* theme's colours (or the stock defaults when no theme sets them).
+- **Import…** in Display Settings, which picks the imported theme.
+
+Launching Genie, connecting, and changing a theme's chrome don't touch them.
+
+**To keep your own colours with a theme,** use **Edit → Theme → Save Current As…** (below). The new theme stores the colours you have now, so picking it later puts them back.
+
+### The vitals bars
+
+The five vitals bars are coloured by Genie 4's presets, in both the **Vitals** panel and the status strip, as in Genie 4:
+
+| Bar | Preset | Stock fill |
+| --- | --- | --- |
+| Health | `health` | Maroon |
+| Mana | `mana` | Navy |
+| Fatigue (stamina) | `stamina` | Green |
+| Spirit | `spirit` | Purple |
+| Concentration | `concentration` | Navy |
+
+- **The preset's colour is the bar's fill; its background is the track** (the empty part) and the border. With no background, the bar shows its normal track. The stock presets have none, as in Genie 4.
+- **Edit them** on **Configuration → Presets**, or as the **Vitals bars** fill and track rows in the theme editor. Either way it's the same preset, and the bars repaint straight away.
+- **A theme carries a fill and a track for each bar** and writes both into the presets when you pick it, like the echo colours: they're saved the same way, and the same actions set them back to the theme's colours. Dark and Genie 4 Classic use Genie 4's stock colours with no track; the other built-in themes have tracks shaded to suit their background.
+- A preset you import from Genie 4 keeps its colours until you pick a theme.
+
+### The menu, command input and status strip
+
+Genie 4 coloured its window chrome with seven `ui.*` presets. They do the same in Genie 5, on the same surfaces:
+
+| Preset | Colours (colour / background) | Genie 4's stock |
+| --- | --- | --- |
+| `ui.menu` | The menu bar and its menus: text / background | Black / #EEEEEE |
+| `ui.menu.highlight` | The menu item under the mouse | LightBlue |
+| `ui.menu.checked` | The box behind a ticked menu item | LightBlue |
+| `ui.textbox` | The command input: text / background | Black / White |
+| `ui.status` | The `#statusbar` strip: text / background | Black / #EEEEEE |
+| `ui.window` | The AutoMapper Settings window: text / background | Black / #EEEEEE |
+| `ui.button` | The AutoMapper Settings window's buttons: text / background | Black / Silver |
+
+- **Genie 5's stock value is `Default`: the theme colours the surface.** Genie 4's stock colours were Windows' own grey chrome, so `Default` (your theme's chrome) is the Genie 5 equivalent.
+- **Set a colour** on **Configuration → Presets** or with `#preset`, for example `#preset ui.status Black #EEEEEE`, and it paints that surface over the theme, straight away. Only that surface changes. Hover, focus and pressed states use the same colour, as in Genie 4.
+- **Picking a theme sets them back to `Default`**, as it resets the echo and vitals colours. Cancelling Display Settings after trying a theme puts your colours back.
+- **Genie 4's stock values count as `Default`.** Importing from Genie 4 brings over a `ui.*` colour you chose there (it applies until you pick a theme), but Genie 4's untouched greys come in as `Default`, so the theme's chrome stays.
+- **Coming from an earlier Genie 5:** it saved every preset, stock values included, so your `presets.json` may hold Genie 4's greys for `ui.*`. The first time this version starts, those exact values are set to `Default` in the shared presets and each character's, once. A colour you set afterwards, even the same grey, is kept.
+
+### Making your own theme
+
+**Edit → Theme → Edit Theme…** opens the theme editor on the active theme:
+
+- **Theme name** — the name to save under. A built-in theme can't be overwritten, so editing one suggests a name like *My Dark* and saves a copy.
+- **Base variant** — Dark or Light styling for the standard controls.
+- **Colour rows** in five groups: **Surfaces**, **Text**, **Accents**, **Vitals bars** and **Game text**. Each row has a colour picker, with transparency (alpha) supported.
+- The vitals and game text groups start with the colours you're using now (Display Settings and Presets), not the theme file's, so you edit what you see. In the vitals group, a fully transparent colour means none: `Default` for a fill, the normal track for a track.
+- **Every change previews live** in the window behind the editor.
+- **Save** writes the theme to `Config/Themes` and makes it active, game, echo and vitals colours included. **Cancel** puts everything back the way it was when you opened the editor.
+
+Other ways to make or manage themes:
+
+| Where | Action | What it does |
+| --- | --- | --- |
+| Edit → Theme | **Save Current As…** | Saves the active theme under a new name, with your current game text, echo and vitals colours. Picking an existing custom name overwrites it. |
+| Display Settings → Theme | **Duplicate…** | Copies the selected theme to a new custom theme without switching to it. The usual way to start from a built-in. |
+| Display Settings → Theme | **Import…** | Adds a theme `.json` file to `Config/Themes` and picks it. It never overwrites a theme: a name that's taken gets `(2)`, `(3)`, … |
+| Display Settings → Theme | **Export…** | Saves the selected theme (built-in or custom) as a `.json` file to share or edit. |
+| Display Settings → Theme | **Delete** | Deletes the selected custom theme's file. Built-in themes can't be deleted. |
+
+### Theme files
+
+Each custom theme is a JSON file in `Config/Themes` (see [Application Folders](Application-Folders)). You can write or edit one by hand; Genie re-reads the folder each time you open the **Edit → Theme** menu.
+
+```json
+{
+  "Name": "Midnight",
+  "BaseVariant": "Dark",
+  "Colors": {
+    "Theme.WindowBg":   "#0B0F1A",
+    "Theme.Accent":     "#7FB2FF",
+    "Theme.Selection":  "#447FB2FF",
+    "Theme.GameText":   "#D0D0D0",
+    "Theme.InputUser":  "#FFD75F",
+    "Theme.InputOther": "#9FE870",
+    "Theme.ScriptEcho": "#5FD7D7",
+    "Theme.HealthBar":  "#C03030",
+    "Theme.HealthTrack": "#300C0C"
+  }
+}
+```
+
+- Colours are `#RRGGBB`, or `#AARRGGBB` with transparency.
+- **List only the colours you want to change.** A missing chrome colour comes from the Dark theme. A missing game text, echo or vitals colour is left as it is when the theme is picked. An empty vitals track (`""`) means none.
+- A file whose `Name` matches a built-in theme is skipped. If `Name` is empty, the file name is used.
+- Comments and trailing commas are allowed.
+- **Older theme files** have vitals fills but no tracks, so picking one leaves your tracks as they are. They may also have a single `Theme.GameEcho` colour (from before the three echo colours). If a theme has that and none of the three echo keys, picking it sets all three echo colours to it. **Save Current As…** and the theme editor write the three keys instead.
+
+All the keys, with their names in the theme editor:
+
+| Key | Theme editor | Key | Theme editor |
+| --- | --- | --- | --- |
+| `Theme.WindowBg` | Window background | `Theme.Accent` | Accent (links, exits, compass) |
+| `Theme.PanelBg` | Panel background | `Theme.AccentBg` | Accent background |
+| `Theme.PanelBgDeep` | Log / output wells | `Theme.AccentBorder` | Accent border |
+| `Theme.ToolbarBg` | Toolbars | `Theme.Success` | Success (players, ok badges) |
+| `Theme.StripBg` | Strips (hands / status bars) | `Theme.SuccessBg` | Success background |
+| `Theme.Border` | Borders & separators | `Theme.Warning` | Warning (stale) |
+| `Theme.Selection` | Text selection | `Theme.WarningBg` | Warning background |
+| `Theme.TextPrimary` | Text — primary | `Theme.Danger` | Danger (errors, destructive) |
+| `Theme.TextSecondary` | Text — secondary | `Theme.DangerBg` | Danger background |
+| `Theme.TextMuted` | Text — muted / hints | `Theme.GameText` | Game text |
+| `Theme.SectionHeader` | Section headers | `Theme.InputUser` | Typed commands (`inputuser`) |
+| | | `Theme.InputOther` | Script commands (`inputother`) |
+| | | `Theme.ScriptEcho` | Echoes & messages (`scriptecho`) |
+
+The vitals keys, a fill and a track per bar, set the preset's colour and background:
+
+| Fill key | Track key | Theme editor | Preset |
+| --- | --- | --- | --- |
+| `Theme.HealthBar` | `Theme.HealthTrack` | Health fill / track | `health` |
+| `Theme.ManaBar` | `Theme.ManaTrack` | Mana fill / track | `mana` |
+| `Theme.StaminaBar` | `Theme.StaminaTrack` | Stamina fill / track | `stamina` |
+| `Theme.SpiritBar` | `Theme.SpiritTrack` | Spirit fill / track | `spirit` |
+| `Theme.ConcBar` | `Theme.ConcTrack` | Concentration fill / track | `concentration` |
+
+### Built-in game text and echo colours
+
+| Theme | Game text | Typed commands | Script commands | Echoes & messages |
+| --- | --- | --- | --- | --- |
+| Dark | `#CCCCCC` | `#FFFF00` | `#ADFF2F` | `#00FFFF` |
+| Light | `#202020` | `#806000` | `#3C7800` | `#00708A` |
+| Genie 4 Classic | `#C0C0C0` | `#FFFF00` | `#ADFF2F` | `#00FFFF` |
+| High Contrast | `#FFFFFF` | `#FFFF00` | `#ADFF2F` | `#00FFFF` |
+| Solarized Dark | `#839496` | `#B58900` | `#859900` | `#2AA198` |
+| Solarized Light | `#657B83` | `#B58900` | `#859900` | `#2AA198` |
+| Wrayth-style | `#F0F0F0` | `#FFFF00` | `#ADFF2F` | `#00FFFF` |
+
+The dark themes use Genie 4's own defaults (Yellow, GreenYellow, Cyan). Light and Solarized use darker or matching shades so the text stays readable on their backgrounds.
+
+### Coming from an earlier Genie 5
+
+**Vitals bars.** The bars used to take fixed colours (the status strip) or the theme's bar colours (the Vitals panel), whatever your presets said. Both now follow the `health` … `concentration` presets: your imported Genie 4 colours, values already saved in your presets, or otherwise Genie 4's stock colours. Pick a theme to get its bar colours.
+
+**Echo colours.** Earlier versions had a single **Echoes** colour in Display Settings, used for every echo line. It's been replaced by the three presets above, so typed commands, script commands and messages can differ, as in Genie 4. Your old Echoes colour isn't carried over. Echo lines use your `inputuser` / `inputother` / `scriptecho` presets — your Genie 4 values if you imported them, otherwise the stock defaults. Custom themes you saved before still work (see *Older theme files* above).
 
 ## Where rules are stored
 

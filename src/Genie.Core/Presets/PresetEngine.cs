@@ -26,11 +26,14 @@ public sealed class PresetEngine
         Set("scriptecho",       "Cyan");
 
         // ── Status bars ─────────────────────────────────────────────────────
-        Set("health",           "Red",      "#400000");
-        Set("mana",             "Aqua",     "#000040");
-        Set("stamina",          "Green",    "#004000");
-        Set("spirit",           "Purple",   "#400040");
-        Set("concentration",    "White",    "#000040");
+        // Vitals bars (public #406): Genie 4's stock values (Lists/Globals.cs
+        // SetDefaultPresets). Foreground = fill; background = track and border,
+        // none by default so the bar's normal track shows.
+        Set("health",           "Maroon");
+        Set("mana",             "Navy");
+        Set("stamina",          "Green");
+        Set("spirit",           "Purple");
+        Set("concentration",    "Navy");
         Set("roundtime",        "Aqua",     "#00004B");
         Set("castbar",          "Magenta");
 
@@ -43,14 +46,20 @@ public sealed class PresetEngine
         Set("automapper.panel",     "Black", "PaleGoldenrod");
         Set("automapper.path",      "Green", "LightGreen");
 
-        // ── UI chrome (Wrayth-style tokens, used by chrome themes) ──────────
-        Set("ui.button",         "Black",     "Silver");
-        Set("ui.menu",           "Black",     "#EEEEEE");
-        Set("ui.menu.checked",   "LightBlue");
-        Set("ui.menu.highlight", "LightBlue");
-        Set("ui.status",         "Black",     "#EEEEEE");
-        Set("ui.textbox",        "Black",     "White");
-        Set("ui.window",         "Black",     "#EEEEEE");
+        // ── UI chrome (public #406) ─────────────────────────────────────────
+        // Genie 4's stock values here (Black on #EEEEEE, White input, Silver
+        // buttons, LightBlue hover/tick) were the Windows system chrome
+        // colours. Genie 5's chrome comes from the theme, so the stock value
+        // is "Default": follow the theme. A colour set here (Presets tab,
+        // #preset, a Genie 4 import) paints that surface over the theme
+        // (Controls/PresetChrome.cs). Picking a theme sets them back to Default.
+        Set("ui.button",         "Default");
+        Set("ui.menu",           "Default");
+        Set("ui.menu.checked",   "Default");
+        Set("ui.menu.highlight", "Default");
+        Set("ui.status",         "Default");
+        Set("ui.textbox",        "Default");
+        Set("ui.window",         "Default");
     }
 
     private void Set(string id, string fg, string bg = "", bool highlightLine = false)
