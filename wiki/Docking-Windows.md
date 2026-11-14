@@ -74,6 +74,7 @@ Everything on this page is remembered automatically between sessions. Beyond tha
 - **Switching keeps what you have open.** Windows that are open stay open and closed ones stay closed, in both directions. Going into windowed mode, the windows are tiled where their docked panes were, so a group of stream tabs becomes a row of stream windows. A window you had already placed in windowed mode earlier in the session goes back to that spot.
 - **Switching back restores your docked arrangement** from before you entered windowed mode, with any windows you opened or closed in the meantime added or removed. Loading a layout replaces that memory, so after a load you land on the default docked arrangement instead.
 - **Child windows stay inside the main window.** They can't be dragged or floated out of it. A panel you last had floating in docked mode opens as a child window while windowed mode is on.
+- **Right-click inside a window for its menu**, as in Genie 4 and in docked mode: **Clear**, **Time Stamp**, **Name List Only**, **Close Window**, and the rest of what that window supports (Copy, Copy All, Save As…, Find…, Pause Scrolling, and so on). Right-clicking the title bar still gives the window-management menu.
 
 ## Related
 

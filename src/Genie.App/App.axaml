@@ -18,6 +18,8 @@
         <!-- #20: design-time defaults for the Theme.* palette; ThemeService
              overwrites the same keys in Application.Resources at runtime. -->
         <ResourceInclude Source="avares://Genie5/Themes/ThemePalette.axaml" />
+        <!-- The per-window right-click menu both window frames below share (#403). -->
+        <ResourceInclude Source="avares://Genie5/Themes/WindowContextMenu.axaml" />
         <ResourceInclude Source="avares://Genie5/Themes/MdiDocumentWindowSkin.axaml" />
         <!-- #80: overrides the stock ToolControl theme with a cached, per-dockable
              content host so stacked tool tabs of different types each keep their own
