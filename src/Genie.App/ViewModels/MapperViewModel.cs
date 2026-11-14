@@ -2510,7 +2510,16 @@ public partial class MapperViewModel : ReactiveObject
         // command / disconnect / window-unfocus-over-60s.
         if (_engine.CurrentNode is not null)
         {
-            if (_engine.CurrentNode.Id == target.Id) { LoadStatus = "Already here."; return; }
+            if (_engine.CurrentNode.Id == target.Id)
+            {
+                // #427: answer the script, as the built-in walker does
+                // (AutoWalkService.Start). Scripts that matchwait on the
+                // arrival after a #goto (travel.cmd, uber.cmd) otherwise treat
+                // the silence as a failed move: retry, #mapper reset, random move.
+                LoadStatus = "Already here.";
+                AutoWalk.EmitAutomapperSignal(AutomapperSignals.Arrived);
+                return;
+            }
             if (TryHandOffToAutomapperScript(_engine.CurrentNode, target)) return;
             if (!AutoWalk.Start(_engine.CurrentNode, target))
                 LoadStatus = AutoWalk.LastStatusFlash ?? $"No path to '{target.Title}'.";
