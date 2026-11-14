@@ -40,7 +40,7 @@
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Key:" VerticalAlignment="Top" Margin="0,4,8,4"
                    ToolTip.Tip="Click the field and press the key combo to capture (e.g. F1, Ctrl+H, Alt+Shift+F5)."/>
         <TextBox   Grid.Row="0" Grid.Column="1" Name="KeyBox" Margin="0,0,0,4"
-                   FontFamily="Consolas,Courier New,monospace"
+                   FontFamily="{DynamicResource Genie.EditorMonoFont}"
                    Watermark="Press a key combo…"
                    IsReadOnly="True"
                    KeyDown="OnKeyBoxKeyDown"/>
