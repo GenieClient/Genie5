@@ -6448,6 +6448,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// applied first (cheap, instant); tool-visibility toggles run
     /// last because Dock.Avalonia mutations need a UI-thread tick.
     /// </summary>
+    /// <summary>Map backgrounds a layout carries without anyone having chosen
+    /// them: Genie 5's old display default and its old dark default.</summary>
+    private static bool IsUnchosenLayoutMapBackground(string hex)
+        => hex.Trim().ToUpperInvariant() is "#EEE8AA" or "#1A1A1A";
+
     internal void ApplyLayout(Settings.SavedLayout layout)
     {
         // Display flags — these have property-changed observers that
@@ -6470,11 +6475,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;
         // A layout's map background goes into the automapper.panel preset (the
-        // one place it's kept, #406) and shows straight away. None, or the old
-        // dark default an older layout carries without having chosen it, leaves
-        // the map as it is.
+        // one place it's kept, #406) and shows straight away. None, or a default
+        // every older layout carries without anyone choosing it — the old display
+        // default #EEE8AA (also in built-in Shadowveil) or the old dark #1A1A1A —
+        // leaves the map as it is, so applying a layout on connect can't undo a
+        // colour set with #preset, #mapper color or a picker (#406 review).
         if (Controls.MapPalette.Parse(layout.MapBackgroundHex) is { } mapBg &&
-            !string.Equals(layout.MapBackgroundHex!.Trim(), "#1A1A1A", StringComparison.OrdinalIgnoreCase))
+            !IsUnchosenLayoutMapBackground(layout.MapBackgroundHex!))
             Mapper.MapBackground = mapBg;
         // Switch document mode to match the saved layout BEFORE rebuilding the
         // dock, so a layout saved in windowed mode reopens windowed (not tabbed).
