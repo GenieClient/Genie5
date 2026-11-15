@@ -66,6 +66,12 @@ public sealed class DisplaySettings : ReactiveObject
     /// <c>MainWindowViewModel.UpgradeUiPresets</c>.</summary>
     public bool UiPresetsUpgraded { get; set; }
 
+    /// <summary>The one-time vitals preset upgrade has run (public #406): saved
+    /// health/mana/stamina/spirit/concentration presets still holding Genie 5's
+    /// old stock colours were reset to the current defaults. See
+    /// <see cref="Settings.StockPresetUpgrade"/>.</summary>
+    public bool VitalsPresetsUpgraded { get; set; }
+
     /// <summary>Show the on-map colour legend (#157). Default on.</summary>
     [Reactive] public bool   ShowMapLegend { get; set; } = true;
 

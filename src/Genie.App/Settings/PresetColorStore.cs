@@ -17,7 +17,9 @@ namespace Genie.App.Settings;
 /// it reads and writes the shared (All characters) layer.</para>
 ///
 /// <para>Only the edited entry is changed in the file; everything else in it is
-/// kept as found.</para>
+/// kept as found. A file that exists but can't be read or parsed is never
+/// written: the edit shows live, the file is left alone and a warning is
+/// reported, so a stray comma can't cost the user every other preset.</para>
 /// </summary>
 public sealed class PresetColorStore
 {
@@ -25,17 +27,21 @@ public sealed class PresetColorStore
     private readonly string              _globalDir;
     private readonly Func<string?>       _connectedProfileDir;
     private readonly PersistenceService  _persistence = new();
+    private readonly Action<string>?     _warn;
 
     /// <param name="engine">The live preset engine the renderer reads.</param>
     /// <param name="globalDir">The shared config dir (<c>Config/</c>).</param>
     /// <param name="connectedProfileDir">The connected character's config dir,
     /// or null when offline. Equal to <paramref name="globalDir"/> for a
     /// single-layer (profile-less) connection.</param>
-    public PresetColorStore(PresetEngine engine, string globalDir, Func<string?> connectedProfileDir)
+    /// <param name="warn">Reports a file that couldn't be read and so wasn't saved.</param>
+    public PresetColorStore(PresetEngine engine, string globalDir, Func<string?> connectedProfileDir,
+                            Action<string>? warn = null)
     {
         _engine              = engine;
         _globalDir           = globalDir;
         _connectedProfileDir = connectedProfileDir;
+        _warn                = warn;
     }
 
     private bool Connected => _connectedProfileDir() is not null;
@@ -113,7 +119,14 @@ public sealed class PresetColorStore
         if (Connected || rule is null || rule.Scope == RuleScope.Global)
             Preview(id, foreground, background);
 
-        var models = Load(path);
+        if (!_persistence.TryLoadPresets(path, out var models, out var error))
+        {
+            // Present but unreadable: saving would replace the whole file with
+            // this one entry. Keep the live change, leave the file alone.
+            _warn?.Invoke($"[config] {Path.GetFileName(path)} could not be read ({error}) — " +
+                          $"the {id} colour is shown but not saved. Fix or remove {path} to save changes.");
+            return;
+        }
         var model  = models.FirstOrDefault(m => m.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
         if (model is null)
         {

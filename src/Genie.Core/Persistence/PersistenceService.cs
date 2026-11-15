@@ -247,6 +247,27 @@ public sealed class PersistenceService
         catch { return new(); }
     }
 
+    /// <summary>Like <see cref="LoadPresets"/>, but tells a missing file (true,
+    /// empty list) apart from one that exists and can't be read or parsed (false,
+    /// with the reason). A caller that writes the list back must not save after a
+    /// false: it would replace the user's whole file with what it added.</summary>
+    public bool TryLoadPresets(string path, out List<PresetPersistenceModel> models, out string? error)
+    {
+        models = new();
+        error  = null;
+        if (!File.Exists(path)) return true;
+        try
+        {
+            models = JsonSerializer.Deserialize<List<PresetPersistenceModel>>(File.ReadAllText(path), PersistenceJsonContext.Read) ?? new();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
     public void SaveLayout(string path, LayoutState state)
         => File.WriteAllText(path, JsonSerializer.Serialize(state, _options));
 

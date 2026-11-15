@@ -1401,6 +1401,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display = DisplaySettings.Load(_displayPath);
         Display.Apply();  // push values into Application.Resources
         Mapper.AttachDisplay(Display, _displayPath);
+        UpgradeVitalsPresets();
 
         // The map's colours are the automapper.* presets (public #406). Until
         // Genie's engine is built (first connect / command) they're read from the
@@ -4013,6 +4014,39 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <c>Config/</c> dir — again matching where Core actually loads from for
     /// such a session.</para>
     /// </summary>
+    private int _presetRepaintQueued;
+
+    private void OnPresetEngineChanged()
+    {
+        if (Interlocked.Exchange(ref _presetRepaintQueued, 1) == 1) return;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            Interlocked.Exchange(ref _presetRepaintQueued, 0);
+            UserHighlights.NotifyRulesChanged();
+        });
+    }
+
+    /// <summary>Saved presets.json files still holding Genie 5's old stock vitals
+    /// colours (White concentration, Aqua mana, …) get the current defaults, once
+    /// (public #406 review): nothing read those presets before the bars did, so
+    /// nobody chose them, and a saved White concentration would paint a white bar
+    /// under a white caption.</summary>
+    private void UpgradeVitalsPresets()
+    {
+        if (Display.VitalsPresetsUpgraded) return;
+        var profileDirs = new List<string>();
+        foreach (var profile in Profiles.Profiles)
+        {
+            try { profileDirs.Add(GetProfileConfigDir(profile)); } catch { /* unreadable profile: skip */ }
+        }
+        Settings.StockPresetUpgrade.Run(
+            Settings.StockPresetUpgrade.ConfigDirs(_configDir, profileDirs),
+            Settings.StockPresetUpgrade.OldVitals,
+            Settings.StockPresetUpgrade.CurrentStock);
+        Display.VitalsPresetsUpgraded = true;
+        try { Display.Save(_displayPath); } catch { /* retried next launch */ }
+    }
+
     public string GetProfileConfigDir(ConnectionProfile? profile)
     {
         if (profile is null) return _configDir;
@@ -5596,10 +5630,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // persist, so the renderer holds them for the whole session.
         UserHighlights.Engine  = _core.Highlights;
         Highlighting.DefaultHighlights.PresetEngine = _core.Presets;      // preset colours (#19)
+        // Repaint everything that paints from presets when one changes — a typed
+        // #preset included, as in Genie 4 (#406 review). Coalesced: a profile load
+        // applies every preset in a row, possibly off the UI thread.
+        _core.Presets.Changed += OnPresetEngineChanged;
         // Display Settings / theme editor / theme apply edit the echo presets
         // through this (public #406) — the preset stays the one source.
         PresetColors = new Settings.PresetColorStore(_core.Presets, _configDir,
-            () => IsConnected ? GetProfileConfigDir(ConnectedProfile) : null);
+            () => IsConnected ? GetProfileConfigDir(ConnectedProfile) : null,
+            warn: msg => GameText.AddSystemLine(msg));
         Themes.Presets = PresetColors;
         Mapper.PresetStore = PresetColors;   // the map's automapper.* presets (#406)
         Controls.PresetChrome.Store = PresetColors;    // ui.* chrome presets (#406)
@@ -6462,6 +6501,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// applied first (cheap, instant); tool-visibility toggles run
     /// last because Dock.Avalonia mutations need a UI-thread tick.
     /// </summary>
+    /// <summary>Map backgrounds a layout carries without anyone having chosen
+    /// them: Genie 5's old display default and its old dark default.</summary>
+    private static bool IsUnchosenLayoutMapBackground(string hex)
+        => hex.Trim().ToUpperInvariant() is "#EEE8AA" or "#1A1A1A";
+
     internal void ApplyLayout(Settings.SavedLayout layout)
     {
         // Display flags — these have property-changed observers that
@@ -6484,11 +6528,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;
         // A layout's map background goes into the automapper.panel preset (the
-        // one place it's kept, #406) and shows straight away. None, or the old
-        // dark default an older layout carries without having chosen it, leaves
-        // the map as it is.
+        // one place it's kept, #406) and shows straight away. None, or a default
+        // every older layout carries without anyone choosing it — the old display
+        // default #EEE8AA (also in built-in Shadowveil) or the old dark #1A1A1A —
+        // leaves the map as it is, so applying a layout on connect can't undo a
+        // colour set with #preset, #mapper color or a picker (#406 review).
         if (Controls.MapPalette.Parse(layout.MapBackgroundHex) is { } mapBg &&
-            !string.Equals(layout.MapBackgroundHex!.Trim(), "#1A1A1A", StringComparison.OrdinalIgnoreCase))
+            !IsUnchosenLayoutMapBackground(layout.MapBackgroundHex!))
             Mapper.MapBackground = mapBg;
         // Switch document mode to match the saved layout BEFORE rebuilding the
         // dock, so a layout saved in windowed mode reopens windowed (not tabbed).

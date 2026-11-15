@@ -234,6 +234,24 @@ public class MapPresetsHeadlessTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void A_layout_carrying_the_old_display_default_keeps_a_chosen_map_background()
+    {
+        // Every layout saved before #406, and built-in Shadowveil, carry #EEE8AA
+        // without anyone choosing it; layouts are applied on connect, so it must
+        // not undo a colour set with #preset / #mapper color / a picker.
+        var vm = new MainWindowViewModel(startup: null, dataDirectoryOverride: _dir);
+        var config = Path.Combine(_dir, "Config");
+        vm.Mapper.MapBackground = Color.Parse("#102030");
+        Dispatcher.UIThread.RunJobs();
+
+        vm.ApplyLayout(new SavedLayout { MapBackgroundHex = "#EEE8AA" });
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(Color.Parse("#102030"), vm.Mapper.Palette.Background);
+        Assert.Equal("#102030", Saved(Panel, config)!.BackgroundColor);
+    }
+
+    [AvaloniaFact]
     public void Saving_a_layout_records_the_presets_map_background()
     {
         var vm = new MainWindowViewModel(startup: null, dataDirectoryOverride: _dir);
