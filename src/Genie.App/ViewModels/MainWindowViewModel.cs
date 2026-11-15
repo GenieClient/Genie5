@@ -5535,7 +5535,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // Display Settings / theme editor / theme apply edit the echo presets
         // through this (public #406) — the preset stays the one source.
         PresetColors = new Settings.PresetColorStore(_core.Presets, _configDir,
-            () => IsConnected ? GetProfileConfigDir(ConnectedProfile) : null);
+            () => IsConnected ? GetProfileConfigDir(ConnectedProfile) : null,
+            warn: msg => GameText.AddSystemLine(msg));
         Themes.Presets = PresetColors;
         Highlighting.DefaultHighlights.NameEngine   = _core.NameHighlights; // name colours (#154)
 
