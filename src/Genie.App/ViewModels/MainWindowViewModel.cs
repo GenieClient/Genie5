@@ -1401,6 +1401,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display = DisplaySettings.Load(_displayPath);
         Display.Apply();  // push values into Application.Resources
         Mapper.AttachDisplay(Display, _displayPath);
+        UpgradeVitalsPresets();
 
         // ── Themes (#20) ──────────────────────────────────────────────────
         // Re-apply the persisted theme's chrome + Fluent variant on top of
@@ -4000,6 +4001,39 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <c>Config/</c> dir — again matching where Core actually loads from for
     /// such a session.</para>
     /// </summary>
+    private int _presetRepaintQueued;
+
+    private void OnPresetEngineChanged()
+    {
+        if (Interlocked.Exchange(ref _presetRepaintQueued, 1) == 1) return;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            Interlocked.Exchange(ref _presetRepaintQueued, 0);
+            UserHighlights.NotifyRulesChanged();
+        });
+    }
+
+    /// <summary>Saved presets.json files still holding Genie 5's old stock vitals
+    /// colours (White concentration, Aqua mana, …) get the current defaults, once
+    /// (public #406 review): nothing read those presets before the bars did, so
+    /// nobody chose them, and a saved White concentration would paint a white bar
+    /// under a white caption.</summary>
+    private void UpgradeVitalsPresets()
+    {
+        if (Display.VitalsPresetsUpgraded) return;
+        var profileDirs = new List<string>();
+        foreach (var profile in Profiles.Profiles)
+        {
+            try { profileDirs.Add(GetProfileConfigDir(profile)); } catch { /* unreadable profile: skip */ }
+        }
+        Settings.StockPresetUpgrade.Run(
+            Settings.StockPresetUpgrade.ConfigDirs(_configDir, profileDirs),
+            Settings.StockPresetUpgrade.OldVitals,
+            Settings.StockPresetUpgrade.CurrentStock);
+        Display.VitalsPresetsUpgraded = true;
+        try { Display.Save(_displayPath); } catch { /* retried next launch */ }
+    }
+
     public string GetProfileConfigDir(ConnectionProfile? profile)
     {
         if (profile is null) return _configDir;
@@ -5534,6 +5568,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // persist, so the renderer holds them for the whole session.
         UserHighlights.Engine  = _core.Highlights;
         Highlighting.DefaultHighlights.PresetEngine = _core.Presets;      // preset colours (#19)
+        // Repaint everything that paints from presets when one changes — a typed
+        // #preset included, as in Genie 4 (#406 review). Coalesced: a profile load
+        // applies every preset in a row, possibly off the UI thread.
+        _core.Presets.Changed += OnPresetEngineChanged;
         // Display Settings / theme editor / theme apply edit the echo presets
         // through this (public #406) — the preset stays the one source.
         PresetColors = new Settings.PresetColorStore(_core.Presets, _configDir,
