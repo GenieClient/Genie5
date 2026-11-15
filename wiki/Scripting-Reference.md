@@ -75,6 +75,8 @@ When a script loads, it's transformed in a few passes: `include foo` is expanded
 
 Matching is **case-sensitive**, Genie 4 style — `match` / `waitfor` look for the exact substring, and `matchre` / `waitforre` / action patterns are case-sensitive regexes unless the pattern says otherwise (e.g. `(?i)`). Regex captures from `matchre` / `waitforre` / actions land in the current `$0..$9` frame.
 
+When a game line satisfies a `matchwait` or `waitfor`, the script carries on only after the rest of the text the server sent with that line has been handled, as in Genie 4. Actions still fire on those remaining lines first. Scripts such as automapper.cmd rely on this: they switch an action off, wait for a line, then switch it back on.
+
 ### Variables and math
 
 | Statement | Notes |

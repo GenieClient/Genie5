@@ -1076,9 +1076,33 @@ public sealed class ScriptEngine
         finally { _inExtensionEcho = false; }
     }
 
-    public void OnGameLine(string line) { lock (_exec) OnGameLineCore(line); }
+    /// <summary>Feed one line to running scripts. <paramref name="fromServerRead"/>
+    /// marks a line parsed from the live connection: a <c>waitfor</c> or
+    /// <c>matchwait</c> it satisfies resumes only at the next
+    /// <see cref="OnServerReadEnd"/> (Genie 4 parity, public #433). Synthetic
+    /// lines (#parse, typed input, automapper signals) resume at once, like
+    /// Genie 4's <c>ParseTriggers(…, bBufferWait: false)</c>.</summary>
+    public void OnGameLine(string line, bool fromServerRead = false)
+    { lock (_exec) OnGameLineCore(line, fromServerRead); }
 
-    private void OnGameLineCore(string line)
+    /// <summary>The connection has finished delivering one network read. Releases
+    /// every script whose <c>waitfor</c>/<c>matchwait</c> matched a line of that
+    /// read — Genie 4's <c>SetBufferEnd</c> (FormMain.cs Simutronics_EventEndUpdate).</summary>
+    public void OnServerReadEnd() { lock (_exec) OnServerReadEndCore(); }
+
+    private void OnServerReadEndCore()
+    {
+        bool any = false;
+        foreach (var inst in _instances)
+        {
+            if (!inst.AwaitReadEnd) continue;
+            inst.AwaitReadEnd = false;
+            any = true;
+        }
+        if (any) TickCore();
+    }
+
+    private void OnGameLineCore(string line, bool fromServerRead = false)
     {
         if (string.IsNullOrEmpty(line)) return;
 
@@ -1126,6 +1150,7 @@ public sealed class ScriptEngine
                 {
                     inst.WaitForPattern  = null;
                     inst.WaitForDeadline = DateTime.MaxValue;
+                    if (fromServerRead) inst.AwaitReadEnd = true;
                 }
             }
 
@@ -1134,7 +1159,8 @@ public sealed class ScriptEngine
             // match / matchre + matchwait
             if (inst.InMatchWait)
             {
-                TryFireMatch(inst, line, replayed: false);
+                if (TryFireMatch(inst, line, replayed: false) && fromServerRead)
+                    inst.AwaitReadEnd = true;
             }
             else if (inst.SendGateBlocked)
             {
@@ -1339,13 +1365,19 @@ public sealed class ScriptEngine
                 // waitfor/matchwait/pause. A script's own put tails never hit
                 // this: its Pc can't reach a blocking line until they drain.
                 // Still roundtime-gated, like every other script send.
-                if (inst.PendingSends.Count > 0 && inst.IsBlocked)
+                if (inst.PendingSends.Count > 0 && (inst.IsBlocked || inst.AwaitReadEnd))
                 {
                     if (!inst.RtBypass && (InRoundtime?.Invoke() ?? false))
                         ScheduleRoundTimeWakeup();
                     else if (DrainPendingSend(inst, markGate: false))
                         progress = true;
                 }
+
+                // A waitfor/matchwait matched a line of a server read that is
+                // still being processed: stay parked until OnServerReadEnd so
+                // actions see the rest of that read first (Genie 4 parity,
+                // public #433).
+                if (inst.AwaitReadEnd) continue;
 
                 if (inst.Paused)
                 {

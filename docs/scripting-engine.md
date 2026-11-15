@@ -107,6 +107,8 @@ Listed by category. For exact semantics, read the `case` arms in [ScriptEngine.c
 
 Regex captures from `matchre`/`waitforre`/actions land in the current `$0..$9` frame, not in the `%N` script args.
 
+When a `matchwait` or `waitfor` is satisfied by a line from the game server, the script resumes only after the rest of that network read has been processed (Genie 4's buffer-end rule). `GameConnection` publishes `ReadEndStream` after each read's chunks, and `GenieCore` calls `Scripts.OnServerReadEnd()`. Until then the script stays parked, while its actions keep seeing the remaining lines of the read. Synthetic lines (`#parse`, typed input, automapper signals) resume at once. automapper.cmd relies on this on timed climbs (public #433).
+
 ### Variables and math
 
 | Statement | Notes |

@@ -96,6 +96,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     private DrXmlParser?       _parser;
     private GameStateEngine?   _stateEngine;
     private IDisposable?       _parserFeed;
+    private IDisposable?       _readEndSub;
+
+    /// <summary>True while a raw chunk from the live connection is being parsed,
+    /// so the text lines it yields are fed to scripts as server-read lines
+    /// (public #433). Game-loop only.</summary>
+    private bool _feedingServerRead;
     private IDisposable?       _settingsInfoSub;
     private IDisposable?       _gameHostSub;
     private IDisposable?       _connectedVarSub;
@@ -1011,8 +1017,17 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
         // Wire raw XML → parser (timed as the Parse stage; no-op overhead when
         // the overlay is hidden because Metrics.Enabled is false).
-        _parserFeed = rawXml.Subscribe(
-            xml => Guard("parser", () => Metrics.Time(PipelineStage.Parse, () => parser.Feed(xml))));
+        _parserFeed = rawXml.Subscribe(xml =>
+        {
+            _feedingServerRead = true;
+            try { Guard("parser", () => Metrics.Time(PipelineStage.Parse, () => parser.Feed(xml))); }
+            finally { _feedingServerRead = false; }
+        });
+
+        // End of one network read → release scripts whose waitfor/matchwait
+        // matched a line of it (Genie 4 SetBufferEnd parity, public #433).
+        _readEndSub = connection.ReadEndStream.Subscribe(
+            _ => Guard("scripts", () => Scripts.OnServerReadEnd()));
 
         // Mapper adapter — feeds the persistent AutoMapper from this parser/state.
         var mapperAdapter = new MapperGameStateAdapter(_state, events);
@@ -1632,7 +1647,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             ? te
             : te with { Text = transformed, Links = null, BoldSpans = null, PresetSpans = null };
 
-        Guard("scripts", () => Metrics.Time(PipelineStage.Scripts, () => Scripts.OnGameLine(ev.Text)));   // match/waitfor + EXP/info trackers
+        Guard("scripts", () => Metrics.Time(PipelineStage.Scripts, () => Scripts.OnGameLine(ev.Text, _feedingServerRead)));   // match/waitfor + EXP/info trackers
         // ParseGameOnly (Genie 4 parity): when on, fire triggers only on
         // the main game stream, not secondary stream-windows (thoughts,
         // logons, combat, …). Default off → triggers see every stream.
@@ -2397,6 +2412,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _gameEventSub?.Dispose();    _gameEventSub    = null;
         _pluginXmlSub?.Dispose();    _pluginXmlSub    = null;
         _parserFeed?.Dispose();      _parserFeed      = null;
+        _readEndSub?.Dispose();      _readEndSub      = null;
+        // No read end will follow from this connection: never strand a script
+        // that matched a line of its last read (public #433).
+        RunOnLoop(() => Guard("scripts", () => Scripts.OnServerReadEnd()));
         _settingsInfoSub?.Dispose(); _settingsInfoSub = null;
         _gameHostSub?.Dispose();     _gameHostSub     = null;
         _globalsSync?.Dispose();     _globalsSync     = null;
