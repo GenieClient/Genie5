@@ -40,12 +40,9 @@
   "IconBarAtBottom": true,
   "HealthBarAtBottom": true,
   "ScriptBarVisible": true,
-  "CombinedSpellTimer": true,
   "MagicPanels": true,
   "KeepRoundTimeVisible": true,
-  "RoundTimeStyle": "CountdownBadge",
   "ShowGameText": true,
   "ShowEchoText": true,
-  "ShowScriptText": true,
-  "MapBackgroundHex": "#EEE8AA"
+  "ShowScriptText": true
 }

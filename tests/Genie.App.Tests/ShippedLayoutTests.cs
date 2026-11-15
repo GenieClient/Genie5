@@ -118,4 +118,18 @@ public class ShippedLayoutTests
             layout.VisibleTools.OrderBy(x => x, StringComparer.OrdinalIgnoreCase),
             layout.MdiBounds!.Keys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
     }
+
+    [Theory]
+    [InlineData("Windowed Genie 4 Retro.json")]
+    [InlineData("Windowed Genie 5 Starter.json")]
+    public void Windowed_starter_layouts_leave_unrelated_settings_alone(string fileName)
+    {
+        // #432 review: neither shows the Mapper, so loading one must not write the
+        // map background; and the roundtime style / combined spell timer keys
+        // belong to the PRs that add those settings.
+        var raw = File.ReadAllText(Path.Combine(RepoRoot().FullName, "src", "Genie.App", "Layouts", fileName));
+        Assert.DoesNotContain("\"MapBackgroundHex\"",   raw);
+        Assert.DoesNotContain("\"RoundTimeStyle\"",     raw);
+        Assert.DoesNotContain("\"CombinedSpellTimer\"", raw);
+    }
 }
