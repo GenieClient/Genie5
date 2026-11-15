@@ -68,6 +68,20 @@ public class CombinedSpellTimerHeadlessTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void Box_fill_starts_below_its_maximum_for_a_fractional_prep()
+    {
+        // #420 review: the maximum was the truncated 5 while the value started
+        // at 5.9, so the fill sat clamped at 100 % until it dropped below 5.
+        var v = new VitalsViewModel();
+        v.ApplyPreparedSpell("Swirling Winds");
+        v.ApplyCastTimeEnd(In(5.9));
+
+        Assert.True(v.CastBarSecondsExact <= v.CastBarSecondsTotalExact,
+            $"value {v.CastBarSecondsExact} is above maximum {v.CastBarSecondsTotalExact}");
+        Assert.InRange(v.CastBarSecondsTotalExact, 5.5, 5.9);
+    }
+
+    [AvaloniaFact]
     public void Countdown_drops_off_the_end_once_the_spell_is_prepared()
     {
         var v = new VitalsViewModel();

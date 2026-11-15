@@ -21,7 +21,7 @@
         ToolTip.Tip="Prepared spell. (N) is seconds since prep started; the fill and the number on the end are the seconds until it is fully prepared.">
     <ProgressBar x:Name="Bar"
                  Value="{Binding Vitals.CastBarSecondsExact}"
-                 Maximum="{Binding Vitals.CastBarSecondsTotal}"
+                 Maximum="{Binding Vitals.CastBarSecondsTotalExact}"
                  IsVisible="{Binding Vitals.IsPrepping}"
                  AutomationProperties.Name="Spell preparation"
                  controls:PresetBar.Preset="castbar"

@@ -59,6 +59,13 @@ public class VitalsViewModel : ReactiveObject
     /// second. Zero whenever prep is complete or no spell is held.</summary>
     [Reactive] public double CastBarSecondsExact     { get; private set; }
 
+    /// <summary>The <see cref="CastBarSecondsExact"/> value captured when the
+    /// prep started — the combined spell box's <c>Maximum</c>. Seeded with the
+    /// fraction so a 5.9 s prep starts at 5.9 / 5.9 instead of being clamped full
+    /// against a truncated 5 until it drops below 5 (#420 review). The plain cast
+    /// bar keeps whole seconds over <see cref="CastBarSecondsTotal"/>.</summary>
+    [Reactive] public double CastBarSecondsTotalExact { get; private set; }
+
     /// <summary>The combined spell box's text (Layout → Combined Spell Timer):
     /// <see cref="PreparedSpellLabel"/> with the prep seconds left on the end,
     /// "(N) Name (M)", while the spell is still preparing; the plain label once
@@ -432,7 +439,8 @@ public class VitalsViewModel : ReactiveObject
             // avoid divide-by-zero in any percentage-style rendering. A
             // CastTime that's already in the past (replay mode) leaves
             // Total=1 and Remaining=0, so the bar paints empty.
-            CastBarSecondsTotal = Math.Max(1, rem);
+            CastBarSecondsTotal      = Math.Max(1, rem);
+            CastBarSecondsTotalExact = rem > 0 ? exact : 1;
         }
 
         if (!IsPrepping)
@@ -508,6 +516,7 @@ public class VitalsViewModel : ReactiveObject
             CastBarSecondsRemaining   = 0;
             CastBarSecondsExact       = 0;
             CastBarSecondsTotal       = 0;
+            CastBarSecondsTotalExact  = 0;
             IsPrepping                = false;
             PreparedSpellLabel        = "";
         }

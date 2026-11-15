@@ -64,6 +64,35 @@ public class HandsStripBarsHeadlessTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void Cast_bar_stays_inside_its_frame_and_fills_the_row_height()
+    {
+        // Same Fluent 200 px minimum as the rested gauge (#420 review: the plain
+        // cast bar had no test after the resize).
+        var vm = new MainWindowViewModel(startup: null, dataDirectoryOverride: _dir);
+        vm.Display.ShowMagicPanels    = true;
+        vm.Display.CombinedSpellTimer = false;
+        vm.Vitals.ApplyPreparedSpell("Swirling Winds");
+        vm.Vitals.ApplyCastTimeEnd(DateTimeOffset.UtcNow.AddSeconds(5.9));
+
+        var view = new CastBarView { DataContext = vm, Height = 30 };
+        using var host = new Hosted<StackPanel>(new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Children    = { view },
+        });
+
+        var frame = view.GetLogicalDescendants().OfType<Border>().First();
+        var bar   = view.GetLogicalDescendants().OfType<ProgressBar>().Single();
+
+        Assert.True(frame.IsVisible);
+        Assert.True(bar.Bounds.Width <= frame.Bounds.Width,
+            $"bar {bar.Bounds.Width} px is wider than its {frame.Bounds.Width} px frame");
+        Assert.True(bar.Bounds.Height >= 26,
+            $"bar is {bar.Bounds.Height} px tall in a 30 px row; it should stretch");
+        Assert.True(bar.Value <= bar.Maximum);
+    }
+
+    [AvaloniaFact]
     public void Cast_bar_uses_the_castbar_preset_stock_magenta()
     {
         var prev = DefaultHighlights.PresetEngine;
