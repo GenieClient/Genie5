@@ -1100,11 +1100,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>Policy guard: the user has sent at least one command since this connect. An untouched,
     /// unattended session must never resurrect itself (DR ToS: no auto-reconnect-and-resume while away).</summary>
     private bool _userInputSinceConnect;
-    /// <summary>The user sent a deliberate disconnect verb (DR's <c>quit</c>/<c>exit</c>) — the server
-    /// close that follows is INTENTIONAL, so do NOT auto-reconnect (the user chose to leave; this is the
-    /// sharpest edge of the no-auto-resume policy). Cleared on the next non-quit command (a rejected quit
-    /// means they're still playing) and on each fresh connect.</summary>
-    private bool _intentionalGameExit;
+    /// <summary>A deliberate disconnect verb (DR's <c>quit</c>/<c>exit</c>, Genie 4's <c>qui</c>/<c>exi</c>
+    /// prefix rule) went to the game — typed, aliased, triggered or from a script (#419). The server
+    /// close that follows is INTENTIONAL, so do NOT auto-reconnect. Cleared only on a fresh connect, as
+    /// Genie 4's <c>m_bManualDisconnect</c> was: a later command (another script still running, an
+    /// anti-idle loop) must not re-arm reconnect while the server is ending the session. Set from
+    /// <see cref="GenieCore.SentCommands"/> off the UI thread, hence volatile.</summary>
+    private volatile bool _intentionalGameExit;
     /// <summary>This drop was an UNEXPECTED dead link — the transport raised an <see cref="ConnectionEventKind.Error"/>
     /// (read exception / keepalive failure / activity watchdog) before the paired Disconnected. Only such a drop
     /// auto-reconnects. A clean server-initiated close (DR idle-kick, boot, server exit/quit) arrives as a bare
@@ -5650,6 +5652,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 WriteCommandBar?.Invoke(d.Text, d.CaretIndex, d.ClearFirst));
 
+        // DR's disconnect verbs (the login banner says "Type QUIT or EXIT!"): a
+        // server close that follows a deliberate quit/exit ends the session on
+        // purpose, so it must NOT auto-reconnect. Checked on every command written
+        // to the game, whatever sent it (typed, alias, trigger, script put/send,
+        // JS genie.put), as Genie 4 did in Game.SendText (#419). It holds until the
+        // next connect, as in Genie 4.
+        _core.SentCommands.Subscribe(NoteCommandSentToGame);
+
         // #beep / #bell → system alert bell (already PlaySounds-gated in Core).
         _core.BeepRequested += () => _audio.Beep();
 
@@ -6188,6 +6198,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         EnsureReconnectTimer();
     }
 
+    /// <summary>A command was written to the game (any source): note whether it
+    /// was a disconnect verb (#419). See <see cref="_intentionalGameExit"/>.</summary>
+    internal void NoteCommandSentToGame(string sent)
+    {
+        if (GenieCore.IsDisconnectVerb(sent)) _intentionalGameExit = true;
+    }
+
+    /// <summary>Whether quit/exit has been sent since this connect, so the next
+    /// drop will not auto-reconnect. For tests.</summary>
+    internal bool IntentionalGameExit => _intentionalGameExit;
+
     /// <summary>Decide whether a just-dropped session should auto-reconnect, and
     /// if so schedule the first attempt. No-op for failed logins, manual
     /// teardown, or when <c>#config reconnect</c> is off.</summary>
@@ -6196,7 +6217,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         if (_reconnectAt is not null) return;            // already scheduled for this drop
         if (!_wasConnected)            return;            // never established (failed login) — don't loop
         if (_manualDisconnect)         return;            // user/explicit teardown — stay down
-        if (_intentionalGameExit)      return;            // user typed quit/exit — they chose to leave
+        if (_intentionalGameExit)      return;            // quit/exit was sent (typed or scripted) — the session ended on purpose
         if (!(_core?.Config.Reconnect ?? false)) return; // auto-reconnect disabled (#config reconnect false)
         if (LastConnectionConfig is null) return;
 
@@ -7109,16 +7130,6 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // Policy guard for auto-reconnect: the user has actively driven this
         // session, so a later unexpected drop may be auto-reconnected.
         _userInputSinceConnect = true;
-
-        // DR's disconnect verbs (the login banner literally says "Type QUIT or
-        // EXIT!"): a server close that follows a deliberate quit/exit is the user
-        // CHOOSING to leave, so it must NOT auto-reconnect (both a UX fix and the
-        // sharpest edge of the DR "no auto-reconnect-and-resume" policy). Any other
-        // command means they're still playing, so clear the flag — that covers a
-        // quit the game rejected (e.g. mid-roundtime).
-        var verb = cmd.Trim();
-        _intentionalGameExit = verb.Equals("quit", StringComparison.OrdinalIgnoreCase)
-                            || verb.Equals("exit", StringComparison.OrdinalIgnoreCase);
 
         _core!.ProcessInput(cmd);
         return Task.CompletedTask;
