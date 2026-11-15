@@ -24,6 +24,10 @@ public sealed class PresetEngine
         Set("inputuser",        "Yellow");
         Set("inputother",       "GreenYellow");
         Set("scriptecho",       "Cyan");
+        // Clickable links (public #396 — formerly hardcoded in DefaultHighlights).
+        // Genie 5 additions: Genie 4 had no link colours. "Default" = text colour.
+        Set("link",             "#80C0FF");   // <d cmd> game-command links
+        Set("url",              "#8CD8A8");   // <a href> external URLs
 
         // ── Status bars ─────────────────────────────────────────────────────
         Set("health",           "Red",      "#400000");

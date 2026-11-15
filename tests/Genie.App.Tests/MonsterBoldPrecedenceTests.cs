@@ -18,8 +18,8 @@ namespace Genie.App.Tests;
 /// cosmetic rule must never disguise a creature or an Events line. G5's layer
 /// order had MonsterBold below user highlights, so a rule matching the same
 /// characters (the reporter's "You also see" line highlight) claimed them
-/// first. Order is now: names (supreme) → MonsterBold → user rules → built-in
-/// defaults → presets, and MonsterBold writes foreground only, so a user
+/// first. Order is now: names (supreme) → MonsterBold → user rules → presets
+/// (no built-in colour layer since #396), and MonsterBold writes foreground only, so a user
 /// rule's background still shows beneath it.</para>
 ///
 /// <para>#236: the MonsterBold colour is the <c>creatures</c> preset — and it
