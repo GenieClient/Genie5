@@ -13,6 +13,16 @@
   The same switches are `#config mapfestivals on|off` and `#config mapquests on|off`;
   they live in `update-feeds.json`, not `settings.cfg`.
 
+## 💡 Notes
+- **Room titles, links and URLs now take their colours from presets** — Genie 5 no
+  longer paints any game text with built-in colours of its own. Bracketed room titles
+  used to be light blue; they now use the `roomname` preset, whose stock colour is
+  orange (`#FF8000`), as in Genie 4. **If you want the old look back,** type
+  `#preset roomname #90A8F0`, or pick the colour on the **Presets** tab in
+  Configuration. Game-command links and web links have their own presets too, `link`
+  and `url`, so they can be recoloured the same way. Thanks @dylb0t
+  ([#408](https://github.com/GenieClient/Genie5/pull/408)).
+
 ---
 
 # Genie 5 — v5.0.0-beta.9.10.1
