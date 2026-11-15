@@ -5,8 +5,9 @@
         x:Class="Genie.App.Views.DisplaySettingsDialog"
         x:DataType="vm:DisplaySettingsViewModel"
         Title="Display Settings"
-        Width="500" Height="640"
-        CanResize="False"
+        Width="500" Height="560"
+        MinWidth="420" MinHeight="320"
+        CanResize="True"
         WindowStartupLocation="CenterOwner">
 
   <Grid RowDefinitions="*,Auto" Margin="16">
@@ -15,160 +16,170 @@
 
       <!-- ══ General ═══════════════════════════════════════════════════ -->
       <TabItem Header="General">
-        <StackPanel Spacing="10" Margin="0,8,0,0">
+        <!-- Scrolls when the dialog is shorter than its content: it keeps its
+             old 560 px height so OK / Cancel stay on a 1366x768 screen at
+             125% (#422 review), and it can be resized. -->
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="10" Margin="0,8,0,0">
 
-          <!-- ── Font family / size ──────────────────────────────────── -->
-          <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto">
+            <!-- ── Font family / size ──────────────────────────────────── -->
+            <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto">
 
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Font family" VerticalAlignment="Center"/>
-            <ComboBox  Grid.Row="0" Grid.Column="1"
-                       AutomationProperties.Name="Font family"
-                       ItemsSource="{Binding SystemFonts}"
-                       SelectedItem="{Binding FontFamily}"
-                       HorizontalAlignment="Stretch"
-                       MaxDropDownHeight="300">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="x:String">
-                  <!-- Render each entry in the font it represents so the user
-                       can preview the typeface as they scroll the list. -->
-                  <TextBlock Text="{Binding}" FontFamily="{Binding Converter={x:Static controls:FontChain.NameToFamily}}" FontSize="13"/>
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Font size" VerticalAlignment="Center" Margin="0,8,0,0"/>
-            <NumericUpDown Grid.Row="1" Grid.Column="1"
-                           AutomationProperties.Name="Font size"
-                           Value="{Binding FontSize}"
-                           Minimum="8" Maximum="48" Increment="1"
-                           FormatString="0"
-                           Margin="0,8,0,0"/>
-
-            <!-- Genie 4's Mono Font (#395): DR's column-aligned blocks (EXP,
-                 maps, appraisals) and #echo mono. -->
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="Mono font" VerticalAlignment="Center" Margin="0,8,0,0"
-                       ToolTip.Tip="Used for the game's column-aligned output (EXP, maps, appraisals) and #echo mono, so the columns line up whatever the font above is."/>
-            <ComboBox  Grid.Row="2" Grid.Column="1"
-                       AutomationProperties.Name="Mono font"
-                       ItemsSource="{Binding SystemFonts}"
-                       SelectedItem="{Binding MonoFontFamily}"
-                       HorizontalAlignment="Stretch"
-                       MaxDropDownHeight="300"
-                       Margin="0,8,0,0">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="x:String">
-                  <TextBlock Text="{Binding}" FontFamily="{Binding Converter={x:Static controls:FontChain.NameToFamily}}" FontSize="13"/>
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-
-            <TextBlock Grid.Row="3" Grid.Column="0" Text="Mono font size" VerticalAlignment="Center" Margin="0,8,0,0"/>
-            <NumericUpDown Grid.Row="3" Grid.Column="1"
-                           AutomationProperties.Name="Mono font size"
-                           ToolTip.Tip="0 uses the window's font size."
-                           Value="{Binding MonoFontSize}"
-                           Minimum="0" Maximum="48" Increment="1"
-                           FormatString="0"
-                           Margin="0,8,0,0"/>
-          </Grid>
-
-          <Separator Margin="0,4,0,4"/>
-
-          <!-- ── Colors (Avalonia ColorPicker — palette + HSV sliders + hex) ── -->
-          <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto">
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Game text" VerticalAlignment="Center"/>
-            <ColorPicker Grid.Row="0" Grid.Column="1"
-                         AutomationProperties.Name="Game text"
-                         Color="{Binding GameColor}"
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="Font family" VerticalAlignment="Center"/>
+              <ComboBox  Grid.Row="0" Grid.Column="1"
+                         AutomationProperties.Name="Font family"
+                         ItemsSource="{Binding SystemFonts}"
+                         SelectedItem="{Binding FontFamily}"
                          HorizontalAlignment="Stretch"
-                         IsAlphaVisible="False"
-                         IsAlphaEnabled="False"/>
+                         MaxDropDownHeight="300">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <!-- Render each entry in the font it represents so the user
+                         can preview the typeface as they scroll the list. -->
+                    <TextBlock Text="{Binding}" FontFamily="{Binding Converter={x:Static controls:FontChain.NameToFamily}}" FontSize="13"/>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
 
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Echoes" VerticalAlignment="Center" Margin="0,8,0,0"/>
-            <ColorPicker Grid.Row="1" Grid.Column="1"
-                         AutomationProperties.Name="Echoes"
-                         Color="{Binding EchoColor}"
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="Font size" VerticalAlignment="Center" Margin="0,8,0,0"/>
+              <NumericUpDown Grid.Row="1" Grid.Column="1"
+                             AutomationProperties.Name="Font size"
+                             Value="{Binding FontSize}"
+                             Minimum="8" Maximum="48" Increment="1"
+                             FormatString="0"
+                             Margin="0,8,0,0"/>
+
+              <!-- Genie 4's Mono Font (#395): DR's column-aligned blocks (EXP,
+                   maps, appraisals) and #echo mono. -->
+              <TextBlock Grid.Row="2" Grid.Column="0" Text="Mono font" VerticalAlignment="Center" Margin="0,8,0,0"
+                         ToolTip.Tip="Used for the game's column-aligned output (EXP, maps, appraisals) and #echo mono, so the columns line up whatever the font above is."/>
+              <ComboBox  Grid.Row="2" Grid.Column="1"
+                         AutomationProperties.Name="Mono font"
+                         ItemsSource="{Binding SystemFonts}"
+                         SelectedItem="{Binding MonoFontFamily}"
                          HorizontalAlignment="Stretch"
-                         IsAlphaVisible="False"
-                         IsAlphaEnabled="False"
-                         Margin="0,8,0,0"/>
-          </Grid>
+                         MaxDropDownHeight="300"
+                         Margin="0,8,0,0">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Text="{Binding}" FontFamily="{Binding Converter={x:Static controls:FontChain.NameToFamily}}" FontSize="13"/>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
 
-          <!-- public #304: these two also appear in the theme editor. It is the SAME
-               value (display.json), not a second copy — say so here too. -->
-          <TextBlock Text="{x:Static vm:DisplaySettingsViewModel.GameColorsNote}"
-                     FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
-                     TextWrapping="Wrap"/>
+              <TextBlock Grid.Row="3" Grid.Column="0" Text="Mono font size" VerticalAlignment="Center" Margin="0,8,0,0"/>
+              <NumericUpDown Grid.Row="3" Grid.Column="1"
+                             AutomationProperties.Name="Mono font size"
+                             ToolTip.Tip="0 uses the window's font size."
+                             Value="{Binding MonoFontSize}"
+                             Minimum="0" Maximum="48" Increment="1"
+                             FormatString="0"
+                             Margin="0,8,0,0"/>
+            </Grid>
 
-          <CheckBox Content="Italicize local echoes (typed commands, #echo, scripts)"
-                    IsChecked="{Binding EchoItalic}"
-                    Margin="0,4,0,0"/>
+            <Separator Margin="0,4,0,4"/>
 
-          <!-- #365: full-width scrollbars instead of the idle thin line. -->
-          <CheckBox Content="Always show scrollbars (don't shrink them to a thin line)"
-                    IsChecked="{Binding AlwaysShowScrollbars}"/>
+            <!-- ── Colors (Avalonia ColorPicker — palette + HSV sliders + hex) ── -->
+            <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto">
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="Game text" VerticalAlignment="Center"/>
+              <ColorPicker Grid.Row="0" Grid.Column="1"
+                           AutomationProperties.Name="Game text"
+                           Color="{Binding GameColor}"
+                           HorizontalAlignment="Stretch"
+                           IsAlphaVisible="False"
+                           IsAlphaEnabled="False"/>
 
-          <Separator Margin="0,4,0,4"/>
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="Echoes" VerticalAlignment="Center" Margin="0,8,0,0"/>
+              <ColorPicker Grid.Row="1" Grid.Column="1"
+                           AutomationProperties.Name="Echoes"
+                           Color="{Binding EchoColor}"
+                           HorizontalAlignment="Stretch"
+                           IsAlphaVisible="False"
+                           IsAlphaEnabled="False"
+                           Margin="0,8,0,0"/>
+            </Grid>
 
-          <!-- ── External editor (Edit Script + #edit foo) ────────────── -->
-          <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto">
-            <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
-                       Text="External editor for &quot;Edit Script&quot; (✏ in Script Bar, #edit command)"
+            <!-- public #304: these two also appear in the theme editor. It is the SAME
+                 value (display.json), not a second copy — say so here too. -->
+            <TextBlock Text="{x:Static vm:DisplaySettingsViewModel.GameColorsNote}"
                        FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
-                       TextWrapping="Wrap" Margin="0,0,0,4"/>
-            <TextBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
-                     AutomationProperties.Name="External editor"
-                     Text="{Binding EditorPath}"
-                     Watermark="Leave empty to use OS default — e.g. C:\Program Files\Notepad++\notepad++.exe"
-                     FontFamily="Consolas,Courier New,monospace"
-                     FontSize="11"/>
-          </Grid>
+                       TextWrapping="Wrap"/>
 
-        </StackPanel>
+            <CheckBox Content="Italicize local echoes (typed commands, #echo, scripts)"
+                      IsChecked="{Binding EchoItalic}"
+                      Margin="0,4,0,0"/>
+
+            <!-- #365: full-width scrollbars instead of the idle thin line. -->
+            <CheckBox Content="Always show scrollbars (don't shrink them to a thin line)"
+                      IsChecked="{Binding AlwaysShowScrollbars}"/>
+
+            <Separator Margin="0,4,0,4"/>
+
+            <!-- ── External editor (Edit Script + #edit foo) ────────────── -->
+            <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto">
+              <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+                         Text="External editor for &quot;Edit Script&quot; (✏ in Script Bar, #edit command)"
+                         FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
+                         TextWrapping="Wrap" Margin="0,0,0,4"/>
+              <TextBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                       AutomationProperties.Name="External editor"
+                       Text="{Binding EditorPath}"
+                       Watermark="Leave empty to use OS default — e.g. C:\Program Files\Notepad++\notepad++.exe"
+                       FontFamily="Consolas,Courier New,monospace"
+                       FontSize="11"/>
+            </Grid>
+
+          </StackPanel>
+        </ScrollViewer>
       </TabItem>
 
       <!-- ══ Theme (#20) ════════════════════════════════════════════════ -->
       <TabItem Header="Theme">
-        <StackPanel Spacing="10" Margin="0,8,0,0">
+        <!-- Scrolls when the dialog is shorter than its content: it keeps its
+             old 560 px height so OK / Cancel stay on a 1366x768 screen at
+             125% (#422 review), and it can be resized. -->
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="10" Margin="0,8,0,0">
 
-          <Grid ColumnDefinitions="110,*">
-            <TextBlock Grid.Column="0" Text="Theme" VerticalAlignment="Center"/>
-            <ComboBox  Grid.Column="1"
-                       AutomationProperties.Name="Theme"
-                       ItemsSource="{Binding ThemeNames}"
-                       SelectedItem="{Binding SelectedThemeName}"
-                       HorizontalAlignment="Stretch"
-                       MaxDropDownHeight="300"/>
-          </Grid>
+            <Grid ColumnDefinitions="110,*">
+              <TextBlock Grid.Column="0" Text="Theme" VerticalAlignment="Center"/>
+              <ComboBox  Grid.Column="1"
+                         AutomationProperties.Name="Theme"
+                         ItemsSource="{Binding ThemeNames}"
+                         SelectedItem="{Binding SelectedThemeName}"
+                         HorizontalAlignment="Stretch"
+                         MaxDropDownHeight="300"/>
+            </Grid>
 
-          <TextBlock Text="Picking a theme applies it immediately so you can see it behind this dialog. Cancel puts the previous theme back."
-                     FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
-                     TextWrapping="Wrap"/>
+            <TextBlock Text="Picking a theme applies it immediately so you can see it behind this dialog. Cancel puts the previous theme back."
+                       FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
+                       TextWrapping="Wrap"/>
 
-          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-            <Button Content="Import…"    Click="OnImportThemeClick"
-                    ToolTip.Tip="Add a shared theme JSON file to your Config\Themes folder and apply it."/>
-            <Button Content="Export…"    Click="OnExportThemeClick"
-                    ToolTip.Tip="Save the selected theme as a JSON file to share or hand-edit."/>
-            <Button Content="Duplicate…" Click="OnDuplicateThemeClick"
-                    ToolTip.Tip="Copy the selected theme to a new custom theme — the usual way to start editing a built-in."/>
-            <Button Content="Delete"     Click="OnDeleteThemeClick"
-                    IsEnabled="{Binding CanDeleteTheme}"
-                    ToolTip.Tip="Delete the selected custom theme file. Built-in themes can't be deleted."/>
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+              <Button Content="Import…"    Click="OnImportThemeClick"
+                      ToolTip.Tip="Add a shared theme JSON file to your Config\Themes folder and apply it."/>
+              <Button Content="Export…"    Click="OnExportThemeClick"
+                      ToolTip.Tip="Save the selected theme as a JSON file to share or hand-edit."/>
+              <Button Content="Duplicate…" Click="OnDuplicateThemeClick"
+                      ToolTip.Tip="Copy the selected theme to a new custom theme — the usual way to start editing a built-in."/>
+              <Button Content="Delete"     Click="OnDeleteThemeClick"
+                      IsEnabled="{Binding CanDeleteTheme}"
+                      ToolTip.Tip="Delete the selected custom theme file. Built-in themes can't be deleted."/>
+            </StackPanel>
+
+            <TextBlock Text="{Binding ThemeStatus}"
+                       FontSize="11" Foreground="{DynamicResource Theme.SectionHeader}"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding ThemeStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+            <Separator Margin="0,4,0,4"/>
+
+            <TextBlock Text="Custom themes are hand-editable JSON files in Config\Themes. For a full color-role editor with live preview, use Edit → Theme → Edit Theme…"
+                       FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
+                       TextWrapping="Wrap"/>
+
           </StackPanel>
-
-          <TextBlock Text="{Binding ThemeStatus}"
-                     FontSize="11" Foreground="{DynamicResource Theme.SectionHeader}"
-                     TextWrapping="Wrap"
-                     IsVisible="{Binding ThemeStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-
-          <Separator Margin="0,4,0,4"/>
-
-          <TextBlock Text="Custom themes are hand-editable JSON files in Config\Themes. For a full color-role editor with live preview, use Edit → Theme → Edit Theme…"
-                     FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
-                     TextWrapping="Wrap"/>
-
-        </StackPanel>
+        </ScrollViewer>
       </TabItem>
 
     </TabControl>

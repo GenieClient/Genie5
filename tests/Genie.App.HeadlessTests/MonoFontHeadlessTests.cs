@@ -77,6 +77,28 @@ public class MonoFontHeadlessTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void Font_list_keeps_later_installed_fonts_for_fallback_and_drops_missing_ones()
+    {
+        // #422 review: resolving to the first installed family alone lost
+        // per-character fallback to the rest of the list. Missing names stay out
+        // (a missing family made Avalonia reload fallback font data on Linux).
+        // The lookup is supplied: the headless font manager reports every name.
+        string? Lookup(string name) => name switch
+        {
+            "Cascadia Mono"    => "Cascadia Mono",
+            "DejaVu Sans Mono" => "DejaVu Sans Mono",
+            "monospace"        => "DejaVu Sans Mono",   // fontconfig's answer on Ubuntu
+            _                  => null,                 // Consolas, Courier New: not installed
+        };
+
+        Assert.Equal(new[] { "Cascadia Mono", "DejaVu Sans Mono" },
+            FontChain.InstalledNames("Consolas, Cascadia Mono, Courier New, DejaVu Sans Mono, monospace", Lookup));
+        Assert.Equal(new[] { "DejaVu Sans Mono" },
+            FontChain.InstalledNames("Consolas,Courier New,monospace", Lookup));
+        Assert.Empty(FontChain.InstalledNames("Consolas,Courier New", Lookup));
+    }
+
+    [AvaloniaFact]
     public void Font_picker_converter_turns_a_name_into_a_font()
     {
         var f = FontChain.NameToFamily.Convert("DejaVu Sans Mono", typeof(FontFamily), null,

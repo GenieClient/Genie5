@@ -19,9 +19,14 @@ namespace Genie.App.Controls;
 ///
 /// <para>So each name is tried on its own, in order: a named family counts only
 /// if that family is what comes back (not the default it falls back to), and
-/// <c>monospace</c> counts only if what comes back is fixed-pitch. If nothing in
-/// the list resolves, the setting is used as written, which is what Genie did
-/// before. Results are cached per setting string.</para>
+/// <c>monospace</c> counts only if what comes back is fixed-pitch. The result is
+/// the first installed font followed by the other installed fonts in the list,
+/// so characters the first one lacks still fall back along the user's list. If
+/// nothing in the list resolves, the setting is used as written, which is what
+/// Genie did before. Results are cached per setting string.</para>
+///
+/// <para>A family must be written the way the system names it: a localized or
+/// aliased name the font manager doesn't report is treated as not installed.</para>
 /// </summary>
 public static class FontChain
 {
@@ -68,9 +73,31 @@ public static class FontChain
         if (setting.Contains('#') || setting.Contains(':'))
             return new FontFamily(setting);
 
-        return ResolvedName(setting) is { } family
-            ? new FontFamily(family)
+        var installed = InstalledNames(setting);
+        return installed.Count > 0
+            ? new FontFamily(string.Join(", ", installed))
             : new FontFamily(setting);
+    }
+
+    /// <summary>The installed families in <paramref name="setting"/>, in order,
+    /// starting at the first one that resolves. Handing the renderer the later
+    /// installed names too keeps per-character fallback to them for glyphs the
+    /// first font lacks (#422 review). Names that aren't installed are left out:
+    /// a missing family in the list is what made Avalonia reload fallback font
+    /// data on every lookup on Linux.</summary>
+    internal static IReadOnlyList<string> InstalledNames(string setting)
+        => InstalledNames(setting, name => TryInstalled(name, out var family) ? family : null);
+
+    /// <summary><see cref="InstalledNames(string)"/> with the font lookup supplied
+    /// (the installed family a name resolves to, or null) — for tests.</summary>
+    internal static IReadOnlyList<string> InstalledNames(string setting, Func<string, string?> lookup)
+    {
+        var result = new List<string>();
+        foreach (var name in Names(setting.Trim()))
+            if (lookup(name) is { } family &&
+                !result.Contains(family, StringComparer.OrdinalIgnoreCase))
+                result.Add(family);
+        return result;
     }
 
     private static string[] Names(string setting)
