@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Input;
@@ -10,25 +9,16 @@ using Genie.Core.Highlights;
 namespace Genie.App.Highlighting;
 
 /// <summary>
-/// Default Wrayth-style highlight set applied to incoming game text. First-rule-
-/// per-character wins on overlap. Patterns are compiled once and reused.
+/// Resolves how incoming game text is coloured: player names, MonsterBold, the
+/// user's highlight rules and the preset palette, plus clickable link spans.
 ///
-/// Future work: merge with user-defined rules from <c>HighlightEngine</c> /
-/// <c>NameHighlightEngine</c> in <c>Genie.Core</c>.
+/// <para>There are no built-in colour rules (public #396). Genie 3/4 coloured
+/// only what the game styled and what the user configured; text nothing claims
+/// keeps the window's normal foreground. Every colour applied here comes from
+/// a user-editable source — name / highlight rules or a preset.</para>
 /// </summary>
 public static partial class DefaultHighlights
 {
-    // ── Brushes (sharable, immutable) ─────────────────────────────────────────
-
-    private static readonly IBrush CurrencyBrush   = MakeBrush(0x7C, 0xC8, 0x7C); // green
-    private static readonly IBrush DirectionBrush  = MakeBrush(0x7C, 0xC8, 0xE8); // cyan
-    private static readonly IBrush PossessiveBrush = MakeBrush(0xE0, 0xC0, 0x78); // gold
-    private static readonly IBrush AllCapsBrush    = MakeBrush(0xE8, 0x90, 0x60); // orange
-    private static readonly IBrush RoundTimeBrush  = MakeBrush(0xE0, 0x60, 0x60); // red-orange
-    private static readonly IBrush NumberBrush     = MakeBrush(0xC8, 0xC8, 0x90); // tan-cream
-    private static readonly IBrush RoomTitleBrush  = MakeBrush(0x90, 0xA8, 0xF0); // light blue
-    private static readonly IBrush LinkBrush       = MakeBrush(0x80, 0xC0, 0xFF); // bright blue (Wrayth convention)
-    private static readonly IBrush UrlBrush        = MakeBrush(0x8C, 0xD8, 0xA8); // cool green — distinguishes external URLs from game-command links
 
     /// <summary>
     /// Click dispatcher for &lt;d cmd&gt; links. Set by <c>MainWindowViewModel</c>
@@ -89,60 +79,23 @@ public static partial class DefaultHighlights
     /// </summary>
     public static bool MonsterBoldEnabled = true;
 
-    // ── Patterns (ordered: earlier rules win on overlap) ──────────────────────
+    /// <summary>Preset ids for link colours (public #396): <c>link</c> for game-command
+    /// <c>&lt;d cmd&gt;</c> links, <c>url</c> for external <c>&lt;a href&gt;</c> links.</summary>
+    public const string LinkPresetId = "link";
+    public const string UrlPresetId  = "url";
 
-    private static readonly (Regex Pattern, IBrush Brush)[] Rules =
-    [
-        // Bracketed room titles on their own line — e.g. [Garden Rooftop, Medical Pavilion]
-        (RoomTitleRegex(), RoomTitleBrush),
+    /// <summary>Stock palette used before a session connects (no
+    /// <see cref="PresetEngine"/> yet), so link colours still come from the
+    /// preset defaults rather than a second hardcoded copy.</summary>
+    private static readonly Genie.Core.Presets.PresetEngine StockPresets = new();
 
-        // "Roundtime: 3 sec." / "Roundtime: 3 seconds." — combat readiness signal
-        (RoundTimeRegex(), RoundTimeBrush),
-
-        // Compass directions when listed as exits or in movement messages
-        (DirectionRegex(), DirectionBrush),
-
-        // Currency metals + DR currency names
-        (CurrencyMetalRegex(), CurrencyBrush),
-        (CurrencyNameRegex(), CurrencyBrush),
-
-        // "Your X" — common in health, vitals, status checks
-        (PossessiveRegex(), PossessiveBrush),
-
-        // All-caps tags like BANK DEBT, GO HOLD, RUMOR — 2+ caps words in a row
-        (AllCapsRegex(), AllCapsBrush),
-
-        // Numbers >= 2 digits (skips small inline numbers like "1 sec")
-        (NumberRegex(), NumberBrush),
-    ];
-
-    // Source-generated (public #285): matcher code is built at compile time
-    // instead of JIT-compiled on first match.
-    [GeneratedRegex(@"^\s*\[[^\]]+\]\s*$", RegexOptions.CultureInvariant)]
-    private static partial Regex RoomTitleRegex();
-    [GeneratedRegex(@"\bRoundtime:\s*\d+\s*sec(?:ond)?s?\.?", RegexOptions.CultureInvariant)]
-    private static partial Regex RoundTimeRegex();
-    [GeneratedRegex(@"\b(?:north|south|east|west|northeast|northwest|southeast|southwest|up|down|out)\b", RegexOptions.CultureInvariant)]
-    private static partial Regex DirectionRegex();
-    [GeneratedRegex(@"\b(?:platinum|gold|silver|bronze|copper)\b(?=\s+(?:Kronars|Lirums|Dokoras|coins?)|\s+to|,|\s*$|\s*\.)", RegexOptions.CultureInvariant)]
-    private static partial Regex CurrencyMetalRegex();
-    [GeneratedRegex(@"\b(?:Kronars|Lirums|Dokoras)\b", RegexOptions.CultureInvariant)]
-    private static partial Regex CurrencyNameRegex();
-    [GeneratedRegex(@"\bYour\b", RegexOptions.CultureInvariant)]
-    private static partial Regex PossessiveRegex();
-    [GeneratedRegex(@"\b[A-Z]{2,}(?:\s+[A-Z]{2,})+\b", RegexOptions.CultureInvariant)]
-    private static partial Regex AllCapsRegex();
-    [GeneratedRegex(@"\b\d{2,}\b", RegexOptions.CultureInvariant)]
-    private static partial Regex NumberRegex();
-
-    private static IBrush MakeBrush(byte r, byte g, byte b)
-        => new SolidColorBrush(Color.FromRgb(r, g, b));
-
-    /// <summary>The foreground a link span paints with — game-command blue or
-    /// external-URL green. Shared with the AvaloniaEdit renderer's link element
-    /// (<c>Controls.GameLinkGenerator</c>) so both paths colour <c>&lt;d cmd&gt;</c>
-    /// spans identically rather than each keeping their own copy of the palette.</summary>
-    internal static IBrush LinkForeground(bool isUrl) => isUrl ? UrlBrush : LinkBrush;
+    /// <summary>The foreground a link span paints with — the <c>link</c> preset for
+    /// game-command links, the <c>url</c> preset for external URLs. Null when the
+    /// preset is "Default"/unset: the link then keeps the surrounding text colour
+    /// (still underlined). Shared with the AvaloniaEdit renderer's link element
+    /// (<c>Controls.GameLinkGenerator</c>) so both paths colour links identically.</summary>
+    internal static IBrush? LinkForeground(bool isUrl)
+        => GetUserBrush((PresetEngine ?? StockPresets).GetForeground(isUrl ? UrlPresetId : LinkPresetId));
 
     // ── Tokenizer ─────────────────────────────────────────────────────────────
 
@@ -207,10 +160,10 @@ public static partial class DefaultHighlights
 
     /// <summary>
     /// Split <paramref name="text"/> into a sequence of styled <see cref="Inline"/>s.
-    /// Each character is colored by the first matching rule; runs of identical-color
-    /// characters collapse into a single <see cref="Run"/>. Built-in defaults run
-    /// first, then user-defined rules from <see cref="UserHighlights.Engine"/>
-    /// fill in any character positions the defaults didn't claim.
+    /// Each character is colored by the first layer that claims it (see
+    /// <see cref="BuildStyleMap"/>); runs of identical-color characters collapse
+    /// into a single <see cref="Run"/>. Unclaimed characters keep the default
+    /// foreground.
     ///
     /// <paramref name="links"/> overlays clickable spans (from
     /// <c>&lt;d cmd="..."&gt;</c> markup): each span emits its own
@@ -264,8 +217,8 @@ public static partial class DefaultHighlights
     /// matching line, exactly as before).
     /// <para>Layer order, top to bottom: player names (#154, supreme) →
     /// MonsterBold colour (#131, above user rules per #235) → user highlight
-    /// rules (#143) → built-in defaults → preset spans (base). Earlier layers
-    /// win: each writes only where the channel is still null.</para>
+    /// rules (#143) → preset spans (base). Earlier layers win: each writes only
+    /// where the channel is still null. There is no built-in colour layer (#396).</para>
     /// </summary>
     public static StyleMap BuildStyleMap(string text,
                                          IReadOnlyList<LinkSpan>? links = null,
@@ -303,7 +256,7 @@ public static partial class DefaultHighlights
 
         // ── Player-name highlights (#154) — SUPREME layer ─────────────
         // Name rules are the top colour layer (Genie 4 semantics): they paint
-        // FIRST, before user string highlights and the built-in defaults, so a
+        // FIRST, before user string highlights and presets, so a
         // named player always shows their name colour even where another rule
         // would also match those characters. First-write-wins, foreground and
         // background painted independently. MatchAll yields non-overlapping
@@ -331,7 +284,7 @@ public static partial class DefaultHighlights
         // PRE-EMPTS normal highlights — a cosmetic rule ("You also see…") must
         // never disguise a creature or an Events message. So the colour paints
         // right after names (a named player inside a bold line keeps their
-        // name colour — names stay supreme) and before user/built-in rules.
+        // name colour — names stay supreme) and before user rules.
         // Foreground only: a user rule's BACKGROUND still applies beneath it.
         // Set the `creatures` preset to Default in the Presets panel for
         // weight-only bold (colour off, and user rules colour bold text again).
@@ -344,12 +297,9 @@ public static partial class DefaultHighlights
         }
 
         // ── User-defined highlights from the live HighlightEngine ─────
-        // User rules paint after names but before the built-in defaults: they win
-        // over the built-ins on overlap (#143) — Genie 4 semantics, where the
-        // user's own highlight config beats the auto-colouring — yet yield to a
-        // name rule on the same characters (names are supreme, above). A user rule
-        // on the room title or on EXP numbers still beats the built-in RoomTitle/
-        // Number colours; the defaults below fill only the characters nothing claimed.
+        // User rules paint after names but before presets: they win over a
+        // preset's base colour on overlap (Genie 4 semantics) yet yield to a
+        // name rule on the same characters (names are supreme, above).
         // Timed into the Highlights stage (no-op overhead when the overlay is
         // hidden). This is the render-path cost of user highlight rules.
         if (UserHighlights.Engine is { Enabled: true } engine)
@@ -403,20 +353,8 @@ public static partial class DefaultHighlights
                 ApplyUserHighlights();
         }
 
-        // ── Built-in default highlights (room titles, currencies, …) ──
-        // Fill only positions no user rule claimed above (the null check keeps
-        // user highlights on top); within this set, earlier rules still win.
-        foreach (var (pattern, brush) in Rules)
-        {
-            foreach (Match m in pattern.Matches(text))
-            {
-                for (int i = m.Index; i < m.Index + m.Length; i++)
-                    if (brushes[i] is null) brushes[i] = brush;
-            }
-        }
-
         // ── Preset colours (base layer) ──────────────────────────────────
-        // Apply preset span colours LAST with ??= so built-in and user
+        // Apply preset span colours LAST with ??= so name / MonsterBold / user
         // highlights win where they fired; presets fill the remaining chars of
         // a preset region (room descriptions, whispers, speech, …) with their
         // palette colour. "Default"/unknown palette entries leave the text its
@@ -588,7 +526,6 @@ public static partial class DefaultHighlights
         var tb = new TextBlock
         {
             Text             = text,
-            Foreground       = isUrl ? UrlBrush : LinkBrush,
             TextDecorations  = TextDecorations.Underline,
             Cursor           = new Cursor(StandardCursorType.Hand),
             // Payload so a container that owns pointer input (the game window's
@@ -597,6 +534,9 @@ public static partial class DefaultHighlights
             // Other panels keep using the PointerPressed handler below.
             Tag              = new LinkPayload(command, text, isUrl),
         };
+        // `link` / `url` preset colour; "Default" leaves Foreground unset so the
+        // link inherits the surrounding text colour.
+        if (LinkForeground(isUrl) is { } linkFg) tb.Foreground = linkFg;
         // Tooltip shows the URL for external links — safety hint before the
         // user clicks something that will leave the game window and open a
         // browser. Game-command links don't need a tooltip because the

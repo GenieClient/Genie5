@@ -116,7 +116,9 @@ internal sealed class GameLinkElement : VisualLineText
         // is created, so this is the last word on a link's appearance — which is
         // what we want, since a link paints as a link regardless of what highlight
         // rules matched the same characters (legacy parity).
-        TextRunProperties.SetForegroundBrush(DefaultHighlights.LinkForeground(_link.IsUrl));
+        // A "Default" link/url preset leaves the run's own foreground in place.
+        if (DefaultHighlights.LinkForeground(_link.IsUrl) is { } linkFg)
+            TextRunProperties.SetForegroundBrush(linkFg);
         TextRunProperties.SetTextDecorations(TextDecorations.Underline);
         return base.CreateTextRun(startVisualColumn, context);
     }

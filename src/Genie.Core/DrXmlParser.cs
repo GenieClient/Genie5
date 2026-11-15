@@ -858,6 +858,28 @@ public sealed partial class DrXmlParser : IDisposable
                 (x, s, l) => new LinkSpan(s, l, x.Command, x.IsUrl), Rebase);
         }
 
+        // Genie 4 parity: DR indents the room-objects line with two spaces
+        // ("  You also see …"), both after a room title and in plain-text
+        // responses such as PEER WINDOW. Genie 4 trimmed that one line before
+        // display and scripts (Game.PrintTextWithParse), so scripts written
+        // for it anchor on "^You also see" and never match the indented copy.
+        // Trim it here too, shifting the spans to the trimmed text. Every
+        // other line keeps its leading whitespace (see the note above).
+        var alsoSee = stripped.TrimStart();
+        if (alsoSee.Length < stripped.Length
+            && alsoSee.StartsWith("You also see", StringComparison.Ordinal))
+        {
+            var lead = stripped.Length - alsoSee.Length;
+            stripped = alsoSee;
+            int Shift(int offset) => Math.Clamp(offset - lead, 0, stripped.Length);
+            boldSpans = RebaseSpans(boldSpans, b => b.Start, b => b.Length,
+                (_, s, l) => new BoldSpan(s, l), Shift);
+            presetSpans = RebaseSpans(presetSpans, p => p.Start, p => p.Length,
+                (p, s, l) => new PresetSpan(s, l, p.PresetId), Shift);
+            links = RebaseSpans(links, x => x.Start, x => x.Length,
+                (x, s, l) => new LinkSpan(s, l, x.Command, x.IsUrl), Shift);
+        }
+
         // Bare-text prompt line (">", "H>", "HR>"). Trim leading whitespace
         // for prompt detection only — the regex anchors on '^' so accidental
         // leading spaces from XML tag splits would miss the match.

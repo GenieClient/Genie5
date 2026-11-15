@@ -1,3 +1,30 @@
+# Unreleased — staged for the next cut
+
+## ✨ New
+- **Festival maps straight from the Maps repo, no root copy needed** — the community
+  Maps repository keeps event zones (Hollow Eve, Guild Fest, the faires) in a
+  "Festivals" subfolder that Genie 5 did not pull, so a festival map only reached you
+  when someone also committed a temporary copy at the repo root. Each row on the
+  Updates dialog's **Maps** tab now has a **Festivals** checkbox (and a separate
+  **Quests (spoilers)** one for the quest-maps folder): tick it and Check, Update,
+  the startup check and **Maps ▸ Update Maps** all pull that folder too, flat into
+  your Maps folder beside the regular zones, tracked like any other zone. Both are
+  off by default, and a zone that is also at the repo root is taken from the root.
+  The same switches are `#config mapfestivals on|off` and `#config mapquests on|off`;
+  they live in `update-feeds.json`, not `settings.cfg`.
+
+## 💡 Notes
+- **Room titles, links and URLs now take their colours from presets** — Genie 5 no
+  longer paints any game text with built-in colours of its own. Bracketed room titles
+  used to be light blue; they now use the `roomname` preset, whose stock colour is
+  orange (`#FF8000`), as in Genie 4. **If you want the old look back,** type
+  `#preset roomname #90A8F0`, or pick the colour on the **Presets** tab in
+  Configuration. Game-command links and web links have their own presets too, `link`
+  and `url`, so they can be recoloured the same way. Thanks @dylb0t
+  ([#408](https://github.com/GenieClient/Genie5/pull/408)).
+
+---
+
 # Genie 5 — v5.0.0-beta.9.10.1
 
 **"Second Pass"** — a small fixes release. Right-click in the Healing window now transfers

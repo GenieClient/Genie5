@@ -720,14 +720,17 @@ public sealed class GenieConfig
             var path = Path.IsPathRooted(fileName) ? fileName : Path.Combine(ConfigDir, fileName);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var pairs = ToConfigPairs();
-            var lines = new string[pairs.Count];
-            for (var i = 0; i < pairs.Count; i++)
+            var lines = new List<string>(pairs.Count);
+            foreach (var (key, raw) in pairs)
             {
+                // Keys whose truth lives in another file are never written
+                // here — see NotPersistedKeys.
+                if (NotPersistedKeys.Contains(key)) continue;
                 // Record is session-only: always written as False (see AutoMapper).
-                var value = pairs[i].Key.Equals(SessionOnlyKey, StringComparison.OrdinalIgnoreCase)
+                var value = key.Equals(SessionOnlyKey, StringComparison.OrdinalIgnoreCase)
                     ? bool.FalseString
-                    : pairs[i].Value;
-                lines[i] = $"#config {{{pairs[i].Key}}} {{{value}}}";
+                    : raw;
+                lines.Add($"#config {{{key}}} {{{value}}}");
             }
             File.WriteAllLines(path, lines);
             return true;
@@ -741,7 +744,11 @@ public sealed class GenieConfig
     /// <c>#config {key} {value}</c> line each) and <see cref="GetSetting"/>
     /// (reads a current value). Keys match the <see cref="SetSetting"/> cases.
     /// </summary>
-    public IReadOnlyList<(string Key, string Value)> ToConfigPairs() => new (string, string)[]
+    public IReadOnlyList<(string Key, string Value)> ToConfigPairs()
+    {
+        // One read of update-feeds.json serves both maps-feed keys.
+        var (mapFestivals, mapQuests) = ReadMapFeedFolders();
+        return new (string, string)[]
     {
         ("alwaysontop", AlwaysOnTop.ToString()),
         ("alwaysshowscrollbars", AlwaysShowScrollbars.ToString()),
@@ -845,9 +852,56 @@ public sealed class GenieConfig
         ("mapperdebug", MapperDebug.ToString()),
         ("autoupdate", AutoUpdate.ToString()),
         ("checkforupdates", CheckForUpdates.ToString()),
+        ("mapfestivals", mapFestivals.ToString()),
+        ("mapquests", mapQuests.ToString()),
         ("scriptextension", ScriptExtension),
         ("frontend", FrontEndIdentifier),
     };
+    }
+
+    // ── Maps feed subfolders (#config mapfestivals / mapquests) ──────────────
+
+    /// <summary>
+    /// <c>#config</c> keys whose value is read from, and written to, another
+    /// file — <see cref="Save"/> never writes them to settings.cfg and
+    /// <see cref="Load"/> ignores them there, so a stale copy can never
+    /// overwrite the real store at the next launch. Today: <c>mapfestivals</c>
+    /// and <c>mapquests</c>, which live per Maps feed row in
+    /// <c>update-feeds.json</c> (<see cref="Update.FeedEntry.IncludeFestivalMaps"/> /
+    /// <see cref="Update.FeedEntry.IncludeQuestMaps"/>) so the Updates dialog
+    /// and the typed command share one source of truth.
+    /// </summary>
+    public static readonly IReadOnlySet<string> NotPersistedKeys =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "mapfestivals", "mapquests" };
+
+    /// <summary>Current state of the two maps-feed subfolder toggles: on when
+    /// ANY Maps feed row has the folder enabled. Never throws — an unreadable
+    /// update-feeds.json reads as both off, the same as a fresh install.</summary>
+    private (bool Festivals, bool Quests) ReadMapFeedFolders()
+    {
+        try
+        {
+            var maps = new Update.FeedConfigStore(ConfigDir).Load().Maps;
+            return (maps.Any(f => f.IncludeFestivalMaps), maps.Any(f => f.IncludeQuestMaps));
+        }
+        catch { return (false, false); }
+    }
+
+    /// <summary>Flip one subfolder toggle on EVERY Maps feed row and write
+    /// update-feeds.json back. The typed command is a global switch; the
+    /// Updates dialog's per-row checkboxes are the fine-grained control.</summary>
+    private void SetMapFeedFolder(bool festivals, bool on)
+    {
+        var store = new Update.FeedConfigStore(ConfigDir);
+        var cfg   = store.Load();
+        foreach (var feed in cfg.Maps)
+        {
+            if (festivals) feed.IncludeFestivalMaps = on;
+            else           feed.IncludeQuestMaps    = on;
+        }
+        if (!store.Save(cfg))
+            throw new InvalidOperationException($"Could not write {store.FilePath}.");
+    }
 
     /// <summary>
     /// Alternate names <see cref="SetSetting"/> accepts for existing keys,
@@ -917,7 +971,7 @@ public sealed class GenieConfig
         ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsstreampriority", "ttsrate", "ttsvolume" }),
         ("Logging",          new[] { "autolog" }),
         ("Analytics",        new[] { "analytics", "analyticsinterval", "analyticsretentiondays", "analyticsreplay", "analyticsnoticeshown", "analyticsdir" }),
-        ("Updates",          new[] { "autoupdate", "checkforupdates" }),
+        ("Updates",          new[] { "autoupdate", "checkforupdates", "mapfestivals", "mapquests" }),
         ("Directories",      new[] { "scriptdir", "reposcriptdir", "sounddir", "artdir", "mapdir", "plugindir", "configdir", "logdir" }),
     };
 
@@ -935,6 +989,10 @@ public sealed class GenieConfig
             {
                 // Record (auto-create rooms) is session-only: never restored from disk.
                 if (parts[1].Equals(SessionOnlyKey, StringComparison.OrdinalIgnoreCase)) continue;
+                // Keys owned by another file (update-feeds.json) are never
+                // restored from here either — a hand-added line would otherwise
+                // overwrite the Updates dialog's choice on every launch.
+                if (NotPersistedKeys.Contains(parts[1])) continue;
                 SetSetting(parts[1], parts[2], showException: false);
             }
         }
@@ -1087,6 +1145,9 @@ public sealed class GenieConfig
                 case "mapperdebug": MapperDebug = ToBool(value); Notify(ConfigFieldUpdated.MapperDebug); break;
                 case "autoupdate": AutoUpdate = ToBool(value); Notify(ConfigFieldUpdated.AutoUpdate); break;
                 case "checkforupdates": CheckForUpdates = ToBool(value); Notify(ConfigFieldUpdated.CheckForUpdates); break;
+                // Written straight to update-feeds.json — see NotPersistedKeys.
+                case "mapfestivals": SetMapFeedFolder(festivals: true,  on: ToBool(value)); break;
+                case "mapquests":    SetMapFeedFolder(festivals: false, on: ToBool(value)); break;
                 case "scriptextension": ScriptExtension = string.IsNullOrWhiteSpace(value) ? "cmd" : value; break;
                 case "frontend":
                 case "fe":

@@ -8,7 +8,7 @@ The mapper knows where you are, draws the zone you're in, and can walk you to an
 
 The Mapper panel (**floating** in its own window by default; dock it by dragging, or toggle it via **Maps ▸ Show Mapper**) shows the current zone with your room highlighted. Rooms are drawn as nodes connected by their exits, color-coded by exit type (compass directions, vertical moves, and special exits like `go gate` or `climb wall`). Scroll to zoom; drag to pan.
 
-As you walk, Genie matches each new room to a node and re-centers on you. When you enter a room it doesn't recognize in the current zone, it can auto-switch to the zone that contains it.
+As you walk, Genie matches each new room to a node and re-centers on you. When you enter a room it doesn't recognize in the current zone, it can auto-switch to the zone that contains it. When you step onto a zone's border room (one whose note names the next map, like Shard's East Bridge), Genie switches to that map as you arrive, so `$zoneid` and `$roomid` already name the new zone when your script checks them.
 
 ### Zones, floors, and the legend
 
@@ -71,7 +71,9 @@ honors its own pacing globals (`$caravan`, `$powerwalk`, …). Starting a new
 `#config abortdupescript`). Without the script installed, the built-in walker
 handles everything as described above; `#config automapperscript false` forces
 the built-in walker even when the script is present. Cross-zone routes always
-use the built-in walker.
+use the built-in walker. A `#goto` to the room you're already in doesn't start
+the script; Genie answers `YOU HAVE ARRIVED!` itself, so a script waiting on
+the result carries on.
 
 Arcs whose move is `script <name>` can only be executed by the community
 script, so the built-in walker (and the cross-zone pathfinder) never plans a

@@ -1134,6 +1134,10 @@ public partial class MapperViewModel : ReactiveObject
         // observable's thread.
         _engine.CurrentNodeChanged += () => Dispatcher.UIThread.Post(() =>
         {
+            // The engine may already have followed a boundary stub into the
+            // next zone (#426); bring the view's zone up to date first, so the
+            // bookkeeping below pairs the room with the zone it belongs to.
+            ApplyEngineZoneFollow();
             Refresh();
             if (!BrowsingZone && _engine?.CurrentNode is { } here && !HasZoneNote(here) &&
                 !string.IsNullOrEmpty(SelectedZoneFile))
@@ -1186,13 +1190,18 @@ public partial class MapperViewModel : ReactiveObject
             // e.g. Dirge's Temple Courtyard) has a fingerprint too weak for
             // the auto-load index (2026-08-06 smoke).
             if (n is not null) _lastMatchedZoneFile = SelectedZoneFile;
-            MaybeFollowZoneNote(n);
+            // Boundary stubs are followed by the engine itself, in the same
+            // room update (see LoadLinkedZoneForEngine / #426).
         });
         _engine.MapChanged         += () => Dispatcher.UIThread.Post(Refresh);
         // #251: the engine fires this on the game thread; the handler mutates
         // VM state (BrowsingZone, LoadStatus) and drives zone loads, so marshal
         // the whole body to the UI thread — same as MapChanged above.
         _engine.ForeignRoomProbe = IsRoomInAnotherZone;
+        // #426: the engine follows a boundary stub's note on the game thread,
+        // in the same room update, so $zoneid is right before scripts react.
+        _engine.LinkedZoneLoader    = LoadLinkedZoneForEngine;
+        _engine.LinkedZoneFollowing += OnEngineFollowingZone;
         _engine.RoomNotFoundInZone += (serverId, title, exits) =>
             Dispatcher.UIThread.Post(() => OnRoomNotFoundInZone(serverId, title, exits));
         // Record mode ⇄ the `automapper` config key. The SAVED preference picks
@@ -1328,17 +1337,76 @@ public partial class MapperViewModel : ReactiveObject
     /// boundary. This is the disambiguation a room shared by several maps needs:
     /// the map data itself names the destination zone, removing the ambiguity
     /// that title/fingerprint matching can't resolve.
+    /// <para>
+    /// #426: the switch happens inside the engine, on the game thread, in the
+    /// same room update that landed on the stub — so <c>$zoneid</c> and
+    /// <c>$roomid</c> already name the new zone when a script reacts to the
+    /// arrival. (Switching here on the UI thread, after the room update, let
+    /// travel.cmd / uber.cmd read the old zone and send a second #goto for it.)
+    /// This loader runs on the game thread: it touches only the repository, the
+    /// maps directory and thread-safe fields, never view state.
+    /// </para>
     /// </summary>
-    private void MaybeFollowZoneNote(MapNode? node)
+    private MapZone? LoadLinkedZoneForEngine(string file)
     {
-        // Engine-driven follow (the character walked onto a boundary node):
-        // flag it so FollowZoneNote's zone switch doesn't read as browsing.
-        _followingEngine = true;
-        try { FollowZoneNote(node); }
-        finally { _followingEngine = false; }
+        // Already on it — also stops re-switch flapping.
+        if (string.Equals(file, _engineZoneFile, StringComparison.OrdinalIgnoreCase)) return null;
+        var repo = _zoneRepo;
+        var dir  = MapsDirectory;
+        if (repo is null || string.IsNullOrEmpty(dir)) return null;
+
+        var zone = repo.Load(Path.Combine(dir, file + ".xml"));
+        if (zone is null)
+            _audit?.Note("XZONE", $"boundary note → '{file}' but that zone isn't available");
+        return zone;
     }
 
-    // True while FollowZoneNote runs on behalf of the ENGINE (character
+    /// <summary>Game thread: the engine is about to load <paramref name="zone"/>
+    /// for a boundary stub. Remember it and let the view catch up on the UI
+    /// thread (it must not load the file again — the engine already has it).</summary>
+    private void OnEngineFollowingZone(string file, MapZone zone)
+    {
+        _audit?.Note("XZONE", $"boundary note: switching '{_engineZoneFile}' → '{file}'");
+        _engineZoneFile = file;
+        Volatile.Write(ref _pendingEngineFollow, new EngineZoneFollow(file, zone));
+        Dispatcher.UIThread.Post(ApplyEngineZoneFollow);
+    }
+
+    private sealed record EngineZoneFollow(string File, MapZone Zone);
+
+    // Set on the game thread by OnEngineFollowingZone, taken on the UI thread.
+    private EngineZoneFollow? _pendingEngineFollow;
+
+    // The zone file the ENGINE has loaded (read on the game thread by the loader).
+    private volatile string? _engineZoneFile;
+
+    // The zone LoadSelectedZone should show without loading it into the engine
+    // (the engine already switched to it — see ApplyEngineZoneFollow).
+    private EngineZoneFollow? _engineLoadedZone;
+
+    /// <summary>UI thread: point the view at the zone the engine followed into.
+    /// Runs the normal zone-change bookkeeping (portal origins, file age, status)
+    /// through LoadSelectedZone, which skips the engine load for it.</summary>
+    private void ApplyEngineZoneFollow()
+    {
+        var follow = Interlocked.Exchange(ref _pendingEngineFollow, null);
+        if (follow is null) return;
+        if (string.Equals(follow.File, SelectedZoneFile, StringComparison.OrdinalIgnoreCase)) return;
+
+        _engineLoadedZone = follow;
+        _followingEngine  = true;
+        _autoZoneSwitch   = true;
+        try { SelectedZoneFile = follow.File; }
+        finally
+        {
+            _autoZoneSwitch   = false;
+            _followingEngine  = false;
+            _engineLoadedZone = null;
+        }
+        if (_engine?.CurrentNode is not null) _lastMatchedZoneFile = follow.File;
+    }
+
+    // True while a zone switch runs on behalf of the ENGINE (character
     // movement) rather than a user action — see BrowsingZone.
     private bool _followingEngine;
 
@@ -1825,6 +1893,7 @@ public partial class MapperViewModel : ReactiveObject
     private void NewZone()
     {
         if (_engine is null) { LoadStatus = "Mapper not ready."; return; }
+        _engineZoneFile = null;   // no file yet
         _engine.NewZone("New Zone");
         // Don't trigger LoadSelectedZone — there's no file yet.
         _suppressAutoLoad = true;
@@ -2322,7 +2391,12 @@ public partial class MapperViewModel : ReactiveObject
         if (string.IsNullOrEmpty(filename))       return;
 
         var path = Path.Combine(MapsDirectory, filename + ".xml");
-        var zone = _zoneRepo.Load(path);
+        // #426: the engine already followed a boundary stub into this zone —
+        // show its copy; don't read the file or load the engine again.
+        var engineLoaded = _engineLoadedZone is { } follow &&
+                           string.Equals(follow.File, filename, StringComparison.OrdinalIgnoreCase)
+            ? follow.Zone : null;
+        var zone = engineLoaded ?? _zoneRepo.Load(path);
         if (zone is null)
         {
             LoadStatus = $"Could not load {filename}.xml";
@@ -2381,7 +2455,16 @@ public partial class MapperViewModel : ReactiveObject
         // The boundary stub we were standing on (a copy of the new zone's room) tells the
         // engine which of several identical rooms in the new zone is this one.
         var stubHint = _followingEngine && _engine.CurrentNode is { } stub && HasZoneNote(stub) ? stub : null;
-        try { _engine.LoadZone(zone, stubHint); }
+        try
+        {
+            if (engineLoaded is null)
+            {
+                // Before LoadZone: its re-resolve may follow a stub, and the
+                // engine's loader compares against this.
+                _engineZoneFile = filename;
+                _engine.LoadZone(zone, stubHint);
+            }
+        }
         finally { _loadingZone = false; }
         IsZoneDirty = false;   // memory now matches the file just read
 
@@ -2427,7 +2510,16 @@ public partial class MapperViewModel : ReactiveObject
         // command / disconnect / window-unfocus-over-60s.
         if (_engine.CurrentNode is not null)
         {
-            if (_engine.CurrentNode.Id == target.Id) { LoadStatus = "Already here."; return; }
+            if (_engine.CurrentNode.Id == target.Id)
+            {
+                // #427: answer the script, as the built-in walker does
+                // (AutoWalkService.Start). Scripts that matchwait on the
+                // arrival after a #goto (travel.cmd, uber.cmd) otherwise treat
+                // the silence as a failed move: retry, #mapper reset, random move.
+                LoadStatus = "Already here.";
+                AutoWalk.EmitAutomapperSignal(AutomapperSignals.Arrived);
+                return;
+            }
             if (TryHandOffToAutomapperScript(_engine.CurrentNode, target)) return;
             if (!AutoWalk.Start(_engine.CurrentNode, target))
                 LoadStatus = AutoWalk.LastStatusFlash ?? $"No path to '{target.Title}'.";
@@ -2681,6 +2773,33 @@ public partial class MapperViewModel : ReactiveObject
     // ── UpdateMaps implementation ─────────────────────────────────────────
     private Task UpdateMapsAsync() => UpdateMapsAsync(repair: false);
 
+    /// <summary>Config folder holding <c>update-feeds.json</c>; set by the host.
+    /// Null (designer / tests) falls back to the hardwired official repo.</summary>
+    public string? FeedConfigDir { get; set; }
+
+    /// <summary>
+    /// The sources Maps ▸ Update Maps pulls from: every ENABLED Maps feed in
+    /// update-feeds.json, each materialised through <see cref="MapsFeedSources"/>
+    /// so a row's Festivals / Quests toggles apply here exactly as they do on
+    /// the Updates dialog's Update button and the startup check. Until the
+    /// feed config is wired (or when no Maps row is enabled) this is the
+    /// official GenieClient/Maps root — the menu never silently does nothing.
+    /// </summary>
+    private IReadOnlyList<IFileListSource> ResolveMapsSources()
+    {
+        if (!string.IsNullOrWhiteSpace(FeedConfigDir))
+        {
+            try
+            {
+                var feeds   = new FeedConfigStore(FeedConfigDir).Load().Maps.Where(f => f.Enabled);
+                var sources = feeds.SelectMany(f => MapsFeedSources.Create(f)).ToList();
+                if (sources.Count > 0) return sources;
+            }
+            catch (Exception ex) { Genie.App.Diagnostics.ErrorLog.Log("ResolveMapsSources", ex); }
+        }
+        return MapsFeedSources.Create(FeedEntry.OfficialMaps());
+    }
+
     /// <summary>
     /// Pull the latest zone XMLs. With <paramref name="repair"/> the installed-
     /// revision manifest is cleared first, so EVERY zone is rewritten from
@@ -2698,21 +2817,12 @@ public partial class MapperViewModel : ReactiveObject
             return;
 
         IsUpdating    = true;
-        UpdateStatus  = "Contacting github.com/GenieClient/Maps...";
+        UpdateStatus  = "Contacting the map repositories...";
         UpdateSummary = "";
 
         try
         {
-            // Phase 1 of the update system: hardwire the default GenieClient/Maps
-            // source here so this menu entry keeps working unchanged. The Updates
-            // dialog (Phase 3) will load enabled feeds from update-feeds.json and
-            // pass them all in; at that point this method becomes a thin shortcut
-            // to the same dialog's Maps tab.
-            var source  = new GithubContentsSource(
-                owner:     "GenieClient",
-                repo:      "Maps",
-                extension: ".xml");
-            var updater = new MapsUpdater(_zoneRepo, MapsDirectory, new[] { source });
+            var updater = new MapsUpdater(_zoneRepo, MapsDirectory, ResolveMapsSources());
 
             // Count BEFORE the rewrite so the summary can state what was
             // actually wrong rather than asking the user to take a full

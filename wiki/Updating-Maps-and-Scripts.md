@@ -12,6 +12,8 @@ Genie 5 uses the **same Genie 4 XML map format**, so maps move between the two c
 
 Choose **Maps ▸ Update from Official Repo…**. Genie 5 fetches the latest zone XML from the community Maps repository via [MapsUpdater](https://github.com/GenieClient/Genie5/blob/main/src/Genie.Core/Update/Updaters/MapsUpdater.cs) (built on the shared [GithubContentsSource](https://github.com/GenieClient/Genie5/blob/main/src/Genie.Core/Update/Sources/GithubContentsSource.cs)) and reports progress in the main game window as `[mapper] …` lines.
 
+**Festival and quest maps.** The repo keeps event zones (Hollow Eve, Guild Fest, the faires) in a *Festivals* subfolder and quest zones in a *Quests* subfolder, neither of which is pulled by default. On the Updates dialog's **Maps** tab each row has a **Festivals** checkbox and a separate **Quests (spoilers)** checkbox — tick one and every update path (Check, Update, the startup check, **Maps ▸ Update from Official Repo…**) pulls that folder too, flat into your Maps folder beside the regular zones. A zone that is also at the repo root is taken from the root. The same switches are `#config mapfestivals on|off` and `#config mapquests on|off`.
+
 ### How the merge works
 
 When an update finds a zone you already have, it doesn't blindly overwrite. It loads the upstream zone and carries your locally-collected data forward — most importantly the **`ServerRoomId`** values stamped on nodes as you played through (from `<nav rm="…"/>`). So:

@@ -48,12 +48,18 @@ public sealed class GithubContentsSource : IFileListSource
     ///   Optional shared <see cref="HttpClient"/>. When null, the source
     ///   creates and owns one configured with a 5-minute timeout and the
     ///   GitHub v3 Accept header.</param>
+    /// <param name="description">
+    ///   Optional override for <see cref="Description"/>. The default is
+    ///   <c>owner/repo[/path]</c> with the path as given, which for an
+    ///   encoded path reads as <c>Festivals%20Copy%20to…</c>; pass the
+    ///   human form when the source will be named in status text.</param>
     public GithubContentsSource(
         string      owner,
         string      repo,
-        string      path      = "",
-        string?     extension = null,
-        HttpClient? http      = null)
+        string      path        = "",
+        string?     extension   = null,
+        HttpClient? http        = null,
+        string?     description = null)
     {
         _owner     = owner;
         _repo      = repo;
@@ -62,9 +68,10 @@ public sealed class GithubContentsSource : IFileListSource
             ? null
             : (extension.StartsWith('.') ? extension : "." + extension);
 
-        Description = string.IsNullOrEmpty(_path)
-            ? $"{_owner}/{_repo}"
-            : $"{_owner}/{_repo}/{_path}";
+        Description = description
+            ?? (string.IsNullOrEmpty(_path)
+                    ? $"{_owner}/{_repo}"
+                    : $"{_owner}/{_repo}/{_path}");
 
         if (http != null)
         {
@@ -104,6 +111,10 @@ public sealed class GithubContentsSource : IFileListSource
     {
         return await _http.GetByteArrayAsync(file.DownloadUrl, ct);
     }
+
+    /// <summary>The Contents API URL this source lists — exposed so a test can
+    /// pin the folder a feed resolves to without a network call.</summary>
+    public string ListingUrl => BuildListingUrl();
 
     private string BuildListingUrl() =>
         string.IsNullOrEmpty(_path)

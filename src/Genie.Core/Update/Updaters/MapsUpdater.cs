@@ -60,6 +60,7 @@ public sealed class MapsUpdater : IUpdater
         var notesLines   = new List<string>();
         var recorded     = LoadShaManifest();
         var changes      = new List<UpdateChange>();
+        var claimed      = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var source in _sources)
         {
@@ -79,6 +80,8 @@ public sealed class MapsUpdater : IUpdater
             {
                 if (!FeedPath.TryResolveUnder(_mapsDir, entry.Name, allowSubdirectories: false, out var localPath))
                     continue;   // hostile / malformed name — ApplyAsync reports it, Check just skips
+                if (!TryClaim(claimed, entry.Name, source, notesLines))
+                    continue;   // a later source re-listing a zone the first one owns — see TryClaim
                 if (!File.Exists(localPath))
                 {
                     newCount++;
@@ -138,6 +141,8 @@ public sealed class MapsUpdater : IUpdater
         progress?.Report(new UpdateProgress(0, 0, "Listing", "fetching file list…", Indeterminate: true));
         var workItems = new List<(IFileListSource Source, FileEntry Entry)>();
         var errors    = new List<string>();
+        var notes     = new List<string>();
+        var claimed   = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var source in _sources)
         {
@@ -145,13 +150,16 @@ public sealed class MapsUpdater : IUpdater
             try
             {
                 var listing = await source.GetFileListAsync(ct);
-                workItems.AddRange(listing.Files.Select(f => (source, f)));
+                foreach (var f in listing.Files)
+                    if (TryClaim(claimed, f.Name, source, notes))
+                        workItems.Add((source, f));
             }
             catch (Exception ex)
             {
                 errors.Add($"{source.Description} listing failed: {ex.Message}");
             }
         }
+        int skipped = notes.Count;
 
         int total      = workItems.Count;
         int mergedRows = 0;
@@ -233,14 +241,39 @@ public sealed class MapsUpdater : IUpdater
 
         SaveShaManifest(recorded);
 
-        var summary = errors.Count == 0
-            ? $"Updated {newRows + mergedRows} zone(s) ({newRows} new, {mergedRows} merged, {currentRows} already current)."
-            : $"Updated {newRows + mergedRows} zone(s) ({newRows} new, {mergedRows} merged, {currentRows} already current, {errors.Count} failed).";
+        var tail = $"{newRows} new, {mergedRows} merged, {currentRows} already current";
+        if (skipped      > 0) tail += $", {skipped} duplicate(s) skipped";
+        if (errors.Count > 0) tail += $", {errors.Count} failed";
+        var summary = $"Updated {newRows + mergedRows} zone(s) ({tail}).";
 
         return new UpdateApplyResult(
             Succeeded: errors.Count == 0,
             Summary:   summary,
-            Errors:    errors);
+            Errors:    errors,
+            Notes:     notes.Count > 0 ? notes : null);
+    }
+
+    /// <summary>
+    /// First source to list a filename owns it. Sources are consulted in the
+    /// order given, and <see cref="MapsFeedSources"/> always puts a feed's
+    /// root folder ahead of its festival / quest subfolders — so when the
+    /// repo carries the same zone in both places (a festival map copied to
+    /// the root for the duration of the event), the root copy is applied and
+    /// the subfolder copy is skipped with a note. Without this the two
+    /// listings would fight over one file: the later download would
+    /// overwrite the earlier one, and the manifest would record whichever
+    /// sha came last, so the other copy counted as "changed" on every check.
+    /// </summary>
+    private static bool TryClaim(
+        Dictionary<string, string> claimed,
+        string                     name,
+        IFileListSource            source,
+        List<string>               notes)
+    {
+        if (claimed.TryAdd(name, source.Description))
+            return true;
+        notes.Add($"{name}: also listed by {source.Description} — skipped, the copy from {claimed[name]} wins.");
+        return false;
     }
 
     /// <summary>

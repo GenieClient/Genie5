@@ -74,27 +74,60 @@ public sealed class UpdateFeedRow : ReactiveObject
 
     private readonly Func<FeedEntry, IProgress<UpdateProgress>?, Task<string>>? _chooseFiles;
 
+    // ── Maps rows only: repo subfolder toggles ───────────────────────────
+
+    /// <summary>Maps rows carry two extra checkboxes — pull the repo's
+    /// festival-maps subfolder, pull its quest-maps subfolder — both off by
+    /// default (quest maps are spoilers). Hidden on Plugins / Scripts rows.</summary>
+    public bool HasMapFolderOptions => _saveMapFolders is not null;
+
+    /// <summary>Bound to the "Festivals" checkbox; persists on change via
+    /// <see cref="FeedEntry.IncludeFestivalMaps"/>.</summary>
+    [Reactive] public bool IncludeFestivalMaps { get; set; }
+
+    /// <summary>Bound to the "Quests (spoilers)" checkbox; persists on change via
+    /// <see cref="FeedEntry.IncludeQuestMaps"/>.</summary>
+    [Reactive] public bool IncludeQuestMaps    { get; set; }
+
+    private readonly Action<FeedEntry>? _saveMapFolders;
+
     public UpdateFeedRow(
         FeedEntry                                                                feed,
         Func<FeedEntry, CancellationToken, Task<(string Status, string? Details)>> check,
         Func<FeedEntry, IProgress<UpdateProgress>?, CancellationToken, Task<string>> apply,
         Action<FeedEntry, bool>                                                  toggle,
         Action<FeedEntry>                                                        remove,
-        Func<FeedEntry, IProgress<UpdateProgress>?, Task<string>>?               chooseFiles = null)
+        Func<FeedEntry, IProgress<UpdateProgress>?, Task<string>>?               chooseFiles    = null,
+        Action<FeedEntry>?                                                       saveMapFolders = null)
     {
         _feed    = feed;
         _check   = check;
         _apply   = apply;
         _toggle  = toggle;
         _remove  = remove;
-        _chooseFiles = chooseFiles;
+        _chooseFiles    = chooseFiles;
+        _saveMapFolders = saveMapFolders;
         Enabled  = feed.Enabled;
+        IncludeFestivalMaps = feed.IncludeFestivalMaps;
+        IncludeQuestMaps    = feed.IncludeQuestMaps;
 
         // Toggle-on-change: persist whenever the checkbox flips. Skip the
         // initial value (just set above) by sub-after-construct via Skip(1).
         this.WhenAnyValue(x => x.Enabled)
             .Skip(1)
             .Subscribe(v => _toggle(_feed, v));
+
+        // Same shape for the Maps-only subfolder checkboxes: write the flag
+        // onto the FeedEntry, then let the parent persist the whole config.
+        if (_saveMapFolders is not null)
+        {
+            this.WhenAnyValue(x => x.IncludeFestivalMaps)
+                .Skip(1)
+                .Subscribe(v => { _feed.IncludeFestivalMaps = v; _saveMapFolders(_feed); });
+            this.WhenAnyValue(x => x.IncludeQuestMaps)
+                .Skip(1)
+                .Subscribe(v => { _feed.IncludeQuestMaps = v; _saveMapFolders(_feed); });
+        }
 
         var notBusy = this.WhenAnyValue(x => x.IsBusy).Select(b => !b);
 
