@@ -45,6 +45,20 @@ public sealed class TtsPanelHeadlessTests : IDisposable
 
     private static void Click(Button b) => b.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
+    /// <summary>The voice list loads in the background (public #402); pump the
+    /// UI thread until it has been shown.</summary>
+    private static void WaitForVoices(TtsPanel p)
+    {
+        var hint = Find<TextBlock>(p, "VoiceHint");
+        for (int i = 0; i < 500 && hint.Text == "Looking for voices…"; i++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            System.Threading.Thread.Sleep(5);
+        }
+        Dispatcher.UIThread.RunJobs();
+        Assert.NotEqual("Looking for voices…", hint.Text);
+    }
+
     [AvaloniaFact]
     public void Offline_the_tab_says_why_at_the_top_not_in_the_bottom_status_line()
     {
@@ -63,6 +77,7 @@ public sealed class TtsPanelHeadlessTests : IDisposable
         var cfg = NewConfig();
         var (panel, window) = Host();
         panel.Initialize(cfg);
+        WaitForVoices(panel);
 
         Assert.True(panel.IsEnabled);
         Assert.False(Find<Border>(panel, "OfflineBanner").IsVisible);
@@ -127,6 +142,7 @@ public sealed class TtsPanelHeadlessTests : IDisposable
             ("vits-piper-en_US-amy-low", "Amy (Piper)"),
             ("system:Microsoft Zira Desktop", "Microsoft Zira Desktop (system)"),
         });
+        WaitForVoices(panel);
         var combo = Find<ComboBox>(panel, "VoiceCombo");
 
         Assert.Equal(new[] { "Amy (Piper)", "Microsoft Zira Desktop (system)" },
@@ -148,6 +164,7 @@ public sealed class TtsPanelHeadlessTests : IDisposable
         var cfg = NewConfig();
         var (panel, window) = Host();
         panel.Initialize(cfg, listVoices: () => new[] { ("system:Microsoft David Desktop", "Microsoft David Desktop (system)") });
+        WaitForVoices(panel);
 
         Assert.True(Find<ComboBox>(panel, "VoiceCombo").IsEnabled);
         Assert.Contains("Install voice", Find<TextBlock>(panel, "VoiceHint").Text);
@@ -165,6 +182,67 @@ public sealed class TtsPanelHeadlessTests : IDisposable
         for (int i = 0; i < 20; i++) { Dispatcher.UIThread.RunJobs(); await Task.Delay(5); }
 
         Assert.Contains("game window", Find<TextBlock>(panel, "StatusText").Text);
+        window.Close();
+    }
+
+    /// <summary>Public #402 — listing the voices (spd-say, espeak-ng, SAPI) no longer
+    /// runs on the UI thread, and the voice box waits for it.</summary>
+    [AvaloniaFact]
+    public void The_voice_list_is_read_off_the_UI_thread()
+    {
+        var cfg = NewConfig();
+        var ui = System.Environment.CurrentManagedThreadId;
+        int listedOn = 0;
+        using var release = new System.Threading.ManualResetEventSlim();
+        var (panel, window) = Host();
+        panel.Initialize(cfg, listVoices: () =>
+        {
+            listedOn = System.Environment.CurrentManagedThreadId;
+            release.Wait(5000);
+            return new[] { ("vits-piper-en_US-amy-low", "Amy (Piper)") };
+        });
+
+        // Initialize returned while the list was still being read.
+        var combo = Find<ComboBox>(panel, "VoiceCombo");
+        Assert.False(combo.IsEnabled);
+        Assert.Equal("Looking for voices…", Find<TextBlock>(panel, "VoiceHint").Text);
+
+        release.Set();
+        WaitForVoices(panel);
+
+        Assert.NotEqual(0, listedOn);
+        Assert.NotEqual(ui, listedOn);
+        Assert.True(combo.IsEnabled);
+        Assert.Equal("Amy (Piper)", combo.SelectedItem?.ToString());
+        window.Close();
+    }
+
+    /// <summary>Public #402 — when the tab is filled again before the first list
+    /// comes back (a profile switch), the older list never replaces the newer one
+    /// and nothing is written to the config.</summary>
+    [AvaloniaFact]
+    public void A_slower_earlier_voice_list_does_not_replace_a_newer_one()
+    {
+        var cfg = NewConfig();
+        int voiceChanged = 0;
+        using var slow = new System.Threading.ManualResetEventSlim();
+        var (panel, window) = Host();
+        panel.Initialize(cfg, voiceChanged: () => voiceChanged++, listVoices: () =>
+        {
+            slow.Wait(5000);
+            return new[] { ("old", "Old (Piper)") };
+        });
+        panel.Initialize(cfg, voiceChanged: () => voiceChanged++,
+                         listVoices: () => new[] { ("vits-piper-en_US-amy-low", "Amy (Piper)") });
+        WaitForVoices(panel);
+
+        slow.Set();
+        for (int i = 0; i < 20; i++) { Dispatcher.UIThread.RunJobs(); System.Threading.Thread.Sleep(5); }
+
+        var combo = Find<ComboBox>(panel, "VoiceCombo");
+        Assert.Equal(new[] { "Amy (Piper)" },
+            System.Linq.Enumerable.Select(System.Linq.Enumerable.Cast<object>(combo.Items), i => i.ToString()));
+        Assert.Equal(0, voiceChanged);
         window.Close();
     }
 }

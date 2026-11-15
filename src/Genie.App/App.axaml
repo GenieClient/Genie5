@@ -38,6 +38,9 @@
              file header. -->
         <ResourceInclude Source="avares://Genie5/Themes/DocumentControlCachedSkin.axaml" />
       </ResourceDictionary.MergedDictionaries>
+      <!-- #402: the Configuration dialog's pattern boxes. EditorFonts replaces
+           this chain with the first installed family on first open. -->
+      <FontFamily x:Key="Genie.EditorMonoFont">Consolas,Courier New,monospace</FontFamily>
     </ResourceDictionary>
   </Application.Resources>
 
