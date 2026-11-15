@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Avalonia.Media;
@@ -139,6 +140,39 @@ public class EchoAndFamiliarPresetTests
         Assert.False(File.Exists(Path.Combine(global, "presets.json")));
         Assert.Equal("#0A0B0C", engine.GetForeground("inputother"));
         Assert.Equal(RuleScope.Character, engine.Get("inputother")!.Scope);
+    }
+
+    [Fact]
+    public void Unreadable_presets_file_is_left_untouched()
+    {
+        // A hand edit with a stray comma: saving would rewrite the whole file
+        // with the one edited entry and lose every other preset (#410 review).
+        var global = TempDir();
+        var path   = Path.Combine(global, "presets.json");
+        const string broken = "[ { \"Id\": \"speech\", \"ForegroundColor\": \"Lime\" }, ]x";
+        File.WriteAllText(path, broken);
+        var engine   = new PresetEngine();
+        var warnings = new List<string>();
+        var store    = new PresetColorStore(engine, global, () => null, warnings.Add);
+
+        store.SetForeground("inputuser", "#010203");
+
+        Assert.Equal(broken, File.ReadAllText(path));               // file untouched
+        Assert.Equal("#010203", engine.GetForeground("inputuser"));  // live change kept
+        Assert.Single(warnings);
+        Assert.Contains("presets.json", warnings[0]);
+    }
+
+    [Fact]
+    public void Missing_presets_file_is_created_with_the_edit()
+    {
+        var global = TempDir();
+        var store  = new PresetColorStore(new PresetEngine(), global, () => null);
+
+        store.SetForeground("inputuser", "#010203");
+
+        var saved = new PersistenceService().LoadPresets(Path.Combine(global, "presets.json"));
+        Assert.Equal("#010203", saved.Single(m => m.Id == "inputuser").ForegroundColor);
     }
 
     [Fact]
