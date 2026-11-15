@@ -106,9 +106,9 @@ public sealed class HighlightRule
     /// matched; with none, the whole match (public #397). Use <c>(?:…)</c> for
     /// grouping that should not narrow the colour.</item>
     /// </list>
-    /// A regex match whose groups all captured nothing yields one zero-length
-    /// span, so callers still see that the rule matched (highlight sound / TTS)
-    /// while no characters are painted.
+    /// A regex match with text whose groups all captured nothing yields one
+    /// zero-length span, so callers still see that the rule matched (highlight
+    /// sound / TTS) while no characters are painted. An empty match is no match.
     /// </summary>
     public IEnumerable<(int Start, int Length)> GetMatchPositions(string line)
     {
@@ -143,7 +143,11 @@ public sealed class HighlightRule
                                 (spans ??= new()).Add((grp.Index, grp.Length));
                                 any = true;
                             }
-                            if (!any) (spans ??= new()).Add((m.Index, 0));   // matched, nothing to paint
+                            // Matched, nothing to paint — but only when the match
+                            // itself has text. A pattern that can match nothing at
+                            // all ((x)*, (foo)?) succeeds empty on every line, and
+                            // its sound / TTS must not fire on every line (#409 review).
+                            if (!any && m.Length > 0) (spans ??= new()).Add((m.Index, 0));
                         }
                         else if (m.Length > 0)
                         {

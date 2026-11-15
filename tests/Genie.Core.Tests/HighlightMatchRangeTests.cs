@@ -58,6 +58,23 @@ public class HighlightMatchRangeTests
         Assert.Equal(new[] { "b" }, Painted(Regex("(a)?(b)"), "b"));
     }
 
+    [Theory]
+    [InlineData("(foo)?")]
+    [InlineData("(x)*")]
+    public void Regex_that_can_match_nothing_does_not_match_a_line_without_it(string pattern)
+    {
+        // Such a pattern succeeds with an empty match at position 0 of every
+        // line; counting that as a match would fire a rule's sound / TTS on every
+        // line of game text (#409 review).
+        Assert.Empty(Regex(pattern).GetMatchPositions("You see nothing of interest."));
+    }
+
+    [Fact]
+    public void Regex_that_can_match_nothing_still_paints_where_it_does_match()
+    {
+        Assert.Equal(new[] { "foo" }, Painted(Regex("(foo)?"), "a foo here"));
+    }
+
     [Fact]
     public void Regex_match_with_empty_groups_still_reports_a_match_but_paints_nothing()
     {
