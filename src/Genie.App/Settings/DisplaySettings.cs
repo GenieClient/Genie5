@@ -68,6 +68,11 @@ public sealed class DisplaySettings : ReactiveObject
     /// <see cref="Settings.StockPresetUpgrade"/>.</summary>
     public bool VitalsPresetsUpgraded { get; set; }
 
+    /// <summary>The one-time roundtime preset upgrade has run: a saved
+    /// <c>roundtime</c> preset still holding Genie 5's old stock Aqua on
+    /// <c>#00004B</c> was reset to the current default (MediumBlue, Genie 4's).</summary>
+    public bool RoundtimePresetUpgraded { get; set; }
+
     /// <summary>Show the on-map colour legend (#157). Default on.</summary>
     [Reactive] public bool   ShowMapLegend { get; set; } = true;
 

@@ -52,7 +52,7 @@
     <Grid Width="120"
           IsVisible="{Binding Display.RoundTimeStyleCountdownBar}"
           ToolTip.Tip="Roundtime — your character can't act until this expires. Layout → Roundtime to move it or change its style.">
-      <ProgressBar Minimum="0"
+      <ProgressBar x:Name="RtCountdownBar" Minimum="0"
                    Maximum="{Binding Vitals.RoundTimeTotalSeconds}"
                    Value="{Binding Vitals.RoundTimeSeconds}"
                    controls:PresetBar.Preset="roundtime"
@@ -60,7 +60,8 @@
                    VerticalAlignment="Stretch" CornerRadius="3"
                    AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"/>
       <TextBlock Text="{Binding Vitals.RoundTimeLabel}"
-                 Foreground="White" FontSize="14" FontWeight="SemiBold"
+                 Foreground="{Binding #RtCountdownBar.Foreground, Converter={x:Static controls:ContrastText.Converter}}"
+                 FontSize="14" FontWeight="SemiBold"
                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
     </Grid>
   </Panel>

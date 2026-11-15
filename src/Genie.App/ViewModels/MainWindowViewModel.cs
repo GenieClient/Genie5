@@ -1441,6 +1441,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.Apply();  // push values into Application.Resources
         Mapper.AttachDisplay(Display, _displayPath);
         UpgradeVitalsPresets();
+        UpgradeRoundtimePreset();
 
         // ── Themes (#20) ──────────────────────────────────────────────────
         // Re-apply the persisted theme's chrome + Fluent variant on top of
@@ -4080,6 +4081,25 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Settings.StockPresetUpgrade.OldVitals,
             Settings.StockPresetUpgrade.CurrentStock);
         Display.VitalsPresetsUpgraded = true;
+        try { Display.Save(_displayPath); } catch { /* retried next launch */ }
+    }
+
+    /// <summary>A saved roundtime preset still holding Genie 5's old stock Aqua
+    /// on navy gets the current default (MediumBlue), once: under the countdown
+    /// bar's white label it is unreadable (#418 review).</summary>
+    private void UpgradeRoundtimePreset()
+    {
+        if (Display.RoundtimePresetUpgraded) return;
+        var profileDirs = new List<string>();
+        foreach (var profile in Profiles.Profiles)
+        {
+            try { profileDirs.Add(GetProfileConfigDir(profile)); } catch { /* unreadable profile: skip */ }
+        }
+        Settings.StockPresetUpgrade.Run(
+            Settings.StockPresetUpgrade.ConfigDirs(_configDir, profileDirs),
+            Settings.StockPresetUpgrade.OldRoundtime,
+            Settings.StockPresetUpgrade.CurrentStock);
+        Display.RoundtimePresetUpgraded = true;
         try { Display.Save(_displayPath); } catch { /* retried next launch */ }
     }
 

@@ -173,6 +173,35 @@ public class RoundTimeCountdownBarHeadlessTests : IDisposable
     private static Color C(IBrush b) => Assert.IsAssignableFrom<ISolidColorBrush>(b).Color;
 
     [AvaloniaFact]
+    public void Countdown_bar_label_stays_readable_on_a_light_fill()
+    {
+        // A light roundtime fill (Genie 5's old stock Aqua, or one picked on
+        // purpose) under a white label was unreadable (#418 review).
+        var prev   = DefaultHighlights.PresetEngine;
+        var engine = new PresetEngine();
+        DefaultHighlights.PresetEngine = engine;
+        try
+        {
+            var vm = NewVm();
+            Run(vm.SetRoundTimeStyleCommand, "CountdownBar");
+            var view = new Genie.App.Views.RoundTimeIndicatorView { DataContext = vm };
+            new Window { Content = view }.Show();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+            var bar   = view.FindControl<ProgressBar>("RtCountdownBar")!;
+            var label = (TextBlock)((Grid)bar.Parent!).Children.OfType<TextBlock>().Single();
+            Assert.Equal(Colors.White, C(label.Foreground!));   // stock MediumBlue: white text
+
+            engine.Apply(new PresetRule { Id = "roundtime", ForegroundColor = "Aqua", BackgroundColor = "#00004B" });
+            PresetBar.Apply(bar);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(Colors.Black, C(label.Foreground!));
+        }
+        finally { DefaultHighlights.PresetEngine = prev; }
+    }
+
+    [AvaloniaFact]
     public void Badge_uses_its_original_reds_with_no_preset_engine()
     {
         var prev = DefaultHighlights.PresetEngine;

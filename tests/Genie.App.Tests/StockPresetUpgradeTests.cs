@@ -62,6 +62,20 @@ public class StockPresetUpgradeTests
     }
 
     [Fact]
+    public void Old_stock_roundtime_gets_the_current_default()
+    {
+        // Aqua on #00004B under the countdown bar's white label (#418 review).
+        var config = Path.Combine(TempDataRoot(), "Config");
+        Save(config, new PresetRule { Id = "roundtime", ForegroundColor = "Aqua", BackgroundColor = "#00004B" });
+
+        StockPresetUpgrade.Run(StockPresetUpgrade.ConfigDirs(config, Array.Empty<string>()),
+            StockPresetUpgrade.OldRoundtime, StockPresetUpgrade.CurrentStock);
+
+        Assert.Equal("MediumBlue", Read(config, "roundtime").ForegroundColor);
+        Assert.Equal("",           Read(config, "roundtime").BackgroundColor);
+    }
+
+    [Fact]
     public void Unreadable_presets_file_is_not_rewritten()
     {
         var config = Path.Combine(TempDataRoot(), "Config");
