@@ -256,6 +256,21 @@ public class UiPresetsHeadlessTests : IDisposable
         Assert.Equal("#EEEEEE", SavedPreset(config, UiPresets.Menu).BackgroundColor);
     }
 
+    [AvaloniaFact]
+    public void The_upgrade_reaches_a_character_folder_with_no_saved_profile()
+    {
+        // A character reached with #connect and never saved as a profile still has
+        // its own Profiles/ folder and presets.json (#406 review).
+        Directory.CreateDirectory(Path.Combine(_dir, "Config"));
+        var unsaved = Directory.CreateDirectory(Path.Combine(_dir, "Profiles", "Kzin-ACCOUNT")).FullName;
+        WritePresets(unsaved, (UiPresets.Menu, "Black", "#EEEEEE"));
+
+        _ = new MainWindowViewModel(startup: null, dataDirectoryOverride: _dir);
+
+        Assert.Equal("Default", SavedPreset(unsaved, UiPresets.Menu).ForegroundColor);
+        Assert.Equal("",        SavedPreset(unsaved, UiPresets.Menu).BackgroundColor);
+    }
+
     // ── Themes ─────────────────────────────────────────────────────────────
 
     private ThemeService Themes() =>

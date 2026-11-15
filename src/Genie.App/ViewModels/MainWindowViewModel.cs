@@ -4317,14 +4317,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     {
         if (Display.UiPresetsUpgraded) return;
         var p    = new PersistenceService();
-        var dirs = new List<string> { _configDir };
+        var profileDirs = new List<string>();
         foreach (var profile in Profiles.Profiles)
         {
-            try { dirs.Add(GetProfileConfigDir(profile)); } catch { /* unreadable profile: skip */ }
+            try { profileDirs.Add(GetProfileConfigDir(profile)); } catch { /* unreadable profile: skip */ }
         }
+        // The shared folder, saved profiles AND every Profiles/ folder on disk: a
+        // character reached with #connect and never saved as a profile has its own
+        // presets.json, and this runs only once (#406 review).
+        var dirs = Settings.StockPresetUpgrade.ConfigDirs(_configDir, profileDirs);
 
         foreach (var path in dirs.Select(d => Path.Combine(d, "presets.json"))
-                                 .Distinct(StringComparer.OrdinalIgnoreCase)
                                  .Where(File.Exists))
         {
             try
