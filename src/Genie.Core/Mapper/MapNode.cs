@@ -61,7 +61,10 @@ public sealed class MapNode
     public string Notes        { get; set; } = string.Empty;
     public string Color        { get; set; } = string.Empty;
     public string ServerRoomId { get; set; } = string.Empty;
-    public List<MapExit> Exits { get; set; } = new();
+    /// <summary>The room's exits. Copy-on-write, so the map panel can read
+    /// them on the UI thread while the automapper changes them on the game
+    /// thread (public #398).</summary>
+    public MapExitList Exits { get; } = new();
 
     /// <summary>
     /// Every <c>&lt;description&gt;</c> element on the room, in file order —

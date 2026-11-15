@@ -162,14 +162,24 @@ public sealed class HealingSettings
         var text = line.Trim();
         foreach (var (_, regex) in regexes)
         {
-            var m = regex.Match(text);
-            if (!m.Success) continue;
+            if (!TryMatch(regex, text, out var m)) continue;
             var name = HealingCommandBuilder.CleanPatient(m.Groups["name"].Value);
             if (name.Length == 0) continue;
             patient = name;
             return true;
         }
         return false;
+    }
+
+    /// <summary>One match that can't throw. The timeout is wall-clock time, so
+    /// a stalled thread (a GC pause, a page fault on a machine short of memory)
+    /// can trip it on a harmless line. Such a line simply names no patient; it
+    /// must never close the app (public #399).</summary>
+    internal static bool TryMatch(Regex regex, string text, out Match match)
+    {
+        try { match = regex.Match(text); }
+        catch (RegexMatchTimeoutException) { match = Match.Empty; return false; }
+        return match.Success;
     }
 
     private static (string Pattern, Regex Regex)[] Compile(IEnumerable<string> patterns)
@@ -179,8 +189,14 @@ public sealed class HealingSettings
             var prefix = Regex.Escape(p[..i]);
             var suffix = Regex.Escape(p[(i + NamePlaceholder.Length)..]);
             return (p, new Regex($"^{prefix}(?<name>.+?){suffix}", RegexOptions.CultureInvariant,
-                                 TimeSpan.FromMilliseconds(50)));
+                                 TouchMatchTimeout));
         }).ToArray();
+
+    /// <summary>Upper bound on one touch-pattern match. The patterns are
+    /// literal text around a lazy name and lines are capped at 400 characters,
+    /// so real matching takes microseconds; this only stops a runaway. It was
+    /// 50 ms, short enough for an ordinary stall to trip it (public #399).</summary>
+    internal static readonly TimeSpan TouchMatchTimeout = TimeSpan.FromSeconds(1);
 
     /// <summary>The mana set in the panel, or null when unset.</summary>
     public int? GetMana(HealingSpell spell)

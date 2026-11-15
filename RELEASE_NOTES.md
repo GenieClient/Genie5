@@ -13,6 +13,24 @@
   The same switches are `#config mapfestivals on|off` and `#config mapquests on|off`;
   they live in `update-feeds.json`, not `settings.cfg`.
 
+## 🐛 Fixes
+- **Two crashes that closed Genie mid-session** — both reported by @dylb0t from
+  Linux machines.
+  - *Fast travel with the automapper on* could close the app with "Collection was
+    modified": the map panel was reading a room's exits while the automapper was
+    adding to them. A room's exits can now be read and changed at the same time
+    ([#398](https://github.com/GenieClient/Genie5/issues/398)).
+  - *On a slow or memory-tight machine*, the Healing window's check for an empathic
+    link could time out on an ordinary game line and close the app, even for a
+    character who never opened the Healing window. A timed-out check now just means
+    "no patient on this line", and the limit goes from 50 ms to 1 second
+    ([#399](https://github.com/GenieClient/Genie5/issues/399)).
+- **One stray error in a window no longer ends the session** — an error that nothing
+  else caught on the interface thread used to close Genie. It is now written to
+  `genie_crash.log` (marked `UiThread.Survived`) and the session carries on. If such
+  errors come in a burst (more than five in ten seconds), Genie still closes, as
+  before, because at that point something is really broken.
+
 ## 💡 Notes
 - **Room titles, links and URLs now take their colours from presets** — Genie 5 no
   longer paints any game text with built-in colours of its own. Bracketed room titles
