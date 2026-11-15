@@ -71,7 +71,9 @@ honors its own pacing globals (`$caravan`, `$powerwalk`, …). Starting a new
 `#config abortdupescript`). Without the script installed, the built-in walker
 handles everything as described above; `#config automapperscript false` forces
 the built-in walker even when the script is present. Cross-zone routes always
-use the built-in walker.
+use the built-in walker. A `#goto` to the room you're already in doesn't start
+the script; Genie answers `YOU HAVE ARRIVED!` itself, so a script waiting on
+the result carries on.
 
 Arcs whose move is `script <name>` can only be executed by the community
 script, so the built-in walker (and the cross-zone pathfinder) never plans a
