@@ -232,4 +232,37 @@ public class WaitEvalLiveVarTests : IDisposable
         Pump();
         Assert.True(Echoed("PASSED"), string.Join(" | ", _echoed));
     }
+
+    [Fact]
+    public void Debug_level_says_when_a_waiteval_starts_already_true()
+    {
+        // #431 review: an already-true waiteval now waits for a change; at debug
+        // level that must not read as a silent hang.
+        _engine.Globals["mana"] = "50";
+        Start("s", "debug 2\nwaiteval $mana > 10\necho PASSED\n");
+        Pump();
+
+        Assert.True(Echoed("already true; waiting for a change"));
+        Assert.False(Echoed("PASSED"));
+    }
+
+    [Fact]
+    public void A_change_an_action_undoes_in_the_same_statement_chain_still_releases()
+    {
+        // #431 review: the change key was compared once per tick, so
+        // `var flag 1;var flag 0` in one action slipped between two ticks.
+        // Genie 4 re-checks on every change and releases on the first true one.
+        Start("s",
+            "var flag 0\n" +
+            "action var flag 1;var flag 0 when ^PULSE\n" +
+            "waiteval %flag = 1\n" +
+            "echo PASSED\n");
+        Pump();
+        Assert.False(Echoed("PASSED"));
+
+        _engine.OnGameLine("PULSE");
+        Pump();
+
+        Assert.True(Echoed("PASSED"));
+    }
 }

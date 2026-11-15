@@ -1585,7 +1585,19 @@ public sealed class ScriptEngine
                 // time so %-references to vars written earlier in the chain
                 // see the fresh value, not the pre-fire one.
                 foreach (var stmt in SplitSemicolons(act.Command))
+                {
                     Dispatch(SubstituteVars(stmt, inst), inst, 0, -1, fromAction: true);
+                    // Genie 4 re-checks a waiteval on every variable change
+                    // (TriggerVariableChanged). Checking after each action
+                    // statement keeps a change the same action undoes —
+                    // `var x 1;var x 0` — from slipping between two ticks
+                    // (#431 review).
+                    if (inst.WaitEvalExpr != null && WaitEvalReleases(inst))
+                    {
+                        inst.WaitEvalExpr = null; inst.WaitEvalDeadline = DateTime.MaxValue;
+                        inst.WaitEvalKey  = null;
+                    }
+                }
             }
             catch (Exception ex)
             { _echo($"[script] {inst.Name} action error: {ex.Message}"); }
@@ -2381,7 +2393,12 @@ public sealed class ScriptEngine
                 inst.WaitEvalKey      = WaitEvalChangeKey(rest, inst);
                 inst.WaitEvalWasTrue  = !IsBareVariable(rest) &&
                                         EvalConditionSafe(SubstituteVars(rest, inst), inst, "waiteval", out _);
-                DbgEcho(inst, 2, $"waiteval {rest}");
+                DbgEcho(inst, 2, inst.WaitEvalWasTrue
+                    // Already true on entry: Genie 4 waits for a change here, which
+                    // reads as a silent hang if the author expected a fall-through
+                    // (#431 review) — say so at debug level.
+                    ? $"waiteval {rest} — already true; waiting for a change"
+                    : $"waiteval {rest}");
                 return false;
 
             case "debug":
