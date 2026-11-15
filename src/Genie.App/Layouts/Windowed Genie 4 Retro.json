@@ -1,6 +1,6 @@
 {
   "Name": "Windowed Genie 4 Retro",
-  "Description": "A windowed (MDI) arrangement in the Genie 4 style: Players, Mobs, Objects and Logons (Genie 4's Arrivals) across the top, Game filling the lower left, Experience, Log and Time Tracker down the right. Script Bar on top, hands strip at the bottom.",
+  "Description": "Genie 4's first-run layout (LayoutBasic) in windowed mode: Game on the left at 70% of the width, Thoughts, Room and Log stacked in thirds down the right.",
   "SavedAt": "2026-11-14T00:00:00.0000000-07:00",
   "WindowWidth": 1920,
   "WindowHeight": 1080,
@@ -10,26 +10,18 @@
   "HasWindowGeometry": true,
   "VisibleTools": [
     "game-text",
-    "logons",
-    "log",
-    "experience",
-    "time-tracker",
-    "mobs",
-    "players",
-    "objects"
+    "thoughts",
+    "room",
+    "log"
   ],
   "DockTree": null,
   "FloatingWindows": [],
   "WindowedMode": true,
   "MdiBounds": {
-    "game-text": { "X": 0, "Y": 155, "Width": 1515, "Height": 692, "State": "Normal" },
-    "logons": { "X": 1168, "Y": 0, "Width": 347, "Height": 155, "State": "Normal" },
-    "log": { "X": 1514, "Y": 465, "Width": 386, "Height": 264, "State": "Normal" },
-    "experience": { "X": 1514, "Y": 0, "Width": 386, "Height": 468, "State": "Normal" },
-    "time-tracker": { "X": 1514, "Y": 727, "Width": 385, "Height": 120, "State": "Normal" },
-    "mobs": { "X": 214, "Y": 0, "Width": 358, "Height": 155, "State": "Normal" },
-    "players": { "X": 0, "Y": 0, "Width": 215, "Height": 155, "State": "Normal" },
-    "objects": { "X": 570, "Y": 0, "Width": 600, "Height": 155, "State": "Normal" }
+    "game-text": { "X": 0, "Y": 0, "Width": 1330, "Height": 847, "State": "Normal" },
+    "thoughts": { "X": 1330, "Y": 0, "Width": 570, "Height": 282, "State": "Normal" },
+    "room": { "X": 1330, "Y": 282, "Width": 570, "Height": 282, "State": "Normal" },
+    "log": { "X": 1330, "Y": 564, "Width": 570, "Height": 283, "State": "Normal" }
   },
   "HandsStripVisible": true,
   "HandsStripAtBottom": true,
