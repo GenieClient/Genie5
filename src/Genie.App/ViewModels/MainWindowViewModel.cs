@@ -1,6 +1,7 @@
 ﻿using System.Reactive;
 using System.Reactive.Linq;
 using Avalonia;
+using Avalonia.Media;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using Dock.Model.Controls;
@@ -460,11 +461,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>Window → Enhanced Hands Strip. Toggles the dylb0t-derived icon widgets (compass / body / status icons) into / out of the strip.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleEnhancedHandsStripCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleRestedExpBarCommand { get; }
-    /// <summary>Window → Roundtime Position → Command Bar. Keeps the "⏱ N.Ns" badge inline with the input row.</summary>
+    /// <summary>Layout → Roundtime → Command Bar. Keeps the RT indicator inline with the input row.</summary>
     public ReactiveCommand<Unit, Unit>                    RoundTimeToCommandBarCommand { get; }
-    /// <summary>Window → Roundtime Position → Hands Strip. Moves the RT badge onto the L/R/S row.</summary>
+    /// <summary>Layout → Roundtime → Hands Strip. Moves the RT indicator onto the L/R/S row.</summary>
     public ReactiveCommand<Unit, Unit>                    RoundTimeToHandsStripCommand { get; }
-    /// <summary>Window → Roundtime Position → Keep Visible. Stops the RT badge collapsing between roundtimes, in either position.</summary>
+    /// <summary>Layout → Roundtime → Badge / Countdown Badge / Countdown Bar (#404).
+    /// Parameter: a <see cref="DisplaySettings.RoundTimeStyles"/> value.</summary>
+    public ReactiveCommand<string, Unit>                  SetRoundTimeStyleCommand { get; }
+    /// <summary>Layout → Roundtime → Keep Visible. Stops the RT indicator collapsing between roundtimes, in either position.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleKeepRoundTimeVisibleCommand { get; }
     /// <summary>Layout → Script Bar Position → Top. Docks the running-script strip under the menu — Genie 4's default (#357).</summary>
     public ReactiveCommand<Unit, Unit>                    ScriptBarToTopCommand    { get; }
@@ -500,6 +504,41 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// badge is only showing because <see cref="DisplaySettings.KeepRoundTimeVisible"/>
     /// keeps it on screen between roundtimes.</summary>
     [Reactive] public double RtBadgeOpacity    { get; private set; } = 0.45;
+
+    /// <summary>Roundtime badge colours from the <c>roundtime.badge</c> preset
+    /// (#404): foreground = the Countdown Badge fill, background = the badge,
+    /// border = 70 % fill + 30 % background. Fall back to the badge's original
+    /// reds when no preset engine is loaded or the preset leaves a colour unset.</summary>
+    [Reactive] public IBrush RtBadgeFill       { get; private set; } = RtBadgeStockFill;
+    [Reactive] public IBrush RtBadgeBackground { get; private set; } = RtBadgeStockBackground;
+    [Reactive] public IBrush RtBadgeBorder     { get; private set; } = new SolidColorBrush(Color.Parse("#8B2929"));
+
+    internal const string RtBadgePreset = "roundtime.badge";
+    private static readonly IBrush RtBadgeStockFill       = new SolidColorBrush(Color.Parse("#A03030"));
+    private static readonly IBrush RtBadgeStockBackground = new SolidColorBrush(Color.Parse("#5A1A1A"));
+
+    /// <summary>Re-read the <c>roundtime.badge</c> preset into the badge brushes.</summary>
+    internal void RefreshRtBadgeColors()
+    {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(RefreshRtBadgeColors);
+            return;
+        }
+        var fill = Highlighting.DefaultHighlights.PresetForeground(RtBadgePreset) ?? RtBadgeStockFill;
+        var back = Highlighting.DefaultHighlights.PresetBackground(RtBadgePreset) ?? RtBadgeStockBackground;
+        RtBadgeFill       = fill;
+        RtBadgeBackground = back;
+        RtBadgeBorder     = fill is ISolidColorBrush f && back is ISolidColorBrush b
+            ? new SolidColorBrush(Mix(f.Color, b.Color, 0.7))
+            : fill;
+
+        static Color Mix(Color a, Color b, double t) => Color.FromArgb(
+            (byte)Math.Round(a.A * t + b.A * (1 - t)),
+            (byte)Math.Round(a.R * t + b.R * (1 - t)),
+            (byte)Math.Round(a.G * t + b.G * (1 - t)),
+            (byte)Math.Round(a.B * t + b.B * (1 - t)));
+    }
 
     /// <summary>True iff the Script Bar should render in its TOP slot — i.e. a
     /// script is running AND the user picked the top position (#357). The strip
@@ -1408,6 +1447,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.Apply();  // push values into Application.Resources
         Mapper.AttachDisplay(Display, _displayPath);
         UpgradeVitalsPresets();
+        UpgradeRoundtimePreset();
 
         // The map's colours are the automapper.* presets (public #406). Until
         // Genie's engine is built (first connect / command) they're read from the
@@ -2123,6 +2163,16 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Display.RoundTimeOnHandsStrip = true;
             Display.Save(_displayPath);
         });
+
+        SetRoundTimeStyleCommand = ReactiveCommand.Create<string>(style =>
+        {
+            Display.RoundTimeStyle = DisplaySettings.RoundTimeStyles.Normalize(style);
+            Display.Save(_displayPath);
+        });
+
+        // The RT badge repaints whenever presets change or load (#404).
+        Highlighting.UserHighlights.RulesChanged += RefreshRtBadgeColors;
+        RefreshRtBadgeColors();
 
         ToggleKeepRoundTimeVisibleCommand = ReactiveCommand.Create(() =>
         {
@@ -4051,6 +4101,25 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Settings.StockPresetUpgrade.OldVitals,
             Settings.StockPresetUpgrade.CurrentStock);
         Display.VitalsPresetsUpgraded = true;
+        try { Display.Save(_displayPath); } catch { /* retried next launch */ }
+    }
+
+    /// <summary>A saved roundtime preset still holding Genie 5's old stock Aqua
+    /// on navy gets the current default (MediumBlue), once: under the countdown
+    /// bar's white label it is unreadable (#418 review).</summary>
+    private void UpgradeRoundtimePreset()
+    {
+        if (Display.RoundtimePresetUpgraded) return;
+        var profileDirs = new List<string>();
+        foreach (var profile in Profiles.Profiles)
+        {
+            try { profileDirs.Add(GetProfileConfigDir(profile)); } catch { /* unreadable profile: skip */ }
+        }
+        Settings.StockPresetUpgrade.Run(
+            Settings.StockPresetUpgrade.ConfigDirs(_configDir, profileDirs),
+            Settings.StockPresetUpgrade.OldRoundtime,
+            Settings.StockPresetUpgrade.CurrentStock);
+        Display.RoundtimePresetUpgraded = true;
         try { Display.Save(_displayPath); } catch { /* retried next launch */ }
     }
 
@@ -6472,6 +6541,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             ScriptBarVisible      = Display.ShowScriptBar,
             MagicPanels           = Display.ShowMagicPanels,
             KeepRoundTimeVisible  = Display.KeepRoundTimeVisible,
+            RoundTimeStyle        = Display.RoundTimeStyle,
             ShowGameText          = Display.ShowGameText,
             ShowEchoText          = Display.ShowEchoText,
             ShowScriptText        = Display.ShowScriptText,
@@ -6553,6 +6623,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         if (layout.ScriptBarVisible  is { } barShown)   Display.ShowScriptBar     = barShown;
         if (layout.MagicPanels       is { } magic)      Display.ShowMagicPanels   = magic;
         if (layout.KeepRoundTimeVisible is { } keepRt)  Display.KeepRoundTimeVisible = keepRt;
+        if (layout.RoundTimeStyle is { } rtStyle)       Display.RoundTimeStyle = DisplaySettings.RoundTimeStyles.Normalize(rtStyle);
         Display.ShowGameText           = layout.ShowGameText;
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;

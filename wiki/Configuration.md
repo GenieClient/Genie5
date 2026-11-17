@@ -282,6 +282,18 @@ Launching Genie, connecting, and changing a theme's chrome don't touch them.
 
 **To keep your own colours with a theme,** use **Edit → Theme → Save Current As…** (below). The new theme stores the colours you have now, so picking it later puts them back.
 
+### The roundtime indicator
+
+The roundtime indicator (**Layout → Roundtime**, see [The Interface](The-Interface)) takes its colours from two presets:
+
+| Style | Preset | Colour | Background | Stock |
+| --- | --- | --- | --- | --- |
+| Badge, Countdown Badge | `roundtime.badge` | the Countdown Badge fill | the badge | `#A03030` on `#5A1A1A` |
+| Countdown Bar (Genie 4) | `roundtime` | the bar's fill | the track | MediumBlue, no track (Genie 4's) |
+
+- `roundtime` is Genie 4's preset. `roundtime.badge` is new in Genie 5; its stock colours are the badge's original reds. The badge border is drawn between its two colours.
+- **Edit them** on **Configuration → Presets** or with `#preset`; the indicator repaints straight away.
+
 ### The vitals bars
 
 The five vitals bars are coloured by Genie 4's presets, in both the **Vitals** panel and the status strip, as in Genie 4:

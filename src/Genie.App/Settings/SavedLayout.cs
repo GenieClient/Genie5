@@ -138,6 +138,11 @@ public sealed class SavedLayout
     /// says whether it collapses. Same null rule as the bars above.</summary>
     public bool?  KeepRoundTimeVisible { get; set; }
 
+    /// <summary>How roundtime is drawn — <c>DisplaySettings.RoundTimeStyle</c>
+    /// (#404): Badge, CountdownBadge or CountdownBar. Same null rule: a layout
+    /// saved before this existed leaves the current style.</summary>
+    public string? RoundTimeStyle { get; set; }
+
     /// <summary>Per-tag visibility filters (Window → Game Window).</summary>
     public bool   ShowGameText         { get; set; } = true;
     public bool   ShowEchoText         { get; set; } = true;

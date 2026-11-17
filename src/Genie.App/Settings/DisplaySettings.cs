@@ -72,6 +72,11 @@ public sealed class DisplaySettings : ReactiveObject
     /// <see cref="Settings.StockPresetUpgrade"/>.</summary>
     public bool VitalsPresetsUpgraded { get; set; }
 
+    /// <summary>The one-time roundtime preset upgrade has run: a saved
+    /// <c>roundtime</c> preset still holding Genie 5's old stock Aqua on
+    /// <c>#00004B</c> was reset to the current default (MediumBlue, Genie 4's).</summary>
+    public bool RoundtimePresetUpgraded { get; set; }
+
     /// <summary>Show the on-map colour legend (#157). Default on.</summary>
     [Reactive] public bool   ShowMapLegend { get; set; } = true;
 
@@ -281,10 +286,50 @@ public sealed class DisplaySettings : ReactiveObject
     /// during ordinary play. <c>true</c> = the badge stays in whichever
     /// position <see cref="RoundTimeOnHandsStrip"/> picks, dimmed and
     /// reading 0.0s when idle, so the input row never jumps sideways as RT
-    /// starts and ends. Toggle via Layout → Roundtime Position → Keep Visible.
+    /// starts and ends. Toggle via Layout → Roundtime → Keep Visible.
     /// Also rides on saved layouts (<c>SavedLayout.KeepRoundTimeVisible</c>).
     /// </summary>
     [Reactive] public bool   KeepRoundTimeVisible { get; set; }
+
+    /// <summary>The <see cref="RoundTimeStyle"/> values (#404).</summary>
+    public static class RoundTimeStyles
+    {
+        /// <summary>The red "⏱ N.Ns" badge, no fill — the default.</summary>
+        public const string Badge          = "Badge";
+        /// <summary>The same red badge with a fill behind the timer that shrinks
+        /// from full to empty over the RT.</summary>
+        public const string CountdownBadge = "CountdownBadge";
+        /// <summary>Genie 4's bar: shrinking fill with the seconds left on it,
+        /// coloured by the <c>roundtime</c> preset.</summary>
+        public const string CountdownBar   = "CountdownBar";
+
+        /// <summary>A known style, or <see cref="Badge"/> for anything else.</summary>
+        public static string Normalize(string? s) => s switch
+        {
+            CountdownBadge => CountdownBadge,
+            CountdownBar   => CountdownBar,
+            _              => Badge,
+        };
+    }
+
+    /// <summary>
+    /// How the roundtime indicator is drawn (#404), in whichever position
+    /// <see cref="RoundTimeOnHandsStrip"/> picks. One of
+    /// <see cref="RoundTimeStyles"/>: <c>Badge</c> (default, the red text
+    /// badge), <c>CountdownBadge</c> (that badge with a fill that shrinks over
+    /// the RT) or <c>CountdownBar</c> (Genie 4's bar, coloured by the
+    /// <c>roundtime</c> preset: foreground = fill, background = track). Pick via
+    /// Layout → Roundtime. Also rides on saved layouts
+    /// (<c>SavedLayout.RoundTimeStyle</c>).
+    /// </summary>
+    [Reactive] public string RoundTimeStyle { get; set; } = RoundTimeStyles.Badge;
+
+    /// <summary>Menu radio / visibility helpers for <see cref="RoundTimeStyle"/>.</summary>
+    [JsonIgnore] public bool RoundTimeStyleBadge          => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.Badge;
+    [JsonIgnore] public bool RoundTimeStyleCountdownBadge => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.CountdownBadge;
+    [JsonIgnore] public bool RoundTimeStyleCountdownBar   => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.CountdownBar;
+    /// <summary>Either badge style (the red badge is shown, with or without fill).</summary>
+    [JsonIgnore] public bool RoundTimeStyleAnyBadge       => !RoundTimeStyleCountdownBar;
 
     /// <summary>
     /// Where the Script Bar (the running-script chip strip) docks.
@@ -459,6 +504,16 @@ public sealed class DisplaySettings : ReactiveObject
         // refreshes too.
         this.WhenAnyValue(x => x.RoundTimeOnHandsStrip)
             .Subscribe(_ => this.RaisePropertyChanged(nameof(RoundTimeOnCommandBar)));
+
+        // Same for the derived RoundTimeStyle flags (#404).
+        this.WhenAnyValue(x => x.RoundTimeStyle)
+            .Subscribe(_ =>
+            {
+                this.RaisePropertyChanged(nameof(RoundTimeStyleBadge));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleCountdownBadge));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleCountdownBar));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleAnyBadge));
+            });
 
         // Same for ScriptBarAtTop (JsonIgnore + derived) so the Layout menu's
         // Top radio button refreshes when the position flips (#357).

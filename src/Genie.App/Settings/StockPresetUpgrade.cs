@@ -26,6 +26,15 @@ public static class StockPresetUpgrade
             ["concentration"] = ("White",  "#000040"),
         };
 
+    /// <summary>The roundtime preset as Genie 5 shipped it before it coloured the
+    /// countdown bar (Aqua on navy). Under the bar's white label it is unreadable,
+    /// and nothing read it before, so nobody chose it.</summary>
+    public static readonly IReadOnlyDictionary<string, (string Fg, string Bg)> OldRoundtime =
+        new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["roundtime"] = ("Aqua", "#00004B"),
+        };
+
     /// <summary>Every config folder that can hold a <c>presets.json</c>: the shared
     /// one, each saved profile's, and every character folder under
     /// <c>Profiles/</c> on disk (a character reached with <c>#connect</c> and never
