@@ -58,11 +58,11 @@ public class PresetCommandTests : IDisposable
     public void Set_with_only_foreground_preserves_the_existing_background()
     {
         var (_, engine) = Make();
-        // health defaults to Red / #400000.
-        engine.ProcessInput("#preset health Orange");
+        // roundtime defaults to Aqua / #00004B.
+        engine.ProcessInput("#preset roundtime Orange");
 
-        Assert.Equal("Orange",  _presets.GetForeground("health"));
-        Assert.Equal("#400000", _presets.GetBackground("health"));
+        Assert.Equal("Orange",  _presets.GetForeground("roundtime"));
+        Assert.Equal("#00004B", _presets.GetBackground("roundtime"));
     }
 
     [Fact]

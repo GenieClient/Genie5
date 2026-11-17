@@ -30,11 +30,14 @@ public sealed class PresetEngine
         Set("url",              "#8CD8A8");   // <a href> external URLs
 
         // ── Status bars ─────────────────────────────────────────────────────
-        Set("health",           "Red",      "#400000");
-        Set("mana",             "Aqua",     "#000040");
-        Set("stamina",          "Green",    "#004000");
-        Set("spirit",           "Purple",   "#400040");
-        Set("concentration",    "White",    "#000040");
+        // Vitals bars (public #406): Genie 4's stock values (Lists/Globals.cs
+        // SetDefaultPresets). Foreground = fill; background = track and border,
+        // none by default so the bar's normal track shows.
+        Set("health",           "Maroon");
+        Set("mana",             "Navy");
+        Set("stamina",          "Green");
+        Set("spirit",           "Purple");
+        Set("concentration",    "Navy");
         Set("roundtime",        "Aqua",     "#00004B");
         Set("castbar",          "Magenta");
 
@@ -66,8 +69,17 @@ public sealed class PresetEngine
             Scope = Persistence.RuleScope.Global,
         };
 
-    public void Apply(PresetRule rule)      => _presets[rule.Id] = rule;
-    public void ResetToDefaults()           { _presets.Clear(); SetDefaults(); }
+    /// <summary>Raised after any preset is applied or the palette is reset —
+    /// a typed <c>#preset</c>, <c>#preset load</c>/<c>reset</c>, a picker, a
+    /// profile load. Genie 4 repaints on a typed <c>#preset</c>
+    /// (Command.cs EventPresetChanged → FormMain.PresetChanged); UI that paints
+    /// from presets (bars, map, chrome) listens here. May be raised off the UI
+    /// thread and many times in a row during a load, so listeners marshal and
+    /// coalesce.</summary>
+    public event Action? Changed;
+
+    public void Apply(PresetRule rule)      { _presets[rule.Id] = rule; Changed?.Invoke(); }
+    public void ResetToDefaults()           { _presets.Clear(); SetDefaults(); Changed?.Invoke(); }
     public PresetRule? Get(string id)       => _presets.TryGetValue(id, out var r) ? r : null;
     public string GetForeground(string id)  => _presets.TryGetValue(id, out var r) ? r.ForegroundColor : "Default";
     public string GetBackground(string id)  => _presets.TryGetValue(id, out var r) ? r.BackgroundColor : string.Empty;

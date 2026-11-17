@@ -63,12 +63,32 @@ public static class ThemeKeys
     /// <summary>Text-selection highlight (semi-transparent).</summary>
     public const string Selection    = "Theme.Selection";
 
-    // ── Vitals bars ───────────────────────────────────────────────────────
+    // ── Vitals bars (routed to the Genie 4 presets, public #406) ──────────
+    // Applying a theme writes each bar's fill into the preset's foreground and
+    // its track into the preset's background (health, mana, …), which colour
+    // the Vitals panel and the status strip. Same apply-time-only rule as
+    // GameText. A theme without a track key leaves the preset's background
+    // alone; an empty track value means none (the bar's normal track).
     public const string HealthBar    = "Theme.HealthBar";
     public const string ManaBar      = "Theme.ManaBar";
     public const string SpiritBar    = "Theme.SpiritBar";
     public const string StaminaBar   = "Theme.StaminaBar";
     public const string ConcBar      = "Theme.ConcBar";
+    public const string HealthTrack  = "Theme.HealthTrack";
+    public const string ManaTrack    = "Theme.ManaTrack";
+    public const string SpiritTrack  = "Theme.SpiritTrack";
+    public const string StaminaTrack = "Theme.StaminaTrack";
+    public const string ConcTrack    = "Theme.ConcTrack";
+
+    /// <summary>Each vitals bar's fill and track keys and the preset they set.</summary>
+    public static readonly (string FillKey, string TrackKey, string PresetId)[] VitalsPresetKeys =
+    {
+        (HealthBar,  HealthTrack,  Genie.Core.VitalsPresets.Health),
+        (ManaBar,    ManaTrack,    Genie.Core.VitalsPresets.Mana),
+        (StaminaBar, StaminaTrack, Genie.Core.VitalsPresets.Stamina),
+        (SpiritBar,  SpiritTrack,  Genie.Core.VitalsPresets.Spirit),
+        (ConcBar,    ConcTrack,    Genie.Core.VitalsPresets.Concentration),
+    };
 
     // ── Game-text defaults (routed to DisplaySettings, not resources) ─────
     // Applying a theme seeds GameColorHex from this; the
@@ -100,8 +120,9 @@ public static class ThemeKeys
 
     /// <summary>
     /// Every key that maps to an <c>Application.Resources</c> brush, in
-    /// display order for editors. <see cref="GameText"/> and the echo keys are
-    /// excluded — they route through <c>DisplaySettings</c> and the presets.
+    /// display order for editors. <see cref="GameText"/>, the echo keys and the
+    /// vitals keys are excluded — they route through <c>DisplaySettings</c> and
+    /// the presets.
     /// </summary>
     public static readonly string[] BrushKeys =
     {
@@ -111,6 +132,5 @@ public static class ThemeKeys
         Accent, AccentBg, AccentBorder,
         Success, SuccessBg, Warning, WarningBg, Danger, DangerBg,
         Selection,
-        HealthBar, ManaBar, SpiritBar, StaminaBar, ConcBar,
     };
 }
