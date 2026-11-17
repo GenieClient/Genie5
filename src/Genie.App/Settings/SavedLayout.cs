@@ -143,10 +143,12 @@ public sealed class SavedLayout
     public bool   ShowEchoText         { get; set; } = true;
     public bool   ShowScriptText       { get; set; } = true;
 
-    /// <summary>Map canvas background hex — kept here so themed layouts
-    /// (light mode in town, dark for hunting) round-trip the mapper
-    /// background too.</summary>
-    public string MapBackgroundHex     { get; set; } = "#1A1A1A";
+    /// <summary>Map canvas background hex — kept here so layouts (light map in
+    /// town, dark for hunting) carry the map background too. Loading the layout
+    /// writes it into the <c>automapper.panel</c> preset, where the map reads it
+    /// (public #406). Empty (a layout saved before this field existed) leaves
+    /// the map alone.</summary>
+    public string? MapBackgroundHex    { get; set; }
 
     // ── (De)serialisation helpers ──────────────────────────────────────
 

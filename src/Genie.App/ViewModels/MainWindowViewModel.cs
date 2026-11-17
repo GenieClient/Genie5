@@ -1409,6 +1409,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Mapper.AttachDisplay(Display, _displayPath);
         UpgradeVitalsPresets();
 
+        // The map's colours are the automapper.* presets (public #406). Until
+        // Genie's engine is built (first connect / command) they're read from the
+        // shared presets file; a map colour an earlier Genie 5 kept in
+        // display.json moves into the preset here, once.
+        var startupPresets = new Settings.PresetColorStore(new Genie.Core.Presets.PresetEngine(), _configDir, () => null);
+        if (MapperViewModel.MigrateLegacyColours(Display, startupPresets))
+        {
+            try { Display.Save(_displayPath); } catch { /* best effort: retried next launch */ }
+        }
+        Mapper.PresetStore = startupPresets;
+
         // ── Themes (#20) ──────────────────────────────────────────────────
         // Re-apply the persisted theme's chrome + Fluent variant on top of
         // the design-time Dark defaults. Chrome only: game-text colours come
@@ -5585,6 +5596,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             () => IsConnected ? GetProfileConfigDir(ConnectedProfile) : null,
             warn: msg => GameText.AddSystemLine(msg));
         Themes.Presets = PresetColors;
+        Mapper.PresetStore = PresetColors;   // the map's automapper.* presets (#406)
         Highlighting.DefaultHighlights.NameEngine   = _core.NameHighlights; // name colours (#154)
 
         // ── Performance / safety ──────────────────────────────────────────────
@@ -6407,7 +6419,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             ShowGameText          = Display.ShowGameText,
             ShowEchoText          = Display.ShowEchoText,
             ShowScriptText        = Display.ShowScriptText,
-            MapBackgroundHex      = Display.MapBackgroundHex,
+            MapBackgroundHex      = Controls.MapPalette.Hex(Mapper.Palette.Background),   // automapper.panel (#406)
             WindowedMode          = Display.WindowedMode,
         };
 
@@ -6462,6 +6474,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// applied first (cheap, instant); tool-visibility toggles run
     /// last because Dock.Avalonia mutations need a UI-thread tick.
     /// </summary>
+    /// <summary>Map backgrounds a layout carries without anyone having chosen
+    /// them: Genie 5's old display default and its old dark default.</summary>
+    private static bool IsUnchosenLayoutMapBackground(string hex)
+        => hex.Trim().ToUpperInvariant() is "#EEE8AA" or "#1A1A1A";
+
     internal void ApplyLayout(Settings.SavedLayout layout)
     {
         // Display flags — these have property-changed observers that
@@ -6483,8 +6500,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.ShowGameText           = layout.ShowGameText;
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;
-        if (!string.IsNullOrWhiteSpace(layout.MapBackgroundHex))
-            Display.MapBackgroundHex   = layout.MapBackgroundHex;
+        // A layout's map background goes into the automapper.panel preset (the
+        // one place it's kept, #406) and shows straight away. None, or a default
+        // every older layout carries without anyone choosing it — the old display
+        // default #EEE8AA (also in built-in Shadowveil) or the old dark #1A1A1A —
+        // leaves the map as it is, so applying a layout on connect can't undo a
+        // colour set with #preset, #mapper color or a picker (#406 review).
+        if (Controls.MapPalette.Parse(layout.MapBackgroundHex) is { } mapBg &&
+            !IsUnchosenLayoutMapBackground(layout.MapBackgroundHex!))
+            Mapper.MapBackground = mapBg;
         // Switch document mode to match the saved layout BEFORE rebuilding the
         // dock, so a layout saved in windowed mode reopens windowed (not tabbed).
         Display.WindowedMode           = layout.WindowedMode;

@@ -72,34 +72,93 @@ public partial class MapperViewModel : ReactiveObject
     /// </summary>
     public ObservableCollection<string> CurrentObviousExits { get; } = new();
 
-    // ── Map canvas background (user-customisable) ─────────────────────────
+    // ── Map colours: the automapper.* presets (public #406) ───────────────
     /// <summary>
-    /// User-chosen background colour for the map canvas. Bound to a
-    /// ColorPickerButton in the Details expander. Setting it updates the
-    /// derived <see cref="MapBackgroundBrush"/> and is persisted to
-    /// <c>display.json</c> via the injected <see cref="DisplaySettings"/>.
+    /// The map's colours, built from the <c>automapper.*</c> presets and bound to
+    /// <see cref="Controls.MapCanvas.Palette"/>. Rebuilt whenever presets change
+    /// (Presets tab, the pickers below, <c>#mapper color</c>, a layout, a reload).
     /// </summary>
-    [Reactive] public Color  MapBackground      { get; set; } = Color.Parse("#EEE8AA");
+    [Reactive] public Controls.MapPalette Palette { get; private set; } = Controls.MapPalette.Stock;
 
     /// <summary>
-    /// Derived brush bound to <see cref="Controls.MapCanvas.MapBackgroundBrush"/>.
-    /// Recomputed whenever <see cref="MapBackground"/> changes so the canvas
-    /// repaints live as the user drags through the colour picker.
+    /// Reads and writes the presets. Set by <c>MainWindowViewModel</c>: the shared
+    /// presets file at startup, the session's store once Genie's engine is built.
     /// </summary>
-    [Reactive] public IBrush MapBackgroundBrush { get; private set; } = new SolidColorBrush(Color.Parse("#EEE8AA"));
+    public PresetColorStore? PresetStore
+    {
+        get => _presetStore;
+        set { _presetStore = value; RefreshPalette(); }
+    }
+    private PresetColorStore? _presetStore;
+    private bool _syncingColours;
 
     /// <summary>
-    /// User-chosen colour for the map's on-canvas label text. Bound to a
-    /// ColorPickerButton in the Details expander; persisted to <c>display.json</c>.
+    /// The map background: <c>automapper.panel</c>'s background. Bound to the
+    /// Details panel's picker and set by <c>#mapper color bg</c> and by loading a
+    /// layout; setting it changes the preset (live and on disk).
     /// </summary>
-    [Reactive] public Color  MapTextColor       { get; set; } = Color.Parse("#000000");
+    [Reactive] public Color  MapBackground      { get; set; } = Controls.MapPalette.Stock.Background;
+
+    /// <summary>The map background as a brush, for the panel behind the canvas.</summary>
+    [Reactive] public IBrush MapBackgroundBrush { get; private set; } = new SolidColorBrush(Controls.MapPalette.Stock.Background);
 
     /// <summary>
-    /// Derived brush bound to <see cref="Controls.MapCanvas.LabelTextBrush"/>.
-    /// Recomputed whenever <see cref="MapTextColor"/> changes so labels repaint
-    /// live as the user drags the colour picker.
+    /// The map's label text: <c>automapper.panel</c>'s colour. Bound to the
+    /// Details panel's picker and set by <c>#mapper color text</c>; setting it
+    /// changes the preset.
     /// </summary>
-    [Reactive] public IBrush MapTextBrush       { get; private set; } = new SolidColorBrush(Color.Parse("#000000"));
+    [Reactive] public Color  MapTextColor       { get; set; } = Controls.MapPalette.Stock.Text;
+
+    /// <summary>Rebuild <see cref="Palette"/> from the presets and show its
+    /// panel colours in the pickers (without writing them back).</summary>
+    public void RefreshPalette()
+    {
+        var store = _presetStore;
+        Controls.MapPalette palette;
+        if (store is null) palette = Controls.MapPalette.Stock;
+        else
+        {
+            var (fg, bg) = store.Reader();
+            palette = Controls.MapPalette.From(fg, bg);
+        }
+        if (palette == Palette) return;
+        Palette = palette;
+        _syncingColours = true;
+        try
+        {
+            MapBackground      = palette.Background;
+            MapTextColor       = palette.Text;
+            MapBackgroundBrush = new SolidColorBrush(palette.Background);
+        }
+        finally { _syncingColours = false; }
+    }
+
+    /// <summary>
+    /// One-time upgrade (public #406): a map background or text colour picked in
+    /// an earlier Genie 5 (kept in <c>display.json</c>) moves into
+    /// <c>automapper.panel</c>, so the map looks the same afterwards. The old
+    /// defaults (#EEE8AA / #1A1A1A background, #000000 text) weren't picked by
+    /// anyone and leave the preset as it is, so a Genie 4 import keeps its
+    /// colours. The display.json fields are then cleared and no longer written.
+    /// </summary>
+    public static bool MigrateLegacyColours(DisplaySettings display, PresetColorStore store)
+    {
+        static bool Picked(string? hex, params string[] defaults) =>
+            !string.IsNullOrWhiteSpace(hex) &&
+            !defaults.Any(d => d.Equals(hex.Trim(), StringComparison.OrdinalIgnoreCase)) &&
+            Controls.MapPalette.Parse(hex) is not null;
+
+        if (display.MapBackgroundHex is null && display.MapTextHex is null) return false;
+
+        var bg   = Picked(display.MapBackgroundHex, "#EEE8AA", "#1A1A1A") ? display.MapBackgroundHex!.Trim() : null;
+        var text = Picked(display.MapTextHex, "#000000")                  ? display.MapTextHex!.Trim()       : null;
+        if (bg is not null || text is not null)
+            store.Set(Controls.MapPalette.PanelPreset, text, bg);
+
+        display.MapBackgroundHex = null;
+        display.MapTextHex       = null;
+        return true;
+    }
 
     /// <summary>
     /// Non-compass arcs from the current room — "go small alleyway",
@@ -936,53 +995,34 @@ public partial class MapperViewModel : ReactiveObject
         this.WhenAnyValue(x => x.MapsDirectory)
             .Subscribe(_ => RecomputeIsGitManaged());
 
-        // Derive MapBackgroundBrush from MapBackground. Persist the hex on
-        // each change so the choice survives restart.
+        // The pickers (and #mapper color, and a layout) edit automapper.panel:
+        // background = map background, colour = label text (public #406). The
+        // preset is the one place the colour is kept; RefreshPalette brings the
+        // change back into Palette.
         this.WhenAnyValue(x => x.MapBackground)
+            .Skip(1)
             .Subscribe(c =>
             {
-                MapBackgroundBrush = new SolidColorBrush(c);
-                if (_display is not null)
-                {
-                    var hex = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
-                    if (!string.Equals(_display.MapBackgroundHex, hex, StringComparison.OrdinalIgnoreCase))
-                    {
-                        _display.MapBackgroundHex = hex;
-                        if (!string.IsNullOrEmpty(_displayPath))
-                        {
-                            try   { _display.Save(_displayPath); }
-                            catch { /* persistence failure isn't fatal */ }
-                        }
-                    }
-                }
+                if (_syncingColours || _presetStore is not { } store || c == Palette.Background) return;
+                store.Set(Controls.MapPalette.PanelPreset, null, Controls.MapPalette.Hex(c));
+            });
+        this.WhenAnyValue(x => x.MapTextColor)
+            .Skip(1)
+            .Subscribe(c =>
+            {
+                if (_syncingColours || _presetStore is not { } store || c == Palette.Text) return;
+                store.Set(Controls.MapPalette.PanelPreset, Controls.MapPalette.Hex(c), null);
             });
 
-        // Same pattern for the label text colour.
-        this.WhenAnyValue(x => x.MapTextColor)
-            .Subscribe(c =>
-            {
-                MapTextBrush = new SolidColorBrush(c);
-                if (_display is not null)
-                {
-                    var hex = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
-                    if (!string.Equals(_display.MapTextHex, hex, StringComparison.OrdinalIgnoreCase))
-                    {
-                        _display.MapTextHex = hex;
-                        if (!string.IsNullOrEmpty(_displayPath))
-                        {
-                            try   { _display.Save(_displayPath); }
-                            catch { /* persistence failure isn't fatal */ }
-                        }
-                    }
-                }
-            });
+        // Any preset change (Presets tab, a reload, a character switch, the
+        // pickers above) repaints the map. RulesChanged can fire off the UI thread.
+        Highlighting.UserHighlights.RulesChanged += () => Dispatcher.UIThread.Post(RefreshPalette);
     }
 
     /// <summary>
     /// Hand the VM its persistent visual settings + the on-disk path. Called
     /// from <c>MainWindowViewModel</c> once <see cref="DisplaySettings"/> has
-    /// loaded. Pre-seeds <see cref="MapBackground"/> from the stored hex and
-    /// keeps the two in sync from then on.
+    /// loaded.
     /// </summary>
     public void AttachDisplay(DisplaySettings display, string displayPath)
     {
@@ -997,19 +1037,8 @@ public partial class MapperViewModel : ReactiveObject
         var sortIdx = Array.IndexOf(ZoneSortKeys, display.MapZoneSort);
         if (sortIdx >= 0) ZoneSortMode = ZoneSortLabels[sortIdx];
 
-        // One-time migration: the old default canvas was dark (#1A1A1A). Genie 4's
-        // AutoMapper uses a PaleGoldenrod (tan) canvas, which the map palette
-        // (black cardinal lines, blue cross-zone borders) is designed for. Treat
-        // the exact old default as "unset" and move it to the tan default so
-        // existing users get the Genie 4 look without losing a genuinely custom
-        // colour they picked. Idempotent — re-running it changes nothing.
-        if (string.Equals(display.MapBackgroundHex, "#1A1A1A", StringComparison.OrdinalIgnoreCase))
-            display.MapBackgroundHex = "#EEE8AA";
-
-        if (Color.TryParse(display.MapBackgroundHex, out var c))
-            MapBackground = c;
-        if (Color.TryParse(display.MapTextHex, out var tc))
-            MapTextColor = tc;
+        // The map colours aren't kept here any more: they're the automapper.*
+        // presets (public #406) — see PresetStore / MigrateLegacyColours.
 
         // Status-bar location line (#66). Zone field follows the user's
         // Zone-name-vs-number setting; Room is always $roomid (the mapper node

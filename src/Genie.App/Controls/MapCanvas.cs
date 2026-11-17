@@ -69,13 +69,12 @@ public class MapCanvas : Control
     private static Rect  R(MapRect r)           => new(r.X, r.Y, r.Width, r.Height);
     private static Point P((double X, double Y) p) => new(p.X, p.Y);
 
-    // Palette mirrors the Genie 4 AutoMapper defaults (Globals.SetDefaultPresets):
-    //   panel bg = PaleGoldenrod, node = White, node border / line = Black.
-    private static readonly IBrush  BackgroundBrush = new SolidColorBrush(Color.FromRgb(0xee, 0xe8, 0xaa)); // PaleGoldenrod (designer fallback)
-    private static readonly IBrush  DefaultNodeFill = new SolidColorBrush(Colors.White);
-    private static readonly IBrush  NodeStroke      = new SolidColorBrush(Colors.Black);
+    // The map's own colours (background, label text, lines, stubs, rooms, and
+    // their other-floor versions) come from the automapper.* presets through
+    // Palette (public #406): see MapPalette and Paint. What's below is the
+    // map's fixed UI (current-room ring, selection, cross-zone border, hover
+    // badge), which Genie 4 doesn't take from a preset either.
     private static readonly IBrush  CurrentStroke   = new SolidColorBrush(Color.FromRgb(0xff, 0x40, 0x40));
-    private static readonly Pen     NodePen         = new(NodeStroke, 1.0);
     private static readonly Pen     CurrentPen      = new(CurrentStroke, 2.5);
     // Cross-zone connector rooms (note references another .xml map) get a 2px
     // blue border — Genie 4's "Other map" boxes that show how maps connect.
@@ -86,23 +85,8 @@ public class MapCanvas : Control
                                                       { DashStyle = new DashStyle(new double[] { 2, 2 }, 0) };
     private static readonly IBrush  EmptyMessageBrush = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66));
 
-    // Edge pens — Genie 4 AutoMapper line palette (Globals.SetDefaultPresets):
-    //   Cardinal (N/NE/E/SE/S/SW/W/NW)  → black  (automapper.line)
-    //   Go / Up / Down / Out            → blue   (automapper.linego)
-    //   Climb                           → green  (automapper.lineclimb)
-    // Genie 5 lumps every non-compass arc into Direction.None, so climb-vs-go is
-    // disambiguated from the move verb (see EdgePenFor).
-    private static readonly Pen     EdgePenCardinal = new(new SolidColorBrush(Colors.Black), EdgeWidth);
-    private static readonly Pen     EdgePenGo       = new(new SolidColorBrush(Colors.Blue),  EdgeWidth);
-    private static readonly Pen     EdgePenClimb    = new(new SolidColorBrush(Color.FromRgb(0x00, 0x80, 0x00)), EdgeWidth);
-    // Directional exit stub (#157) — a short cyan tick out of a room's edge for a
-    // cardinal exit whose neighbour isn't drawn, so you can still see which ways
-    // leave the room (Genie 4 mapper behaviour).
-    private static readonly IBrush  StubBrush       = new SolidColorBrush(Color.FromRgb(0x00, 0xC8, 0xE8)); // cyan
-    private static readonly Pen     StubPen         = new(StubBrush, EdgeWidth);
-
-    // On-map label text — Genie 4 paints <label> elements in the panel's
-    // foreground colour (black on the PaleGoldenrod canvas).
+    // Legend panel text and label measuring (the legend sits on its own white
+    // panel, so it isn't a map colour).
     private static readonly IBrush  RoomLabelBrush  = new SolidColorBrush(Colors.Black);
     // A selected label (edit mode) — Genie 4 paints it white-on-blue with a
     // black border (MapForm.cs, m_SelectedLabels).
@@ -184,21 +168,12 @@ public class MapCanvas : Control
         AvaloniaProperty.Register<MapCanvas, ICommand?>(nameof(EditExitCommand));
 
     /// <summary>
-    /// User-chosen canvas background brush. Bound to
-    /// <see cref="ViewModels.MapperViewModel.MapBackgroundBrush"/>. Null falls
-    /// back to the default dark fill, so layout tests / designer previews
-    /// without a DataContext still render sensibly.
+    /// The map's colours, from the <c>automapper.*</c> presets (public #406).
+    /// Bound to <see cref="ViewModels.MapperViewModel.Palette"/>. Null draws the
+    /// stock presets' colours (designer previews, tests without a view-model).
     /// </summary>
-    public static readonly StyledProperty<IBrush?> MapBackgroundBrushProperty =
-        AvaloniaProperty.Register<MapCanvas, IBrush?>(nameof(MapBackgroundBrush));
-
-    /// <summary>
-    /// User-chosen colour for on-map <c>&lt;label&gt;</c> text. Bound to
-    /// <see cref="ViewModels.MapperViewModel.MapTextBrush"/>. Null falls back to
-    /// the default black so designer previews without a DataContext still render.
-    /// </summary>
-    public static readonly StyledProperty<IBrush?> LabelTextBrushProperty =
-        AvaloniaProperty.Register<MapCanvas, IBrush?>(nameof(LabelTextBrush));
+    public static readonly StyledProperty<MapPalette?> PaletteProperty =
+        AvaloniaProperty.Register<MapCanvas, MapPalette?>(nameof(Palette));
 
     /// <summary>
     /// Opacity (0–255) of the "ghost" rooms and arcs drawn for the floors directly
@@ -322,8 +297,7 @@ public class MapCanvas : Control
     public ICommand? CrossZoneClickedCommand { get => GetValue(CrossZoneClickedCommandProperty); set => SetValue(CrossZoneClickedCommandProperty, value); }
     public double    Zoom               { get => GetValue(ZoomProperty);               set => SetValue(ZoomProperty, value); }
     public IBrush?   CurrentRoomBrush   { get => GetValue(CurrentRoomBrushProperty);   set => SetValue(CurrentRoomBrushProperty, value); }
-    public IBrush?   MapBackgroundBrush { get => GetValue(MapBackgroundBrushProperty); set => SetValue(MapBackgroundBrushProperty, value); }
-    public IBrush?   LabelTextBrush     { get => GetValue(LabelTextBrushProperty);     set => SetValue(LabelTextBrushProperty, value); }
+    public MapPalette? Palette          { get => GetValue(PaletteProperty);            set => SetValue(PaletteProperty, value); }
     public int       AutoMapperAlpha    { get => GetValue(AutoMapperAlphaProperty);    set => SetValue(AutoMapperAlphaProperty, value); }
     public bool      ShowLegend         { get => GetValue(ShowLegendProperty);         set => SetValue(ShowLegendProperty, value); }
     public ICommand? EditExitCommand    { get => GetValue(EditExitCommandProperty);    set => SetValue(EditExitCommandProperty, value); }
@@ -378,8 +352,8 @@ public class MapCanvas : Control
         // Any of these changing means we need to repaint AND recompute size.
         AffectsRender<MapCanvas>(ShowSpoilersProperty);
         AffectsRender<MapCanvas>(ZoneProperty, CurrentNodeProperty, LevelProperty, RenderTickProperty,
-                                 ZoomProperty, CurrentRoomBrushProperty, MapBackgroundBrushProperty,
-                                 LabelTextBrushProperty, AutoMapperAlphaProperty, ShowLegendProperty,
+                                 ZoomProperty, CurrentRoomBrushProperty, PaletteProperty,
+                                 AutoMapperAlphaProperty, ShowLegendProperty,
                                  EditModeProperty, SelectedNodeProperty, FullLabelsProperty,
                                  SelectedLabelProperty);
         AffectsMeasure<MapCanvas>(ZoneProperty, LevelProperty, RenderTickProperty, ZoomProperty);
@@ -453,14 +427,74 @@ public class MapCanvas : Control
 
     // ── Render ────────────────────────────────────────────────────────────
 
+    // ── Paint: brushes and pens built from the palette ────────────────────
+
+    /// <summary>The brushes and pens for one palette and ghost opacity, built
+    /// once and reused until either changes.</summary>
+    private sealed class Paint
+    {
+        public readonly MapPalette Palette;
+        public readonly int        Alpha;
+        public readonly IBrush Background, Text, Node;
+        public readonly Pen    NodeBorder, Line, LineGo, LineClimb, Stump;
+        // Other floors (Genie 4: each preset's background), faded by AutoMapperAlpha.
+        public readonly IBrush GhostNode;
+        public readonly Pen    GhostBorder, GhostLine, GhostLineGo, GhostLineClimb, GhostStump;
+
+        public Paint(MapPalette p, int alpha)
+        {
+            Palette = p; Alpha = alpha;
+            static SolidColorBrush B(Color c) => new(c);
+            SolidColorBrush G(Color c) => new(Color.FromArgb((byte)(c.A * alpha / 255), c.R, c.G, c.B));
+
+            Background = B(p.Background);
+            Text       = B(p.Text);
+            Node       = B(p.Node);
+            NodeBorder = new Pen(B(p.Line), 1.0);
+            Line       = new Pen(B(p.Line),      EdgeWidth);
+            LineGo     = new Pen(B(p.LineGo),    EdgeWidth);
+            LineClimb  = new Pen(B(p.LineClimb), EdgeWidth);
+            Stump      = new Pen(B(p.LineStump), EdgeWidth);
+
+            GhostNode      = G(p.NodeOtherFloor);
+            GhostBorder    = new Pen(G(p.LineOtherFloor),      EdgeWidth);
+            GhostLine      = new Pen(G(p.LineOtherFloor),      EdgeWidth);
+            GhostLineGo    = new Pen(G(p.LineGoOtherFloor),    EdgeWidth);
+            GhostLineClimb = new Pen(G(p.LineClimbOtherFloor), EdgeWidth);
+            GhostStump     = new Pen(G(p.LineStumpOtherFloor), EdgeWidth);
+        }
+
+        public Pen EdgePen(MapExit exit) => EdgeKindFor(exit) switch
+        {
+            EdgeKind.Cardinal => Line,        // automapper.line
+            EdgeKind.Climb    => LineClimb,   // automapper.lineclimb
+            _                 => LineGo,      // automapper.linego
+        };
+
+        public Pen GhostEdgePen(MapExit exit) => EdgeKindFor(exit) switch
+        {
+            EdgeKind.Cardinal => GhostLine,
+            EdgeKind.Climb    => GhostLineClimb,
+            _                 => GhostLineGo,
+        };
+    }
+
+    private Paint? _paint;
+    private Paint CurrentPaint()
+    {
+        var palette = Palette ?? MapPalette.Stock;
+        if (_paint is null || !ReferenceEquals(_paint.Palette, palette) || _paint.Alpha != AutoMapperAlpha)
+            _paint = new Paint(palette, AutoMapperAlpha);
+        return _paint;
+    }
+
     public override void Render(DrawingContext context)
     {
+        var paint = CurrentPaint();
+
         // Background — paint the whole control so empty areas don't show
-        // whatever was behind the canvas. Honours the user-chosen brush from
-        // the Mapper VM (ColorPickerButton in Details); falls back to the
-        // dark default if no brush bound (designer / no-DataContext).
-        var bg = MapBackgroundBrush ?? BackgroundBrush;
-        context.FillRectangle(bg, new Rect(Bounds.Size));
+        // whatever was behind the canvas: automapper.panel's background.
+        context.FillRectangle(paint.Background, new Rect(Bounds.Size));
 
         if (Zone is null || Zone.Nodes.Count == 0)
         {
@@ -481,7 +515,8 @@ public class MapCanvas : Control
         // Drawn first (under everything current) so a multi-floor zone shows
         // where the adjacent levels extend. Genie 4 parity (MapForm.cs, "Mark
         // all other levels gray"): an off-floor room AND its arcs are painted in
-        // the automapper presets' BACKGROUND colour — white by default
+        // the automapper presets' BACKGROUND colour (#406: read from the presets,
+        // each line type its own) — white by default
         // ("automapper.node" / "automapper.line" = "…, White") — so the floor
         // below stays a readable map under the current floor. The earlier cut
         // painted opaque grey boxes and skipped the arcs; on a map whose new
@@ -493,21 +528,17 @@ public class MapCanvas : Control
         // as in Genie 4.
         if (AutoMapperAlpha > 0)
         {
-            var a          = (byte)AutoMapperAlpha;
-            var ghostBrush = new SolidColorBrush(Color.FromArgb(a, 0xff, 0xff, 0xff));
-            var ghostPen   = new Pen(ghostBrush, EdgeWidth);
-
             // Ghost arcs first, under the ghost boxes, exactly like Pass 1 → 2.
             ForEachGhostEdge(Zone, Level, ShowSpoilers,
-                (from, to)  => context.DrawLine(ghostPen, P(proj.NodeCenter(from)), P(proj.NodeCenter(to))),
-                (from, dir) => DrawExitStub(context, P(proj.NodeCenter(from)), dir, nodeSide, ghostPen));
+                (from, to, exit) => context.DrawLine(paint.GhostEdgePen(exit), P(proj.NodeCenter(from)), P(proj.NodeCenter(to))),
+                (from, dir)      => DrawExitStub(context, P(proj.NodeCenter(from)), dir, nodeSide, paint.GhostStump));
 
             foreach (var node in Zone.Nodes.Values)
             {
                 if (!IsGhostFloor(node.Z, Level)) continue;
                 var rect = R(proj.NodeRect(node));
-                context.FillRectangle(ghostBrush, rect);
-                context.DrawRectangle(ghostPen, rect);
+                context.FillRectangle(paint.GhostNode, rect);
+                context.DrawRectangle(paint.GhostBorder, rect);
             }
         }
 
@@ -529,13 +560,14 @@ public class MapCanvas : Control
                     // Neighbour is drawn on this level → full edge (once, from the
                     // lower id side). Pen by exit type, matching Genie 4's palette.
                     if (node.Id > dest.Id) continue;
-                    context.DrawLine(EdgePenFor(exit), fromCenter, P(proj.NodeCenter(dest)));
+                    context.DrawLine(paint.EdgePen(exit), fromCenter, P(proj.NodeCenter(dest)));
                 }
                 else
                 {
                     // Neighbour isn't drawn (no dest, off-level, or unrecorded) →
-                    // a short cyan stub in the exit's cardinal direction (#157).
-                    DrawExitStub(context, fromCenter, exit.Direction, nodeSide);
+                    // a short stub in the exit's cardinal direction (#157),
+                    // automapper.linestump.
+                    DrawExitStub(context, fromCenter, exit.Direction, nodeSide, paint.Stump);
                 }
             }
         }
@@ -559,12 +591,14 @@ public class MapCanvas : Control
             var rect = (_dragging && isSelected)
                 ? new Rect(_cursor.X - nodeSide / 2, _cursor.Y - nodeSide / 2, nodeSide, nodeSide)
                 : R(proj.NodeRect(node));
-            var fill = ParseColor(node.Color) ?? DefaultNodeFill;
+            // A room with no colour of its own is automapper.node.
+            var fill = ParseColor(node.Color) ?? paint.Node;
 
             context.FillRectangle(fill, rect);
             // Cross-zone connector rooms get a 2px blue border (Genie 4 "Other
-            // map" boxes); ordinary rooms get the thin black border.
-            context.DrawRectangle(node.IsCrossZone ? CrossZonePen : NodePen, rect);
+            // map" boxes); ordinary rooms get a thin border in automapper.line
+            // (Genie 4 draws room borders in the line colour).
+            context.DrawRectangle(node.IsCrossZone ? CrossZonePen : paint.NodeBorder, rect);
 
             if (CurrentNode is not null && node.Id == CurrentNode.Id) currentRect  = rect;
             if (isSelected)                                           selectedRect = rect;
@@ -594,7 +628,7 @@ public class MapCanvas : Control
         // hover badge instead. This is why a cross-zone room no longer shows its
         // raw "Map31_…xml|…" note.
         var labelSize  = proj.LabelFontSize;                 // Genie 4: default font × scale
-        var labelBrush = LabelTextBrush ?? RoomLabelBrush;   // user colour, default black
+        var labelBrush = paint.Text;                         // automapper.panel's colour
 
         if (FullLabels)
         foreach (var label in Zone.Labels)
@@ -617,7 +651,7 @@ public class MapCanvas : Control
             {
                 var box = new Rect(origin.X, origin.Y, ft.Width + 2, proj.LabelRowHeight);
                 context.FillRectangle(SelectedLabelFillBrush, box);
-                context.DrawRectangle(NodePen, box);
+                context.DrawRectangle(paint.NodeBorder, box);
             }
             context.DrawText(ft, new Point(origin.X + 1, origin.Y + 1));
         }
@@ -685,8 +719,6 @@ public class MapCanvas : Control
     };
 
     private static readonly Color SelectedColor = Color.FromRgb(0xff, 0xe0, 0x40);
-    private static readonly Color StubColor     = Color.FromRgb(0x00, 0xC8, 0xE8);
-    private static readonly Color ClimbColor    = Color.FromRgb(0x00, 0x80, 0x00);
 
     /// <summary>
     /// Build the legend rows for <paramref name="level"/> of <paramref name="zone"/>:
@@ -701,8 +733,10 @@ public class MapCanvas : Control
     /// a render surface.
     /// </summary>
     internal static List<LegendEntry> BuildLegend(MapZone zone, int level, MapNode? current, MapNode? selected,
-                                                  bool showSpoilers, bool ghostsVisible, Color currentRing)
+                                                  bool showSpoilers, bool ghostsVisible, Color currentRing,
+                                                  MapPalette? palette = null)
     {
+        var pal = palette ?? MapPalette.Stock;
         bool plain = false, crossZone = false, ghost = false;
         bool cardinal = false, go = false, climb = false, stub = false;
         var fills = new HashSet<Color>();
@@ -739,7 +773,7 @@ public class MapCanvas : Control
         }
 
         var rows = new List<LegendEntry>();
-        if (plain) rows.Add(new(LegendStyle.Room, Colors.White, "Room"));
+        if (plain) rows.Add(new(LegendStyle.Room, pal.Node, "Room"));
 
         // Known colours in README priority order, then anything off-key by hex.
         foreach (var (color, label) in RoomColourKey)
@@ -750,12 +784,12 @@ public class MapCanvas : Control
         if (crossZone)                                   rows.Add(new(LegendStyle.Ring, Colors.Blue,   "Cross-zone room"));
         if (current  is not null && current.Z  == level) rows.Add(new(LegendStyle.Ring, currentRing,   "Current room *"));
         if (selected is not null && selected.Z == level) rows.Add(new(LegendStyle.Ring, SelectedColor, "Selected room", Dashed: true));
-        if (ghost)                                       rows.Add(new(LegendStyle.Ghost, Colors.White, "Floor above / below"));
+        if (ghost)                                       rows.Add(new(LegendStyle.Ghost, pal.NodeOtherFloor, "Floor above / below"));
 
-        if (cardinal) rows.Add(new(LegendStyle.Line, Colors.Black, "Path"));
-        if (go)       rows.Add(new(LegendStyle.Line, Colors.Blue,  "Go / up / down"));
-        if (climb)    rows.Add(new(LegendStyle.Line, ClimbColor,   "Climb"));
-        if (stub)     rows.Add(new(LegendStyle.Line, StubColor,    "Exit (neighbour not mapped)"));
+        if (cardinal) rows.Add(new(LegendStyle.Line, pal.Line,      "Path"));
+        if (go)       rows.Add(new(LegendStyle.Line, pal.LineGo,    "Go / up / down"));
+        if (climb)    rows.Add(new(LegendStyle.Line, pal.LineClimb, "Climb"));
+        if (stub)     rows.Add(new(LegendStyle.Line, pal.LineStump, "Exit (neighbour not mapped)"));
         return rows;
     }
 
@@ -778,7 +812,8 @@ public class MapCanvas : Control
     private void DrawLegend(DrawingContext context, MapProjection proj)
     {
         var currentRing = CurrentRoomBrush is ISolidColorBrush scb ? scb.Color : Color.FromRgb(0xff, 0x40, 0x40);
-        var rows = BuildLegend(Zone!, Level, CurrentNode, SelectedNode, ShowSpoilers, AutoMapperAlpha > 0, currentRing);
+        var paint = CurrentPaint();
+        var rows = BuildLegend(Zone!, Level, CurrentNode, SelectedNode, ShowSpoilers, AutoMapperAlpha > 0, currentRing, paint.Palette);
         if (rows.Count == 0) return;
 
         const double pad = 8, row = 16, sw = 12, gap = 8;
@@ -835,7 +870,6 @@ public class MapCanvas : Control
         context.FillRectangle(new SolidColorBrush(Color.FromArgb(0xCC, 0xff, 0xff, 0xff)), panel, 4);
         context.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), 1.0), panel, 4, 4);
 
-        var bg = MapBackgroundBrush ?? BackgroundBrush;
         for (int i = 0; i < rows.Count; i++)
         {
             var (style, color, _, dashed) = rows[i];
@@ -849,23 +883,22 @@ public class MapCanvas : Control
                     context.DrawLine(new Pen(brush, 2.0), new Point(x0, cy), new Point(x0 + sw, cy));
                     break;
                 case LegendStyle.Room:
-                    // The colour IS the fill, with the map's thin black node border.
+                    // The colour IS the fill, with the map's thin room border.
                     context.FillRectangle(brush, swatch);
-                    context.DrawRectangle(NodePen, swatch);
+                    context.DrawRectangle(paint.NodeBorder, swatch);
                     break;
                 case LegendStyle.Ring:
-                    // White box, colour as a 2px border (cross-zone / current / selected).
-                    context.FillRectangle(DefaultNodeFill, swatch);
+                    // Room box, colour as a 2px border (cross-zone / current / selected).
+                    context.FillRectangle(paint.Node, swatch);
                     var ring = new Pen(brush, 2.0);
                     if (dashed) ring.DashStyle = new DashStyle(new double[] { 2, 2 }, 0);
                     context.DrawRectangle(ring, swatch);
                     break;
                 case LegendStyle.Ghost:
-                    // Alpha-white over the map background, exactly as Pass 0 paints a ghost.
-                    var ghostBrush = new SolidColorBrush(Color.FromArgb((byte)AutoMapperAlpha, 0xff, 0xff, 0xff));
-                    context.FillRectangle(bg, swatch);
-                    context.FillRectangle(ghostBrush, swatch);
-                    context.DrawRectangle(new Pen(ghostBrush, EdgeWidth), swatch);
+                    // Over the map background, exactly as Pass 0 paints a ghost.
+                    context.FillRectangle(paint.Background, swatch);
+                    context.FillRectangle(paint.GhostNode, swatch);
+                    context.DrawRectangle(paint.GhostBorder, swatch);
                     break;
             }
             var ft = texts[i];
@@ -1578,11 +1611,11 @@ public class MapCanvas : Control
 
     // ── Geometry helpers (instance so they pick up live Zoom) ─────────────
 
-    /// <summary>Draw a short cyan tick out of a room's edge in <paramref name="dir"/>'s
+    /// <summary>Draw a short tick (automapper.linestump) out of a room's edge in <paramref name="dir"/>'s
     /// direction (#157). Only the eight 2-D cardinals get a stub — up/down/out/in
     /// have no on-map direction. The grid Δ maps straight to screen space (grid Y
     /// and screen Y both grow downward), normalised so diagonals aren't longer.</summary>
-    private void DrawExitStub(DrawingContext ctx, Point center, Direction dir, double nodeSide, Pen? pen = null)
+    private void DrawExitStub(DrawingContext ctx, Point center, Direction dir, double nodeSide, Pen pen)
     {
         if (!IsStubDirection(dir, out var d)) return;
 
@@ -1593,7 +1626,7 @@ public class MapCanvas : Control
         var stub = nodeSide * 0.7;
         var start = new Point(center.X + ux * half,          center.Y + uy * half);
         var end   = new Point(center.X + ux * (half + stub), center.Y + uy * (half + stub));
-        ctx.DrawLine(pen ?? StubPen, start, end);
+        ctx.DrawLine(pen, start, end);
     }
 
     /// <summary>The eight 2-D cardinals get an exit stub; up/down/out/in/none have
@@ -1621,6 +1654,13 @@ public class MapCanvas : Control
     /// </summary>
     internal static void ForEachGhostEdge(MapZone zone, int level, bool showSpoilers,
                                           Action<MapNode, MapNode> edge,
+                                          Action<MapNode, Direction> stub) =>
+        ForEachGhostEdge(zone, level, showSpoilers, (from, to, _) => edge(from, to), stub);
+
+    /// <summary>As above, with the arc itself so the renderer can pick its
+    /// line type's colour.</summary>
+    internal static void ForEachGhostEdge(MapZone zone, int level, bool showSpoilers,
+                                          Action<MapNode, MapNode, MapExit> edge,
                                           Action<MapNode, Direction> stub)
     {
         foreach (var node in zone.Nodes.Values)
@@ -1634,7 +1674,7 @@ public class MapCanvas : Control
                     && dest.Z == node.Z)
                 {
                     if (node.Id > dest.Id) continue;
-                    edge(node, dest);
+                    edge(node, dest, exit);
                 }
                 else if (IsStubDirection(exit.Direction, out _))
                 {
@@ -1658,7 +1698,7 @@ public class MapCanvas : Control
     /// arcs black, climb arcs green, and everything else (go-doors, up/down/out,
     /// swim, etc.) blue. Genie 5 collapses all non-compass arcs into
     /// <see cref="Direction.None"/>, so climb is recognised from the move verb.
-    /// Shared by the renderer (<see cref="EdgePenFor"/>) and the legend, so the
+    /// Shared by the renderer (<see cref="Paint.EdgePen"/>) and the legend, so the
     /// key can never disagree with the map.
     /// </summary>
     internal static EdgeKind EdgeKindFor(MapExit exit)
@@ -1680,13 +1720,6 @@ public class MapCanvas : Control
                     : EdgeKind.Go;
         }
     }
-
-    private static Pen EdgePenFor(MapExit exit) => EdgeKindFor(exit) switch
-    {
-        EdgeKind.Cardinal => EdgePenCardinal,   // black
-        EdgeKind.Climb    => EdgePenClimb,      // green
-        _                 => EdgePenGo,         // blue
-    };
 
     private void DrawCenteredMessage(DrawingContext context, string text)
     {
