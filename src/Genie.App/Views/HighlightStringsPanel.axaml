@@ -78,7 +78,8 @@
 
         <TextBlock Grid.Row="2" Grid.Column="0" Text="Match:" VerticalAlignment="Center" Margin="0,0,8,4"/>
         <ComboBox  Grid.Row="2" Grid.Column="1"
-                   Name="MatchTypeBox" Margin="0,0,8,4" HorizontalAlignment="Stretch"/>
+                   Name="MatchTypeBox" Margin="0,0,8,4" HorizontalAlignment="Stretch"
+                   ToolTip.Tip="String: colour the text wherever it appears. Line: colour the whole line when the text appears in it. BeginsWith: colour the whole line when it starts with the text. Regex: colour only what the ( ) capture groups match, or the whole match when there are none — use (?: ) for grouping that shouldn't narrow the colour. Same as Genie 4."/>
         <TextBlock Grid.Row="2" Grid.Column="2" Text="Class:" VerticalAlignment="Center" Margin="0,0,8,4"/>
         <TextBox   Grid.Row="2" Grid.Column="3" Name="ClassBox" Margin="0,0,0,4"/>
 
