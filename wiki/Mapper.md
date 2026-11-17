@@ -61,7 +61,8 @@ Genie identifies your current room from what the game sends — the room title, 
 ### Lookup vs. learning
 
 - **Lookup-only (default)** — Genie matches you against the community map but never changes the map files.
-- **Learning (Record on)** — Genie also stamps server-room ids onto matched rooms it is sure of, records exits it sees you use, and adds new rooms it doesn't recognize. The changes live in memory until you **Save** the zone (a dot marks unsaved edits), so you can reload the zone to discard them. Record starts **off** every session and is never saved, so it cannot stay on by accident; `#config automapper true` (or the Record button, or a script) turns it on for the session only.
+- **Learning (Record on)** — Genie also stamps server-room ids onto matched rooms it is sure of, records exits it sees you use, and adds new rooms it doesn't recognize. The changes live in memory until you **Save** the zone (a dot marks unsaved edits), so you can reload the zone to discard them. Record starts **off** every session and is never saved, so it cannot stay on by accident; the Record button, `#mapper record on` or `#config automapperrecord true` (or a script) turns it on for the session only.
+- **Mapper off** — **Enable AutoMapper** in **Maps ▸ AutoMapper Settings…** (`#config automapper`, on by default) is Genie 4's on/off switch. Off, the mapper stops following you, `$roomid` and the other mapper variables keep their last values, and `#goto` / `#mapper` reply that the mapper is disabled. Turning it back on finds your room again at once.
 
 ## Click-to-walk
 

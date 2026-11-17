@@ -145,6 +145,20 @@
   **Script commands** and **Echoes & messages**. They edit the `inputuser`,
   `inputother` and `scriptecho` presets, so the dialog, the theme editor and the
   Presets tab all show the same colour ([#410](https://github.com/GenieClient/Genie5/pull/410)).
+- ⚠ **Behaviour change: `#config automapper` turns the mapper on and off, as in
+  Genie 4; Record is now `#config automapperrecord`** — scripts written for Genie 4,
+  such as hunting scripts, run `#config automapper true` at startup to make sure the
+  mapper is on. In Genie 5 that line was turning on Record, which then edited the
+  loaded map as the script walked, could leave the mapper on the wrong zone and made `#goto` answer
+  DESTINATION NOT FOUND. Now `automapper` is Genie 4's switch, on by default: off,
+  the mapper stops following you (`$roomid` and the other mapper variables keep their
+  last values) and `#goto` / `#mapper` say the mapper is disabled. **Maps ▸ AutoMapper
+  Settings** has it as **Enable AutoMapper**, with a new **Record new rooms as you
+  walk** checkbox below it. Record works as before (the ⏺ Record button, `#mapper
+  record on|off`, off every session); only its `#config` name changed, to
+  `automapperrecord`. The `automapper False` line older versions saved was Record,
+  so it is ignored once and your mapper stays on. Thanks @dylb0t
+  ([#401](https://github.com/GenieClient/Genie5/issues/401)).
 - ⚠ **Behaviour change: `waiteval` waits for a change, as in Genie 4** — a `waiteval`
   whose condition is already true when the script reaches it no longer continues at
   once. It waits until a variable in the condition changes and the condition is then

@@ -28,6 +28,7 @@ public partial class MapperSettingsDialog : Window
 
         _loading = true;
         EnableCheck.IsChecked       = config.AutoMapper;
+        RecordCheck.IsChecked       = config.AutoMapperRecord;
         AlphaSlider.Value           = config.AutoMapperAlpha;
         AlphaValue.Text             = config.AutoMapperAlpha.ToString();
         PauseUnfocusCheck.IsChecked = config.AutoWalkPauseOnUnfocus;
@@ -37,6 +38,7 @@ public partial class MapperSettingsDialog : Window
         _loading = false;
 
         EnableCheck.IsCheckedChanged       += (_, _) => ApplyConfig();
+        RecordCheck.IsCheckedChanged       += (_, _) => ApplyConfig();
         PauseUnfocusCheck.IsCheckedChanged += (_, _) => ApplyConfig();
         UnfocusSecondsBox.ValueChanged     += (_, _) => ApplyConfig();
         AlphaSlider.PropertyChanged        += (_, e) =>
@@ -59,6 +61,7 @@ public partial class MapperSettingsDialog : Window
     {
         if (_loading || _config is null) return;
         _config.SetSetting("automapper",             (EnableCheck.IsChecked == true).ToString(),      showException: false);
+        _config.SetSetting("automapperrecord",       (RecordCheck.IsChecked == true).ToString(),      showException: false);
         _config.SetSetting("automapperalpha",        ((int)AlphaSlider.Value).ToString(),             showException: false);
         _config.SetSetting("autowalkpauseonunfocus", (PauseUnfocusCheck.IsChecked == true).ToString(), showException: false);
         _config.SetSetting("autowalkunfocusseconds", ((int)(UnfocusSecondsBox.Value ?? 60)).ToString(), showException: false);

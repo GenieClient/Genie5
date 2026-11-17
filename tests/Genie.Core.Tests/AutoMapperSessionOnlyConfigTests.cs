@@ -6,7 +6,12 @@ using Xunit;
 
 namespace Genie.Core.Tests;
 
-/// <summary>Record (automapper) is session-only: never restored from disk, never saved as True.</summary>
+/// <summary>
+/// Record (<c>automapperrecord</c>) is session-only: never restored from disk,
+/// never saved as True. <c>automapper</c> is the mapper's on/off switch (Genie 4
+/// parity, #401): default on and saved, except that a file written before #401
+/// (no <c>automapperrecord</c> line) holds a Record value there, which is ignored.
+/// </summary>
 public sealed class AutoMapperSessionOnlyConfigTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "g5cfg-" + Guid.NewGuid().ToString("N"));
@@ -20,16 +25,29 @@ public sealed class AutoMapperSessionOnlyConfigTests : IDisposable
         return new GenieConfig(lds);
     }
 
-    [Fact]
-    public void Load_IgnoresASavedAutomapperTrue_ButStillLoadsOtherSettings()
+    private string Write(params string[] lines)
     {
-        var path = Path.Combine(_dir, "settings.cfg");
-        File.WriteAllLines(path, new[] { "#config {automapper} {True}", "#config {automapperalpha} {96}" });
+        var path = Path.Combine(_dir, Guid.NewGuid().ToString("N") + ".cfg");
+        File.WriteAllLines(path, lines);
+        return path;
+    }
 
+    [Fact]
+    public void Defaults_MapperOn_RecordOff()
+    {
         var cfg = NewConfig();
-        cfg.Load(path);
+        Assert.True(cfg.AutoMapper);
+        Assert.False(cfg.AutoMapperRecord);
+    }
 
-        Assert.False(cfg.AutoMapper);
+    [Fact]
+    public void Load_IgnoresASavedRecordTrue_ButStillLoadsOtherSettings()
+    {
+        var cfg = NewConfig();
+        cfg.Load(Write("#config {automapper} {True}", "#config {automapperrecord} {True}", "#config {automapperalpha} {96}"));
+
+        Assert.False(cfg.AutoMapperRecord);
+        Assert.True(cfg.AutoMapper);
         Assert.Equal(96, cfg.AutoMapperAlpha);
     }
 
@@ -37,13 +55,49 @@ public sealed class AutoMapperSessionOnlyConfigTests : IDisposable
     public void RecordOnInTheSession_IsReportedOn_ButSavedAsFalse()
     {
         var cfg = NewConfig();
-        cfg.SetSetting("automapper", "True");
-        Assert.True(cfg.AutoMapper);
-        Assert.Equal("True", cfg.GetSetting("automapper"));          // the live value is honoured
+        cfg.SetSetting("automapperrecord", "True");
+        Assert.True(cfg.AutoMapperRecord);
+        Assert.Equal("True", cfg.GetSetting("automapperrecord"));     // the live value is honoured
 
         var path = Path.Combine(_dir, "out.cfg");
         Assert.True(cfg.Save(path));
-        Assert.Contains("#config {automapper} {False}", File.ReadAllLines(path));
-        Assert.DoesNotContain(File.ReadAllLines(path), l => l.Contains("{automapper} {True}"));
+        var lines = File.ReadAllLines(path);
+        Assert.Contains("#config {automapperrecord} {False}", lines);
+        Assert.Contains("#config {automapper} {True}", lines);
+    }
+
+    [Fact]
+    public void PreFix401File_ItsAutomapperFalseIsIgnored_MapperStaysOn()
+    {
+        // Every Genie 5 settings.cfg before #401 says `automapper False`: that was
+        // Record, always saved as False, not the user turning the mapper off.
+        var cfg = NewConfig();
+        cfg.Load(Write("#config {automapper} {False}", "#config {automapperalpha} {96}"));
+
+        Assert.True(cfg.AutoMapper);
+        Assert.Equal(96, cfg.AutoMapperAlpha);
+    }
+
+    [Fact]
+    public void FileSavedSince401_AutomapperFalseIsHonoured()
+    {
+        var cfg = NewConfig();
+        cfg.SetSetting("automapper", "False");
+        var path = Path.Combine(_dir, "off.cfg");
+        Assert.True(cfg.Save(path));
+
+        var reloaded = NewConfig();
+        reloaded.Load(path);
+        Assert.False(reloaded.AutoMapper);
+    }
+
+    [Fact]
+    public void AutomapperKey_NeverChangesRecord()
+    {
+        var cfg = NewConfig();
+        cfg.SetSetting("automapper", "True");
+        Assert.False(cfg.AutoMapperRecord);
+        cfg.SetSetting("automapper", "False");
+        Assert.False(cfg.AutoMapperRecord);
     }
 }

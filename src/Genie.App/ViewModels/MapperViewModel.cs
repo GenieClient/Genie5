@@ -1080,7 +1080,11 @@ public partial class MapperViewModel : ReactiveObject
     {
         if (_core is null) return;
         AutoMapperAlpha   = _core.Config.AutoMapperAlpha;
-        AutoCreateEnabled = _core.Config.AutoMapper;
+        AutoCreateEnabled = _core.Config.AutoMapperRecord;
+        // Turning the mapper off (#401) stops room tracking, so a built-in walk
+        // could no longer see its moves land; end it rather than leave it hanging.
+        if (!_core.Config.AutoMapper && AutoWalk is { Current.State: Services.AutoWalkState.Active or Services.AutoWalkState.Paused })
+            AutoWalk.Cancel("mapper disabled");
     }
 
     /// <summary>Map spoilers (public #254): whether search / objsearch / quick-send
@@ -1239,8 +1243,8 @@ public partial class MapperViewModel : ReactiveObject
         // every session in lookup-only mode, and `#mapper record on` echoed a
         // state change that never reached the engine (#274). Push the seed into
         // the engine explicitly; the subscription skips the initial emission.
-        AutoCreateEnabled = core.Config.AutoMapper;
-        _engine.IsEnabled = core.Config.AutoMapper;
+        AutoCreateEnabled = core.Config.AutoMapperRecord;
+        _engine.IsEnabled = core.Config.AutoMapperRecord;
         this.WhenAnyValue(x => x.AutoCreateEnabled)
             .Skip(1)   // ignore the initial emission; engine already matches
             .Subscribe(v =>
@@ -1250,8 +1254,8 @@ public partial class MapperViewModel : ReactiveObject
                 // checkbox persist, like `#mapper record` already did. Guarded
                 // on an actual change so this and the ConfigChanged handler
                 // below can't bounce a value between each other.
-                if (_core is not null && _core.Config.AutoMapper != v)
-                    _core.Config.SetSetting("automapper", v.ToString(), showException: false);
+                if (_core is not null && _core.Config.AutoMapperRecord != v)
+                    _core.Config.SetSetting("automapperrecord", v.ToString(), showException: false);
             });
 
         // Allow-duplicate mirror (Genie 4 parity) — same pattern. No config key
@@ -2531,6 +2535,12 @@ public partial class MapperViewModel : ReactiveObject
     private void GotoNode(MapNode target)
     {
         if (_engine is null || AutoWalk is null) return;
+        // Genie 4 parity (#401): with the mapper off, a walk only says so.
+        if (_core is { Config.AutoMapper: false })
+        {
+            LoadStatus = Genie.Core.Mapper.AutoMapperEngine.DisabledMessage;
+            return;
+        }
 
         // In-zone: the mapper has placed the player in the currently displayed
         // zone, so origin + target share a graph — use the well-tested single-zone
