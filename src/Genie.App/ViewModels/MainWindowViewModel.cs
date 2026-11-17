@@ -7067,9 +7067,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 break;
 
             case "record":
-                // Auto-map as you walk = the AutoMapper master toggle (Genie 3/4 flavour).
-                var rec = parts.Length > 1 ? ParseOnOff(parts[1], _core!.Config.AutoMapper) : !_core!.Config.AutoMapper;
-                _core.Config.SetSetting("automapper", rec.ToString(), showException: false);
+                // Record (auto-map as you walk) = `automapperrecord`; `automapper`
+                // is the mapper's on/off switch, as in Genie 4 (#401).
+                var rec = parts.Length > 1 ? ParseOnOff(parts[1], _core!.Config.AutoMapperRecord) : !_core!.Config.AutoMapperRecord;
+                _core.Config.SetSetting("automapperrecord", rec.ToString(), showException: false);
                 Echo($"[mapper] Record (auto-map as you walk): {(rec ? "on" : "off")}");
                 break;
 

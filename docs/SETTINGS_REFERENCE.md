@@ -104,7 +104,8 @@ setting; only `frontend` appears in `settings.cfg` and `#config list`).
 
 | Key | Default | What it does |
 | --- | --- | --- |
-| `automapper` | `False` | Record mode ("auto-map as you walk"): the mapper creates new rooms as you explore. Off = lookup-only, where the loaded map is read-only. Same toggle as the ⏺ Record button and `#mapper record on\|off`. |
+| `automapper` | `True` | The mapper's on/off switch (Genie 4's File ▸ AutoMapper Enabled; **Enable AutoMapper** in Maps ▸ AutoMapper Settings). Off: the mapper stops following you (`$roomid` and the other mapper variables keep their last values) and `#goto` / `#mapper` reply that the mapper is disabled. It never changes Record mode. A settings file saved before `automapperrecord` existed held Record here, so its `automapper` line is ignored. |
+| `automapperrecord` | `False` | Record mode ("auto-map as you walk"): the mapper creates new rooms as you explore. Off = lookup-only, where the loaded map is read-only. Same toggle as the ⏺ Record button, `#mapper record on\|off` and **Record new rooms as you walk** in Maps ▸ AutoMapper Settings. Session-only: always saved as `False`, so every launch starts with Record off. |
 | `automapperalpha` | `255` | Opacity (0–255) of the ghost rooms and paths drawn for the floors directly above and below the current level, in Genie 4's white off-floor colour. 0 = off-level rooms hidden (single-level view). |
 | `automapperscript` | `True` | Let `#goto` hand the walk to a community `automapper.cmd` when one is present, so the map's special-move directives and the script's pacing are honored. Off forces the built-in walker. Cross-zone gotos always use the built-in walker. |
 | `showmapspoilers` | `True` | Draw hidden exits (search / objsearch arcs) and quick-send secret sequences on the map canvas and in Less Obvious Paths. Off lets a new player use the mapper without secrets pre-revealed. |

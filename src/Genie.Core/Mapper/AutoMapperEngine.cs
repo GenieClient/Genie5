@@ -115,7 +115,32 @@ public sealed class AutoMapperEngine
     public string CurrentServerRoomId => _state?.ServerRoomId ?? string.Empty;
 
     public MapZone   ActiveZone   => _zone;
+    /// <summary>What <c>#goto</c>, <c>#mapper</c> and a map-panel walk answer while the
+    /// mapper is off (Genie 4's wording, pointing at Genie 5's switch).</summary>
+    public const string DisabledMessage =
+        "Mapper is currently disabled. Turn it back on under [Maps/AutoMapper Settings] or with #config automapper true";
+
+    /// <summary>Record mode (auto-create rooms), from <c>automapperrecord</c>.</summary>
     public bool      IsEnabled    { get; set; } = false;
+
+    /// <summary>
+    /// The mapper's master switch: Genie 4's <c>automapper</c> setting (#401).
+    /// While off, room changes and sent commands are ignored, as Genie 4 stopped
+    /// passing game text and input to its mapper: <see cref="CurrentNode"/> and
+    /// the variables mirrored from it keep their last values. Turning it back on
+    /// re-resolves the current room at once rather than waiting for a move.
+    /// </summary>
+    public bool IsTracking
+    {
+        get => _isTracking;
+        set
+        {
+            if (_isTracking == value) return;
+            _isTracking = value;
+            if (value) Recalculate();
+        }
+    }
+    private bool _isTracking = true;
 
     /// <summary>
     /// True when the loaded zone differs in memory from what was last loaded or
@@ -261,6 +286,7 @@ public sealed class AutoMapperEngine
     /// </summary>
     public void OnCommandSent(string rawCommand)
     {
+        if (!_isTracking) return;
         // Strip leading/trailing whitespace; handle semicolon-separated commands
         // by looking at the first token only.
         var first = rawCommand.Split(';')[0].Trim();
@@ -584,7 +610,7 @@ public sealed class AutoMapperEngine
 
     private void OnStateChanged()
     {
-        if (_state is null) return;
+        if (_state is null || !_isTracking) return;
 
         var title        = _state.RoomTitle;
         var exits        = _state.Exits;

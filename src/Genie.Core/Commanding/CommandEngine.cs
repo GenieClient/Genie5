@@ -766,6 +766,8 @@ public sealed class CommandEngine
                 break;
             case "goto":
             case "go2":
+                // Genie 4 parity (#401): with the mapper off, #goto only says so.
+                if (!_config.AutoMapper) { _host.Echo(Mapper.AutoMapperEngine.DisabledMessage); break; }
                 // #goto <room> — start a mapper walk to a room identified by
                 // numeric map id, note label, or title text. Forwarded whole
                 // (minus the verb) so multi-word labels survive. Genie 4
@@ -838,6 +840,7 @@ public sealed class CommandEngine
                 // Console too); everything else forwards to the App mapper host,
                 // which echoes usage for anything unknown. Either way a stray
                 // "#mapper foo" never reaches the game.
+                if (!_config.AutoMapper) { _host.Echo(Mapper.AutoMapperEngine.DisabledMessage); break; }
                 var sub = parts.Count > 1 ? parts[1].ToLowerInvariant() : "";
                 if (sub == "reset")
                 {

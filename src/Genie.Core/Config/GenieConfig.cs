@@ -233,21 +233,34 @@ public sealed class GenieConfig
     /// in Wizard/plain-text mode. Toggle with <c>#config flagscheck on|off</c>.</summary>
     public bool FlagsCheck { get; set; } = true;
 
+    /// <summary>The mapper's master switch — Genie 4's <c>automapper</c> setting
+    /// (File ▸ AutoMapper Enabled there; Maps ▸ AutoMapper Settings ▸ Enable here).
+    /// When off, game text and sent commands are not passed to the mapper, so it
+    /// stops tracking the room ($roomid and the other mapper variables keep their
+    /// last values), and <c>#goto</c> / <c>#mapper</c> reply that the mapper is
+    /// disabled. <strong>Default on</strong>, as in Genie 4, and saved like any
+    /// other setting. It never changes Record mode: that is
+    /// <see cref="AutoMapperRecord"/> (#401).</summary>
+    public bool AutoMapper { get; set; } = true;
+
     /// <summary>Record mode — "auto-map as you walk": the engine creates new
     /// nodes for rooms the loaded zone doesn't contain, instead of staying
     /// lookup-only. Read into <c>AutoMapperEngine.IsEnabled</c> at mapper attach
-    /// and followed live from there (#274); the ⏺ Record toggle writes back here.
+    /// and followed live from there (#274); the ⏺ Record toggle and
+    /// <c>#mapper record</c> write back here. Set with
+    /// <c>#config automapperrecord true|false</c>.
     /// <para><strong>Default off</strong>, matching the engine's own default and
     /// the reasoning at <c>AutoMapperEngine</c>'s match branch: an imported
     /// community map is read-only until the user opts in, so a wrong match can't
-    /// silently mutate the right node and fork the map from upstream. A profile
-    /// that says <c>automapper = True</c> turns recording on for THAT SESSION
-    /// (a Genie 4 settings.cfg, or a script's <c>#config automapper true</c>),
-    /// but the value is never persisted: <see cref="Load"/> ignores it and
-    /// <see cref="Save"/> writes <c>False</c>, so every launch starts with Record
-    /// off. Record edits the loaded map in memory, which is easy to leave on by
-    /// accident and then pollute (teleport arrivals, wrong-match arcs).</para></summary>
-    public bool AutoMapper { get; set; }
+    /// silently mutate the right node and fork the map from upstream. The value is
+    /// session-only: <see cref="Load"/> ignores it and <see cref="Save"/> writes
+    /// <c>False</c>, so every launch starts with Record off. Record edits the
+    /// loaded map in memory, which is easy to leave on by accident and then
+    /// pollute (teleport arrivals, wrong-match arcs).</para>
+    /// <para>Until #401 this was the <c>automapper</c> key, which in Genie 4 was
+    /// the mapper's on/off switch; scripts written for Genie 4 run
+    /// <c>#config automapper true</c> and were turning Record on.</para></summary>
+    public bool AutoMapperRecord { get; set; }
 
     /// <summary>Opacity (0–255) of the ghost rooms drawn for the floors directly
     /// above and below the current level; 0 hides them (single-level view).
@@ -783,6 +796,7 @@ public sealed class GenieConfig
         ("showtimetracker", ShowTimeTracker.ToString()),
         ("autolog", AutoLog.ToString()),
         ("automapper", AutoMapper.ToString()),
+        ("automapperrecord", AutoMapperRecord.ToString()),
         ("automapperalpha", AutoMapperAlpha.ToString()),
         ("showmapspoilers", ShowMapSpoilers.ToString()),
         ("avoidmapspoilers", AvoidMapSpoilers.ToString()),
@@ -966,7 +980,7 @@ public sealed class GenieConfig
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "experienceconfigbar", "experiencesort", "experiencesortorder", "experienceecho", "experienceechoparse", "experiencerested", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "monsterbold", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety", "injurieslayout", "objectscreatures", "objectsconfigbar" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases", "serverdialogs" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "warnrawvars", "tracesends", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor", "externaleditor", "scriptdebugwindow", "gamethread" }),
-        ("Mapper",           new[] { "automapper", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug", "showmapspoilers", "avoidmapspoilers" }),
+        ("Mapper",           new[] { "automapper", "automapperrecord", "automapperalpha", "automapperscript", "updatemapperscripts", "mapperdebug", "showmapspoilers", "avoidmapspoilers" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
         ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsstreampriority", "ttsrate", "ttsvolume" }),
         ("Logging",          new[] { "autolog" }),
@@ -976,25 +990,35 @@ public sealed class GenieConfig
     };
 
     /// <summary>The one setting that is never persisted: Record (auto-create rooms).</summary>
-    private const string SessionOnlyKey = "automapper";
+    private const string SessionOnlyKey = "automapperrecord";
+
+    /// <summary>The mapper's on/off switch (see <see cref="AutoMapper"/>).</summary>
+    private const string MapperEnabledKey = "automapper";
 
     public bool Load(string fileName = "settings.cfg")
     {
         var path = Path.IsPathRooted(fileName) ? fileName : Path.Combine(ConfigDir, fileName);
         if (!File.Exists(path)) return false;
-        foreach (var line in File.ReadLines(path))
+        var rows = File.ReadLines(path)
+            .Select(ArgumentParser.ParseArgs)
+            .Where(p => p.Count == 3)
+            .ToList();
+        // Before #401 `automapper` was Record mode, which Genie 5 always saved
+        // as False. A file written since #401 always has an `automapperrecord`
+        // line; one without it was written by an older Genie 5 (or by Genie 4),
+        // and its `automapper` value is not a choice the user made, so it is
+        // ignored and the mapper stays on (the default).
+        bool savedSince401 = rows.Any(p => p[1].Equals(SessionOnlyKey, StringComparison.OrdinalIgnoreCase));
+        foreach (var parts in rows)
         {
-            var parts = ArgumentParser.ParseArgs(line);
-            if (parts.Count == 3)
-            {
-                // Record (auto-create rooms) is session-only: never restored from disk.
-                if (parts[1].Equals(SessionOnlyKey, StringComparison.OrdinalIgnoreCase)) continue;
-                // Keys owned by another file (update-feeds.json) are never
-                // restored from here either — a hand-added line would otherwise
-                // overwrite the Updates dialog's choice on every launch.
-                if (NotPersistedKeys.Contains(parts[1])) continue;
-                SetSetting(parts[1], parts[2], showException: false);
-            }
+            // Record (auto-create rooms) is session-only: never restored from disk.
+            if (parts[1].Equals(SessionOnlyKey, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!savedSince401 && parts[1].Equals(MapperEnabledKey, StringComparison.OrdinalIgnoreCase)) continue;
+            // Keys owned by another file (update-feeds.json) are never
+            // restored from here either — a hand-added line would otherwise
+            // overwrite the Updates dialog's choice on every launch.
+            if (NotPersistedKeys.Contains(parts[1])) continue;
+            SetSetting(parts[1], parts[2], showException: false);
         }
         return true;
     }
@@ -1106,6 +1130,7 @@ public sealed class GenieConfig
                 case "parsegameonly": ParseGameOnly = ToBool(value); break;
                 case "flagscheck": FlagsCheck = ToBool(value); break;
                 case "automapper": AutoMapper = ToBool(value); Notify(ConfigFieldUpdated.AutoMapper); break;
+                case "automapperrecord": AutoMapperRecord = ToBool(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "automapperalpha": AutoMapperAlpha = ClampAlpha(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "showmapspoilers": ShowMapSpoilers = ToBool(value); Notify(ConfigFieldUpdated.MapSpoilers); break;
                 case "avoidmapspoilers": AvoidMapSpoilers = ToBool(value); Notify(ConfigFieldUpdated.MapSpoilers); break;
