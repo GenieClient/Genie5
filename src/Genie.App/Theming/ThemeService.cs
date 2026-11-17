@@ -127,9 +127,20 @@ public sealed class ThemeService
                     if (savePresets) presets.Set(presetId, fill, track);
                     else             presets.Preview(presetId, fill, track);
                 }
+                // The ui.* chrome presets (public #406) go back to Default, so the
+                // theme just picked colours the menu, input, status strip and
+                // AutoMapper Settings again, as picking a theme resets the echo
+                // and vitals colours. A preview leaves them alone.
+                if (savePresets)
+                    foreach (var presetId in Genie.Core.UiPresets.All)
+                        if (!IsDefault(presets.GetForeground(presetId)) || presets.GetBackground(presetId).Length > 0)
+                            presets.Set(presetId, "Default", "");
             }
         }
     }
+
+    private static bool IsDefault(string colour) =>
+        colour.Length == 0 || colour.Equals("Default", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The vitals preset colours <paramref name="theme"/> sets (public
     /// #406): each bar's fill (the preset's foreground) and track (its

@@ -39,6 +39,9 @@ public class DisplaySettingsViewModel : ReactiveObject
     /// <summary>The vitals presets at open (public #406). Picking a theme on the
     /// Theme tab writes the theme's bar colours into them; Cancel puts these back.</summary>
     private readonly Dictionary<string, (string Fill, string Track)> _vitalsAtOpen = new();
+    /// <summary>The ui.* chrome presets at open (public #406). Picking a theme on
+    /// the Theme tab sets them back to Default; Cancel puts these back.</summary>
+    private readonly Dictionary<string, (string Fg, string Bg)> _uiAtOpen = new();
     private bool _themeTouched;
     private bool _suppressThemeApply;
 
@@ -126,8 +129,12 @@ public class DisplaySettingsViewModel : ReactiveObject
         }
         LoadEchoColours(id => _echoAtOpen[id].Shown);
         if (_presets is not null)
+        {
             foreach (var id in Genie.Core.VitalsPresets.All)
                 _vitalsAtOpen[id] = (_presets.GetForeground(id), _presets.GetBackground(id));
+            foreach (var id in Genie.Core.UiPresets.All)
+                _uiAtOpen[id] = (_presets.GetForeground(id), _presets.GetBackground(id));
+        }
         EchoItalic = live.EchoItalic;
         AlwaysShowScrollbars = live.AlwaysShowScrollbars;
         FontFamily = currentFont;
@@ -193,6 +200,9 @@ public class DisplaySettingsViewModel : ReactiveObject
             foreach (var (id, (fill, track)) in _vitalsAtOpen)
                 if (_presets.GetForeground(id) != fill || _presets.GetBackground(id) != track)
                     _presets.Set(id, fill, track);
+            foreach (var (id, (fg, bg)) in _uiAtOpen)
+                if (_presets.GetForeground(id) != fg || _presets.GetBackground(id) != bg)
+                    _presets.Set(id, fg, bg);
         }
     }
 
