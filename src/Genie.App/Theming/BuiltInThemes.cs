@@ -41,7 +41,9 @@ public static class BuiltInThemes
         [StaminaBar]    = "#E0C050",
         [ConcBar]       = "#C050E0",
         [GameText]      = "#CCCCCC",
-        [GameEcho]      = "#88BBCC",
+        [InputUser]     = "#FFFF00",
+        [InputOther]    = "#ADFF2F",
+        [ScriptEcho]    = "#00FFFF",
     });
 
     public static Theme Light { get; } = Make("Light", "Light", new()
@@ -72,12 +74,14 @@ public static class BuiltInThemes
         [StaminaBar]    = "#B08A20",
         [ConcBar]       = "#8F30B0",
         [GameText]      = "#202020",
-        [GameEcho]      = "#336688",
+        [InputUser]     = "#806000",
+        [InputOther]    = "#3C7800",
+        [ScriptEcho]    = "#00708A",
     });
 
     /// <summary>
-    /// Genie 4's look: pure black game surfaces, silver text, yellow echo
-    /// (Genie 4's <c>inputuser</c> preset), and its classic vitals colours
+    /// Genie 4's look: pure black game surfaces, silver text, Genie 4's echo
+    /// preset colours (yellow typed commands), and its classic vitals colours
     /// (red health, aqua mana, purple spirit, green stamina, white conc).
     /// </summary>
     public static Theme Genie4Classic { get; } = Make("Genie 4 Classic", "Dark", new()
@@ -108,7 +112,9 @@ public static class BuiltInThemes
         [StaminaBar]    = "#00A000",
         [ConcBar]       = "#E8E8E8",
         [GameText]      = "#C0C0C0",
-        [GameEcho]      = "#FFFF00",
+        [InputUser]     = "#FFFF00",
+        [InputOther]    = "#ADFF2F",
+        [ScriptEcho]    = "#00FFFF",
     });
 
     public static Theme HighContrast { get; } = Make("High Contrast", "Dark", new()
@@ -139,7 +145,9 @@ public static class BuiltInThemes
         [StaminaBar]    = "#FFE040",
         [ConcBar]       = "#FF40FF",
         [GameText]      = "#FFFFFF",
-        [GameEcho]      = "#FFFF00",
+        [InputUser]     = "#FFFF00",
+        [InputOther]    = "#ADFF2F",
+        [ScriptEcho]    = "#00FFFF",
     });
 
     public static Theme SolarizedDark { get; } = Make("Solarized Dark", "Dark", new()
@@ -170,7 +178,9 @@ public static class BuiltInThemes
         [StaminaBar]    = "#B58900",
         [ConcBar]       = "#6C71C4",
         [GameText]      = "#839496",
-        [GameEcho]      = "#2AA198",
+        [InputUser]     = "#B58900",
+        [InputOther]    = "#859900",
+        [ScriptEcho]    = "#2AA198",
     });
 
     public static Theme SolarizedLight { get; } = Make("Solarized Light", "Light", new()
@@ -201,7 +211,9 @@ public static class BuiltInThemes
         [StaminaBar]    = "#B58900",
         [ConcBar]       = "#6C71C4",
         [GameText]      = "#657B83",
-        [GameEcho]      = "#268BD2",
+        [InputUser]     = "#B58900",
+        [InputOther]    = "#859900",
+        [ScriptEcho]    = "#2AA198",
     });
 
     /// <summary>
@@ -236,7 +248,9 @@ public static class BuiltInThemes
         [StaminaBar]    = "#E0C040",
         [ConcBar]       = "#C060E0",
         [GameText]      = "#F0F0F0",
-        [GameEcho]      = "#C8C864",
+        [InputUser]     = "#FFFF00",
+        [InputOther]    = "#ADFF2F",
+        [ScriptEcho]    = "#00FFFF",
     });
 
     /// <summary>All built-ins in menu order.</summary>

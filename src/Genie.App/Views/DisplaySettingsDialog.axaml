@@ -4,7 +4,7 @@
         x:Class="Genie.App.Views.DisplaySettingsDialog"
         x:DataType="vm:DisplaySettingsViewModel"
         Title="Display Settings"
-        Width="500" Height="560"
+        Width="500" Height="640"
         CanResize="False"
         WindowStartupLocation="CenterOwner">
 
@@ -47,7 +47,9 @@
           <Separator Margin="0,4,0,4"/>
 
           <!-- ── Colors (Avalonia ColorPicker — palette + HSV sliders + hex) ── -->
-          <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto">
+          <!-- #406: the three echo colours ARE the Genie 4 presets inputuser /
+               inputother / scriptecho (the Presets tab edits the same values). -->
+          <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto">
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Game text" VerticalAlignment="Center"/>
             <ColorPicker Grid.Row="0" Grid.Column="1"
                          AutomationProperties.Name="Game text"
@@ -56,18 +58,39 @@
                          IsAlphaVisible="False"
                          IsAlphaEnabled="False"/>
 
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Echoes" VerticalAlignment="Center" Margin="0,8,0,0"/>
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Typed commands" VerticalAlignment="Center" Margin="0,8,0,0"
+                       ToolTip.Tip="Commands you type (the inputuser preset)."/>
             <ColorPicker Grid.Row="1" Grid.Column="1"
-                         AutomationProperties.Name="Echoes"
-                         Color="{Binding EchoColor}"
+                         AutomationProperties.Name="Typed commands"
+                         Color="{Binding InputUserColor}"
+                         HorizontalAlignment="Stretch"
+                         IsAlphaVisible="False"
+                         IsAlphaEnabled="False"
+                         Margin="0,8,0,0"/>
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Script commands" VerticalAlignment="Center" Margin="0,8,0,0"
+                       ToolTip.Tip="Game commands sent by scripts (the inputother preset)."/>
+            <ColorPicker Grid.Row="2" Grid.Column="1"
+                         AutomationProperties.Name="Script commands"
+                         Color="{Binding InputOtherColor}"
+                         HorizontalAlignment="Stretch"
+                         IsAlphaVisible="False"
+                         IsAlphaEnabled="False"
+                         Margin="0,8,0,0"/>
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Echoes &amp; messages" VerticalAlignment="Center" Margin="0,8,0,0"
+                       ToolTip.Tip="Script output, #echo and Genie's own messages (the scriptecho preset)."/>
+            <ColorPicker Grid.Row="3" Grid.Column="1"
+                         AutomationProperties.Name="Echoes and messages"
+                         Color="{Binding ScriptEchoColor}"
                          HorizontalAlignment="Stretch"
                          IsAlphaVisible="False"
                          IsAlphaEnabled="False"
                          Margin="0,8,0,0"/>
           </Grid>
 
-          <!-- public #304: these two also appear in the theme editor. It is the SAME
-               value (display.json), not a second copy — say so here too. -->
+          <!-- public #304: these also appear in the theme editor. It is the SAME
+               value, not a second copy — say so here too. -->
           <TextBlock Text="{x:Static vm:DisplaySettingsViewModel.GameColorsNote}"
                      FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
                      TextWrapping="Wrap"/>

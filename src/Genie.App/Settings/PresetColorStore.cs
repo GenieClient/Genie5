@@ -1,0 +1,130 @@
+using System.IO;
+using Genie.App.Highlighting;
+using Genie.Core.Persistence;
+using Genie.Core.Presets;
+
+namespace Genie.App.Settings;
+
+/// <summary>
+/// Reads and writes individual preset foreground colours for editors outside
+/// the Presets tab — Display Settings and the theme editor (public #406). The
+/// preset stays the ONE source of the colour: these editors change the preset
+/// itself rather than keeping a second setting.
+///
+/// <para><b>Which layer.</b> Connected, an edit goes to the layer the preset is
+/// in effect from — the character's <c>presets.json</c> when it carries an
+/// override, else the shared one — like an edit on the Presets tab. Offline,
+/// it reads and writes the shared (All characters) layer.</para>
+///
+/// <para>Only the edited entry is changed in the file; everything else in it is
+/// kept as found. A file that exists but can't be read or parsed is never
+/// written: the edit shows live, the file is left alone and a warning is
+/// reported, so a stray comma can't cost the user every other preset.</para>
+/// </summary>
+public sealed class PresetColorStore
+{
+    private readonly PresetEngine        _engine;
+    private readonly string              _globalDir;
+    private readonly Func<string?>       _connectedProfileDir;
+    private readonly PersistenceService  _persistence = new();
+    private readonly Action<string>?     _warn;
+
+    /// <param name="engine">The live preset engine the renderer reads.</param>
+    /// <param name="globalDir">The shared config dir (<c>Config/</c>).</param>
+    /// <param name="connectedProfileDir">The connected character's config dir,
+    /// or null when offline. Equal to <paramref name="globalDir"/> for a
+    /// single-layer (profile-less) connection.</param>
+    /// <param name="warn">Reports a file that couldn't be read and so wasn't saved.</param>
+    public PresetColorStore(PresetEngine engine, string globalDir, Func<string?> connectedProfileDir,
+                            Action<string>? warn = null)
+    {
+        _engine              = engine;
+        _globalDir           = globalDir;
+        _connectedProfileDir = connectedProfileDir;
+        _warn                = warn;
+    }
+
+    private bool Connected => _connectedProfileDir() is not null;
+
+    /// <summary>The preset's effective foreground: the live engine's when
+    /// connected; offline, the shared file's value or the stock default.</summary>
+    public string GetForeground(string id)
+    {
+        if (Connected) return _engine.GetForeground(id);
+        var disk = Load(GlobalPath).FirstOrDefault(m => m.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+        return disk?.ForegroundColor ?? new PresetEngine().GetForeground(id);
+    }
+
+    /// <summary>Show <paramref name="foreground"/> live without saving — for a
+    /// dialog's preview. Undo by previewing the original value.</summary>
+    public void Preview(string id, string foreground)
+    {
+        var rule = _engine.Get(id);
+        _engine.Apply(new PresetRule
+        {
+            Id              = rule?.Id ?? id,
+            ForegroundColor = foreground,
+            BackgroundColor = rule?.BackgroundColor ?? string.Empty,
+            HighlightLine   = rule?.HighlightLine ?? false,
+            Scope           = rule?.Scope ?? RuleScope.Global,
+        });
+        UserHighlights.NotifyRulesChanged();   // repaint visible lines
+    }
+
+    /// <summary>Set the preset's foreground live and save it to its layer's file.</summary>
+    public void SetForeground(string id, string foreground)
+    {
+        var rule  = _engine.Get(id);
+        var scope = Connected ? rule?.Scope ?? RuleScope.Global : RuleScope.Global;
+        var profileDir = _connectedProfileDir();
+        var path  = scope == RuleScope.Character && profileDir is not null
+            ? Path.Combine(profileDir, "presets.json")
+            : GlobalPath;
+
+        // Offline, the live engine may still hold a character override from the
+        // last session; only touch it when the shared value is what it shows.
+        if (Connected || rule is null || rule.Scope == RuleScope.Global)
+            Preview(id, foreground);
+
+        if (!_persistence.TryLoadPresets(path, out var models, out var error))
+        {
+            // Present but unreadable: saving would replace the whole file with
+            // this one entry. Keep the live change, leave the file alone.
+            _warn?.Invoke($"[config] {Path.GetFileName(path)} could not be read ({error}) — " +
+                          $"the {id} colour is shown but not saved. Fix or remove {path} to save changes.");
+            return;
+        }
+        var model  = models.FirstOrDefault(m => m.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (model is null)
+        {
+            model = new PresetPersistenceModel
+            {
+                Id              = rule?.Id ?? id,
+                BackgroundColor = rule?.BackgroundColor ?? string.Empty,
+                HighlightLine   = rule?.HighlightLine ?? false,
+            };
+            models.Add(model);
+        }
+        model.ForegroundColor = foreground;
+
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            RuleFileWatcher.MarkAppWrite(path);
+            _persistence.SavePresets(path, models.Select(m => new PresetRule
+            {
+                Id = m.Id, ForegroundColor = m.ForegroundColor,
+                BackgroundColor = m.BackgroundColor, HighlightLine = m.HighlightLine,
+            }));
+        }
+        catch { /* best-effort, like the Presets tab's save */ }
+    }
+
+    private string GlobalPath => Path.Combine(_globalDir, "presets.json");
+
+    private List<PresetPersistenceModel> Load(string path)
+    {
+        try { return File.Exists(path) ? _persistence.LoadPresets(path) : new(); }
+        catch { return new(); }
+    }
+}

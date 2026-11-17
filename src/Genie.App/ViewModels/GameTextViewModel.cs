@@ -256,32 +256,27 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
                 }
             });
 
-        // ── Local echoes: typed commands + system diagnostics ─────────────
-        // EchoLine carries non-script lines of two kinds:
-        //   (a) typed-command echoes ("> look", "> n", …) — what we call "Echo"
-        //   (b) system diagnostics ([plugin] …, [layout] …, [recorder] …) — a
-        //       bracketed tag, grouped with "Script" for filtering purposes.
-        // The split is detected by prefix: a line starting with [xxx] is a
-        // bracketed system tag. Script-originated lines no longer arrive here —
-        // they come via ScriptOutputLine (below) — so there's no double render.
-        // Both render with StreamColor.System styling (italic-gray); the filter
-        // just decides whether to render at all.
-        Observable.FromEvent<Action<string>, string>(
-                h => core.EchoLine += h,
-                h => core.EchoLine -= h)
+        // ── Local echoes: typed commands, script output, Genie messages ────
+        // ClassifiedEchoLine carries every EchoLine and ScriptOutputLine line
+        // with what produced it, and each is coloured by its Genie 4 preset
+        // (public #406): typed commands `inputuser`, script-sent commands
+        // `inputother`, script output and Genie messages `scriptecho`.
+        // Filtering is unchanged:
+        //   • script lines (commands + output) → the "Script Lines" toggle;
+        //   • other lines → a bracketed system tag ([plugin] …, [layout] …) is
+        //     grouped with Script, anything else (typed commands, #echo) with Echo.
+        Observable.FromEvent<Action<string, EchoKind>, (string Msg, EchoKind Kind)>(
+                rx => (t, k) => rx((t, k)),
+                h => core.ClassifiedEchoLine += h,
+                h => core.ClassifiedEchoLine -= h)
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(msg =>
+            .Subscribe(t =>
             {
-                var isSystemTag = msg.StartsWith("[", StringComparison.Ordinal);
-                if (isSystemTag)
-                {
-                    if (DisplaySettings?.ShowScriptText == false) return;
-                }
-                else
-                {
-                    if (DisplaySettings?.ShowEchoText == false) return;
-                }
-                AddLine(msg, StreamColor.System);
+                var scriptLine = t.Kind is EchoKind.ScriptCommand or EchoKind.ScriptEcho
+                              || t.Msg.StartsWith("[", StringComparison.Ordinal);
+                if (scriptLine ? DisplaySettings?.ShowScriptText == false
+                               : DisplaySettings?.ShowEchoText   == false) return;
+                AddEchoLine(t.Msg, t.Kind.PresetId());
             });
 
         // ── Styled #echo (colour / mono, no >window) ──────────────────────
@@ -298,21 +293,6 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
             {
                 if (DisplaySettings?.ShowEchoText == false) return;
                 AddEcho(t.Msg, t.Color, t.Mono);
-            });
-
-        // ── Script-originated lines ───────────────────────────────────────
-        // Everything a script produces arrives on ScriptOutputLine: its
-        // echo output, [script]/[dbg] diagnostics, AND the game commands it
-        // issues (`put north`, …). All classified as Script lines so the
-        // "Script Lines" toggle governs the whole of a script's activity.
-        Observable.FromEvent<Action<string>, string>(
-                h => core.ScriptOutputLine += h,
-                h => core.ScriptOutputLine -= h)
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(msg =>
-            {
-                if (DisplaySettings?.ShowScriptText == false) return;
-                AddLine(msg, StreamColor.System);
             });
 
         // ── Highlight-rule changes: re-tokenize already-rendered lines so
@@ -373,7 +353,8 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
                          IReadOnlyList<BoldSpan>? bolds = null,
                          IReadOnlyList<PresetSpan>? presets = null,
                          bool isPrompt = false,
-                         bool mono = false)
+                         bool mono = false,
+                         string? echoPreset = null)
     {
         // #90: per-window timestamp. When the "game-text" window has the Layout-
         // tab "prepend timestamp to each line" toggle on, stamp each content line
@@ -396,7 +377,7 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
             bolds   = bolds?.Select(s   => s with { Start = s.Start + shift }).ToList();
             presets = presets?.Select(s => s with { Start = s.Start + shift }).ToList();
         }
-        Lines.Add(new TextLine(text, color, links, bolds, presets, Mono: mono));
+        Lines.Add(new TextLine(text, color, links, bolds, presets, Mono: mono, EchoPreset: echoPreset));
         TrimScrollback();
         // Only a prompt line arms the dedup; every other line clears it so the
         // next prompt is allowed through (Genie 4 LastRowWasPrompt semantics).
@@ -495,7 +476,12 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
     /// game text.
     /// </summary>
     public void AddSystemLine(string text)
-        => AddLine(text, StreamColor.System);
+        => AddLine(text, StreamColor.System, echoPreset: EchoKindPresets.ScriptEcho);
+
+    /// <summary>A local echo line coloured by <paramref name="presetId"/>
+    /// (<c>inputuser</c> / <c>inputother</c> / <c>scriptecho</c>, public #406).</summary>
+    private void AddEchoLine(string text, string presetId)
+        => AddLine(text, StreamColor.System, echoPreset: presetId);
 
     /// <summary>
     /// Add a styled <c>#echo</c> line to the main window — an explicit colour
@@ -546,7 +532,8 @@ public class GameTextViewModel : ReactiveObject, Controls.IScrollHoldSink
             text  = prefix + text;
             links = links?.Select(s => s with { Start = s.Start + prefix.Length }).ToList();
         }
-        Lines.Add(new TextLine(text, StreamColor.System, links, EchoColor: color, Mono: mono));
+        Lines.Add(new TextLine(text, StreamColor.System, links, EchoColor: color, Mono: mono,
+                               EchoPreset: EchoKindPresets.ScriptEcho));
         TrimScrollback();
         _lastLineWasPrompt = false;
     }
@@ -565,7 +552,8 @@ public record TextLine(string Text, StreamColor Color,
                        string? EchoColor = null,
                        bool Mono = false,
                        string Window = "main",
-                       InlineImage? Image = null)
+                       InlineImage? Image = null,
+                       string? EchoPreset = null)
 {
     public bool IsEcho => Color == StreamColor.System;
 
@@ -628,7 +616,6 @@ public record TextLine(string Text, StreamColor Color,
                 var echoLinks = DefaultHighlights.ValidLinks(Text, Links);
                 if (echoLinks.Count > 0)
                     return DefaultHighlights.PlainWithLinks(Text, echoLinks, EchoRun);
-                if (EchoColor is null && !Mono) return [new Run(Text)];
                 return [EchoRun(Text)];
             }
 
@@ -644,25 +631,29 @@ public record TextLine(string Text, StreamColor Color,
         }
     }
 
-    /// <summary>A run of this echo line's text, carrying its explicit colour and
-    /// mono font (the AXAML <c>.echo</c> class supplies the default italic + colour).</summary>
+    /// <summary>A run of this echo line's text, carrying its colour (see
+    /// <see cref="EchoForeground"/>) and mono font. The AXAML <c>.echo</c> class
+    /// supplies the italic style and the fallback colour.</summary>
     private Run EchoRun(string text)
     {
         var run = new Run(text);
         if (Mono) run.FontFamily = MonoFont;
-        if (EchoColor is not null && TryParseColor(EchoColor, out var c))
-            run.Foreground = new SolidColorBrush(c);
+        if (EchoForeground() is { } fg) run.Foreground = fg;
         return run;
     }
 
-    /// <summary>The explicit <c>#echo</c> colour as a brush, or null when the line
-    /// carries none / it doesn't parse (caller keeps the default echo colour).
-    /// Same parse as the <see cref="Inlines"/> echo branch, exposed so the
-    /// AvaloniaEdit colorizer resolves it identically instead of re-deriving it.</summary>
+    /// <summary>This echo line's foreground: an explicit <c>#echo</c> colour when it
+    /// carries one, else its preset's (<see cref="EchoPreset"/>, public #406) — read
+    /// at render time so a preset edit repaints existing lines. Null when neither
+    /// applies (no preset, or the preset is "Default"): the caller keeps the
+    /// <c>.echo</c> class colour, which is the normal game-text colour. Shared with
+    /// the AvaloniaEdit colorizer so both renderers resolve it identically.</summary>
     internal IBrush? EchoForeground()
-        => EchoColor is not null && TryParseColor(EchoColor, out var c)
-            ? new SolidColorBrush(c)
-            : null;
+    {
+        if (EchoColor is not null && TryParseColor(EchoColor, out var c))
+            return new SolidColorBrush(c);
+        return EchoPreset is null ? null : DefaultHighlights.PresetForeground(EchoPreset);
+    }
 
     /// <summary>Parse a Genie 4 echo colour — a named colour (Yellow, DodgerBlue)
     /// or <c>#rrggbb</c> hex. Returns false (caller keeps the default colour) on
