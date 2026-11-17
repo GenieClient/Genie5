@@ -1,0 +1,40 @@
+{
+  "Name": "Windowed Genie 4 Retro",
+  "Description": "Genie 4's first-run layout (LayoutBasic) in windowed mode: Game on the left at 70% of the width, Thoughts, Room and Log stacked in thirds down the right.",
+  "SavedAt": "2026-11-14T00:00:00.0000000-07:00",
+  "WindowWidth": 1920,
+  "WindowHeight": 1080,
+  "WindowX": 0,
+  "WindowY": 0,
+  "WindowMaximized": true,
+  "HasWindowGeometry": true,
+  "VisibleTools": [
+    "game-text",
+    "thoughts",
+    "room",
+    "log"
+  ],
+  "DockTree": null,
+  "FloatingWindows": [],
+  "WindowedMode": true,
+  "MdiBounds": {
+    "game-text": { "X": 0, "Y": 0, "Width": 1330, "Height": 847, "State": "Normal" },
+    "thoughts": { "X": 1330, "Y": 0, "Width": 570, "Height": 282, "State": "Normal" },
+    "room": { "X": 1330, "Y": 282, "Width": 570, "Height": 282, "State": "Normal" },
+    "log": { "X": 1330, "Y": 564, "Width": 570, "Height": 283, "State": "Normal" }
+  },
+  "HandsStripVisible": true,
+  "HandsStripAtBottom": true,
+  "ShowStatusBar": true,
+  "RoundTimeOnHandsStrip": false,
+  "ScriptBarAtBottom": false,
+  "IconBarVisible": true,
+  "IconBarAtBottom": true,
+  "HealthBarAtBottom": true,
+  "ScriptBarVisible": true,
+  "MagicPanels": true,
+  "KeepRoundTimeVisible": false,
+  "ShowGameText": true,
+  "ShowEchoText": true,
+  "ShowScriptText": true
+}
