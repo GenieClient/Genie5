@@ -128,6 +128,11 @@ public sealed class SavedLayout
     /// Genie 4's <c>ScriptBar Visible</c>.</summary>
     public bool?  ScriptBarVisible     { get; set; }
 
+    /// <summary>Combined spell timer (the spell box counts down, no separate
+    /// cast bar) — <c>DisplaySettings.CombinedSpellTimer</c>. Same null rule:
+    /// an older layout leaves the current choice.</summary>
+    public bool?  CombinedSpellTimer   { get; set; }
+
     /// <summary>Magic Panels (mana bar, prepared-spell label, cast bar) —
     /// <c>DisplaySettings.ShowMagicPanels</c>, Genie 4's <c>HealthBar Magic</c>.</summary>
     public bool?  MagicPanels          { get; set; }

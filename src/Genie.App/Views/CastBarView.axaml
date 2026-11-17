@@ -1,0 +1,42 @@
+<!-- Spell-preparation countdown bar for the hands strip. Declared once here and
+     hosted in both the top and bottom strip, like RestedExpBarView.
+     Margin gives extra breathing room on both sides so the bar reads as its own
+     widget next to the spell name and the status badges.
+     Sizing (#405): the frame stretches to the strip's height like the S / L / R
+     boxes, and the ProgressBar's MinWidth/MinHeight override Fluent's 200 px
+     minimum so the bar stays inside its 100 px frame.
+     Colours (#406): the castbar preset, as in Genie 4 (FormMain.cs:
+     Castbar.ForegroundColor / BackgroundColorRT = PresetList["castbar"]):
+     foreground = fill, background = track and frame (Controls/PresetBar.cs). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Genie.App.ViewModels"
+             xmlns:controls="using:Genie.App.Controls"
+             x:Class="Genie.App.Views.CastBarView"
+             x:DataType="vm:MainWindowViewModel">
+  <Border MinWidth="90" Width="100"
+          Margin="6,0,6,0"
+          ClipToBounds="True" CornerRadius="3"
+          ToolTip.Tip="Seconds remaining until the prepared spell is fully harnessed.">
+    <!-- Genie 4's SetMagicPanels hides the Castbar too — AND-ed with
+         the only-while-prepping collapse. -->
+    <Border.IsVisible>
+      <MultiBinding Converter="{x:Static BoolConverters.And}">
+        <Binding Path="Vitals.IsPrepping"/>
+        <Binding Path="Display.ShowMagicPanels"/>
+        <Binding Path="!Display.CombinedSpellTimer"/>
+      </MultiBinding>
+    </Border.IsVisible>
+    <Grid>
+      <ProgressBar Value="{Binding Vitals.CastBarSecondsRemaining}"
+                   Maximum="{Binding Vitals.CastBarSecondsTotal}"
+                   AutomationProperties.Name="Spell preparation"
+                   controls:PresetBar.Preset="castbar"
+                   MinWidth="0" MinHeight="0"
+                   VerticalAlignment="Stretch" CornerRadius="3"/>
+      <TextBlock Text="{Binding Vitals.CastBarSecondsRemaining}"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                 FontSize="10" Foreground="#fff" FontWeight="SemiBold"/>
+    </Grid>
+  </Border>
+</UserControl>

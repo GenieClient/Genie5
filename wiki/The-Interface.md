@@ -207,6 +207,7 @@ Rearrange the panels however you like, then keep the arrangement — the **Layou
 - **Layout → Always on Top** keeps Genie above other windows.
 - **Layout → Align Input to Game Window** makes the command bar track the Game window's width instead of spanning the full frame.
 - **Layout → Magic Panels** hides the mana bar, cast bar, and spell labels — tidy on a non-caster.
+- **Layout → Combined Spell Timer** works the cast bar into the spell box on the hands strip. The box fills with the `castbar` colour and empties over the prep time, and the label reads `(4) Swirling Winds (3)`: seconds since you started preparing in front, seconds until it's fully prepared on the end (the end number goes once it's ready). Off (the default) keeps Genie 4's separate spell label and cast bar. It's saved with your layout.
 - **Layout → Icon Bar** shows or hides the status-chip strip.
 - **Layout → Script Bar** shows or hides the running-script strip; even when shown, it only appears while a script is running.
 - **Layout → Script Bar Position**, **Icon Bar Position** and **Health Bar Position** each dock that bar at the **Top** or **Bottom** of the window, as Genie 4 allowed. (Icon Bar Position needs the Icon Bar shown, and Health Bar Position needs the Status Bar shown.)

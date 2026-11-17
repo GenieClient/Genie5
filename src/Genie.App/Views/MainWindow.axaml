@@ -314,6 +314,12 @@
                   IsChecked="{Binding Display.ShowMagicPanels}"
                   Command="{Binding ToggleMagicPanelsCommand}"
                   ToolTip.Tip="Show the magic widgets (Genie 4 parity): the mana bar on the status bar plus the prepared-spell label and cast bar on the hands strip. Turn off to reclaim the space on a non-caster."/>
+        <MenuItem Header="Combined Spell Timer"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.CombinedSpellTimer, Mode=OneWay}"
+                  Command="{Binding ToggleCombinedSpellTimerCommand}"
+                  IsEnabled="{Binding Display.ShowMagicPanels}"
+                  ToolTip.Tip="Work the cast bar into the spell box: the box fills and empties over the prep time, and the seconds left go on the end of the spell name, (N) Spell (M). Off keeps Genie 4's separate spell label and cast bar."/>
         <MenuItem Header="_Zone / Room ID"
                   ToggleType="CheckBox"
                   IsChecked="{Binding Display.ShowZoneRoomId}"
@@ -1099,48 +1105,17 @@
                Field", "Whole Displacement") so the bar (in the next sub-group)
                doesn't crowd against the trailing letter. -->
           <TextBlock Text="{Binding Vitals.PreparedSpellLabel}"
+                     IsVisible="{Binding !Display.CombinedSpellTimer}"
                      AutomationProperties.Name="{Binding Vitals.PreparedSpellLabel, StringFormat='Prepared spell: {0}'}"
                      AutomationProperties.LiveSetting="Polite"
                      Foreground="#c8a8e0" FontSize="12" MinWidth="170"
                      VerticalAlignment="Center"/>
+          <!-- Layout → Combined Spell Timer: the spell box is the cast bar (#405). -->
+          <views:SpellCountdownBoxView IsVisible="{Binding Display.CombinedSpellTimer}"/>
         </StackPanel>
 
-        <!-- Magenta prep-countdown bar — separate StackPanel sibling so the
-             parent's Spacing=24 puts visible breathing room between the spell
-             name and the bar. IsVisible collapses the whole strip when no
-             prep is active, so the layout doesn't reserve dead space. -->
-        <!-- Margin gives extra breathing room on both sides so the bar reads
-             as its own widget — the track's dark plum (#2a1024) sits in the
-             same value range as the status-badge backgrounds (#2a2a2a) and
-             the strip background (#1c1c1c), so without explicit padding the
-             bar visually blurs into KNEEL/HIDE/etc. on the right and into
-             the spell name on the left. A faint BorderBrush draws the edge
-             so even when the bar is mostly empty (low remaining seconds) the
-             outline is clearly demarcated. -->
-        <Border MinWidth="90" Width="100"
-                Margin="6,0,6,0"
-                VerticalAlignment="Center"
-                BorderBrush="#7a3580" BorderThickness="1" CornerRadius="3"
-                ToolTip.Tip="Seconds remaining until the prepared spell is fully harnessed.">
-          <!-- Genie 4's SetMagicPanels hides the Castbar too — AND-ed with
-               the only-while-prepping collapse. -->
-          <Border.IsVisible>
-            <MultiBinding Converter="{x:Static BoolConverters.And}">
-              <Binding Path="Vitals.IsPrepping"/>
-              <Binding Path="Display.ShowMagicPanels"/>
-            </MultiBinding>
-          </Border.IsVisible>
-          <Grid>
-            <ProgressBar Value="{Binding Vitals.CastBarSecondsRemaining}"
-                         Maximum="{Binding Vitals.CastBarSecondsTotal}"
-                         AutomationProperties.Name="Spell preparation"
-                         Foreground="#D040C0" Background="#2a1024"
-                         Height="14" CornerRadius="2"/>
-            <TextBlock Text="{Binding Vitals.CastBarSecondsRemaining}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontSize="10" Foreground="#fff" FontWeight="SemiBold"/>
-          </Grid>
-        </Border>
+        <!-- Prep-countdown bar (castbar preset), shared by both strips. -->
+        <views:CastBarView/>
 
         <!-- ── Status indicators ──────────────────────────────────────
              Each badge is IsVisible-bound to the matching Vitals bool, so
@@ -1545,48 +1520,17 @@
                Field", "Whole Displacement") so the bar (in the next sub-group)
                doesn't crowd against the trailing letter. -->
           <TextBlock Text="{Binding Vitals.PreparedSpellLabel}"
+                     IsVisible="{Binding !Display.CombinedSpellTimer}"
                      AutomationProperties.Name="{Binding Vitals.PreparedSpellLabel, StringFormat='Prepared spell: {0}'}"
                      AutomationProperties.LiveSetting="Polite"
                      Foreground="#c8a8e0" FontSize="12" MinWidth="170"
                      VerticalAlignment="Center"/>
+          <!-- Layout → Combined Spell Timer: the spell box is the cast bar (#405). -->
+          <views:SpellCountdownBoxView IsVisible="{Binding Display.CombinedSpellTimer}"/>
         </StackPanel>
 
-        <!-- Magenta prep-countdown bar — separate StackPanel sibling so the
-             parent's Spacing=24 puts visible breathing room between the spell
-             name and the bar. IsVisible collapses the whole strip when no
-             prep is active, so the layout doesn't reserve dead space. -->
-        <!-- Margin gives extra breathing room on both sides so the bar reads
-             as its own widget — the track's dark plum (#2a1024) sits in the
-             same value range as the status-badge backgrounds (#2a2a2a) and
-             the strip background (#1c1c1c), so without explicit padding the
-             bar visually blurs into KNEEL/HIDE/etc. on the right and into
-             the spell name on the left. A faint BorderBrush draws the edge
-             so even when the bar is mostly empty (low remaining seconds) the
-             outline is clearly demarcated. -->
-        <Border MinWidth="90" Width="100"
-                Margin="6,0,6,0"
-                VerticalAlignment="Center"
-                BorderBrush="#7a3580" BorderThickness="1" CornerRadius="3"
-                ToolTip.Tip="Seconds remaining until the prepared spell is fully harnessed.">
-          <!-- Genie 4's SetMagicPanels hides the Castbar too — AND-ed with
-               the only-while-prepping collapse. -->
-          <Border.IsVisible>
-            <MultiBinding Converter="{x:Static BoolConverters.And}">
-              <Binding Path="Vitals.IsPrepping"/>
-              <Binding Path="Display.ShowMagicPanels"/>
-            </MultiBinding>
-          </Border.IsVisible>
-          <Grid>
-            <ProgressBar Value="{Binding Vitals.CastBarSecondsRemaining}"
-                         Maximum="{Binding Vitals.CastBarSecondsTotal}"
-                         AutomationProperties.Name="Spell preparation"
-                         Foreground="#D040C0" Background="#2a1024"
-                         Height="14" CornerRadius="2"/>
-            <TextBlock Text="{Binding Vitals.CastBarSecondsRemaining}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontSize="10" Foreground="#fff" FontWeight="SemiBold"/>
-          </Grid>
-        </Border>
+        <!-- Prep-countdown bar (castbar preset), shared by both strips. -->
+        <views:CastBarView/>
 
         <!-- ── Status indicators ──────────────────────────────────────
              Each badge is IsVisible-bound to the matching Vitals bool, so
