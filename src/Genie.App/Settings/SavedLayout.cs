@@ -128,6 +128,11 @@ public sealed class SavedLayout
     /// Genie 4's <c>ScriptBar Visible</c>.</summary>
     public bool?  ScriptBarVisible     { get; set; }
 
+    /// <summary>Combined spell timer (the spell box counts down, no separate
+    /// cast bar) — <c>DisplaySettings.CombinedSpellTimer</c>. Same null rule:
+    /// an older layout leaves the current choice.</summary>
+    public bool?  CombinedSpellTimer   { get; set; }
+
     /// <summary>Magic Panels (mana bar, prepared-spell label, cast bar) —
     /// <c>DisplaySettings.ShowMagicPanels</c>, Genie 4's <c>HealthBar Magic</c>.</summary>
     public bool?  MagicPanels          { get; set; }
@@ -138,15 +143,22 @@ public sealed class SavedLayout
     /// says whether it collapses. Same null rule as the bars above.</summary>
     public bool?  KeepRoundTimeVisible { get; set; }
 
+    /// <summary>How roundtime is drawn — <c>DisplaySettings.RoundTimeStyle</c>
+    /// (#404): Badge, CountdownBadge or CountdownBar. Same null rule: a layout
+    /// saved before this existed leaves the current style.</summary>
+    public string? RoundTimeStyle { get; set; }
+
     /// <summary>Per-tag visibility filters (Window → Game Window).</summary>
     public bool   ShowGameText         { get; set; } = true;
     public bool   ShowEchoText         { get; set; } = true;
     public bool   ShowScriptText       { get; set; } = true;
 
-    /// <summary>Map canvas background hex — kept here so themed layouts
-    /// (light mode in town, dark for hunting) round-trip the mapper
-    /// background too.</summary>
-    public string MapBackgroundHex     { get; set; } = "#1A1A1A";
+    /// <summary>Map canvas background hex — kept here so layouts (light map in
+    /// town, dark for hunting) carry the map background too. Loading the layout
+    /// writes it into the <c>automapper.panel</c> preset, where the map reads it
+    /// (public #406). Empty (a layout saved before this field existed) leaves
+    /// the map alone.</summary>
+    public string? MapBackgroundHex    { get; set; }
 
     // ── (De)serialisation helpers ──────────────────────────────────────
 

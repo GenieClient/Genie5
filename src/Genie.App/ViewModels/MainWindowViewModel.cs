@@ -1,6 +1,7 @@
 ﻿using System.Reactive;
 using System.Reactive.Linq;
 using Avalonia;
+using Avalonia.Media;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using Dock.Model.Controls;
@@ -185,6 +186,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>Theme registry + apply pipeline. Created right after
     /// <see cref="Display"/> loads; startup-applies the persisted theme.</summary>
     public Theming.ThemeService Themes { get; }
+
+    /// <summary>Preset colour reads/writes for editors outside the Presets tab
+    /// (public #406). Null until the core exists.</summary>
+    public Settings.PresetColorStore? PresetColors { get; private set; }
 
     // ── Help menu (Updates) ─────────────────────────────────────────────────
     public ReactiveCommand<Unit, Unit>                    ShowUpdatesCommand       { get; }
@@ -440,6 +445,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// the vitals Status Bar (Genie 4 StatusStrip parity, #111).</summary>
     public StatusSlotsViewModel StatusSlots { get; } = new();
     public ReactiveCommand<Unit, Unit>                    ToggleMagicPanelsCommand { get; }
+    /// <summary>Layout → Combined Spell Timer: the spell box counts down in place of the separate cast bar.</summary>
+    public ReactiveCommand<Unit, Unit>                    ToggleCombinedSpellTimerCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomIdCommand  { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomNumberCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleWindowedModeCommand{ get; }
@@ -456,11 +463,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>Window → Enhanced Hands Strip. Toggles the dylb0t-derived icon widgets (compass / body / status icons) into / out of the strip.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleEnhancedHandsStripCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleRestedExpBarCommand { get; }
-    /// <summary>Window → Roundtime Position → Command Bar. Keeps the "⏱ N.Ns" badge inline with the input row.</summary>
+    /// <summary>Layout → Roundtime → Command Bar. Keeps the RT indicator inline with the input row.</summary>
     public ReactiveCommand<Unit, Unit>                    RoundTimeToCommandBarCommand { get; }
-    /// <summary>Window → Roundtime Position → Hands Strip. Moves the RT badge onto the L/R/S row.</summary>
+    /// <summary>Layout → Roundtime → Hands Strip. Moves the RT indicator onto the L/R/S row.</summary>
     public ReactiveCommand<Unit, Unit>                    RoundTimeToHandsStripCommand { get; }
-    /// <summary>Window → Roundtime Position → Keep Visible. Stops the RT badge collapsing between roundtimes, in either position.</summary>
+    /// <summary>Layout → Roundtime → Badge / Countdown Badge / Countdown Bar (#404).
+    /// Parameter: a <see cref="DisplaySettings.RoundTimeStyles"/> value.</summary>
+    public ReactiveCommand<string, Unit>                  SetRoundTimeStyleCommand { get; }
+    /// <summary>Layout → Roundtime → Keep Visible. Stops the RT indicator collapsing between roundtimes, in either position.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleKeepRoundTimeVisibleCommand { get; }
     /// <summary>Layout → Script Bar Position → Top. Docks the running-script strip under the menu — Genie 4's default (#357).</summary>
     public ReactiveCommand<Unit, Unit>                    ScriptBarToTopCommand    { get; }
@@ -496,6 +506,41 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// badge is only showing because <see cref="DisplaySettings.KeepRoundTimeVisible"/>
     /// keeps it on screen between roundtimes.</summary>
     [Reactive] public double RtBadgeOpacity    { get; private set; } = 0.45;
+
+    /// <summary>Roundtime badge colours from the <c>roundtime.badge</c> preset
+    /// (#404): foreground = the Countdown Badge fill, background = the badge,
+    /// border = 70 % fill + 30 % background. Fall back to the badge's original
+    /// reds when no preset engine is loaded or the preset leaves a colour unset.</summary>
+    [Reactive] public IBrush RtBadgeFill       { get; private set; } = RtBadgeStockFill;
+    [Reactive] public IBrush RtBadgeBackground { get; private set; } = RtBadgeStockBackground;
+    [Reactive] public IBrush RtBadgeBorder     { get; private set; } = new SolidColorBrush(Color.Parse("#8B2929"));
+
+    internal const string RtBadgePreset = "roundtime.badge";
+    private static readonly IBrush RtBadgeStockFill       = new SolidColorBrush(Color.Parse("#A03030"));
+    private static readonly IBrush RtBadgeStockBackground = new SolidColorBrush(Color.Parse("#5A1A1A"));
+
+    /// <summary>Re-read the <c>roundtime.badge</c> preset into the badge brushes.</summary>
+    internal void RefreshRtBadgeColors()
+    {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(RefreshRtBadgeColors);
+            return;
+        }
+        var fill = Highlighting.DefaultHighlights.PresetForeground(RtBadgePreset) ?? RtBadgeStockFill;
+        var back = Highlighting.DefaultHighlights.PresetBackground(RtBadgePreset) ?? RtBadgeStockBackground;
+        RtBadgeFill       = fill;
+        RtBadgeBackground = back;
+        RtBadgeBorder     = fill is ISolidColorBrush f && back is ISolidColorBrush b
+            ? new SolidColorBrush(Mix(f.Color, b.Color, 0.7))
+            : fill;
+
+        static Color Mix(Color a, Color b, double t) => Color.FromArgb(
+            (byte)Math.Round(a.A * t + b.A * (1 - t)),
+            (byte)Math.Round(a.R * t + b.R * (1 - t)),
+            (byte)Math.Round(a.G * t + b.G * (1 - t)),
+            (byte)Math.Round(a.B * t + b.B * (1 - t)));
+    }
 
     /// <summary>True iff the Script Bar should render in its TOP slot — i.e. a
     /// script is running AND the user picked the top position (#357). The strip
@@ -1100,11 +1145,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>Policy guard: the user has sent at least one command since this connect. An untouched,
     /// unattended session must never resurrect itself (DR ToS: no auto-reconnect-and-resume while away).</summary>
     private bool _userInputSinceConnect;
-    /// <summary>The user sent a deliberate disconnect verb (DR's <c>quit</c>/<c>exit</c>) — the server
-    /// close that follows is INTENTIONAL, so do NOT auto-reconnect (the user chose to leave; this is the
-    /// sharpest edge of the no-auto-resume policy). Cleared on the next non-quit command (a rejected quit
-    /// means they're still playing) and on each fresh connect.</summary>
-    private bool _intentionalGameExit;
+    /// <summary>A deliberate disconnect verb (DR's <c>quit</c>/<c>exit</c>, Genie 4's <c>qui</c>/<c>exi</c>
+    /// prefix rule) went to the game — typed, aliased, triggered or from a script (#419). The server
+    /// close that follows is INTENTIONAL, so do NOT auto-reconnect. Cleared only on a fresh connect, as
+    /// Genie 4's <c>m_bManualDisconnect</c> was: a later command (another script still running, an
+    /// anti-idle loop) must not re-arm reconnect while the server is ending the session. Set from
+    /// <see cref="GenieCore.SentCommands"/> off the UI thread, hence volatile.</summary>
+    private volatile bool _intentionalGameExit;
     /// <summary>This drop was an UNEXPECTED dead link — the transport raised an <see cref="ConnectionEventKind.Error"/>
     /// (read exception / keepalive failure / activity watchdog) before the paired Disconnected. Only such a drop
     /// auto-reconnects. A clean server-initiated close (DR idle-kick, boot, server exit/quit) arrives as a bare
@@ -1382,6 +1429,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Mapper.MapsDirectory = string.IsNullOrWhiteSpace(Paths.MapsDirectory)
             ? _defaultMapsDir
             : Paths.MapsDirectory;
+        // Maps ▸ Update Maps reads the enabled Maps feeds (and their festival /
+        // quest subfolder toggles) from the same update-feeds.json the Updates
+        // dialog and the startup check use.
+        Mapper.FeedConfigDir = _configDir;
 
         Profiles.Load(_profilesPath);
         if (Profiles.LastLoadError is { } profileFault)
@@ -1397,6 +1448,21 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display = DisplaySettings.Load(_displayPath);
         Display.Apply();  // push values into Application.Resources
         Mapper.AttachDisplay(Display, _displayPath);
+        UpgradeVitalsPresets();
+        UpgradeRoundtimePreset();
+
+        // The map's colours are the automapper.* presets (public #406). Until
+        // Genie's engine is built (first connect / command) they're read from the
+        // shared presets file; a map colour an earlier Genie 5 kept in
+        // display.json moves into the preset here, once.
+        var startupPresets = new Settings.PresetColorStore(new Genie.Core.Presets.PresetEngine(), _configDir, () => null);
+        if (MapperViewModel.MigrateLegacyColours(Display, startupPresets))
+        {
+            try { Display.Save(_displayPath); } catch { /* best effort: retried next launch */ }
+        }
+        Mapper.PresetStore = startupPresets;
+        UpgradeUiPresets();
+        Controls.PresetChrome.Store = startupPresets;   // ui.* chrome presets (#406)
 
         // ── Themes (#20) ──────────────────────────────────────────────────
         // Re-apply the persisted theme's chrome + Fluent variant on top of
@@ -1461,7 +1527,6 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // pushed the seeded values; nothing to repaint yet at construct).
         Display.WhenAnyValue(
                 x => x.GameColorHex,
-                x => x.EchoColorHex,
                 x => x.FontFamily,
                 x => x.FontSize)
             .Skip(1)
@@ -1978,6 +2043,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Display.Save(_displayPath);
         });
 
+        ToggleCombinedSpellTimerCommand = ReactiveCommand.Create(() =>
+        {
+            Display.CombinedSpellTimer = !Display.CombinedSpellTimer;
+            Display.Save(_displayPath);
+        });
+
         ToggleZoneRoomIdCommand = ReactiveCommand.Create(() =>
         {
             Display.ShowZoneRoomId = !Display.ShowZoneRoomId;
@@ -2100,6 +2171,16 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             Display.RoundTimeOnHandsStrip = true;
             Display.Save(_displayPath);
         });
+
+        SetRoundTimeStyleCommand = ReactiveCommand.Create<string>(style =>
+        {
+            Display.RoundTimeStyle = DisplaySettings.RoundTimeStyles.Normalize(style);
+            Display.Save(_displayPath);
+        });
+
+        // The RT badge repaints whenever presets change or load (#404).
+        Highlighting.UserHighlights.RulesChanged += RefreshRtBadgeColors;
+        RefreshRtBadgeColors();
 
         ToggleKeepRoundTimeVisibleCommand = ReactiveCommand.Create(() =>
         {
@@ -2613,10 +2694,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 {
                     try
                     {
-                        var src = new Genie.Core.Update.Sources.GithubContentsSource(
-                            feed.Owner, feed.Repo, feed.Path, feed.Extension);
+                        // Root folder plus any festival / quest subfolder the
+                        // row opted into — same sources the Updates dialog
+                        // row builds, so the startup check sees what it sees.
                         var u = new Genie.Core.Update.Updaters.MapsUpdater(
-                            zoneRepo, mapsDir, new[] { (Genie.Core.Update.Sources.IFileListSource)src });
+                            zoneRepo, mapsDir, Genie.Core.Update.MapsFeedSources.Create(feed));
                         if (!(await u.CheckAsync()).UpdateAvailable) continue;
                         if (cfg.MapsPolicy.AutoApply && (await u.ApplyAsync()).Succeeded)
                             applied.Add("Maps");
@@ -3997,6 +4079,58 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <c>Config/</c> dir — again matching where Core actually loads from for
     /// such a session.</para>
     /// </summary>
+    private int _presetRepaintQueued;
+
+    private void OnPresetEngineChanged()
+    {
+        if (Interlocked.Exchange(ref _presetRepaintQueued, 1) == 1) return;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            Interlocked.Exchange(ref _presetRepaintQueued, 0);
+            UserHighlights.NotifyRulesChanged();
+        });
+    }
+
+    /// <summary>Saved presets.json files still holding Genie 5's old stock vitals
+    /// colours (White concentration, Aqua mana, …) get the current defaults, once
+    /// (public #406 review): nothing read those presets before the bars did, so
+    /// nobody chose them, and a saved White concentration would paint a white bar
+    /// under a white caption.</summary>
+    private void UpgradeVitalsPresets()
+    {
+        if (Display.VitalsPresetsUpgraded) return;
+        var profileDirs = new List<string>();
+        foreach (var profile in Profiles.Profiles)
+        {
+            try { profileDirs.Add(GetProfileConfigDir(profile)); } catch { /* unreadable profile: skip */ }
+        }
+        Settings.StockPresetUpgrade.Run(
+            Settings.StockPresetUpgrade.ConfigDirs(_configDir, profileDirs),
+            Settings.StockPresetUpgrade.OldVitals,
+            Settings.StockPresetUpgrade.CurrentStock);
+        Display.VitalsPresetsUpgraded = true;
+        try { Display.Save(_displayPath); } catch { /* retried next launch */ }
+    }
+
+    /// <summary>A saved roundtime preset still holding Genie 5's old stock Aqua
+    /// on navy gets the current default (MediumBlue), once: under the countdown
+    /// bar's white label it is unreadable (#418 review).</summary>
+    private void UpgradeRoundtimePreset()
+    {
+        if (Display.RoundtimePresetUpgraded) return;
+        var profileDirs = new List<string>();
+        foreach (var profile in Profiles.Profiles)
+        {
+            try { profileDirs.Add(GetProfileConfigDir(profile)); } catch { /* unreadable profile: skip */ }
+        }
+        Settings.StockPresetUpgrade.Run(
+            Settings.StockPresetUpgrade.ConfigDirs(_configDir, profileDirs),
+            Settings.StockPresetUpgrade.OldRoundtime,
+            Settings.StockPresetUpgrade.CurrentStock);
+        Display.RoundtimePresetUpgraded = true;
+        try { Display.Save(_displayPath); } catch { /* retried next launch */ }
+    }
+
     public string GetProfileConfigDir(ConnectionProfile? profile)
     {
         if (profile is null) return _configDir;
@@ -4178,6 +4312,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         LoadLayeredNames(core, p, profileDir, globalDir, single);
         LoadLayeredPresets(core, p, profileDir, globalDir, single);
+        // Preset-coloured UI (the vitals bars, #406) repaints from the loaded set.
+        Avalonia.Threading.Dispatcher.UIThread.Post(UserHighlights.NotifyRulesChanged);
 
         var hadAnyMacros = glob.Macros.Rules.Count > 0 || (prof?.Macros.Rules.Count ?? 0) > 0;
         if (hadAnyMacros)
@@ -4252,6 +4388,58 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     /// <summary>Layered presets.json load (#257/#149): each saved token
     /// overrides the seeded default; a profile token overrides a global one.</summary>
+    /// <summary>
+    /// One-time upgrade (public #406). Genie 5 saves every preset, stock values
+    /// included, so a presets.json written by an earlier Genie 5 holds Genie 4's
+    /// stock ui.* chrome colours (its Windows greys) that nobody chose. Now that
+    /// the ui.* presets paint the chrome, those would turn the menu bar, command
+    /// input and status strip light grey under any theme. Each presets.json (the
+    /// shared one and every profile's) has such entries set to Default, once; a
+    /// colour set afterwards, even the same grey, is left alone.
+    /// </summary>
+    private void UpgradeUiPresets()
+    {
+        if (Display.UiPresetsUpgraded) return;
+        var p    = new PersistenceService();
+        var profileDirs = new List<string>();
+        foreach (var profile in Profiles.Profiles)
+        {
+            try { profileDirs.Add(GetProfileConfigDir(profile)); } catch { /* unreadable profile: skip */ }
+        }
+        // The shared folder, saved profiles AND every Profiles/ folder on disk: a
+        // character reached with #connect and never saved as a profile has its own
+        // presets.json, and this runs only once (#406 review).
+        var dirs = Settings.StockPresetUpgrade.ConfigDirs(_configDir, profileDirs);
+
+        foreach (var path in dirs.Select(d => Path.Combine(d, "presets.json"))
+                                 .Where(File.Exists))
+        {
+            try
+            {
+                var models  = p.LoadPresets(path);
+                var changed = false;
+                foreach (var m in models)
+                    if (Genie.Core.UiPresets.IsGenie4Stock(m.Id, m.ForegroundColor, m.BackgroundColor))
+                    {
+                        m.ForegroundColor = "Default";
+                        m.BackgroundColor = "";
+                        changed = true;
+                    }
+                if (!changed) continue;
+                RuleFileWatcher.MarkAppWrite(path);
+                p.SavePresets(path, models.Select(m => new Genie.Core.Presets.PresetRule
+                {
+                    Id = m.Id, ForegroundColor = m.ForegroundColor,
+                    BackgroundColor = m.BackgroundColor, HighlightLine = m.HighlightLine,
+                }));
+            }
+            catch { /* best effort: an unreadable file keeps its values */ }
+        }
+
+        Display.UiPresetsUpgraded = true;
+        try { Display.Save(_displayPath); } catch { /* retried next launch */ }
+    }
+
     private void LoadLayeredPresets(GenieCore core, PersistenceService p,
                                     string profileDir, string globalDir, bool single)
     {
@@ -5529,6 +5717,19 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // persist, so the renderer holds them for the whole session.
         UserHighlights.Engine  = _core.Highlights;
         Highlighting.DefaultHighlights.PresetEngine = _core.Presets;      // preset colours (#19)
+        // Repaint everything that paints from presets when one changes — a typed
+        // #preset included, as in Genie 4 (#406 review). Coalesced: a profile load
+        // applies every preset in a row, possibly off the UI thread.
+        _core.Presets.Changed += OnPresetEngineChanged;
+        // Display Settings / theme editor / theme apply edit the echo presets
+        // through this (public #406) — the preset stays the one source.
+        PresetColors = new Settings.PresetColorStore(_core.Presets, _configDir,
+            () => IsConnected ? GetProfileConfigDir(ConnectedProfile) : null,
+            warn: msg => GameText.AddSystemLine(msg));
+        Themes.Presets = PresetColors;
+        Mapper.PresetStore = PresetColors;   // the map's automapper.* presets (#406)
+        Controls.PresetChrome.Store = PresetColors;    // ui.* chrome presets (#406)
+        Highlighting.UserHighlights.NotifyRulesChanged();
         Highlighting.DefaultHighlights.NameEngine   = _core.NameHighlights; // name colours (#154)
 
         // ── Performance / safety ──────────────────────────────────────────────
@@ -5644,6 +5845,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _core.CommandBarRequested += d =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 WriteCommandBar?.Invoke(d.Text, d.CaretIndex, d.ClearFirst));
+
+        // DR's disconnect verbs (the login banner says "Type QUIT or EXIT!"): a
+        // server close that follows a deliberate quit/exit ends the session on
+        // purpose, so it must NOT auto-reconnect. Checked on every command written
+        // to the game, whatever sent it (typed, alias, trigger, script put/send,
+        // JS genie.put), as Genie 4 did in Game.SendText (#419). It holds until the
+        // next connect, as in Genie 4.
+        _core.SentCommands.Subscribe(NoteCommandSentToGame);
 
         // #beep / #bell → system alert bell (already PlaySounds-gated in Core).
         _core.BeepRequested += () => _audio.Beep();
@@ -6183,6 +6392,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         EnsureReconnectTimer();
     }
 
+    /// <summary>A command was written to the game (any source): note whether it
+    /// was a disconnect verb (#419). See <see cref="_intentionalGameExit"/>.</summary>
+    internal void NoteCommandSentToGame(string sent)
+    {
+        if (GenieCore.IsDisconnectVerb(sent)) _intentionalGameExit = true;
+    }
+
+    /// <summary>Whether quit/exit has been sent since this connect, so the next
+    /// drop will not auto-reconnect. For tests.</summary>
+    internal bool IntentionalGameExit => _intentionalGameExit;
+
     /// <summary>Decide whether a just-dropped session should auto-reconnect, and
     /// if so schedule the first attempt. No-op for failed logins, manual
     /// teardown, or when <c>#config reconnect</c> is off.</summary>
@@ -6191,7 +6411,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         if (_reconnectAt is not null) return;            // already scheduled for this drop
         if (!_wasConnected)            return;            // never established (failed login) — don't loop
         if (_manualDisconnect)         return;            // user/explicit teardown — stay down
-        if (_intentionalGameExit)      return;            // user typed quit/exit — they chose to leave
+        if (_intentionalGameExit)      return;            // quit/exit was sent (typed or scripted) — the session ended on purpose
         if (!(_core?.Config.Reconnect ?? false)) return; // auto-reconnect disabled (#config reconnect false)
         if (LastConnectionConfig is null) return;
 
@@ -6326,13 +6546,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             IconBarVisible        = Display.ShowIconBar,
             IconBarAtBottom       = Display.IconBarAtBottom,
             HealthBarAtBottom     = Display.StatusBarAtBottom,
+            CombinedSpellTimer    = Display.CombinedSpellTimer,
             ScriptBarVisible      = Display.ShowScriptBar,
             MagicPanels           = Display.ShowMagicPanels,
             KeepRoundTimeVisible  = Display.KeepRoundTimeVisible,
+            RoundTimeStyle        = Display.RoundTimeStyle,
             ShowGameText          = Display.ShowGameText,
             ShowEchoText          = Display.ShowEchoText,
             ShowScriptText        = Display.ShowScriptText,
-            MapBackgroundHex      = Display.MapBackgroundHex,
+            MapBackgroundHex      = Controls.MapPalette.Hex(Mapper.Palette.Background),   // automapper.panel (#406)
             WindowedMode          = Display.WindowedMode,
         };
 
@@ -6387,6 +6609,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// applied first (cheap, instant); tool-visibility toggles run
     /// last because Dock.Avalonia mutations need a UI-thread tick.
     /// </summary>
+    /// <summary>Map backgrounds a layout carries without anyone having chosen
+    /// them: Genie 5's old display default and its old dark default.</summary>
+    private static bool IsUnchosenLayoutMapBackground(string hex)
+        => hex.Trim().ToUpperInvariant() is "#EEE8AA" or "#1A1A1A";
+
     internal void ApplyLayout(Settings.SavedLayout layout)
     {
         // Display flags — these have property-changed observers that
@@ -6402,14 +6629,23 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         if (layout.IconBarVisible    is { } iconShown)  Display.ShowIconBar       = iconShown;
         if (layout.IconBarAtBottom   is { } iconBottom) Display.IconBarAtBottom   = iconBottom;
         if (layout.HealthBarAtBottom is { } hpBottom)   Display.StatusBarAtBottom = hpBottom;
+        if (layout.CombinedSpellTimer is { } combined)  Display.CombinedSpellTimer = combined;
         if (layout.ScriptBarVisible  is { } barShown)   Display.ShowScriptBar     = barShown;
         if (layout.MagicPanels       is { } magic)      Display.ShowMagicPanels   = magic;
         if (layout.KeepRoundTimeVisible is { } keepRt)  Display.KeepRoundTimeVisible = keepRt;
+        if (layout.RoundTimeStyle is { } rtStyle)       Display.RoundTimeStyle = DisplaySettings.RoundTimeStyles.Normalize(rtStyle);
         Display.ShowGameText           = layout.ShowGameText;
         Display.ShowEchoText           = layout.ShowEchoText;
         Display.ShowScriptText         = layout.ShowScriptText;
-        if (!string.IsNullOrWhiteSpace(layout.MapBackgroundHex))
-            Display.MapBackgroundHex   = layout.MapBackgroundHex;
+        // A layout's map background goes into the automapper.panel preset (the
+        // one place it's kept, #406) and shows straight away. None, or a default
+        // every older layout carries without anyone choosing it — the old display
+        // default #EEE8AA (also in built-in Shadowveil) or the old dark #1A1A1A —
+        // leaves the map as it is, so applying a layout on connect can't undo a
+        // colour set with #preset, #mapper color or a picker (#406 review).
+        if (Controls.MapPalette.Parse(layout.MapBackgroundHex) is { } mapBg &&
+            !IsUnchosenLayoutMapBackground(layout.MapBackgroundHex!))
+            Mapper.MapBackground = mapBg;
         // Switch document mode to match the saved layout BEFORE rebuilding the
         // dock, so a layout saved in windowed mode reopens windowed (not tabbed).
         Display.WindowedMode           = layout.WindowedMode;
@@ -7104,16 +7340,6 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // Policy guard for auto-reconnect: the user has actively driven this
         // session, so a later unexpected drop may be auto-reconnected.
         _userInputSinceConnect = true;
-
-        // DR's disconnect verbs (the login banner literally says "Type QUIT or
-        // EXIT!"): a server close that follows a deliberate quit/exit is the user
-        // CHOOSING to leave, so it must NOT auto-reconnect (both a UX fix and the
-        // sharpest edge of the DR "no auto-reconnect-and-resume" policy). Any other
-        // command means they're still playing, so clear the flag — that covers a
-        // quit the game rejected (e.g. mid-roundtime).
-        var verb = cmd.Trim();
-        _intentionalGameExit = verb.Equals("quit", StringComparison.OrdinalIgnoreCase)
-                            || verb.Equals("exit", StringComparison.OrdinalIgnoreCase);
 
         _core!.ProcessInput(cmd);
         return Task.CompletedTask;

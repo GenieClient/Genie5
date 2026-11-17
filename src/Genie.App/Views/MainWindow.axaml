@@ -24,7 +24,16 @@
   <DockPanel>
 
     <!-- ── Menu bar ──────────────────────────────────────────────────────── -->
-    <Menu DockPanel.Dock="Top">
+    <!-- Colours: the theme, unless the Genie 4 ui.menu / ui.menu.highlight /  -->
+    <!-- ui.menu.checked presets set one (public #406, PresetChrome).         -->
+    <Menu DockPanel.Dock="Top" controls:PresetChrome.Surface="menu">
+      <Menu.Styles>
+        <!-- ui.menu.checked: the box behind a ticked item's tick, as Genie 4's -->
+        <!-- MenuRenderer painted it. Unset (Default) = no box, the theme's look. -->
+        <Style Selector="MenuItem /template/ ContentControl#PART_ToggleIconPresenter">
+          <Setter Property="Background" Value="{DynamicResource Genie.UiMenuChecked}"/>
+        </Style>
+      </Menu.Styles>
       <MenuItem Header="_File">
         <MenuItem Header="_Connect..."    Command="{Binding ConnectCommand}"/>
         <MenuItem Header="_Disconnect"    Command="{Binding DisconnectCommand}"/>
@@ -82,7 +91,7 @@
         <MenuItem Header="Master _Toggles"
                   ToolTip.Tip="Turn whole features on or off without touching their rules or data — rules stay loaded and editable, they just stop applying. Genie 4 File-menu parity. Saved to settings.cfg; same as `#config triggers off` etc. Rule toggles apply to new lines — already-rendered text is unchanged.">
           <MenuItem Header="_Highlights"  ToggleType="CheckBox" IsChecked="{Binding HighlightsEnabled, Mode=TwoWay}"
-                    ToolTip.Tip="User highlight rules — colours and highlight sounds (built-in default highlights and Names are unaffected)."/>
+                    ToolTip.Tip="User highlight rules — colours and highlight sounds (presets and Names are unaffected)."/>
           <MenuItem Header="_Triggers"    ToggleType="CheckBox" IsChecked="{Binding TriggersEnabled, Mode=TwoWay}"
                     ToolTip.Tip="User triggers — no trigger fires while off."/>
           <MenuItem Header="_Substitutes" ToggleType="CheckBox" IsChecked="{Binding SubstitutesEnabled, Mode=TwoWay}"
@@ -189,8 +198,8 @@
                     Command="{Binding HandsBarToBottomCommand}"
                     ToolTip.Tip="Dock the hands strip at the bottom of the window, just above the vitals strip — Genie 4 layout."/>
         </MenuItem>
-        <MenuItem Header="_Roundtime Position"
-                  ToolTip.Tip="Where the &quot;⏱ N.Ns&quot; roundtime badge appears while you're locked in RT.">
+        <MenuItem Header="_Roundtime"
+                  ToolTip.Tip="Where the roundtime indicator appears while you're locked in RT, and how it looks.">
           <MenuItem Header="_Command Bar"
                     ToggleType="Radio" GroupName="RtPos"
                     IsChecked="{Binding Display.RoundTimeOnCommandBar, Mode=OneWay}"
@@ -200,7 +209,23 @@
                     ToggleType="Radio" GroupName="RtPos"
                     IsChecked="{Binding Display.RoundTimeOnHandsStrip, Mode=OneWay}"
                     Command="{Binding RoundTimeToHandsStripCommand}"
-                    ToolTip.Tip="Show the RT badge as an inline R-badge on the L/R/S hands strip, so the &quot;what's locked&quot; indicators all live together."/>
+                    ToolTip.Tip="Show the roundtime indicator on the L/R/S hands strip, so the &quot;what's locked&quot; indicators all live together."/>
+          <Separator/>
+          <MenuItem Header="_Badge"
+                    ToggleType="Radio" GroupName="RtStyle"
+                    IsChecked="{Binding Display.RoundTimeStyleBadge, Mode=OneWay}"
+                    Command="{Binding SetRoundTimeStyleCommand}" CommandParameter="Badge"
+                    ToolTip.Tip="The red roundtime badge with its timer."/>
+          <MenuItem Header="Countdown B_adge"
+                    ToggleType="Radio" GroupName="RtStyle"
+                    IsChecked="{Binding Display.RoundTimeStyleCountdownBadge, Mode=OneWay}"
+                    Command="{Binding SetRoundTimeStyleCommand}" CommandParameter="CountdownBadge"
+                    ToolTip.Tip="The same red badge and timer, with a brighter fill behind the timer that shrinks from full to empty over the roundtime."/>
+          <MenuItem Header="Countdown Ba_r (Genie 4)"
+                    ToggleType="Radio" GroupName="RtStyle"
+                    IsChecked="{Binding Display.RoundTimeStyleCountdownBar, Mode=OneWay}"
+                    Command="{Binding SetRoundTimeStyleCommand}" CommandParameter="CountdownBar"
+                    ToolTip.Tip="Genie 4's roundtime bar: it shrinks from full to empty over the RT, with the seconds left drawn on it. Coloured by the roundtime preset (foreground = fill, background = track)."/>
           <Separator/>
           <MenuItem Header="_Keep Visible"
                     ToggleType="CheckBox"
@@ -289,6 +314,12 @@
                   IsChecked="{Binding Display.ShowMagicPanels}"
                   Command="{Binding ToggleMagicPanelsCommand}"
                   ToolTip.Tip="Show the magic widgets (Genie 4 parity): the mana bar on the status bar plus the prepared-spell label and cast bar on the hands strip. Turn off to reclaim the space on a non-caster."/>
+        <MenuItem Header="Combined Spell Timer"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.CombinedSpellTimer, Mode=OneWay}"
+                  Command="{Binding ToggleCombinedSpellTimerCommand}"
+                  IsEnabled="{Binding Display.ShowMagicPanels}"
+                  ToolTip.Tip="Work the cast bar into the spell box: the box fills and empties over the prep time, and the seconds left go on the end of the spell name, (N) Spell (M). Off keeps Genie 4's separate spell label and cast bar."/>
         <MenuItem Header="_Zone / Room ID"
                   ToggleType="CheckBox"
                   IsChecked="{Binding Display.ShowZoneRoomId}"
@@ -954,26 +985,16 @@
       <StackPanel Orientation="Horizontal" Spacing="24">
 
         <!-- ── Roundtime (optional position) ─────────────────────────
-             Inline RT badge — visible only when the user chose "Hands Strip"
+             RT indicator (Views/RoundTimeIndicatorView, the same one the
+             command bar uses, #404) — visible only when the user chose "Hands Strip"
              for the roundtime position. ShowRtOnHandsStrip is computed on
              MainWindowViewModel as (Vitals.InRoundTime AND
              Display.RoundTimeOnHandsStrip), or KeepRoundTimeVisible pins it
-             on (dimmed) between roundtimes. Red palette matches the command-
-             bar version so the indicator means the same thing wherever it
-             sits. -->
-        <StackPanel Orientation="Horizontal" Spacing="6"
-                    IsVisible="{Binding ShowRtOnHandsStrip}"
-                    Opacity="{Binding RtBadgeOpacity}">
-          <Border Background="#5a1a1a" BorderBrush="#8a2a2a" BorderThickness="1"
-                  CornerRadius="2" Padding="6,1">
-            <TextBlock Text="R" Foreground="#ffd0d0" FontWeight="SemiBold" FontSize="11"
-                       ToolTip.Tip="Roundtime — your character can't act until this expires"/>
-          </Border>
-          <TextBlock Text="{Binding Vitals.RoundTimeSeconds, StringFormat='{}{0:F1}s'}"
-                     AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
-                     Foreground="#ffd0d0" FontSize="12" MinWidth="40"
-                     VerticalAlignment="Center"/>
-        </StackPanel>
+             on (dimmed) between roundtimes. -->
+        <!-- Stretches to the strip's height like the L/R/S boxes, so it
+             matches them and the command-bar badge. -->
+        <views:RoundTimeIndicatorView IsVisible="{Binding ShowRtOnHandsStrip}"
+                                      Opacity="{Binding RtBadgeOpacity}"/>
 
         <!-- ── Enhanced (dylb0t-derived) icon widgets ─────────────────
              Collapsed by default; toggled on via Window → Enhanced Hands
@@ -1084,48 +1105,17 @@
                Field", "Whole Displacement") so the bar (in the next sub-group)
                doesn't crowd against the trailing letter. -->
           <TextBlock Text="{Binding Vitals.PreparedSpellLabel}"
+                     IsVisible="{Binding !Display.CombinedSpellTimer}"
                      AutomationProperties.Name="{Binding Vitals.PreparedSpellLabel, StringFormat='Prepared spell: {0}'}"
                      AutomationProperties.LiveSetting="Polite"
                      Foreground="#c8a8e0" FontSize="12" MinWidth="170"
                      VerticalAlignment="Center"/>
+          <!-- Layout → Combined Spell Timer: the spell box is the cast bar (#405). -->
+          <views:SpellCountdownBoxView IsVisible="{Binding Display.CombinedSpellTimer}"/>
         </StackPanel>
 
-        <!-- Magenta prep-countdown bar — separate StackPanel sibling so the
-             parent's Spacing=24 puts visible breathing room between the spell
-             name and the bar. IsVisible collapses the whole strip when no
-             prep is active, so the layout doesn't reserve dead space. -->
-        <!-- Margin gives extra breathing room on both sides so the bar reads
-             as its own widget — the track's dark plum (#2a1024) sits in the
-             same value range as the status-badge backgrounds (#2a2a2a) and
-             the strip background (#1c1c1c), so without explicit padding the
-             bar visually blurs into KNEEL/HIDE/etc. on the right and into
-             the spell name on the left. A faint BorderBrush draws the edge
-             so even when the bar is mostly empty (low remaining seconds) the
-             outline is clearly demarcated. -->
-        <Border MinWidth="90" Width="100"
-                Margin="6,0,6,0"
-                VerticalAlignment="Center"
-                BorderBrush="#7a3580" BorderThickness="1" CornerRadius="3"
-                ToolTip.Tip="Seconds remaining until the prepared spell is fully harnessed.">
-          <!-- Genie 4's SetMagicPanels hides the Castbar too — AND-ed with
-               the only-while-prepping collapse. -->
-          <Border.IsVisible>
-            <MultiBinding Converter="{x:Static BoolConverters.And}">
-              <Binding Path="Vitals.IsPrepping"/>
-              <Binding Path="Display.ShowMagicPanels"/>
-            </MultiBinding>
-          </Border.IsVisible>
-          <Grid>
-            <ProgressBar Value="{Binding Vitals.CastBarSecondsRemaining}"
-                         Maximum="{Binding Vitals.CastBarSecondsTotal}"
-                         AutomationProperties.Name="Spell preparation"
-                         Foreground="#D040C0" Background="#2a1024"
-                         Height="14" CornerRadius="2"/>
-            <TextBlock Text="{Binding Vitals.CastBarSecondsRemaining}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontSize="10" Foreground="#fff" FontWeight="SemiBold"/>
-          </Grid>
-        </Border>
+        <!-- Prep-countdown bar (castbar preset), shared by both strips. -->
+        <views:CastBarView/>
 
         <!-- ── Status indicators ──────────────────────────────────────
              Each badge is IsVisible-bound to the matching Vitals bool, so
@@ -1251,7 +1241,10 @@
     <!-- cell clipped it to nothing) and ellipsizes at that cap, so a huge    -->
     <!-- line can never push slots 2-10 off screen. Empty slots — slot 1     -->
     <!-- included — take no space at all.                                     -->
+    <!-- Colours: the theme, unless the Genie 4 ui.status preset sets one     -->
+    <!-- (public #406, PresetChrome).                                          -->
     <Border DockPanel.Dock="Bottom"
+            controls:PresetChrome.Surface="status"
             Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
             ToolTip.Tip="Script status slots — written with #statusbar [N] text; a bare #statusbar N clears slot N, #statusbar clearall empties all ten.">
       <Border.IsVisible>
@@ -1407,26 +1400,16 @@
       <StackPanel Orientation="Horizontal" Spacing="24">
 
         <!-- ── Roundtime (optional position) ─────────────────────────
-             Inline RT badge — visible only when the user chose "Hands Strip"
+             RT indicator (Views/RoundTimeIndicatorView, the same one the
+             command bar uses, #404) — visible only when the user chose "Hands Strip"
              for the roundtime position. ShowRtOnHandsStrip is computed on
              MainWindowViewModel as (Vitals.InRoundTime AND
              Display.RoundTimeOnHandsStrip), or KeepRoundTimeVisible pins it
-             on (dimmed) between roundtimes. Red palette matches the command-
-             bar version so the indicator means the same thing wherever it
-             sits. -->
-        <StackPanel Orientation="Horizontal" Spacing="6"
-                    IsVisible="{Binding ShowRtOnHandsStrip}"
-                    Opacity="{Binding RtBadgeOpacity}">
-          <Border Background="#5a1a1a" BorderBrush="#8a2a2a" BorderThickness="1"
-                  CornerRadius="2" Padding="6,1">
-            <TextBlock Text="R" Foreground="#ffd0d0" FontWeight="SemiBold" FontSize="11"
-                       ToolTip.Tip="Roundtime — your character can't act until this expires"/>
-          </Border>
-          <TextBlock Text="{Binding Vitals.RoundTimeSeconds, StringFormat='{}{0:F1}s'}"
-                     AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
-                     Foreground="#ffd0d0" FontSize="12" MinWidth="40"
-                     VerticalAlignment="Center"/>
-        </StackPanel>
+             on (dimmed) between roundtimes. -->
+        <!-- Stretches to the strip's height like the L/R/S boxes, so it
+             matches them and the command-bar badge. -->
+        <views:RoundTimeIndicatorView IsVisible="{Binding ShowRtOnHandsStrip}"
+                                      Opacity="{Binding RtBadgeOpacity}"/>
 
         <!-- ── Enhanced (dylb0t-derived) icon widgets ─────────────────
              Collapsed by default; toggled on via Window → Enhanced Hands
@@ -1537,48 +1520,17 @@
                Field", "Whole Displacement") so the bar (in the next sub-group)
                doesn't crowd against the trailing letter. -->
           <TextBlock Text="{Binding Vitals.PreparedSpellLabel}"
+                     IsVisible="{Binding !Display.CombinedSpellTimer}"
                      AutomationProperties.Name="{Binding Vitals.PreparedSpellLabel, StringFormat='Prepared spell: {0}'}"
                      AutomationProperties.LiveSetting="Polite"
                      Foreground="#c8a8e0" FontSize="12" MinWidth="170"
                      VerticalAlignment="Center"/>
+          <!-- Layout → Combined Spell Timer: the spell box is the cast bar (#405). -->
+          <views:SpellCountdownBoxView IsVisible="{Binding Display.CombinedSpellTimer}"/>
         </StackPanel>
 
-        <!-- Magenta prep-countdown bar — separate StackPanel sibling so the
-             parent's Spacing=24 puts visible breathing room between the spell
-             name and the bar. IsVisible collapses the whole strip when no
-             prep is active, so the layout doesn't reserve dead space. -->
-        <!-- Margin gives extra breathing room on both sides so the bar reads
-             as its own widget — the track's dark plum (#2a1024) sits in the
-             same value range as the status-badge backgrounds (#2a2a2a) and
-             the strip background (#1c1c1c), so without explicit padding the
-             bar visually blurs into KNEEL/HIDE/etc. on the right and into
-             the spell name on the left. A faint BorderBrush draws the edge
-             so even when the bar is mostly empty (low remaining seconds) the
-             outline is clearly demarcated. -->
-        <Border MinWidth="90" Width="100"
-                Margin="6,0,6,0"
-                VerticalAlignment="Center"
-                BorderBrush="#7a3580" BorderThickness="1" CornerRadius="3"
-                ToolTip.Tip="Seconds remaining until the prepared spell is fully harnessed.">
-          <!-- Genie 4's SetMagicPanels hides the Castbar too — AND-ed with
-               the only-while-prepping collapse. -->
-          <Border.IsVisible>
-            <MultiBinding Converter="{x:Static BoolConverters.And}">
-              <Binding Path="Vitals.IsPrepping"/>
-              <Binding Path="Display.ShowMagicPanels"/>
-            </MultiBinding>
-          </Border.IsVisible>
-          <Grid>
-            <ProgressBar Value="{Binding Vitals.CastBarSecondsRemaining}"
-                         Maximum="{Binding Vitals.CastBarSecondsTotal}"
-                         AutomationProperties.Name="Spell preparation"
-                         Foreground="#D040C0" Background="#2a1024"
-                         Height="14" CornerRadius="2"/>
-            <TextBlock Text="{Binding Vitals.CastBarSecondsRemaining}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontSize="10" Foreground="#fff" FontWeight="SemiBold"/>
-          </Grid>
-        </Border>
+        <!-- Prep-countdown bar (castbar preset), shared by both strips. -->
+        <views:CastBarView/>
 
         <!-- ── Status indicators ──────────────────────────────────────
              Each badge is IsVisible-bound to the matching Vitals bool, so
@@ -1698,21 +1650,10 @@
          between RT and the input and is always visible (dim when idle). -->
     <Grid x:Name="CommandBarGrid" DockPanel.Dock="Bottom" ColumnDefinitions="Auto,Auto,*,Auto" Margin="4,2">
 
-      <Border Grid.Column="0"
-              IsVisible="{Binding ShowRtInCommandBar}"
-              Opacity="{Binding RtBadgeOpacity}"
-              Background="#5a1a1a" BorderBrush="#8a2a2a" BorderThickness="1"
-              CornerRadius="3" Padding="6,2" Margin="0,0,4,0"
-              VerticalAlignment="Stretch"
-              ToolTip.Tip="Roundtime — your character can't act until this expires. Right-click Window → Roundtime Position to relocate."
-              MinWidth="64">
-        <TextBlock Foreground="#ffd0d0" FontWeight="SemiBold"
-                   AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontSize="12">
-          <Run Text="⏱ "/><Run Text="{Binding Vitals.RoundTimeSeconds, StringFormat={}{0:F1}s}"/>
-        </TextBlock>
-      </Border>
+      <views:RoundTimeIndicatorView Grid.Column="0"
+                                    IsVisible="{Binding ShowRtInCommandBar}"
+                                    Opacity="{Binding RtBadgeOpacity}"
+                                    Margin="0,0,4,0"/>
 
       <!-- ── Type-ahead counter ──────────────────────────────────────────
            Pips show the type-ahead buffer: filled = commands queued ahead of
@@ -1747,6 +1688,7 @@
 
       <TextBox Grid.Column="2"
                x:Name="CommandInput"
+               controls:PresetChrome.Surface="textbox"
                AutomationProperties.Name="Command input"
                AutomationProperties.AutomationId="CommandInput"
                AutomationProperties.HelpText="Type game commands here and press Enter to send them to the game."

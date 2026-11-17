@@ -66,6 +66,8 @@ On every relevant state change, [OnStateChanged](../src/Genie.Core/Mapper/AutoMa
 
 Once matched, `ServerRoomId` is stamped (when learning is on) so future visits resolve via (a) in O(1). An index (`RebuildIndex`) keeps fingerprint→nodes and serverRoomId→node lookups warm.
 
+**Boundary stubs.** When the matched node is a cross-zone connector (its note names another map, e.g. `note="Map66_Shard_to_Gondola_Area.xml|E Gate"`), the engine loads that map through the host's `LinkedZoneLoader` and re-resolves the room there, in the same room update (`FollowLinkedZone`). So `$zoneid`/`$roomid` already name the new zone when a script reacts to the arrival — travel.cmd and uber.cmd check `$zoneid` the moment `#goto` reports `YOU HAVE ARRIVED` (#426). The stub itself is passed as the arrival hint, follow happens once per update (no bouncing back through the new zone's own stub), and it is skipped while the view is browsing another map. The mapper window then catches up on the UI thread without reloading the zone. The same follow runs when the room can't be placed at all but a stub in the active zone has its title (walking through a gate with no arc onto the stub): `SignalRoomNotFound` tries that stub's note first and only asks the host for a zone if none can be followed.
+
 ## Pathfinding
 
 [FindPath(start, destination)](../src/Genie.Core/Mapper/AutoMapperEngine.cs#L547) is **Dijkstra** over the exit graph of the active zone. Edges are **weighted** (`EdgeCost` / `IntraZoneEdgeCost`): cost = `1` baseline `+ (rt + 1)/2` when the exit has an authored `RtCost` — otherwise a verb-inferred effort penalty (`EffortPenalty`: swim/climb moves cost more, scaled down by the character's Athletics rank) — `+ waitAvg/30` for scheduled waits (boats). A brutal high-RT swim costs as much as ~8 dry rooms, so a nearby bridge or gate wins the route. Each exit is gated by [ExitRequirement.Parse(exit.Requires).IsMet(Skills, CharacterClass, CharacterLevel)](../src/Genie.Core/Mapper/ExitRequirement.cs) — an exit the character can't take (climb wall below the skill threshold, guild-locked door, level gate) is excluded entirely. When `Skills` is null (no character data), every exit passes and the result matches a plain BFS. It returns the ordered list of `MoveCommand` strings to send.
@@ -104,6 +106,21 @@ For a cross-zone hop with a known wait window (boats, ferries), `AutoWalkService
 ## Drawing geometry
 
 Zone XML stores room and label positions in **Genie 4 map pixels**, and the canvas draws them through [MapProjection](../src/Genie.Core/Mapper/MapProjection.cs) — one transform shared by paint, hit-testing, drag and layout. Genie 4 draws every room as a 9px box centred on its raw pixel and its snap-to-grid step is 10px, so the community maps are authored on a **10px grid** (the Crossing has 623 rooms on an odd ten). Genie 5 scales that space by 1.1 per zoom unit (a 20px pitch becomes 22px) and keeps Genie 4's ratios: boxes are 9 map-px, label text is Genie 4's default font size, label rectangles are 15 map-px tall, and labels are anchored top-left at their raw pixel in the *same* space as the rooms. The canvas is sized from the rooms **and** the visible labels' measured rectangles, so label text past the outermost room is never clipped. Dragging a room in edit mode writes `MapNode.PixelX/PixelY` back with the 10px snap ("Snap" toggle) or to the pixel; the derived 20px grid cell `MapNode.X/Y` is only what the automapper *places* new rooms on. `MapProjectionTests` pins the ratios and sweeps every installed zone for stacked rooms and clipped labels.
+
+### Colours
+
+The canvas draws from Genie 4's `automapper.*` presets through
+`MapPalette` (built by `MapperViewModel.RefreshPalette`, bound to
+`MapCanvas.Palette`): each preset's foreground on the current floor and its
+background on the ghost floors (faded by `AutoMapperAlpha`), matching
+Genie 4's `MapForm`. A preset change fires `UserHighlights.RulesChanged`,
+which rebuilds the palette. The preset is the only store for these colours:
+the Details pickers, `#mapper color bg|text` and `ApplyLayout` all write
+`automapper.panel` through `PresetColorStore`, and the old
+`DisplaySettings.MapBackgroundHex` / `MapTextHex` are read once by
+`MapperViewModel.MigrateLegacyColours` and cleared. `automapper.path` is in
+the palette but unused until the map shows a walk path. Tests:
+`MapPresetsHeadlessTests`.
 
 ### Legend
 

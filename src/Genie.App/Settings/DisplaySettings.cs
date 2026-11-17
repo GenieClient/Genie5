@@ -40,28 +40,42 @@ public sealed class DisplaySettings : ReactiveObject
     /// survive relaunches). Empty/unknown falls back to "Dark".
     /// </summary>
     [Reactive] public string ThemeName { get; set; } = "Dark";
-    [Reactive] public string EchoColorHex  { get; set; } = "#88BBCC";
     [Reactive] public bool   EchoItalic    { get; set; } = true;
     [Reactive] public string FontFamily    { get; set; } = "Consolas,Courier New,monospace";
     [Reactive] public double FontSize      { get; set; } = 13d;
 
     /// <summary>
-    /// Background colour of the Mapper canvas. User-editable via a
-    /// ColorPickerButton in the Mapper panel's Details expander. Defaults to
-    /// PaleGoldenrod (#EEE8AA) — the cream/tan Genie 4 AutoMapper canvas the
-    /// map palette (black cardinal lines, blue cross-zone borders) is designed
-    /// for. The old dark default (#1A1A1A) is migrated to this on load (see
-    /// <c>MapperViewModel.AttachDisplay</c>) so existing users get the look
-    /// without losing a genuinely custom colour.
+    /// Legacy: the Mapper canvas background before it moved into the
+    /// <c>automapper.panel</c> preset (public #406). Read once on upgrade: a
+    /// colour the user picked is copied into the preset, then this is cleared
+    /// and no longer written. Null in a current display.json.
     /// </summary>
-    [Reactive] public string MapBackgroundHex { get; set; } = "#EEE8AA";
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MapBackgroundHex { get; set; }
 
     /// <summary>
-    /// Colour of the map's on-canvas <c>&lt;label&gt;</c> text (landmark names).
-    /// User-editable via a ColorPickerButton in the Mapper panel's Details
-    /// expander. Defaults to black — Genie 4's label colour on the tan canvas.
+    /// Legacy: the map's label text colour before it moved into the
+    /// <c>automapper.panel</c> preset (public #406). Migrated and cleared like
+    /// <see cref="MapBackgroundHex"/>.
     /// </summary>
-    [Reactive] public string MapTextHex { get; set; } = "#000000";
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MapTextHex { get; set; }
+
+    /// <summary>The one-time ui.* preset upgrade has run (public #406): saved
+    /// presets holding Genie 4's stock chrome colours were set to Default. See
+    /// <c>MainWindowViewModel.UpgradeUiPresets</c>.</summary>
+    public bool UiPresetsUpgraded { get; set; }
+
+    /// <summary>The one-time vitals preset upgrade has run (public #406): saved
+    /// health/mana/stamina/spirit/concentration presets still holding Genie 5's
+    /// old stock colours were reset to the current defaults. See
+    /// <see cref="Settings.StockPresetUpgrade"/>.</summary>
+    public bool VitalsPresetsUpgraded { get; set; }
+
+    /// <summary>The one-time roundtime preset upgrade has run: a saved
+    /// <c>roundtime</c> preset still holding Genie 5's old stock Aqua on
+    /// <c>#00004B</c> was reset to the current default (MediumBlue, Genie 4's).</summary>
+    public bool RoundtimePresetUpgraded { get; set; }
 
     /// <summary>Show the on-map colour legend (#157). Default on.</summary>
     [Reactive] public bool   ShowMapLegend { get; set; } = true;
@@ -125,6 +139,16 @@ public sealed class DisplaySettings : ReactiveObject
     /// View → Magic Panels.
     /// </summary>
     [Reactive] public bool   ShowMagicPanels { get; set; } = true;
+
+    /// <summary>
+    /// Combined spell timer: off (default) keeps Genie 4's two widgets, the
+    /// "(N) Spell" label counting up and the separate cast bar counting down.
+    /// On, the spell box itself is the cast bar: it fills with the
+    /// <c>castbar</c> preset and empties over the prep time, and the seconds
+    /// left go on the end of the label, "(N) Spell (M)". Toggle via
+    /// Layout → Combined Spell Timer; rides on saved layouts.
+    /// </summary>
+    [Reactive] public bool   CombinedSpellTimer { get; set; }
 
     /// <summary>
     /// Whether the optional zone/room location line (the mapper's current zone
@@ -272,10 +296,50 @@ public sealed class DisplaySettings : ReactiveObject
     /// during ordinary play. <c>true</c> = the badge stays in whichever
     /// position <see cref="RoundTimeOnHandsStrip"/> picks, dimmed and
     /// reading 0.0s when idle, so the input row never jumps sideways as RT
-    /// starts and ends. Toggle via Layout → Roundtime Position → Keep Visible.
+    /// starts and ends. Toggle via Layout → Roundtime → Keep Visible.
     /// Also rides on saved layouts (<c>SavedLayout.KeepRoundTimeVisible</c>).
     /// </summary>
     [Reactive] public bool   KeepRoundTimeVisible { get; set; }
+
+    /// <summary>The <see cref="RoundTimeStyle"/> values (#404).</summary>
+    public static class RoundTimeStyles
+    {
+        /// <summary>The red "⏱ N.Ns" badge, no fill — the default.</summary>
+        public const string Badge          = "Badge";
+        /// <summary>The same red badge with a fill behind the timer that shrinks
+        /// from full to empty over the RT.</summary>
+        public const string CountdownBadge = "CountdownBadge";
+        /// <summary>Genie 4's bar: shrinking fill with the seconds left on it,
+        /// coloured by the <c>roundtime</c> preset.</summary>
+        public const string CountdownBar   = "CountdownBar";
+
+        /// <summary>A known style, or <see cref="Badge"/> for anything else.</summary>
+        public static string Normalize(string? s) => s switch
+        {
+            CountdownBadge => CountdownBadge,
+            CountdownBar   => CountdownBar,
+            _              => Badge,
+        };
+    }
+
+    /// <summary>
+    /// How the roundtime indicator is drawn (#404), in whichever position
+    /// <see cref="RoundTimeOnHandsStrip"/> picks. One of
+    /// <see cref="RoundTimeStyles"/>: <c>Badge</c> (default, the red text
+    /// badge), <c>CountdownBadge</c> (that badge with a fill that shrinks over
+    /// the RT) or <c>CountdownBar</c> (Genie 4's bar, coloured by the
+    /// <c>roundtime</c> preset: foreground = fill, background = track). Pick via
+    /// Layout → Roundtime. Also rides on saved layouts
+    /// (<c>SavedLayout.RoundTimeStyle</c>).
+    /// </summary>
+    [Reactive] public string RoundTimeStyle { get; set; } = RoundTimeStyles.Badge;
+
+    /// <summary>Menu radio / visibility helpers for <see cref="RoundTimeStyle"/>.</summary>
+    [JsonIgnore] public bool RoundTimeStyleBadge          => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.Badge;
+    [JsonIgnore] public bool RoundTimeStyleCountdownBadge => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.CountdownBadge;
+    [JsonIgnore] public bool RoundTimeStyleCountdownBar   => RoundTimeStyles.Normalize(RoundTimeStyle) == RoundTimeStyles.CountdownBar;
+    /// <summary>Either badge style (the red badge is shown, with or without fill).</summary>
+    [JsonIgnore] public bool RoundTimeStyleAnyBadge       => !RoundTimeStyleCountdownBar;
 
     /// <summary>
     /// Where the Script Bar (the running-script chip strip) docks.
@@ -411,7 +475,6 @@ public sealed class DisplaySettings : ReactiveObject
         PushAll();
         this.WhenAnyValue(
                 x => x.GameColorHex,
-                x => x.EchoColorHex,
                 x => x.EchoItalic,
                 x => x.FontFamily,
                 x => x.FontSize,
@@ -473,6 +536,16 @@ public sealed class DisplaySettings : ReactiveObject
         this.WhenAnyValue(x => x.RoundTimeOnHandsStrip)
             .Subscribe(_ => this.RaisePropertyChanged(nameof(RoundTimeOnCommandBar)));
 
+        // Same for the derived RoundTimeStyle flags (#404).
+        this.WhenAnyValue(x => x.RoundTimeStyle)
+            .Subscribe(_ =>
+            {
+                this.RaisePropertyChanged(nameof(RoundTimeStyleBadge));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleCountdownBadge));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleCountdownBar));
+                this.RaisePropertyChanged(nameof(RoundTimeStyleAnyBadge));
+            });
+
         // Same for ScriptBarAtTop (JsonIgnore + derived) so the Layout menu's
         // Top radio button refreshes when the position flips (#357).
         // #349: the Icon Bar / vitals strip compound slot flags are computed,
@@ -505,7 +578,10 @@ public sealed class DisplaySettings : ReactiveObject
         if (res is null) return;
 
         res[GameBrushKey]      = MakeBrush(GameColorHex, fallback: Colors.LightGray);
-        res[EchoBrushKey]      = MakeBrush(EchoColorHex, fallback: Color.FromRgb(0x88, 0xbb, 0xcc));
+        // Echo lines are coloured by their preset (inputuser / inputother /
+        // scriptecho, public #406); this is only the colour for a preset set to
+        // "Default", which — as for every preset — is the normal text colour.
+        res[EchoBrushKey]      = MakeBrush(GameColorHex, fallback: Colors.LightGray);
         res[GameFontFamilyKey] = new FontFamily(FontFamily);
         res[GameFontSizeKey]   = FontSize;
         res[EchoFontStyleKey]  = EchoItalic ? Avalonia.Media.FontStyle.Italic : Avalonia.Media.FontStyle.Normal;

@@ -277,7 +277,21 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
             check:  (f, ct)         => CheckOneAsync(f,  Kind.Maps,    ct),
             apply:  (f, prog, ct)   => ApplyOneAsync(f,  Kind.Maps,    prog, ct),
             toggle: (f, on)         => ToggleFeed(f, on),
-            remove: f               => RemoveFeed(f, Kind.Maps));
+            remove: f               => RemoveFeed(f, Kind.Maps),
+            saveMapFolders: SaveMapFolders);
+
+    /// <summary>A Maps row's Festivals / Quests checkbox flipped — the row
+    /// already wrote the flag onto its <see cref="FeedEntry"/>; persist it.</summary>
+    private void SaveMapFolders(FeedEntry feed)
+    {
+        _store.Save(_config);
+        var on = new List<string>(2);
+        if (feed.IncludeFestivalMaps) on.Add("festival");
+        if (feed.IncludeQuestMaps)    on.Add("quest");
+        Status = on.Count == 0
+            ? $"'{feed.Name}' pulls the root folder only."
+            : $"'{feed.Name}' also pulls its {string.Join(" and ", on)} maps on the next Update.";
+    }
 
     private UpdateFeedRow BuildPluginsRow(FeedEntry feed) =>
         new(feed,
@@ -426,12 +440,12 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
     {
         if (kind == Kind.Maps)
         {
-            // One single-source MapsUpdater per row. The CheckAsync uses the
-            // existing source's blob-sha skip optimization, so re-checking
-            // is cheap even with many feeds.
-            return new MapsUpdater(
-                _zoneRepo, _mapsDir,
-                new[] { (IFileListSource)MakeFileListSource(feed) });
+            // One MapsUpdater per row: the feed's root folder plus any
+            // festival / quest subfolder the row opted into (root first, so
+            // a zone copied to the root for an event wins over the subfolder
+            // copy). CheckAsync uses the source's blob-sha skip optimization,
+            // so re-checking is cheap even with many feeds.
+            return new MapsUpdater(_zoneRepo, _mapsDir, MapsFeedSources.Create(feed));
         }
         else if (kind == Kind.Scripts)
         {
@@ -452,11 +466,6 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
                 channel:    _config.Core.Channel);
         }
     }
-
-    private static IFileListSource MakeFileListSource(FeedEntry feed) =>
-        feed.Kind.Equals("github-contents", StringComparison.OrdinalIgnoreCase)
-            ? new GithubContentsSource(feed.Owner, feed.Repo, feed.Path, feed.Extension)
-            : throw new NotSupportedException($"Maps source kind '{feed.Kind}' is not supported yet.");
 
     /// <summary>
     /// Scripts sources are github-tree (recursive) by default; a hand-edited

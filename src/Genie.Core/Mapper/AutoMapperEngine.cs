@@ -208,6 +208,29 @@ public sealed class AutoMapperEngine
     /// </summary>
     public Func<string, string, IReadOnlyCollection<string>, bool>? ForeignRoomProbe { get; set; }
 
+    /// <summary>
+    /// Host-supplied (#426): zone file name (no extension, e.g.
+    /// <c>Map66_Shard_to_Gondola_Area</c>) → that zone, or null to stay put
+    /// (missing file, or it is already the active zone). When set, a room
+    /// update that lands on a boundary stub (<see cref="MapNode.IsCrossZone"/>)
+    /// loads the stub's zone and re-resolves there in the same update, so
+    /// <c>$zoneid</c>/<c>$roomid</c> already name the new zone when a script
+    /// reacts to the arrival. Called on the thread that delivers room updates.
+    /// </summary>
+    public Func<string, MapZone?>? LinkedZoneLoader { get; set; }
+
+    /// <summary>
+    /// Raised just before the engine switches to a stub's zone
+    /// (see <see cref="LinkedZoneLoader"/>), with the zone file name and the
+    /// zone it is about to load, so the host's view can follow without
+    /// loading the file again.
+    /// </summary>
+    public event Action<string, MapZone>? LinkedZoneFollowing;
+
+    // True while FollowLinkedZone's own LoadZone re-resolves, so a stub in the
+    // new zone can't bounce the engine straight back.
+    private bool _followingLink;
+
     public AutoMapperEngine(MapZone zone)
     {
         _zone = zone;
@@ -669,6 +692,73 @@ public sealed class AutoMapperEngine
         _lastServerRoomId = serverRoomId;
 
         OnRoomChanged(title, description, exits);
+        FollowLinkedZone();
+    }
+
+    /// <summary>
+    /// #426: when the room just resolved is a boundary stub, switch to the
+    /// zone its note names and re-resolve there, before this update returns.
+    /// Skipped while the view is browsing another map (the character's room
+    /// must not drag the view), and while already following.
+    /// </summary>
+    private void FollowLinkedZone()
+    {
+        if (CurrentNode is { IsCrossZone: true } stub) TryFollowStub(stub);
+    }
+
+    /// <summary>
+    /// Switch to the zone <paramref name="stub"/>'s note names and re-resolve
+    /// there, with the stub as the arrival hint. False when there is nothing
+    /// to follow: browsing, already following, no loader, no <c>.xml</c> note,
+    /// or the host can't supply the zone.
+    /// </summary>
+    private bool TryFollowStub(MapNode stub)
+    {
+        if (_followingLink || ViewIsBrowsing || LinkedZoneLoader is null) return false;
+
+        string? file = null;
+        foreach (var token in stub.Notes.Split('|'))
+        {
+            var t = token.Trim();
+            if (t.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+            {
+                file = Path.GetFileNameWithoutExtension(t);
+                break;
+            }
+        }
+        if (string.IsNullOrEmpty(file)) return false;
+
+        var zone = LinkedZoneLoader(file);
+        if (zone is null) return false;
+
+        Diagnostics?.Invoke($"[mapper]   -> stub #{stub.Id} links to '{file}'; switching zones");
+        LinkedZoneFollowing?.Invoke(file, zone);
+        _followingLink = true;
+        try { LoadZone(zone, stub); }
+        finally { _followingLink = false; }
+        return true;
+    }
+
+    /// <summary>
+    /// The room couldn't be placed in the active zone. Walking through a gate
+    /// with no arc onto its boundary stub ends here rather than on the stub,
+    /// so a stub with this title is tried first: its note names the zone the
+    /// room belongs to, and following it now keeps <c>$zoneid</c> right for
+    /// the script's next line, as landing on the stub does (#426). With no
+    /// such stub the placement is cleared and the host is asked for a zone.
+    /// </summary>
+    private void SignalRoomNotFound(string serverRoomId, string title, IReadOnlyCollection<string> exits)
+    {
+        if (!string.IsNullOrWhiteSpace(title))
+            foreach (var n in _zone.Nodes.Values)
+                if (n.IsCrossZone &&
+                    string.Equals(n.Title, title, StringComparison.OrdinalIgnoreCase) &&
+                    TryFollowStub(n))
+                    return;
+
+        CurrentNode = null;
+        CurrentNodeChanged?.Invoke();
+        RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
     }
 
     private string DescribePending() =>
@@ -1036,9 +1126,7 @@ public sealed class AutoMapperEngine
             Diagnostics?.Invoke(
                 $"[mapper]   -> NO MATCH in zone '{_zone.Name}' (was {DescribeCurrent()}, " +
                 $"moved '{DescribePending()}'); asking host to find a zone for this room");
-            CurrentNode = null;
-            CurrentNodeChanged?.Invoke();
-            RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
+            SignalRoomNotFound(serverRoomId, title, exits);
             return;
         }
         else if (!_zoneEverLoaded)
@@ -1056,9 +1144,7 @@ public sealed class AutoMapperEngine
             // (called on a successful auto-detect, a manual pick, or "New
             // Zone") flips _zoneEverLoaded permanently, so this only ever
             // gates the very first, otherwise-orphaned room of a session.
-            CurrentNode = null;
-            CurrentNodeChanged?.Invoke();
-            RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
+            SignalRoomNotFound(serverRoomId, title, exits);
             return;
         }
         else if (_zone.Nodes.Count > 0 &&
@@ -1092,9 +1178,7 @@ public sealed class AutoMapperEngine
             Diagnostics?.Invoke(
                 $"[mapper]   -> NO MATCH in zone '{_zone.Name}' and no walk evidence " +
                 $"(was {DescribeCurrent()}); deferring record, asking host for a zone");
-            CurrentNode = null;
-            CurrentNodeChanged?.Invoke();
-            RoomNotFoundInZone?.Invoke(serverRoomId, title, exits);
+            SignalRoomNotFound(serverRoomId, title, exits);
             return;
         }
         else

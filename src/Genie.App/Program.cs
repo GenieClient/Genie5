@@ -36,7 +36,12 @@ internal static class Program
 
         try
         {
-            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            // The guard goes on once Avalonia has set its dispatcher up;
+            // touching Dispatcher.UIThread any earlier would create it
+            // before the platform is chosen.
+            BuildAvaloniaApp()
+                .AfterSetup(_ => InstallUiCrashGuard(Avalonia.Threading.Dispatcher.UIThread, new UiCrashGuard()))
+                .StartWithClassicDesktopLifetime(args);
         }
         catch (Exception ex)
         {
@@ -153,6 +158,28 @@ internal static class Program
         {
             return Path.Combine(AppContext.BaseDirectory, "genie_crash.log");
         }
+    }
+
+    /// <summary>
+    /// Last resort for the UI thread: one exception nothing caught is logged
+    /// and the session carries on; a burst still closes the app (see
+    /// <see cref="UiCrashGuard"/>). Public #398 / #399. Returns the handler so
+    /// a test can take it off again; <paramref name="log"/> defaults to the crash
+    /// log.
+    /// </summary>
+    internal static Avalonia.Threading.DispatcherUnhandledExceptionEventHandler InstallUiCrashGuard(
+        Avalonia.Threading.Dispatcher dispatcher, UiCrashGuard guard,
+        Action<string, Exception>? log = null)
+    {
+        log ??= WriteCrash;
+        Avalonia.Threading.DispatcherUnhandledExceptionEventHandler handler = (_, e) =>
+        {
+            var survive = guard.ShouldSurvive(DateTime.UtcNow);
+            log(survive ? "UiThread.Survived" : "UiThread.Burst", e.Exception);
+            e.Handled = survive;
+        };
+        dispatcher.UnhandledException += handler;
+        return handler;
     }
 
     private static void InstallCrashLogger()

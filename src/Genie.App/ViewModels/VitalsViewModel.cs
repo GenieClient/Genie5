@@ -20,6 +20,16 @@ public class VitalsViewModel : ReactiveObject
     [Reactive] public double RoundTimeSeconds { get; private set; }
     [Reactive] public bool   InRoundTime      { get; private set; }
 
+    /// <summary>The roundtime the countdown bar started from (#404), so its fill
+    /// is remaining ÷ starting RT, as in Genie 4's <c>ComponentRoundtime</c>
+    /// (<c>width / StartRT * RT</c>). Reset by <see cref="SeedRoundTimeTotal"/>.</summary>
+    [Reactive] public double RoundTimeTotalSeconds { get; private set; } = 1;
+
+    /// <summary>The number drawn on the countdown bar (#404): whole seconds left,
+    /// rounded up so it reads N at the start and 1 in the last second, and blank
+    /// with no roundtime, like Genie 4's <c>LabelRT</c>.</summary>
+    [Reactive] public string RoundTimeLabel { get; private set; } = "";
+
     /// <summary>Commands currently typed ahead of the game (sent, awaiting a
     /// prompt). Drives the filled pips in the command-bar type-ahead counter.</summary>
     [Reactive] public int    TypeAheadInFlight { get; private set; }
@@ -53,6 +63,24 @@ public class VitalsViewModel : ReactiveObject
     /// so the fill ratio is stable even though Remaining ticks down. Reseeded
     /// on every new CastTimeEvent (mirrors Genie 4's <c>StartRT</c>).</summary>
     [Reactive] public int    CastBarSecondsTotal     { get; private set; }
+
+    /// <summary><see cref="CastBarSecondsRemaining"/> with the fraction kept, so
+    /// the combined spell box's fill slides smoothly instead of stepping once a
+    /// second. Zero whenever prep is complete or no spell is held.</summary>
+    [Reactive] public double CastBarSecondsExact     { get; private set; }
+
+    /// <summary>The <see cref="CastBarSecondsExact"/> value captured when the
+    /// prep started — the combined spell box's <c>Maximum</c>. Seeded with the
+    /// fraction so a 5.9 s prep starts at 5.9 / 5.9 instead of being clamped full
+    /// against a truncated 5 until it drops below 5 (#420 review). The plain cast
+    /// bar keeps whole seconds over <see cref="CastBarSecondsTotal"/>.</summary>
+    [Reactive] public double CastBarSecondsTotalExact { get; private set; }
+
+    /// <summary>The combined spell box's text (Layout → Combined Spell Timer):
+    /// <see cref="PreparedSpellLabel"/> with the prep seconds left on the end,
+    /// "(N) Name (M)", while the spell is still preparing; the plain label once
+    /// it is ready.</summary>
+    [Reactive] public string PreparedSpellCountdownLabel { get; private set; } = "";
 
     /// <summary>True while the bar is actively counting down — drives the bar's
     /// visibility so it disappears once prep is complete.</summary>
@@ -147,6 +175,10 @@ public class VitalsViewModel : ReactiveObject
         // visual bar interpolates) and the spell-elapsed (N) prefix counter.
         _ticker = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _ticker.Tick += (_, _) => Tick();
+
+        this.WhenAnyValue(x => x.PreparedSpellLabel, x => x.CastBarSecondsRemaining, x => x.IsPrepping)
+            .Subscribe(t => PreparedSpellCountdownLabel =
+                t.Item3 && t.Item1.Length > 0 ? $"{t.Item1} ({t.Item2})" : t.Item1);
     }
 
     public void Attach(GenieCore core)
@@ -200,9 +232,7 @@ public class VitalsViewModel : ReactiveObject
                 // Ordering is safe: the engine applies events synchronously on
                 // the pipeline thread; this handler runs after the
                 // MainThreadScheduler hop.
-                _rtExpiresAt = core.State.Combat.RoundTimeEnd;
-                RecomputeRt();
-                StartTickerIfNeeded();
+                ApplyRoundTimeEnd(core.State.Combat.RoundTimeEnd);
             });
 
         // ── Spell preparation bar ─────────────────────────────────────────
@@ -217,47 +247,12 @@ public class VitalsViewModel : ReactiveObject
             {
                 // Trigger-only, same as the RT handler above: the clock-offset-
                 // corrected instant lives in GameState (#261).
-                _castExpiresAt = core.State.Combat.CastTimeEnd;
-                // Seed both Total and Remaining with the same value so the
-                // bar starts at 100% full and ticks down from there. This
-                // mirrors ComponentRoundtime.SetRT(secondsRemaining) which
-                // assigns both RT and StartRT in one shot.
-                RecomputeCastBar(seedTotal: true);
-                StartTickerIfNeeded();
+                ApplyCastTimeEnd(core.State.Combat.CastTimeEnd);
             });
 
         core.GameEvents.OfType<SpellEvent>()
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(e =>
-            {
-                var name = e.SpellName ?? "";
-                PreparedSpell = name;
-
-                // Genie 4 parity: anything other than literal "None" counts as
-                // an active spell. Empty string is also treated as cleared in
-                // case the parser ever emits one (the canonical clear payload
-                // from the server is "None").
-                var isCleared = string.IsNullOrEmpty(name) ||
-                                name.Equals("None", StringComparison.OrdinalIgnoreCase);
-
-                if (isCleared)
-                {
-                    _spellPreparedAtWallClock = null;
-                    _castExpiresAt            = DateTimeOffset.MinValue;
-                    SpellElapsedSeconds       = 0;
-                    CastBarSecondsRemaining   = 0;
-                    CastBarSecondsTotal       = 0;
-                    IsPrepping                = false;
-                    PreparedSpellLabel        = "";
-                }
-                else
-                {
-                    _spellPreparedAtWallClock = DateTime.UtcNow;
-                    SpellElapsedSeconds       = 0;
-                    UpdateSpellLabel();
-                    StartTickerIfNeeded();
-                }
-            });
+            .Subscribe(e => ApplyPreparedSpell(e.SpellName));
 
         core.GameEvents.OfType<HeldItemEvent>()
             .ObserveOn(RxApp.MainThreadScheduler)
@@ -417,10 +412,38 @@ public class VitalsViewModel : ReactiveObject
         {
             RoundTimeSeconds = 0;
             InRoundTime      = false;
+            RoundTimeLabel   = "";
             return;
         }
         RoundTimeSeconds = remaining;
         InRoundTime      = true;
+        RoundTimeLabel   = ((int)Math.Ceiling(remaining)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>A roundtime ending at <paramref name="expiresAt"/> (local clock,
+    /// already offset-corrected) arrived: reseed the bar if needed, update the
+    /// countdown and start the ticker. Internal so tests can drive it.</summary>
+    internal void ApplyRoundTimeEnd(DateTimeOffset expiresAt)
+    {
+        _rtExpiresAt = expiresAt;
+        SeedRoundTimeTotal();
+        RecomputeRt();
+        StartTickerIfNeeded();
+    }
+
+    /// <summary>
+    /// A new roundtime arrived: decide whether the countdown bar starts again
+    /// from full (#404). Genie 4 (<c>FormMain.cs</c> L6488) restarts the bar only
+    /// when there is no roundtime running or the new one is more than a second
+    /// longer than what is left, so a re-sent or shorter RT keeps the bar's
+    /// current scale instead of jumping back to full.
+    /// </summary>
+    private void SeedRoundTimeTotal()
+    {
+        var remaining = (_rtExpiresAt - DateTimeOffset.UtcNow).TotalSeconds;
+        if (remaining <= 0) return;
+        if (!InRoundTime || remaining > RoundTimeSeconds + 1 || remaining > RoundTimeTotalSeconds)
+            RoundTimeTotalSeconds = remaining;
     }
 
     /// <summary>
@@ -435,12 +458,15 @@ public class VitalsViewModel : ReactiveObject
         if (_castExpiresAt == DateTimeOffset.MinValue)
         {
             CastBarSecondsRemaining = 0;
+            CastBarSecondsExact     = 0;
             IsPrepping              = false;
             return;
         }
 
-        var rem = (int)Math.Max(0, (_castExpiresAt - DateTimeOffset.UtcNow).TotalSeconds);
+        var exact = Math.Max(0, (_castExpiresAt - DateTimeOffset.UtcNow).TotalSeconds);
+        var rem = (int)exact;
         CastBarSecondsRemaining = rem;
+        CastBarSecondsExact     = rem > 0 ? exact : 0;
         IsPrepping              = rem > 0;
 
         if (seedTotal)
@@ -449,7 +475,8 @@ public class VitalsViewModel : ReactiveObject
             // avoid divide-by-zero in any percentage-style rendering. A
             // CastTime that's already in the past (replay mode) leaves
             // Total=1 and Remaining=0, so the bar paints empty.
-            CastBarSecondsTotal = Math.Max(1, rem);
+            CastBarSecondsTotal      = Math.Max(1, rem);
+            CastBarSecondsTotalExact = rem > 0 ? exact : 1;
         }
 
         if (!IsPrepping)
@@ -489,6 +516,53 @@ public class VitalsViewModel : ReactiveObject
             return;
         }
         PreparedSpellLabel = $"({SpellElapsedSeconds}) {PreparedSpell}";
+    }
+
+    /// <summary>A <c>&lt;castTime&gt;</c> arrived: seed the cast bar from full.
+    /// Seed both Total and Remaining with the same value so the bar starts at
+    /// 100% full and ticks down from there. This mirrors
+    /// ComponentRoundtime.SetRT(secondsRemaining) which assigns both RT and
+    /// StartRT in one shot. Tests call it directly.</summary>
+    internal void ApplyCastTimeEnd(DateTimeOffset expiresAt)
+    {
+        _castExpiresAt = expiresAt;
+        RecomputeCastBar(seedTotal: true);
+        StartTickerIfNeeded();
+    }
+
+    /// <summary>A <c>&lt;spell&gt;</c> arrived: start or clear the prepared-spell
+    /// timer. Tests call it directly.</summary>
+    internal void ApplyPreparedSpell(string? spellName)
+    {
+        var name = spellName ?? "";
+        PreparedSpell = name;
+
+        // Genie 4 parity: anything other than literal "None" counts as
+        // an active spell. Empty string is also treated as cleared in
+        // case the parser ever emits one (the canonical clear payload
+        // from the server is "None").
+        var isCleared = string.IsNullOrEmpty(name) ||
+                        name.Equals("None", StringComparison.OrdinalIgnoreCase);
+
+        if (isCleared)
+        {
+            _spellPreparedAtWallClock = null;
+            _castExpiresAt            = DateTimeOffset.MinValue;
+            SpellElapsedSeconds       = 0;
+            CastBarSecondsRemaining   = 0;
+            CastBarSecondsExact       = 0;
+            CastBarSecondsTotal       = 0;
+            CastBarSecondsTotalExact  = 0;
+            IsPrepping                = false;
+            PreparedSpellLabel        = "";
+        }
+        else
+        {
+            _spellPreparedAtWallClock = DateTime.UtcNow;
+            SpellElapsedSeconds       = 0;
+            UpdateSpellLabel();
+            StartTickerIfNeeded();
+        }
     }
 
     // ── Timer lifecycle ───────────────────────────────────────────────────

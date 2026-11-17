@@ -72,34 +72,93 @@ public partial class MapperViewModel : ReactiveObject
     /// </summary>
     public ObservableCollection<string> CurrentObviousExits { get; } = new();
 
-    // ── Map canvas background (user-customisable) ─────────────────────────
+    // ── Map colours: the automapper.* presets (public #406) ───────────────
     /// <summary>
-    /// User-chosen background colour for the map canvas. Bound to a
-    /// ColorPickerButton in the Details expander. Setting it updates the
-    /// derived <see cref="MapBackgroundBrush"/> and is persisted to
-    /// <c>display.json</c> via the injected <see cref="DisplaySettings"/>.
+    /// The map's colours, built from the <c>automapper.*</c> presets and bound to
+    /// <see cref="Controls.MapCanvas.Palette"/>. Rebuilt whenever presets change
+    /// (Presets tab, the pickers below, <c>#mapper color</c>, a layout, a reload).
     /// </summary>
-    [Reactive] public Color  MapBackground      { get; set; } = Color.Parse("#EEE8AA");
+    [Reactive] public Controls.MapPalette Palette { get; private set; } = Controls.MapPalette.Stock;
 
     /// <summary>
-    /// Derived brush bound to <see cref="Controls.MapCanvas.MapBackgroundBrush"/>.
-    /// Recomputed whenever <see cref="MapBackground"/> changes so the canvas
-    /// repaints live as the user drags through the colour picker.
+    /// Reads and writes the presets. Set by <c>MainWindowViewModel</c>: the shared
+    /// presets file at startup, the session's store once Genie's engine is built.
     /// </summary>
-    [Reactive] public IBrush MapBackgroundBrush { get; private set; } = new SolidColorBrush(Color.Parse("#EEE8AA"));
+    public PresetColorStore? PresetStore
+    {
+        get => _presetStore;
+        set { _presetStore = value; RefreshPalette(); }
+    }
+    private PresetColorStore? _presetStore;
+    private bool _syncingColours;
 
     /// <summary>
-    /// User-chosen colour for the map's on-canvas label text. Bound to a
-    /// ColorPickerButton in the Details expander; persisted to <c>display.json</c>.
+    /// The map background: <c>automapper.panel</c>'s background. Bound to the
+    /// Details panel's picker and set by <c>#mapper color bg</c> and by loading a
+    /// layout; setting it changes the preset (live and on disk).
     /// </summary>
-    [Reactive] public Color  MapTextColor       { get; set; } = Color.Parse("#000000");
+    [Reactive] public Color  MapBackground      { get; set; } = Controls.MapPalette.Stock.Background;
+
+    /// <summary>The map background as a brush, for the panel behind the canvas.</summary>
+    [Reactive] public IBrush MapBackgroundBrush { get; private set; } = new SolidColorBrush(Controls.MapPalette.Stock.Background);
 
     /// <summary>
-    /// Derived brush bound to <see cref="Controls.MapCanvas.LabelTextBrush"/>.
-    /// Recomputed whenever <see cref="MapTextColor"/> changes so labels repaint
-    /// live as the user drags the colour picker.
+    /// The map's label text: <c>automapper.panel</c>'s colour. Bound to the
+    /// Details panel's picker and set by <c>#mapper color text</c>; setting it
+    /// changes the preset.
     /// </summary>
-    [Reactive] public IBrush MapTextBrush       { get; private set; } = new SolidColorBrush(Color.Parse("#000000"));
+    [Reactive] public Color  MapTextColor       { get; set; } = Controls.MapPalette.Stock.Text;
+
+    /// <summary>Rebuild <see cref="Palette"/> from the presets and show its
+    /// panel colours in the pickers (without writing them back).</summary>
+    public void RefreshPalette()
+    {
+        var store = _presetStore;
+        Controls.MapPalette palette;
+        if (store is null) palette = Controls.MapPalette.Stock;
+        else
+        {
+            var (fg, bg) = store.Reader();
+            palette = Controls.MapPalette.From(fg, bg);
+        }
+        if (palette == Palette) return;
+        Palette = palette;
+        _syncingColours = true;
+        try
+        {
+            MapBackground      = palette.Background;
+            MapTextColor       = palette.Text;
+            MapBackgroundBrush = new SolidColorBrush(palette.Background);
+        }
+        finally { _syncingColours = false; }
+    }
+
+    /// <summary>
+    /// One-time upgrade (public #406): a map background or text colour picked in
+    /// an earlier Genie 5 (kept in <c>display.json</c>) moves into
+    /// <c>automapper.panel</c>, so the map looks the same afterwards. The old
+    /// defaults (#EEE8AA / #1A1A1A background, #000000 text) weren't picked by
+    /// anyone and leave the preset as it is, so a Genie 4 import keeps its
+    /// colours. The display.json fields are then cleared and no longer written.
+    /// </summary>
+    public static bool MigrateLegacyColours(DisplaySettings display, PresetColorStore store)
+    {
+        static bool Picked(string? hex, params string[] defaults) =>
+            !string.IsNullOrWhiteSpace(hex) &&
+            !defaults.Any(d => d.Equals(hex.Trim(), StringComparison.OrdinalIgnoreCase)) &&
+            Controls.MapPalette.Parse(hex) is not null;
+
+        if (display.MapBackgroundHex is null && display.MapTextHex is null) return false;
+
+        var bg   = Picked(display.MapBackgroundHex, "#EEE8AA", "#1A1A1A") ? display.MapBackgroundHex!.Trim() : null;
+        var text = Picked(display.MapTextHex, "#000000")                  ? display.MapTextHex!.Trim()       : null;
+        if (bg is not null || text is not null)
+            store.Set(Controls.MapPalette.PanelPreset, text, bg);
+
+        display.MapBackgroundHex = null;
+        display.MapTextHex       = null;
+        return true;
+    }
 
     /// <summary>
     /// Non-compass arcs from the current room — "go small alleyway",
@@ -936,53 +995,34 @@ public partial class MapperViewModel : ReactiveObject
         this.WhenAnyValue(x => x.MapsDirectory)
             .Subscribe(_ => RecomputeIsGitManaged());
 
-        // Derive MapBackgroundBrush from MapBackground. Persist the hex on
-        // each change so the choice survives restart.
+        // The pickers (and #mapper color, and a layout) edit automapper.panel:
+        // background = map background, colour = label text (public #406). The
+        // preset is the one place the colour is kept; RefreshPalette brings the
+        // change back into Palette.
         this.WhenAnyValue(x => x.MapBackground)
+            .Skip(1)
             .Subscribe(c =>
             {
-                MapBackgroundBrush = new SolidColorBrush(c);
-                if (_display is not null)
-                {
-                    var hex = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
-                    if (!string.Equals(_display.MapBackgroundHex, hex, StringComparison.OrdinalIgnoreCase))
-                    {
-                        _display.MapBackgroundHex = hex;
-                        if (!string.IsNullOrEmpty(_displayPath))
-                        {
-                            try   { _display.Save(_displayPath); }
-                            catch { /* persistence failure isn't fatal */ }
-                        }
-                    }
-                }
+                if (_syncingColours || _presetStore is not { } store || c == Palette.Background) return;
+                store.Set(Controls.MapPalette.PanelPreset, null, Controls.MapPalette.Hex(c));
+            });
+        this.WhenAnyValue(x => x.MapTextColor)
+            .Skip(1)
+            .Subscribe(c =>
+            {
+                if (_syncingColours || _presetStore is not { } store || c == Palette.Text) return;
+                store.Set(Controls.MapPalette.PanelPreset, Controls.MapPalette.Hex(c), null);
             });
 
-        // Same pattern for the label text colour.
-        this.WhenAnyValue(x => x.MapTextColor)
-            .Subscribe(c =>
-            {
-                MapTextBrush = new SolidColorBrush(c);
-                if (_display is not null)
-                {
-                    var hex = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
-                    if (!string.Equals(_display.MapTextHex, hex, StringComparison.OrdinalIgnoreCase))
-                    {
-                        _display.MapTextHex = hex;
-                        if (!string.IsNullOrEmpty(_displayPath))
-                        {
-                            try   { _display.Save(_displayPath); }
-                            catch { /* persistence failure isn't fatal */ }
-                        }
-                    }
-                }
-            });
+        // Any preset change (Presets tab, a reload, a character switch, the
+        // pickers above) repaints the map. RulesChanged can fire off the UI thread.
+        Highlighting.UserHighlights.RulesChanged += () => Dispatcher.UIThread.Post(RefreshPalette);
     }
 
     /// <summary>
     /// Hand the VM its persistent visual settings + the on-disk path. Called
     /// from <c>MainWindowViewModel</c> once <see cref="DisplaySettings"/> has
-    /// loaded. Pre-seeds <see cref="MapBackground"/> from the stored hex and
-    /// keeps the two in sync from then on.
+    /// loaded.
     /// </summary>
     public void AttachDisplay(DisplaySettings display, string displayPath)
     {
@@ -997,19 +1037,8 @@ public partial class MapperViewModel : ReactiveObject
         var sortIdx = Array.IndexOf(ZoneSortKeys, display.MapZoneSort);
         if (sortIdx >= 0) ZoneSortMode = ZoneSortLabels[sortIdx];
 
-        // One-time migration: the old default canvas was dark (#1A1A1A). Genie 4's
-        // AutoMapper uses a PaleGoldenrod (tan) canvas, which the map palette
-        // (black cardinal lines, blue cross-zone borders) is designed for. Treat
-        // the exact old default as "unset" and move it to the tan default so
-        // existing users get the Genie 4 look without losing a genuinely custom
-        // colour they picked. Idempotent — re-running it changes nothing.
-        if (string.Equals(display.MapBackgroundHex, "#1A1A1A", StringComparison.OrdinalIgnoreCase))
-            display.MapBackgroundHex = "#EEE8AA";
-
-        if (Color.TryParse(display.MapBackgroundHex, out var c))
-            MapBackground = c;
-        if (Color.TryParse(display.MapTextHex, out var tc))
-            MapTextColor = tc;
+        // The map colours aren't kept here any more: they're the automapper.*
+        // presets (public #406) — see PresetStore / MigrateLegacyColours.
 
         // Status-bar location line (#66). Zone field follows the user's
         // Zone-name-vs-number setting; Room is always $roomid (the mapper node
@@ -1134,6 +1163,10 @@ public partial class MapperViewModel : ReactiveObject
         // observable's thread.
         _engine.CurrentNodeChanged += () => Dispatcher.UIThread.Post(() =>
         {
+            // The engine may already have followed a boundary stub into the
+            // next zone (#426); bring the view's zone up to date first, so the
+            // bookkeeping below pairs the room with the zone it belongs to.
+            ApplyEngineZoneFollow();
             Refresh();
             if (!BrowsingZone && _engine?.CurrentNode is { } here && !HasZoneNote(here) &&
                 !string.IsNullOrEmpty(SelectedZoneFile))
@@ -1186,13 +1219,18 @@ public partial class MapperViewModel : ReactiveObject
             // e.g. Dirge's Temple Courtyard) has a fingerprint too weak for
             // the auto-load index (2026-08-06 smoke).
             if (n is not null) _lastMatchedZoneFile = SelectedZoneFile;
-            MaybeFollowZoneNote(n);
+            // Boundary stubs are followed by the engine itself, in the same
+            // room update (see LoadLinkedZoneForEngine / #426).
         });
         _engine.MapChanged         += () => Dispatcher.UIThread.Post(Refresh);
         // #251: the engine fires this on the game thread; the handler mutates
         // VM state (BrowsingZone, LoadStatus) and drives zone loads, so marshal
         // the whole body to the UI thread — same as MapChanged above.
         _engine.ForeignRoomProbe = IsRoomInAnotherZone;
+        // #426: the engine follows a boundary stub's note on the game thread,
+        // in the same room update, so $zoneid is right before scripts react.
+        _engine.LinkedZoneLoader    = LoadLinkedZoneForEngine;
+        _engine.LinkedZoneFollowing += OnEngineFollowingZone;
         _engine.RoomNotFoundInZone += (serverId, title, exits) =>
             Dispatcher.UIThread.Post(() => OnRoomNotFoundInZone(serverId, title, exits));
         // Record mode ⇄ the `automapper` config key. The SAVED preference picks
@@ -1328,17 +1366,76 @@ public partial class MapperViewModel : ReactiveObject
     /// boundary. This is the disambiguation a room shared by several maps needs:
     /// the map data itself names the destination zone, removing the ambiguity
     /// that title/fingerprint matching can't resolve.
+    /// <para>
+    /// #426: the switch happens inside the engine, on the game thread, in the
+    /// same room update that landed on the stub — so <c>$zoneid</c> and
+    /// <c>$roomid</c> already name the new zone when a script reacts to the
+    /// arrival. (Switching here on the UI thread, after the room update, let
+    /// travel.cmd / uber.cmd read the old zone and send a second #goto for it.)
+    /// This loader runs on the game thread: it touches only the repository, the
+    /// maps directory and thread-safe fields, never view state.
+    /// </para>
     /// </summary>
-    private void MaybeFollowZoneNote(MapNode? node)
+    private MapZone? LoadLinkedZoneForEngine(string file)
     {
-        // Engine-driven follow (the character walked onto a boundary node):
-        // flag it so FollowZoneNote's zone switch doesn't read as browsing.
-        _followingEngine = true;
-        try { FollowZoneNote(node); }
-        finally { _followingEngine = false; }
+        // Already on it — also stops re-switch flapping.
+        if (string.Equals(file, _engineZoneFile, StringComparison.OrdinalIgnoreCase)) return null;
+        var repo = _zoneRepo;
+        var dir  = MapsDirectory;
+        if (repo is null || string.IsNullOrEmpty(dir)) return null;
+
+        var zone = repo.Load(Path.Combine(dir, file + ".xml"));
+        if (zone is null)
+            _audit?.Note("XZONE", $"boundary note → '{file}' but that zone isn't available");
+        return zone;
     }
 
-    // True while FollowZoneNote runs on behalf of the ENGINE (character
+    /// <summary>Game thread: the engine is about to load <paramref name="zone"/>
+    /// for a boundary stub. Remember it and let the view catch up on the UI
+    /// thread (it must not load the file again — the engine already has it).</summary>
+    private void OnEngineFollowingZone(string file, MapZone zone)
+    {
+        _audit?.Note("XZONE", $"boundary note: switching '{_engineZoneFile}' → '{file}'");
+        _engineZoneFile = file;
+        Volatile.Write(ref _pendingEngineFollow, new EngineZoneFollow(file, zone));
+        Dispatcher.UIThread.Post(ApplyEngineZoneFollow);
+    }
+
+    private sealed record EngineZoneFollow(string File, MapZone Zone);
+
+    // Set on the game thread by OnEngineFollowingZone, taken on the UI thread.
+    private EngineZoneFollow? _pendingEngineFollow;
+
+    // The zone file the ENGINE has loaded (read on the game thread by the loader).
+    private volatile string? _engineZoneFile;
+
+    // The zone LoadSelectedZone should show without loading it into the engine
+    // (the engine already switched to it — see ApplyEngineZoneFollow).
+    private EngineZoneFollow? _engineLoadedZone;
+
+    /// <summary>UI thread: point the view at the zone the engine followed into.
+    /// Runs the normal zone-change bookkeeping (portal origins, file age, status)
+    /// through LoadSelectedZone, which skips the engine load for it.</summary>
+    private void ApplyEngineZoneFollow()
+    {
+        var follow = Interlocked.Exchange(ref _pendingEngineFollow, null);
+        if (follow is null) return;
+        if (string.Equals(follow.File, SelectedZoneFile, StringComparison.OrdinalIgnoreCase)) return;
+
+        _engineLoadedZone = follow;
+        _followingEngine  = true;
+        _autoZoneSwitch   = true;
+        try { SelectedZoneFile = follow.File; }
+        finally
+        {
+            _autoZoneSwitch   = false;
+            _followingEngine  = false;
+            _engineLoadedZone = null;
+        }
+        if (_engine?.CurrentNode is not null) _lastMatchedZoneFile = follow.File;
+    }
+
+    // True while a zone switch runs on behalf of the ENGINE (character
     // movement) rather than a user action — see BrowsingZone.
     private bool _followingEngine;
 
@@ -1825,6 +1922,7 @@ public partial class MapperViewModel : ReactiveObject
     private void NewZone()
     {
         if (_engine is null) { LoadStatus = "Mapper not ready."; return; }
+        _engineZoneFile = null;   // no file yet
         _engine.NewZone("New Zone");
         // Don't trigger LoadSelectedZone — there's no file yet.
         _suppressAutoLoad = true;
@@ -2322,7 +2420,12 @@ public partial class MapperViewModel : ReactiveObject
         if (string.IsNullOrEmpty(filename))       return;
 
         var path = Path.Combine(MapsDirectory, filename + ".xml");
-        var zone = _zoneRepo.Load(path);
+        // #426: the engine already followed a boundary stub into this zone —
+        // show its copy; don't read the file or load the engine again.
+        var engineLoaded = _engineLoadedZone is { } follow &&
+                           string.Equals(follow.File, filename, StringComparison.OrdinalIgnoreCase)
+            ? follow.Zone : null;
+        var zone = engineLoaded ?? _zoneRepo.Load(path);
         if (zone is null)
         {
             LoadStatus = $"Could not load {filename}.xml";
@@ -2381,7 +2484,16 @@ public partial class MapperViewModel : ReactiveObject
         // The boundary stub we were standing on (a copy of the new zone's room) tells the
         // engine which of several identical rooms in the new zone is this one.
         var stubHint = _followingEngine && _engine.CurrentNode is { } stub && HasZoneNote(stub) ? stub : null;
-        try { _engine.LoadZone(zone, stubHint); }
+        try
+        {
+            if (engineLoaded is null)
+            {
+                // Before LoadZone: its re-resolve may follow a stub, and the
+                // engine's loader compares against this.
+                _engineZoneFile = filename;
+                _engine.LoadZone(zone, stubHint);
+            }
+        }
         finally { _loadingZone = false; }
         IsZoneDirty = false;   // memory now matches the file just read
 
@@ -2427,7 +2539,16 @@ public partial class MapperViewModel : ReactiveObject
         // command / disconnect / window-unfocus-over-60s.
         if (_engine.CurrentNode is not null)
         {
-            if (_engine.CurrentNode.Id == target.Id) { LoadStatus = "Already here."; return; }
+            if (_engine.CurrentNode.Id == target.Id)
+            {
+                // #427: answer the script, as the built-in walker does
+                // (AutoWalkService.Start). Scripts that matchwait on the
+                // arrival after a #goto (travel.cmd, uber.cmd) otherwise treat
+                // the silence as a failed move: retry, #mapper reset, random move.
+                LoadStatus = "Already here.";
+                AutoWalk.EmitAutomapperSignal(AutomapperSignals.Arrived);
+                return;
+            }
             if (TryHandOffToAutomapperScript(_engine.CurrentNode, target)) return;
             if (!AutoWalk.Start(_engine.CurrentNode, target))
                 LoadStatus = AutoWalk.LastStatusFlash ?? $"No path to '{target.Title}'.";
@@ -2681,6 +2802,33 @@ public partial class MapperViewModel : ReactiveObject
     // ── UpdateMaps implementation ─────────────────────────────────────────
     private Task UpdateMapsAsync() => UpdateMapsAsync(repair: false);
 
+    /// <summary>Config folder holding <c>update-feeds.json</c>; set by the host.
+    /// Null (designer / tests) falls back to the hardwired official repo.</summary>
+    public string? FeedConfigDir { get; set; }
+
+    /// <summary>
+    /// The sources Maps ▸ Update Maps pulls from: every ENABLED Maps feed in
+    /// update-feeds.json, each materialised through <see cref="MapsFeedSources"/>
+    /// so a row's Festivals / Quests toggles apply here exactly as they do on
+    /// the Updates dialog's Update button and the startup check. Until the
+    /// feed config is wired (or when no Maps row is enabled) this is the
+    /// official GenieClient/Maps root — the menu never silently does nothing.
+    /// </summary>
+    private IReadOnlyList<IFileListSource> ResolveMapsSources()
+    {
+        if (!string.IsNullOrWhiteSpace(FeedConfigDir))
+        {
+            try
+            {
+                var feeds   = new FeedConfigStore(FeedConfigDir).Load().Maps.Where(f => f.Enabled);
+                var sources = feeds.SelectMany(f => MapsFeedSources.Create(f)).ToList();
+                if (sources.Count > 0) return sources;
+            }
+            catch (Exception ex) { Genie.App.Diagnostics.ErrorLog.Log("ResolveMapsSources", ex); }
+        }
+        return MapsFeedSources.Create(FeedEntry.OfficialMaps());
+    }
+
     /// <summary>
     /// Pull the latest zone XMLs. With <paramref name="repair"/> the installed-
     /// revision manifest is cleared first, so EVERY zone is rewritten from
@@ -2698,21 +2846,12 @@ public partial class MapperViewModel : ReactiveObject
             return;
 
         IsUpdating    = true;
-        UpdateStatus  = "Contacting github.com/GenieClient/Maps...";
+        UpdateStatus  = "Contacting the map repositories...";
         UpdateSummary = "";
 
         try
         {
-            // Phase 1 of the update system: hardwire the default GenieClient/Maps
-            // source here so this menu entry keeps working unchanged. The Updates
-            // dialog (Phase 3) will load enabled feeds from update-feeds.json and
-            // pass them all in; at that point this method becomes a thin shortcut
-            // to the same dialog's Maps tab.
-            var source  = new GithubContentsSource(
-                owner:     "GenieClient",
-                repo:      "Maps",
-                extension: ".xml");
-            var updater = new MapsUpdater(_zoneRepo, MapsDirectory, new[] { source });
+            var updater = new MapsUpdater(_zoneRepo, MapsDirectory, ResolveMapsSources());
 
             // Count BEFORE the rewrite so the summary can state what was
             // actually wrong rather than asking the user to take a full

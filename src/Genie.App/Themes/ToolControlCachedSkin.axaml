@@ -111,10 +111,14 @@
                         <Binding Path="((core:IDock)Owner).ActiveDockable" />
                       </MultiBinding>
                     </DockableControl.IsVisible>
+                    <!-- ContextMenu: the Genie 4-style per-window right-click
+                         menu, shared with the windowed-mode (MDI) frame
+                         (Themes/WindowContextMenu.axaml, public #403). -->
                     <ContentControl x:Name="PART_CachedContentPresenter"
                                     HorizontalAlignment="Stretch"
                                     VerticalAlignment="Stretch"
-                                    Content="{Binding}">
+                                    Content="{Binding}"
+                                    ContextMenu="{DynamicResource GenieWindowContextMenu}">
                       <!-- Right-click anywhere in the window (incl. on text) should
                            surface the per-window menu below. Avalonia's
                            SelectableTextBlock ships a built-in "Copy" flyout that
@@ -123,77 +127,14 @@
                            dock content only — dialogs keep their copy flyout.
                            Ctrl+C still copies. -->
                       <ContentControl.Styles>
-                        <Style Selector="SelectableTextBlock">
+                        <!-- :not(:disabled) is needed: Fluent sets the flyout from
+                             a style trigger, which outranks a plain style setter,
+                             so the plain "SelectableTextBlock" selector never won
+                             (public #403). -->
+                        <Style Selector="SelectableTextBlock:not(:disabled)">
                           <Setter Property="ContextFlyout" Value="{x:Null}" />
                         </Style>
                       </ContentControl.Styles>
-                      <!-- Genie 4-style per-window right-click menu. Bound to the
-                           dockable's WindowMenu (IWindowMenuHost); reflection
-                           bindings (x:CompileBindings=False) since the item
-                           DataType here is core:IDockable, which has no WindowMenu.
-                           Each item hides itself when the window doesn't support
-                           it, so a Vitals tab shows only "Close Window" while a
-                           stream tab shows all four. -->
-                      <ContentControl.ContextMenu>
-                        <ContextMenu x:CompileBindings="False"
-                                     docking:WindowMenuBehavior.RefreshOnOpen="True">
-                          <MenuItem Header="Copy"
-                                    InputGesture="Ctrl+C"
-                                    Command="{x:Static docking:WindowMenuBehavior.CopySelectionCommand}"
-                                    IsVisible="{Binding WindowMenu.ShowCopyAll}" />
-                          <MenuItem Header="Copy All"
-                                    Command="{Binding WindowMenu.CopyAllCommand}"
-                                    IsVisible="{Binding WindowMenu.ShowCopyAll}" />
-                          <MenuItem Header="Save As…"
-                                    Command="{Binding WindowMenu.SaveAsCommand}"
-                                    IsVisible="{Binding WindowMenu.ShowSaveAs}" />
-                          <MenuItem Header="Find…"
-                                    InputGesture="{x:Static docking:WindowMenuBehavior.FindGesture}"
-                                    Command="{Binding WindowMenu.FindCommand}"
-                                    IsVisible="{Binding WindowMenu.ShowFind}" />
-                          <MenuItem Header="Clear"
-                                    Command="{Binding WindowMenu.ClearCommand}"
-                                    IsVisible="{Binding WindowMenu.ShowClear}" />
-                          <MenuItem Header="Time Stamp"
-                                    ToggleType="CheckBox"
-                                    IsChecked="{Binding WindowMenu.IsTimestampOn, Mode=TwoWay}"
-                                    IsVisible="{Binding WindowMenu.ShowTimestamp}" />
-                          <MenuItem Header="Name List Only"
-                                    ToggleType="CheckBox"
-                                    IsChecked="{Binding WindowMenu.IsNameListOnlyOn, Mode=TwoWay}"
-                                    IsVisible="{Binding WindowMenu.ShowNameListOnly}" />
-                          <MenuItem Header="Show in Main Window"
-                                    ToggleType="CheckBox"
-                                    IsChecked="{Binding WindowMenu.IsEchoToMainOn, Mode=TwoWay}"
-                                    IsVisible="{Binding WindowMenu.ShowEchoToMain}" />
-                          <MenuItem Header="Word Wrap"
-                                    ToggleType="CheckBox"
-                                    IsChecked="{Binding WindowMenu.IsWordWrapOn, Mode=TwoWay}"
-                                    IsVisible="{Binding WindowMenu.ShowWordWrap}" />
-                          <MenuItem Header="Flash on Activity"
-                                    ToggleType="CheckBox"
-                                    IsChecked="{Binding WindowMenu.IsFlashOn, Mode=TwoWay}"
-                                    IsVisible="{Binding WindowMenu.ShowFlash}" />
-                          <MenuItem Header="Show Config Bar"
-                                    ToggleType="CheckBox"
-                                    IsChecked="{Binding WindowMenu.IsConfigBarOn, Mode=TwoWay}"
-                                    IsVisible="{Binding WindowMenu.ShowConfigBar}" />
-                          <MenuItem Header="Pause Scrolling"
-                                    ToggleType="CheckBox"
-                                    IsChecked="{Binding WindowMenu.IsScrollPaused, Mode=TwoWay}"
-                                    IsVisible="{Binding WindowMenu.ShowPauseScroll}" />
-                          <MenuItem Header="{Binding WindowMenu.FloatHeader}"
-                                    Command="{Binding WindowMenu.ToggleFloatCommand}"
-                                    IsVisible="{Binding WindowMenu.ShowFloat}" />
-                          <MenuItem Header="{Binding WindowMenu.TitleBarHeader}"
-                                    Command="{Binding WindowMenu.ToggleTitleBarCommand}"
-                                    IsVisible="{Binding WindowMenu.ShowHideTitleBar}" />
-                          <Separator IsVisible="{Binding WindowMenu.ShowCloseSeparator}" />
-                          <MenuItem Header="Close Window"
-                                    Command="{Binding WindowMenu.CloseCommand}"
-                                    IsVisible="{Binding WindowMenu.ShowClose}" />
-                        </ContextMenu>
-                      </ContentControl.ContextMenu>
                     </ContentControl>
                   </DockableControl>
                 </DataTemplate>

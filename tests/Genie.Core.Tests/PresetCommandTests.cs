@@ -58,11 +58,11 @@ public class PresetCommandTests : IDisposable
     public void Set_with_only_foreground_preserves_the_existing_background()
     {
         var (_, engine) = Make();
-        // health defaults to Red / #400000.
-        engine.ProcessInput("#preset health Orange");
+        // automapper.line defaults to Black / White.
+        engine.ProcessInput("#preset automapper.line Orange");
 
-        Assert.Equal("Orange",  _presets.GetForeground("health"));
-        Assert.Equal("#400000", _presets.GetBackground("health"));
+        Assert.Equal("Orange", _presets.GetForeground("automapper.line"));
+        Assert.Equal("White",  _presets.GetBackground("automapper.line"));
     }
 
     [Fact]

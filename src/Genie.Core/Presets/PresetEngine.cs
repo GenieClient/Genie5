@@ -24,14 +24,27 @@ public sealed class PresetEngine
         Set("inputuser",        "Yellow");
         Set("inputother",       "GreenYellow");
         Set("scriptecho",       "Cyan");
+        // Clickable links (public #396 — formerly hardcoded in DefaultHighlights).
+        // Genie 5 additions: Genie 4 had no link colours. "Default" = text colour.
+        Set("link",             "#80C0FF");   // <d cmd> game-command links
+        Set("url",              "#8CD8A8");   // <a href> external URLs
 
         // ── Status bars ─────────────────────────────────────────────────────
-        Set("health",           "Red",      "#400000");
-        Set("mana",             "Aqua",     "#000040");
-        Set("stamina",          "Green",    "#004000");
-        Set("spirit",           "Purple",   "#400040");
-        Set("concentration",    "White",    "#000040");
-        Set("roundtime",        "Aqua",     "#00004B");
+        // Vitals bars (public #406): Genie 4's stock values (Lists/Globals.cs
+        // SetDefaultPresets). Foreground = fill; background = track and border,
+        // none by default so the bar's normal track shows.
+        Set("health",           "Maroon");
+        Set("mana",             "Navy");
+        Set("stamina",          "Green");
+        Set("spirit",           "Purple");
+        Set("concentration",    "Navy");
+        // Roundtime countdown bar (public #404): Genie 4's stock MediumBlue fill,
+        // no track.
+        Set("roundtime",        "MediumBlue");
+        // Roundtime badge (Genie 5, #404): the red Badge / Countdown Badge.
+        // Foreground = the countdown fill, background = the badge. The border
+        // is drawn between the two. Stock = the badge's original reds.
+        Set("roundtime.badge",  "#A03030",  "#5A1A1A");
         Set("castbar",          "Magenta");
 
         // ── AutoMapper overlay ──────────────────────────────────────────────
@@ -43,14 +56,20 @@ public sealed class PresetEngine
         Set("automapper.panel",     "Black", "PaleGoldenrod");
         Set("automapper.path",      "Green", "LightGreen");
 
-        // ── UI chrome (Wrayth-style tokens, used by chrome themes) ──────────
-        Set("ui.button",         "Black",     "Silver");
-        Set("ui.menu",           "Black",     "#EEEEEE");
-        Set("ui.menu.checked",   "LightBlue");
-        Set("ui.menu.highlight", "LightBlue");
-        Set("ui.status",         "Black",     "#EEEEEE");
-        Set("ui.textbox",        "Black",     "White");
-        Set("ui.window",         "Black",     "#EEEEEE");
+        // ── UI chrome (public #406) ─────────────────────────────────────────
+        // Genie 4's stock values here (Black on #EEEEEE, White input, Silver
+        // buttons, LightBlue hover/tick) were the Windows system chrome
+        // colours. Genie 5's chrome comes from the theme, so the stock value
+        // is "Default": follow the theme. A colour set here (Presets tab,
+        // #preset, a Genie 4 import) paints that surface over the theme
+        // (Controls/PresetChrome.cs). Picking a theme sets them back to Default.
+        Set("ui.button",         "Default");
+        Set("ui.menu",           "Default");
+        Set("ui.menu.checked",   "Default");
+        Set("ui.menu.highlight", "Default");
+        Set("ui.status",         "Default");
+        Set("ui.textbox",        "Default");
+        Set("ui.window",         "Default");
     }
 
     private void Set(string id, string fg, string bg = "", bool highlightLine = false)
@@ -62,8 +81,17 @@ public sealed class PresetEngine
             Scope = Persistence.RuleScope.Global,
         };
 
-    public void Apply(PresetRule rule)      => _presets[rule.Id] = rule;
-    public void ResetToDefaults()           { _presets.Clear(); SetDefaults(); }
+    /// <summary>Raised after any preset is applied or the palette is reset —
+    /// a typed <c>#preset</c>, <c>#preset load</c>/<c>reset</c>, a picker, a
+    /// profile load. Genie 4 repaints on a typed <c>#preset</c>
+    /// (Command.cs EventPresetChanged → FormMain.PresetChanged); UI that paints
+    /// from presets (bars, map, chrome) listens here. May be raised off the UI
+    /// thread and many times in a row during a load, so listeners marshal and
+    /// coalesce.</summary>
+    public event Action? Changed;
+
+    public void Apply(PresetRule rule)      { _presets[rule.Id] = rule; Changed?.Invoke(); }
+    public void ResetToDefaults()           { _presets.Clear(); SetDefaults(); Changed?.Invoke(); }
     public PresetRule? Get(string id)       => _presets.TryGetValue(id, out var r) ? r : null;
     public string GetForeground(string id)  => _presets.TryGetValue(id, out var r) ? r.ForegroundColor : "Default";
     public string GetBackground(string id)  => _presets.TryGetValue(id, out var r) ? r.BackgroundColor : string.Empty;

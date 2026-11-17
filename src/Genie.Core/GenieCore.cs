@@ -96,6 +96,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     private DrXmlParser?       _parser;
     private GameStateEngine?   _stateEngine;
     private IDisposable?       _parserFeed;
+    private IDisposable?       _readEndSub;
+
+    /// <summary>True while a raw chunk from the live connection is being parsed,
+    /// so the text lines it yields are fed to scripts as server-read lines
+    /// (public #433). Game-loop only.</summary>
+    private bool _feedingServerRead;
     private IDisposable?       _settingsInfoSub;
     private IDisposable?       _gameHostSub;
     private IDisposable?       _connectedVarSub;
@@ -349,6 +355,20 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         remove => _typeAhead.Changed -= value;
     }
 
+    /// <summary>
+    /// Genie 4's disconnect-verb rule (<c>Game.SendText</c>, which every send went
+    /// through): a command starting with <c>qui</c> or <c>exi</c>, any case, ends
+    /// the session on purpose, so the drop that follows must not auto-reconnect.
+    /// Leading spaces are ignored. The App checks each of <see cref="SentCommands"/>
+    /// with it (#419).
+    /// </summary>
+    public static bool IsDisconnectVerb(string command)
+    {
+        var t = command.AsSpan().TrimStart();
+        return t.StartsWith("qui", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("exi", StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Timed connect-progress sink (TLS attempt, per-step SGE timings,
     /// fallback, game-server connect) surfaced to the game window so a stall can
     /// be isolated to an exact step. Set once by the host; persisted on the core
@@ -404,6 +424,16 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     public event Action<string>?                   ScriptOutputLine;
 
     /// <summary>
+    /// Every line raised on <see cref="EchoLine"/> or <see cref="ScriptOutputLine"/>,
+    /// with what produced it (public #406), so the game window can colour it
+    /// with the matching Genie 4 preset: <c>inputuser</c> for a typed command,
+    /// <c>inputother</c> for a command a script sent, <c>scriptecho</c> for script
+    /// output and Genie's own messages. Fires right after the untyped event,
+    /// with the same (plugin-processed) text.
+    /// </summary>
+    public event Action<string, EchoKind>?         ClassifiedEchoLine;
+
+    /// <summary>
     /// Raised by directed <c>#echo &gt;window #color</c>. Args: (text, windowName?, hexColor?).
     /// Null window/color means fall back to main window / default colour.
     /// </summary>
@@ -424,10 +454,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     // (null return suppresses the event). Plugin echoes emitted from inside
     // OnEcho pass through undispatched (PluginManager re-entrancy guard).
 
-    private void RaiseEchoLine(string text)
+    private void RaiseEchoLine(string text, EchoKind kind = EchoKind.Message)
     {
         var t = Plugins is null ? text : Plugins.DispatchEcho(text, "main");
-        if (t is not null) EchoLine?.Invoke(t);
+        if (t is null) return;
+        EchoLine?.Invoke(t);
+        ClassifiedEchoLine?.Invoke(t, kind);
     }
 
     // ── Pipeline fault containment (2026-08-31 stability review) ─────────────────────────────
@@ -486,10 +518,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         catch (Exception ex) { ReportPipelineFault(stage, ex); }
     }
 
-    private void RaiseScriptOutput(string text)
+    private void RaiseScriptOutput(string text, EchoKind kind = EchoKind.ScriptEcho)
     {
         var t = Plugins is null ? text : Plugins.DispatchEcho(text, "main");
-        if (t is not null) ScriptOutputLine?.Invoke(t);
+        if (t is null) return;
+        ScriptOutputLine?.Invoke(t);
+        ClassifiedEchoLine?.Invoke(t, kind);
     }
 
     private void RaiseEchoToWindow(string text, string? window, string? color)
@@ -736,7 +770,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                                if (Config?.TraceSends == true)
                                    RaiseEchoLine($"[send:script] {cmd}");
 
-                               RaiseScriptOutput(cmd);
+                               RaiseScriptOutput(cmd, EchoKind.ScriptCommand);
                                _typeAhead.NotifySent();
                                // The mapper must see script sends exactly as it sees
                                // SendToGame's (below, :1508). It keeps the LAST sent
@@ -997,8 +1031,17 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
         // Wire raw XML → parser (timed as the Parse stage; no-op overhead when
         // the overlay is hidden because Metrics.Enabled is false).
-        _parserFeed = rawXml.Subscribe(
-            xml => Guard("parser", () => Metrics.Time(PipelineStage.Parse, () => parser.Feed(xml))));
+        _parserFeed = rawXml.Subscribe(xml =>
+        {
+            _feedingServerRead = true;
+            try { Guard("parser", () => Metrics.Time(PipelineStage.Parse, () => parser.Feed(xml))); }
+            finally { _feedingServerRead = false; }
+        });
+
+        // End of one network read → release scripts whose waitfor/matchwait
+        // matched a line of it (Genie 4 SetBufferEnd parity, public #433).
+        _readEndSub = connection.ReadEndStream.Subscribe(
+            _ => Guard("scripts", () => Scripts.OnServerReadEnd()));
 
         // Mapper adapter — feeds the persistent AutoMapper from this parser/state.
         var mapperAdapter = new MapperGameStateAdapter(_state, events);
@@ -1462,7 +1505,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // display name), use it instead of the raw text so the user sees
         // "get a tapered cutlass" instead of "get #49489411 in #49489410".
         if (userInput)
-            RaiseEchoLine(echoOverride ?? text);
+            RaiseEchoLine(echoOverride ?? text, EchoKind.Command);
 
         // Genie 4 mycommandchar (Game.cs SendText: `!sText.StartsWith(
         // cMyCommandChar)` gates the socket write, lastcommand, and activity
@@ -1618,7 +1661,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             ? te
             : te with { Text = transformed, Links = null, BoldSpans = null, PresetSpans = null };
 
-        Guard("scripts", () => Metrics.Time(PipelineStage.Scripts, () => Scripts.OnGameLine(ev.Text)));   // match/waitfor + EXP/info trackers
+        Guard("scripts", () => Metrics.Time(PipelineStage.Scripts, () => Scripts.OnGameLine(ev.Text, _feedingServerRead)));   // match/waitfor + EXP/info trackers
         // ParseGameOnly (Genie 4 parity): when on, fire triggers only on
         // the main game stream, not secondary stream-windows (thoughts,
         // logons, combat, …). Default off → triggers see every stream.
@@ -2383,6 +2426,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _gameEventSub?.Dispose();    _gameEventSub    = null;
         _pluginXmlSub?.Dispose();    _pluginXmlSub    = null;
         _parserFeed?.Dispose();      _parserFeed      = null;
+        _readEndSub?.Dispose();      _readEndSub      = null;
+        // No read end will follow from this connection: never strand a script
+        // that matched a line of its last read (public #433).
+        RunOnLoop(() => Guard("scripts", () => Scripts.OnServerReadEnd()));
         _settingsInfoSub?.Dispose(); _settingsInfoSub = null;
         _gameHostSub?.Dispose();     _gameHostSub     = null;
         _globalsSync?.Dispose();     _globalsSync     = null;
@@ -2512,7 +2559,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// </summary>
     private void SyncMapperDebug()
     {
-        AutoMapper.Diagnostics = Config.MapperDebug ? RaiseEchoLine : null;
+        AutoMapper.Diagnostics = Config.MapperDebug ? msg => RaiseEchoLine(msg) : null;
         if (Config.MapperDebug)
             RaiseEchoLine("[mapper] Room-resolution trace ON. `#config mapperdebug off` to stop.");
     }

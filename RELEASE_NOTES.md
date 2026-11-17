@@ -1,3 +1,161 @@
+# Unreleased — staged for the next cut
+
+## ✨ New
+- **Festival maps straight from the Maps repo, no root copy needed** — the community
+  Maps repository keeps event zones (Hollow Eve, Guild Fest, the faires) in a
+  "Festivals" subfolder that Genie 5 did not pull, so a festival map only reached you
+  when someone also committed a temporary copy at the repo root. Each row on the
+  Updates dialog's **Maps** tab now has a **Festivals** checkbox (and a separate
+  **Quests (spoilers)** one for the quest-maps folder): tick it and Check, Update,
+  the startup check and **Maps ▸ Update Maps** all pull that folder too, flat into
+  your Maps folder beside the regular zones, tracked like any other zone. Both are
+  off by default, and a zone that is also at the repo root is taken from the root.
+  The same switches are `#config mapfestivals on|off` and `#config mapquests on|off`;
+  they live in `update-feeds.json`, not `settings.cfg`.
+- **Roundtime as a countdown bar** — **Layout ▸ Roundtime** (was *Roundtime
+  Position*) now also picks a style. **Badge** is the timer you have today.
+  **Countdown Badge** is the same badge with a fill behind the timer that shrinks as
+  the roundtime runs out. **Countdown Bar (Genie 4)** is Genie 4's bar: a fill that
+  shrinks from full to empty with the whole seconds drawn on it, coloured by the
+  `roundtime` preset. All three work on the command bar and on the hands strip, and
+  with **Keep Visible**. Thanks @dylb0t ([#404](https://github.com/GenieClient/Genie5/issues/404), [#418](https://github.com/GenieClient/Genie5/pull/418)).
+- **Combined Spell Timer** — **Layout ▸ Combined Spell Timer** (off by default) turns
+  the spell box on the hands strip into the cast bar: `(12) Swirling Winds (7)` shows
+  the seconds since you started preparing on the left and the seconds until fully
+  prepared on the right, and the box empties as the spell prepares. While it is on,
+  the separate cast bar is hidden. Thanks @dylb0t ([#420](https://github.com/GenieClient/Genie5/pull/420)).
+- **Two ready-made layouts for windowed mode** — **Layout ▸ Load Layout** has two new
+  built-ins. **Windowed Genie 4 Retro** is Genie 4's first-run arrangement: the game
+  window on the left at 70% of the width, with Thoughts, Room and Log stacked down
+  the right. **Windowed Genie 5 Starter** adds Item Log, Familiar, OOC and Assess
+  across the top. Both are sized for a maximized 1920×1080 window. Turning windowed
+  mode on still stacks the windows until you load one. Thanks @dylb0t
+  ([#425](https://github.com/GenieClient/Genie5/issues/425), [#432](https://github.com/GenieClient/Genie5/pull/432)).
+
+## 🐛 Fixes
+- **Two crashes that closed Genie mid-session** — both reported by @dylb0t from
+  Linux machines.
+  - *Fast travel with the automapper on* could close the app with "Collection was
+    modified": the map panel was reading a room's exits while the automapper was
+    adding to them. A room's exits can now be read and changed at the same time
+    ([#398](https://github.com/GenieClient/Genie5/issues/398)).
+  - *On a slow or memory-tight machine*, the Healing window's check for an empathic
+    link could time out on an ordinary game line and close the app, even for a
+    character who never opened the Healing window. A timed-out check now just means
+    "no patient on this line", and the limit goes from 50 ms to 1 second
+    ([#399](https://github.com/GenieClient/Genie5/issues/399)).
+- **One stray error in a window no longer ends the session** — an error that nothing
+  else caught on the interface thread used to close Genie. It is now written to
+  `genie_crash.log` (marked `UiThread.Survived`) and the session carries on. If such
+  errors come in a burst (more than five in ten seconds), Genie still closes, as
+  before, because at that point something is really broken.
+- **Presets on the Presets tab do what they did in Genie 4** — most of the presets
+  listed in Configuration were saved and shown but never used. They now colour what
+  they name, and repaint at once when you change one on the tab, with a picker or by
+  typing `#preset`. Thanks @dylb0t ([#406](https://github.com/GenieClient/Genie5/issues/406); [#410](https://github.com/GenieClient/Genie5/pull/410), [#412](https://github.com/GenieClient/Genie5/pull/412), [#414](https://github.com/GenieClient/Genie5/pull/414),
+  [#415](https://github.com/GenieClient/Genie5/pull/415), [#420](https://github.com/GenieClient/Genie5/pull/420)).
+  - *Text:* `inputuser` colours commands you type, `inputother` commands a script
+    sends, `scriptecho` script output and Genie's own messages, and `familiar` the
+    Familiar window's text.
+  - *Vitals:* `health`, `mana`, `stamina`, `spirit` and `concentration` colour the
+    bars on the status strip and in the Vitals panel. The colour is the fill and the
+    background is the track.
+  - *Map:* the seven `automapper.*` presets colour the map's lines, rooms and labels,
+    and `automapper.panel` holds the map background and label text. The **Map
+    background** and **Map text** pickers and `#mapper color` set that same preset, so
+    there is now one place the colour is kept.
+  - *Window chrome:* the seven `ui.*` presets colour the menu bar, the command input,
+    the status strip and the AutoMapper Settings window. Left at `Default`, each keeps
+    the theme's colour.
+  - *Cast bar:* `castbar` colours the spell-preparation bar.
+- **Regex and "begins with" highlights colour what Genie 4 coloured** — a Regex
+  highlight with capture groups now colours only the groups, not the whole match, so
+  highlight files brought over from Genie 4 look right. A Regex with no groups still
+  colours the whole match; use `(?:…)` for grouping that should not narrow the colour.
+  A BeginsWith highlight now colours the whole line instead of only the matched
+  start. Thanks @dylb0t ([#397](https://github.com/GenieClient/Genie5/issues/397), [#400](https://github.com/GenieClient/Genie5/issues/400), [#409](https://github.com/GenieClient/Genie5/pull/409)).
+- **`#goto` with automapper.cmd stays in step on timed climbs** — when a server line
+  satisfied a `waitfor`, `waitforre` or `matchwait`, the script resumed on that very
+  line, before Genie had finished the rest of what the server sent with it. Actions
+  then saw the following lines too late, and automapper.cmd could count a room twice
+  and send moves for the wrong room. The script now resumes after the whole read has
+  been processed, as in Genie 4. Lines that do not come from the server (`#parse`,
+  typed input, the mapper's arrival signals) still resume a script at once. Thanks
+  @dylb0t ([#433](https://github.com/GenieClient/Genie5/issues/433), [#434](https://github.com/GenieClient/Genie5/pull/434)).
+- **Crossing into the next map no longer sends a second `#goto` for the old one** —
+  when a move ends on a room that links two maps, Genie now switches to the new map
+  in the same step, so `$zoneid` and `$roomid` already name the new zone when a script
+  reacts to the arrival. Before, travel.cmd and uber.cmd could read the old zone and
+  loop, as on the Faldesu River crossing. Genie also follows the link when the room
+  you land in is missing from the current map but present, by title, in the linked
+  one. Thanks @dylb0t ([#426](https://github.com/GenieClient/Genie5/issues/426), [#429](https://github.com/GenieClient/Genie5/pull/429)).
+- **`#goto` to the room you are already in answers `YOU HAVE ARRIVED!`** — with
+  automapper.cmd installed it used to say nothing, and scripts that wait for the
+  result of every `#goto` took the silence for a failed move: they retried, reset the
+  mapper and made random moves. Thanks @dylb0t ([#427](https://github.com/GenieClient/Genie5/issues/427), [#430](https://github.com/GenieClient/Genie5/pull/430)).
+- **The room's "You also see" line is no longer indented** — the game sends that line
+  with two leading spaces, and Genie 4 removed them before scripts saw it. Genie 5
+  kept them, so a script matching `^You also see` never matched and could wait
+  forever. Other indented lines keep their spacing. Thanks @dylb0t ([#413](https://github.com/GenieClient/Genie5/pull/413)).
+- **A script that sends `quit` or `exit` stays logged out** — auto-reconnect is
+  skipped after you quit on purpose, but only a typed `quit` counted. A script's
+  `put quit` did not, so Genie logged the character back in when the link dropped.
+  Every command sent to the game is now checked, whatever sent it. Thanks @dylb0t
+  ([#419](https://github.com/GenieClient/Genie5/issues/419), [#421](https://github.com/GenieClient/Genie5/pull/421)).
+- **Right-click inside a window in windowed mode opens the window's menu** — Clear,
+  Time Stamp, Name List Only and Close Window were only reachable in docked mode. In
+  both modes, right-clicking on text now opens the full menu rather than a lone Copy.
+  Thanks @dylb0t ([#403](https://github.com/GenieClient/Genie5/issues/403), [#417](https://github.com/GenieClient/Genie5/pull/417)).
+- **Edit ▸ Configuration opens at once** — on a slow machine it could freeze Genie
+  for many seconds before the window appeared. The window now shows first and fills
+  the tab you are looking at; the other tabs fill in the background or when you pick
+  them. Thanks @dylb0t ([#402](https://github.com/GenieClient/Genie5/issues/402), [#416](https://github.com/GenieClient/Genie5/pull/416)).
+- **The cast bar and the rested-EXP gauge fit the hands strip** — both were drawn
+  wider than their frames and thinner than the boxes beside them. Thanks @dylb0t
+  ([#405](https://github.com/GenieClient/Genie5/issues/405), [#420](https://github.com/GenieClient/Genie5/pull/420)).
+
+## 💡 Notes
+- **Room titles, links and URLs now take their colours from presets** — Genie 5 no
+  longer paints any game text with built-in colours of its own. Bracketed room titles
+  used to be light blue; they now use the `roomname` preset, whose stock colour is
+  orange (`#FF8000`), as in Genie 4. **If you want the old look back,** type
+  `#preset roomname #90A8F0`, or pick the colour on the **Presets** tab in
+  Configuration. Game-command links and web links have their own presets too, `link`
+  and `url`, so they can be recoloured the same way. Thanks @dylb0t
+  ([#408](https://github.com/GenieClient/Genie5/pull/408)).
+- **The vitals bars change colour** — their stock colours are now Genie 4's: maroon
+  health, navy mana, green stamina, purple spirit and navy concentration. Saved
+  presets that still held Genie 5's old stock values are moved to the new ones once;
+  a colour you picked yourself is left alone. To change a bar, edit its preset on the
+  **Presets** tab, or type for example `#preset health Red`. Themes carry their own
+  bar colours and write them into the presets when you pick the theme ([#412](https://github.com/GenieClient/Genie5/pull/412)).
+- **Display Settings has three echo colours instead of one** — **Typed commands**,
+  **Script commands** and **Echoes & messages**. They edit the `inputuser`,
+  `inputother` and `scriptecho` presets, so the dialog, the theme editor and the
+  Presets tab all show the same colour ([#410](https://github.com/GenieClient/Genie5/pull/410)).
+- ⚠ **Behaviour change: `waiteval` waits for a change, as in Genie 4** — a `waiteval`
+  whose condition is already true when the script reaches it no longer continues at
+  once. It waits until a variable in the condition changes and the condition is then
+  true. This fixes automapper.cmd stalling for five minutes on the Himineldar Shel ice
+  road. **If a script of yours relied on falling straight through,** it now waits, with
+  no timeout. Before, this continued at once if the character was already standing:
+
+  ```
+  waiteval $standing = 1
+  ```
+
+  After, check first and wait only when the condition is false:
+
+  ```
+  if ($standing != 1) then waiteval $standing = 1
+  ```
+
+  At `#debug 2` or above, a `waiteval` that starts with its condition already true
+  echoes that it is waiting for a change.
+  ([#428](https://github.com/GenieClient/Genie5/issues/428))
+
+---
+
 # Genie 5 — v5.0.0-beta.9.10.1
 
 **"Second Pass"** — a small fixes release. Right-click in the Healing window now transfers

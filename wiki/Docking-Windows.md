@@ -69,11 +69,12 @@ Everything on this page is remembered automatically between sessions. Beyond tha
 
 ## Windowed mode (MDI)
 
-**Layout → Windowed Mode (MDI)** turns every open panel into a child window inside the main window, the way Genie 4 worked. It is also what gives windows the Genie 4 title bars: the **Genie 4 Classic** theme changes colours only, so pick windowed mode (or the built-in **Heirloom** layout, which uses it) for the classic look.
+**Layout → Windowed Mode (MDI)** turns every open panel into a child window inside the main window, the way Genie 4 worked. It is also what gives windows the Genie 4 title bars: the **Genie 4 Classic** theme changes colours only, so pick windowed mode (or the built-in **Heirloom**, **Windowed Genie 4 Retro** or **Windowed Genie 5 Starter** layout, which use it) for the classic look. Turning on windowed mode by itself stacks every open window; loading one of those layouts sizes and places them for you.
 
 - **Switching keeps what you have open.** Windows that are open stay open and closed ones stay closed, in both directions. Going into windowed mode, the windows are tiled where their docked panes were, so a group of stream tabs becomes a row of stream windows. A window you had already placed in windowed mode earlier in the session goes back to that spot.
 - **Switching back restores your docked arrangement** from before you entered windowed mode, with any windows you opened or closed in the meantime added or removed. Loading a layout replaces that memory, so after a load you land on the default docked arrangement instead.
 - **Child windows stay inside the main window.** They can't be dragged or floated out of it. A panel you last had floating in docked mode opens as a child window while windowed mode is on.
+- **Right-click inside a window for its menu**, as in Genie 4 and in docked mode: **Clear**, **Time Stamp**, **Name List Only**, **Close Window**, and the rest of what that window supports (Copy, Copy All, Save As…, Find…, Pause Scrolling, and so on). Right-clicking the title bar still gives the window-management menu.
 
 ## Related
 
