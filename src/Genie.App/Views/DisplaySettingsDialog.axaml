@@ -20,7 +20,9 @@
              old 560 px height so OK / Cancel stay on a 1366x768 screen at
              125% (#422 review), and it can be resized. -->
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <StackPanel Spacing="10" Margin="0,8,0,0">
+          <!-- Right margin: the scrollbar overlays the content, so keep the
+               drop-down arrows and spinners clear of it. -->
+          <StackPanel Spacing="10" Margin="0,8,18,0">
 
             <!-- ── Font family / size ──────────────────────────────────── -->
             <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto">
@@ -162,7 +164,9 @@
              old 560 px height so OK / Cancel stay on a 1366x768 screen at
              125% (#422 review), and it can be resized. -->
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <StackPanel Spacing="10" Margin="0,8,0,0">
+          <!-- Right margin: the scrollbar overlays the content, so keep the
+               drop-down arrows and spinners clear of it. -->
+          <StackPanel Spacing="10" Margin="0,8,18,0">
 
             <Grid ColumnDefinitions="110,*">
               <TextBlock Grid.Column="0" Text="Theme" VerticalAlignment="Center"/>
