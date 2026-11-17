@@ -113,6 +113,18 @@
 - **The cast bar and the rested-EXP gauge fit the hands strip** — both were drawn
   wider than their frames and thinner than the boxes beside them. Thanks @dylb0t
   ([#405](https://github.com/GenieClient/Genie5/issues/405), [#420](https://github.com/GenieClient/Genie5/pull/420)).
+- **EXP, maps and appraisals line up on Linux, and the Mono font is a setting
+  again** — the game's column-aligned output was drawn in a fixed font list that
+  names no font a stock Linux has, so it fell back to a proportional font and the
+  columns drifted. A fresh Linux install drew all game text that way too. A font
+  setting can now be a list, such as `Cascadia Mono,Consolas,Courier New,monospace`:
+  Genie uses the first font in it that is installed, and `monospace` asks the system
+  for its monospace font. **Edit ▸ Display Settings** has Genie 4's **Mono font**
+  back, with a **Mono font size** (0, the default, uses the window's size). The font
+  pickers show the font a list really uses, preview each font, and OK keeps the
+  whole list unless you pick a different font. The dialog also scrolls and can be
+  resized, so OK and Cancel stay on a small screen. Windows and macOS look as
+  before. Thanks @dylb0t ([#395](https://github.com/GenieClient/Genie5/issues/395), [#422](https://github.com/GenieClient/Genie5/pull/422)).
 
 ## 💡 Notes
 - **Room titles, links and URLs now take their colours from presets** — Genie 5 no
