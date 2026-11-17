@@ -146,6 +146,16 @@ public sealed class ScriptInstance
 
     public bool IsBlocked => Paused || InMatchWait || WaitForPattern != null || WaitEvalExpr != null;
 
+    /// <summary>Set when a live server line satisfied this script's
+    /// <c>waitfor</c>/<c>waitforre</c>/<c>matchwait</c>: the script stays parked
+    /// until the rest of that network read has been processed
+    /// (<see cref="ScriptEngine.OnServerReadEnd"/>). Genie 4 parity
+    /// (Script.cs SetBufferWait / m_bBufferEnd): a match only flags the resume,
+    /// and the script runs after the whole socket read is parsed, so actions
+    /// still see every remaining line of that read first. automapper.cmd's
+    /// MOVE.WAIT relies on it (public #433).</summary>
+    public bool AwaitReadEnd;
+
     /// <summary>Set when a <c>delay</c> timer expires; lets the tick loop run
     /// this instance through the roundtime gate until it next blocks. Genie 4
     /// parity: TickScript's RT early-return is skipped while the state is

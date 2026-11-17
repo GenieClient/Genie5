@@ -57,6 +57,16 @@ public sealed class GameConnection : IAsyncDisposable
     public IObservable<string> SentCommandStream => _sentSubject;
 
     /// <summary>
+    /// Fires once after every network read whose chunks have all been
+    /// published on <see cref="RawXmlStream"/> (same FIFO, so it always follows
+    /// them). Genie 4's <c>Connection.DataRecieveEnd</c>: scripts whose
+    /// waitfor/matchwait matched a line of that read resume here, after the
+    /// rest of the read has been processed (public #433).
+    /// </summary>
+    private readonly Subject<bool> _readEndSubject = new();
+    public IObservable<bool> ReadEndStream => _readEndSubject;
+
+    /// <summary>
     /// Connection lifecycle events (Connected, Disconnected, Reconnecting, Error).
     /// </summary>
     private readonly Subject<ConnectionEvent> _stateSubject = new();
@@ -539,6 +549,7 @@ public sealed class GameConnection : IAsyncDisposable
         // cursor, and a single Clear+Append of the trailing remainder.
         var raw = pending.ToString();
         int pos = 0;
+        bool published = false;
 
         while (pos < raw.Length)
         {
@@ -572,7 +583,10 @@ public sealed class GameConnection : IAsyncDisposable
             if (chunk.Length == 0) continue;
 
             Publish(chunk);
+            published = true;
         }
+
+        if (published) PublishReadEnd();
 
         // Retain only the unconsumed remainder (a partial tag / line) for the
         // next read to complete.
@@ -595,6 +609,21 @@ public sealed class GameConnection : IAsyncDisposable
         {
             PublishCore(chunk);
         }
+    }
+
+    private void PublishReadEnd()
+    {
+        if (_loop is { } loop)
+            loop.Post(PublishReadEndCore);
+        else
+            PublishReadEndCore();
+    }
+
+    private void PublishReadEndCore()
+    {
+        try { _readEndSubject.OnNext(true); }
+        catch (ObjectDisposedException) { }
+        catch (Exception ex) { _log.LogError(ex, "Contained subscriber fault publishing read end"); }
     }
 
     private void PublishCore(string chunk)
@@ -670,6 +699,7 @@ public sealed class GameConnection : IAsyncDisposable
         _rawXmlSubject.Dispose();
         _aiRawSubject.Dispose();
         _sentSubject.Dispose();
+        _readEndSubject.Dispose();
         _stateSubject.Dispose();
         _cts.Dispose();
         _sendGate.Dispose();
