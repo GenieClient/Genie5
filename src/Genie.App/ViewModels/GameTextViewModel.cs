@@ -573,11 +573,17 @@ public record TextLine(string Text, StreamColor Color,
         }
     }
 
-    /// <summary>Monospaced font for <c>#echo mono</c> lines — falls back through
-    /// the chain if the first family is unavailable. Internal (not private) so the
-    /// AvaloniaEdit renderer's colorizer can force the identical family for a mono
-    /// line instead of keeping a second copy of the fallback chain (#178).</summary>
-    internal static readonly FontFamily MonoFont = new("Consolas,Courier New,monospace");
+    /// <summary>Monospaced font for <c>&lt;output class="mono"&gt;</c> blocks and
+    /// <c>#echo mono</c> lines: <c>DisplaySettings.MonoFontFamily</c> (Genie 4's
+    /// Mono Font), resolved to the first installed font (#395). Pushed by
+    /// <c>DisplaySettings.Apply</c>; also read by the AvaloniaEdit renderer's
+    /// colorizer so both renderers use the identical font (#178).</summary>
+    internal static FontFamily MonoFont { get; set; } =
+        Controls.FontChain.Resolve(Settings.DisplaySettings.DefaultMonoFontFamily);
+
+    /// <summary>The mono font's own size (<c>DisplaySettings.MonoFontSize</c>), or
+    /// null to use the window's size.</summary>
+    internal static double? MonoFontSize { get; set; }
 
     /// <summary>
     /// The line broken into styled <see cref="Inline"/> segments by
@@ -626,7 +632,10 @@ public record TextLine(string Text, StreamColor Color,
             var inlines = DefaultHighlights.Tokenize(Text, Links, BoldSpans, PresetSpans, Window);
             if (Mono)
                 foreach (var inl in inlines)
+                {
                     inl.FontFamily = MonoFont;
+                    if (MonoFontSize is { } size) inl.FontSize = size;
+                }
             return inlines;
         }
     }
@@ -637,6 +646,7 @@ public record TextLine(string Text, StreamColor Color,
     private Run EchoRun(string text)
     {
         var run = new Run(text);
+        if (Mono && MonoFontSize is { } size) run.FontSize = size;
         if (Mono) run.FontFamily = MonoFont;
         if (EchoForeground() is { } fg) run.Foreground = fg;
         return run;

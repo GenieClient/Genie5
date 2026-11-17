@@ -104,7 +104,7 @@ Everything V1 tagged 🔧 FIX BEFORE ALPHA is done, verified against beta.3 sour
 | Paste Multi Line | ✅ | ✅ | ✅ | Edit ▸ Paste Multi Line splits clipboard text on the separator char |
 | Configuration... | ✅ tabbed dialog | ✅ tabbed dialog | ⚠️ | Genie 5 has tabs but the UX still wants a holistic pass per `backlog.md` "Configuration dialog UX pass" |
 | Update Images | ✅ | n/a | 🗓 | No image rendering |
-| Display Settings... | n/a | 🆕 | 🆕 | Font family/size, game + echo colors, theme picker, editor path. The strip-position choices (hands / roundtime / script bar) live in the Layout menu, not here |
+| Display Settings... | n/a | 🆕 | 🆕 | Font family/size, mono font (Genie 4's Mono Font) + size, game + echo colors, theme picker, editor path. The strip-position choices (hands / roundtime / script bar) live in the Layout menu, not here |
 | Profile → Load / Save / Include Password | ✅ | ✅ merged into Connect dialog | ✅ | Genie 5 always encrypts saved passwords (AES-GCM) — no include toggle |
 
 ### Window menu

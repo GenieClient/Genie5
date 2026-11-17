@@ -100,8 +100,12 @@ internal sealed class GameTextColorizer : DocumentColorizingTransformer
         // one advance width. Later ChangeLinePart calls only set fore/back/weight
         // (re-deriving the typeface from whatever this left), so they can't undo it.
         if (meta.Mono)
-            ChangeLinePart(start, end, el => el.TextRunProperties.SetTypeface(
-                Retypeface(el.TextRunProperties.Typeface, TextLine.MonoFont, bold: false)));
+            ChangeLinePart(start, end, el =>
+            {
+                el.TextRunProperties.SetTypeface(
+                    Retypeface(el.TextRunProperties.Typeface, TextLine.MonoFont, bold: false));
+                if (TextLine.MonoFontSize is { } size) el.TextRunProperties.SetFontRenderingEmSize(size);
+            });
 
         if (meta.IsEcho)
         {
