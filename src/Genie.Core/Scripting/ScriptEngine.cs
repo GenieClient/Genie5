@@ -1431,17 +1431,16 @@ public sealed class ScriptEngine
 
                 if (inst.WaitEvalExpr != null)
                 {
-                    // Re-evaluate each tick — cheap and matches Genie4 semantics
-                    // of "unblock as soon as the condition flips to true". The
-                    // expression is stored raw so $/%/etc vars pick up live
-                    // values; substitute each tick before passing to
-                    // ScriptExpression, which doesn't itself parse $var refs.
-                    // A malformed waiteval warns ONCE (inside EvalConditionSafe)
-                    // — otherwise it reads as a silent hang until the deadline.
-                    var waitCond = SubstituteVars(inst.WaitEvalExpr, inst);
-                    bool done = EvalConditionSafe(waitCond, inst, "waiteval", out _);
-                    if (done || DateTime.UtcNow >= inst.WaitEvalDeadline)
-                    { inst.WaitEvalExpr = null; inst.WaitEvalDeadline = DateTime.MaxValue; }
+                    // Checked each tick, but released only on a CHANGE (#428 —
+                    // see WaitEvalReleases). The expression is stored raw so
+                    // $/%/etc vars pick up live values. A malformed waiteval
+                    // warns ONCE (inside EvalConditionSafe) — otherwise it
+                    // reads as a silent hang until the deadline.
+                    if (WaitEvalReleases(inst) || DateTime.UtcNow >= inst.WaitEvalDeadline)
+                    {
+                        inst.WaitEvalExpr = null; inst.WaitEvalDeadline = DateTime.MaxValue;
+                        inst.WaitEvalKey  = null;
+                    }
                     else continue;
                 }
 
@@ -1618,7 +1617,19 @@ public sealed class ScriptEngine
                 // time so %-references to vars written earlier in the chain
                 // see the fresh value, not the pre-fire one.
                 foreach (var stmt in SplitSemicolons(act.Command))
+                {
                     Dispatch(SubstituteVars(stmt, inst), inst, 0, -1, fromAction: true);
+                    // Genie 4 re-checks a waiteval on every variable change
+                    // (TriggerVariableChanged). Checking after each action
+                    // statement keeps a change the same action undoes —
+                    // `var x 1;var x 0` — from slipping between two ticks
+                    // (#431 review).
+                    if (inst.WaitEvalExpr != null && WaitEvalReleases(inst))
+                    {
+                        inst.WaitEvalExpr = null; inst.WaitEvalDeadline = DateTime.MaxValue;
+                        inst.WaitEvalKey  = null;
+                    }
+                }
             }
             catch (Exception ex)
             { _echo($"[script] {inst.Name} action error: {ex.Message}"); }
@@ -2410,7 +2421,16 @@ public sealed class ScriptEngine
                 inst.GateReplay.Clear();  // script-authored block (public #309)
                 inst.WaitEvalExpr     = rest;
                 inst.WaitEvalDeadline = DateTime.MaxValue;
-                DbgEcho(inst, 2, $"waiteval {rest}");
+                // #428: baseline for "changed" / "turned true" (see WaitEvalReleases).
+                inst.WaitEvalKey      = WaitEvalChangeKey(rest, inst);
+                inst.WaitEvalWasTrue  = !IsBareVariable(rest) &&
+                                        EvalConditionSafe(SubstituteVars(rest, inst), inst, "waiteval", out _);
+                DbgEcho(inst, 2, inst.WaitEvalWasTrue
+                    // Already true on entry: Genie 4 waits for a change here, which
+                    // reads as a silent hang if the author expected a fall-through
+                    // (#431 review) — say so at debug level.
+                    ? $"waiteval {rest} — already true; waiting for a change"
+                    : $"waiteval {rest}");
                 return false;
 
             case "debug":
@@ -3902,6 +3922,56 @@ public sealed class ScriptEngine
     /// <c>$time24</c> still appends the AM/PM designator. Returns false for any
     /// name that isn't one of these so normal resolution can continue.
     /// </summary>
+    // ── waiteval release rule (#428) ───────────────────────────────────────
+    // Genie 4 never checks a waiteval when the script reaches it: it re-checks
+    // only when a variable named in the condition changes, and releases on the
+    // first change that leaves it true (Script.cs EvalWaitEval +
+    // TriggerVariableChanged). Community scripts depend on that —
+    // automapper.cmd's `if (%depth > 1) then waiteval ((1 <= %depth) || …)`
+    // means "wait for the move in flight to land". Clock variables
+    // ($unixtime …) are computed on read in Genie 4 and never fire a change, so
+    // they don't count as one here either; but a condition that TURNS true
+    // (e.g. a `$unixtime >= %timeout` term) also releases, so such timeouts
+    // still fire.
+
+    private static readonly Regex WaitEvalVarRef =
+        new(@"\$(?<name>[A-Za-z_][\w.]*)", RegexOptions.Compiled);
+    private static readonly Regex WaitEvalBareVar =
+        new(@"^\s*[%$][A-Za-z_][\w.]*\s*$", RegexOptions.Compiled);
+
+    /// <summary>A waiteval that is just one variable (<c>waiteval $standing</c>)
+    /// releases on any change of it, without evaluating (Genie 4 parity).</summary>
+    private static bool IsBareVariable(string expr) => WaitEvalBareVar.IsMatch(expr);
+
+    /// <summary>The condition with its variables substituted and clock variables
+    /// masked: it differs from the last one exactly when a variable the condition
+    /// names (other than a clock) changed.</summary>
+    private string WaitEvalChangeKey(string expr, ScriptInstance inst)
+    {
+        var masked = WaitEvalVarRef.Replace(expr, m =>
+        {
+            var name = m.Groups["name"].Value;
+            return !Globals.ContainsKey(name) && TryClockVar(name, out _) ? "\u0001" : m.Value;
+        });
+        return SubstituteVars(masked, inst);
+    }
+
+    /// <summary>One tick of a waiteval: true when the script should continue.</summary>
+    private bool WaitEvalReleases(ScriptInstance inst)
+    {
+        var expr    = inst.WaitEvalExpr!;
+        var key     = WaitEvalChangeKey(expr, inst);
+        bool changed = !string.Equals(key, inst.WaitEvalKey, StringComparison.Ordinal);
+        inst.WaitEvalKey = key;
+
+        if (IsBareVariable(expr)) return changed;
+
+        bool isTrue  = EvalConditionSafe(SubstituteVars(expr, inst), inst, "waiteval", out _);
+        bool turned  = isTrue && !inst.WaitEvalWasTrue;
+        inst.WaitEvalWasTrue = isTrue;
+        return isTrue && (changed || turned);
+    }
+
     private static bool TryClockVar(string name, out string value)
     {
         var now = DateTime.Now;

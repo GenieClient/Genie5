@@ -40,6 +40,26 @@
   Configuration. Game-command links and web links have their own presets too, `link`
   and `url`, so they can be recoloured the same way. Thanks @dylb0t
   ([#408](https://github.com/GenieClient/Genie5/pull/408)).
+- ⚠ **Behaviour change: `waiteval` waits for a change, as in Genie 4** — a `waiteval`
+  whose condition is already true when the script reaches it no longer continues at
+  once. It waits until a variable in the condition changes and the condition is then
+  true. This fixes automapper.cmd stalling for five minutes on the Himineldar Shel ice
+  road. **If a script of yours relied on falling straight through,** it now waits, with
+  no timeout. Before, this continued at once if the character was already standing:
+
+  ```
+  waiteval $standing = 1
+  ```
+
+  After, check first and wait only when the condition is false:
+
+  ```
+  if ($standing != 1) then waiteval $standing = 1
+  ```
+
+  At `#debug 2` or above, a `waiteval` that starts with its condition already true
+  echoes that it is waiting for a change.
+  ([#428](https://github.com/GenieClient/Genie5/issues/428))
 
 ---
 
