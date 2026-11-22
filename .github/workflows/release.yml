@@ -37,9 +37,30 @@ permissions:
   id-token: write          # SignPath uses GitHub's OIDC token for origin verification
 
 jobs:
+  guard:
+    name: Check the tag's shape and order
+    runs-on: ubuntu-latest
+    # Runs before anything is created. The tag must be vX.Y.Z (stable) or
+    # vX.Y.Z-beta.N (pre-release) and must sort above every release already
+    # published here. A pre-release sorts BELOW its own base version, so a
+    # v5.0.0-beta.N pushed after v5.0.0 would never be offered to anyone; this
+    # stops such a run before a GitHub Release exists. See the script header.
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate ${{ github.ref_name }}
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 1000             --json tagName --jq '.[].tagName' > published-tags.txt
+          python3 .github/scripts/check_release_tag.py "$GITHUB_REF_NAME" < published-tags.txt
+
   notes:
     name: Extract this tag's section from RELEASE_NOTES.md
     runs-on: ubuntu-latest
+    needs: guard
     # RELEASE_NOTES.md is a cumulative changelog (every version stacked, newest
     # on top). Publishing the whole file as the release body made every Release
     # page show its version PLUS all older ones. This job slices out only the

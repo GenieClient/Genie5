@@ -95,6 +95,12 @@ kinds.** The packaging step refuses a version lower than the newest published
 one, so a stable fix made while `5.1.0-beta.2` is out is numbered above it
 (or ships as the next beta and then as `5.1.0`), never as `5.0.1` behind it.
 
+The workflow's first job enforces both rules before anything is created
+(`.github/scripts/check_release_tag.py`): the tag must be `vX.Y.Z` or
+`vX.Y.Z-beta.N`, and it must sort above every release already published. A
+pre-release sorts *below* its own base version, so after `v5.0.0` the next test
+build is `v5.0.1-beta.1` or `v5.1.0-beta.1` — a `v5.0.0-beta.N` tag is rejected.
+
 To stamp a different version at publish time, override on the CLI:
 
 ```bash
