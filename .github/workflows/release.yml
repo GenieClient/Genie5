@@ -26,7 +26,10 @@ name: Release (signed)
 
 on:
   push:
-    tags: ["v*"]          # e.g. v5.0.0-alpha.1
+    # A tag with a "-" suffix (v5.1.0-beta.1) publishes a GitHub pre-release;
+    # a plain tag (v5.0.1) publishes a stable release. Every job below derives
+    # `prerelease:` from the tag, so the two kinds cannot drift apart.
+    tags: ["v*"]          # e.g. v5.1.0 or v5.1.0-beta.1
   workflow_dispatch:       # allow manual runs from the Actions tab
 
 permissions:
@@ -97,7 +100,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
           body_path: RELEASE_BODY.md
           generate_release_notes: false
 
@@ -270,7 +273,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
           # Velopack produces: Setup.exe, *-full.nupkg, *-delta.nupkg (when
           # prior versions exist), Portable.zip, RELEASES, releases.win.json,
           # assets.win.json. Attach everything in the output dir.
@@ -355,7 +358,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
           # Velopack on Linux produces: Genie5.AppImage, *-linux-full.nupkg,
           # RELEASES-linux, releases.linux.json. Per-platform feeds coexist
           # with Windows/macOS feeds on the same Release page; the in-app
@@ -466,7 +469,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
           # macOS arm64 (Apple Silicon, Macs from late 2020 onward).
           # Unsigned: first-time users must right-click → Open or run
           # `xattr -d com.apple.quarantine /Applications/Genie.app`.
@@ -579,7 +582,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
           # macOS x64 (Intel Macs, hardware up to ~2020). Separate channel
           # from osx-arm64 so the in-app updater pulls the right binary
           # for each user's CPU.

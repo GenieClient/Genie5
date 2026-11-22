@@ -70,6 +70,6 @@ public class UpdatePolicyTests : IDisposable
         var loaded = new FeedConfigStore(_dir).Load();
         Assert.True(loaded.CorePolicy.CheckOnStartup);    // default, not crash
         Assert.False(loaded.ScriptsPolicy.AutoApply);
-        Assert.Equal("beta", loaded.Core.Channel);         // rest of the file intact
+        Assert.Equal("Genie5", loaded.Core.Repo);          // rest of the file intact
     }
 }

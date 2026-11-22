@@ -76,7 +76,7 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
     [Reactive] public bool   CoreCanUpdate       { get; private set; }
 
     /// <summary>Bound to the channel ComboBox. Persisted on change to <see cref="CoreFeed.Channel"/>.</summary>
-    [Reactive] public string CoreChannel { get; set; } = "beta";
+    [Reactive] public string CoreChannel { get; set; } = "stable";
 
     /// <summary>0–100 fill for the Core progress bar. Driven by the
     /// <see cref="UpdateProgress"/> stream during an update.</summary>
@@ -161,7 +161,7 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
         _pluginManager = pluginManager;
 
         _config = _store.Load();
-        CoreChannel          = string.IsNullOrWhiteSpace(_config.Core.Channel) ? "beta" : _config.Core.Channel;
+        CoreChannel          = string.IsNullOrWhiteSpace(_config.Core.Channel) ? "stable" : _config.Core.Channel;
         CoreInstalledVersion = Genie.Core.GenieCore.HostVersionString;
 
         RebuildCoreUpdater();

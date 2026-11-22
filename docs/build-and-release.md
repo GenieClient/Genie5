@@ -74,11 +74,26 @@ Because these live in the csproj, the `dotnet publish -r <rid>` command above is
 Version metadata is set in [Genie.App.csproj](../src/Genie.App/Genie.App.csproj):
 
 ```xml
-<Version>5.0.0-beta.9.5</Version>      <!-- current tier; bump per release -->
+<Version>5.0.0</Version>               <!-- bump per release -->
 <AssemblyVersion>5.0.0.0</AssemblyVersion>
 <FileVersion>5.0.0.0</FileVersion>
-<InformationalVersion>5.0.0-beta.9.5</InformationalVersion>
+<InformationalVersion>5.0.0</InformationalVersion>
 ```
+
+### Stable releases and pre-releases
+
+The tag decides which kind of release the workflow publishes:
+
+| Tag | Kind | Who is offered it |
+| --- | --- | --- |
+| `v5.0.1`, `v5.1.0` | Stable release | The **stable** and **beta** update channels |
+| `v5.1.0-beta.1` | Pre-release (any tag with a `-` suffix) | The **beta** channel only |
+
+Pre-releases are test builds of the next stable release: `5.1.0-beta.1`,
+`5.1.0-beta.2`, then `5.1.0`. **Version numbers only ever go up, across both
+kinds.** The packaging step refuses a version lower than the newest published
+one, so a stable fix made while `5.1.0-beta.2` is out is numbered above it
+(or ships as the next beta and then as `5.1.0`), never as `5.0.1` behind it.
 
 To stamp a different version at publish time, override on the CLI:
 

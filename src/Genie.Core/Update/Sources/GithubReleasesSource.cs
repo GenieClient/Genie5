@@ -12,10 +12,9 @@ namespace Genie.Core.Update.Sources;
 /// Channel mapping:
 ///   - <c>"stable"</c> → hits <c>/releases/latest</c>, which excludes
 ///     drafts and prereleases. Returns null if no stable release exists.
-///   - <c>"beta"</c>   → lists recent releases and returns the most-recent
-///     one that's marked prerelease. If there are no prereleases, falls
-///     through to the latest stable so a beta-channel user without an active
-///     beta still sees the stable build.
+///   - <c>"beta"</c>   → lists recent releases and returns the most recently
+///     published one, prerelease or stable, so a beta-channel user is never
+///     held on an old prerelease that a stable release has superseded.
 /// </summary>
 public sealed class GithubReleasesSource : IReleaseSource
 {
@@ -93,11 +92,10 @@ public sealed class GithubReleasesSource : IReleaseSource
         var raw     = JsonSerializer.Deserialize<List<RawRelease>>(json) ?? new();
 
         // Filter out drafts (they shouldn't be in the list per the API contract,
-        // but be defensive). Sort by published date descending; pick the first
-        // prerelease. If none, fall back to the first non-prerelease.
-        var nonDrafts = raw.Where(r => !r.Draft).OrderByDescending(r => r.PublishedAt).ToList();
-        var beta      = nonDrafts.FirstOrDefault(r => r.Prerelease);
-        var picked    = beta ?? nonDrafts.FirstOrDefault();
+        // but be defensive) and pick the most recently published release,
+        // prerelease or not. Preferring a prerelease would keep offering an old
+        // beta after a newer stable release has superseded it.
+        var picked = raw.Where(r => !r.Draft).OrderByDescending(r => r.PublishedAt).FirstOrDefault();
         return picked is null ? null : Map(picked);
     }
 

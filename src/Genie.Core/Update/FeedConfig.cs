@@ -69,11 +69,16 @@ public sealed class CoreFeed
     public string Owner        { get; set; } = "GenieClient";
     public string Repo         { get; set; } = "Genie5";
 
-    /// <summary>Release channel — <c>"stable"</c> or <c>"beta"</c>. Beta = GitHub releases marked prerelease.
-    /// Defaults to <c>"beta"</c> during the alpha/beta period: every shipped build is a GitHub
-    /// prerelease, so a <c>"stable"</c> default would never surface an update. Flip back to
-    /// <c>"stable"</c> at the 5.0.0 GA release (when a non-prerelease exists to track).</summary>
-    public string Channel      { get; set; } = "beta";
+    /// <summary>Release channel — <c>"stable"</c> or <c>"beta"</c>. Stable follows releases that
+    /// are not marked prerelease on GitHub; beta follows prereleases as well, so a beta-channel
+    /// install is also offered every stable build. The default was <c>"beta"</c> until 5.0.0,
+    /// while every build was a prerelease.</summary>
+    public string Channel      { get; set; } = "stable";
+
+    /// <summary>False in a file written before 5.0.0, when <c>"beta"</c> was the only channel
+    /// that ever offered an update. <see cref="FeedConfigStore.Load"/> moves such a file to
+    /// <c>"stable"</c> once and sets this, so a later deliberate choice of beta is kept.</summary>
+    public bool StableChannelMigrated { get; set; }
 
     /// <summary>
     ///   Asset filename pattern. Supports <c>{os}</c> (win/osx/linux) and
@@ -86,7 +91,7 @@ public sealed class CoreFeed
     /// consulted.</summary>
     public bool CheckOnStartup { get; set; } = true;
 
-    public static CoreFeed Default() => new();
+    public static CoreFeed Default() => new() { StableChannelMigrated = true };
 }
 
 /// <summary>One entry in the Maps or Plugins feeds list.</summary>

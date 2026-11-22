@@ -62,6 +62,18 @@ public sealed class FeedConfigStore
             // another owner/repo, it is theirs and stays.
             cfg.Plugins.RemoveAll(IsSeededExpTrackerRow);
 
+            // Migration (5.0.0): before the first stable release every build was
+            // a prerelease, so "beta" was the default and the only channel that
+            // offered updates; a saved "beta" was not a choice. Move such a file
+            // to "stable" once. The flag is written with the next save, so a
+            // user who then picks beta in the Updates dialog keeps it.
+            if (!cfg.Core.StableChannelMigrated)
+            {
+                if (string.Equals(cfg.Core.Channel, "beta", StringComparison.OrdinalIgnoreCase))
+                    cfg.Core.Channel = "stable";
+                cfg.Core.StableChannelMigrated = true;
+            }
+
             return cfg;
         }
         catch
