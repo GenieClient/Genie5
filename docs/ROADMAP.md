@@ -11,9 +11,19 @@ Items are grouped into **horizons**, not hard dates:
   that 5.0.0 is out. This is where help moves the needle most.
 - **Horizon 2 — Near-term wins**: low-risk parity and quality-of-life items
   that can ship in a point release without an architecture debate.
-- **Horizon 3 — Post-1.0 differentiators**: the features that make Genie 5 more
-  than a faithful Genie 4 port. Scoped, but deliberately after stable.
+- **Horizon 3 — Differentiators**: the features that make Genie 5 more
+  than a faithful Genie 4 port. Scoped, and sequenced after the hardening work.
 - **Horizon 4 — Expansion bets**: the longer-arc "platform" ideas.
+
+**Release cadence.** From 5.0.0 on there is **one stable release a month, on
+the third Saturday**: 5.1 on 19 December 2026, 5.2 on 16 January 2027, 5.3 on
+20 February, 5.4 on 20 March. Each is published as a pre-release a week
+earlier and promoted to stable once that week of testing is clean, so the date
+is fixed and anything not ready moves to the next month. Crashes, data loss,
+security fixes, login failures and regressions that break Genie 4 scripts or
+settings do not wait for the month: they ship as a patch release (5.0.1,
+5.0.2, …) after 24 to 48 hours as a pre-release. Every open issue carries the
+milestone of the release it is aimed at, or **Backlog**.
 
 If you want to pick up an item, **open an issue first** so we don't end up with
 two parallel PRs. Roadmap edits land via PR the same as code — when you start an
@@ -135,7 +145,7 @@ Highlights of what works today:
 - **Runtime** — .NET 10, the current LTS (supported to November 2028). Shipped
   in beta.5; every download still bundles the runtime it needs.
 - **Updater** — in-process update system (Core via Velopack, Maps + Plugins via
-  GitHub feeds) with a beta channel. Self-update is **live and verified
+  GitHub feeds) with stable and beta channels. Self-update is **live and verified
   end-to-end on Windows, macOS, and Linux** (#27), including the AppImage
   self-replace leg and delta feeds on all four platform channels.
 - **Code signing** — every tagged release is EV-signed under Shadow Realms LLC
@@ -189,7 +199,9 @@ them P2:
 
 This track is tracked privately during triage because some items are live
 attack surface; the fixes ship in the open. **It is the first priority for the
-releases after 5.0.0.**
+releases after 5.0.0.** Download-URL validation and the profile-file
+permissions are aimed at 5.0.1; plugin hash verification, the password key
+derivation, the regex timeout and dependency scanning are aimed at 5.1.
 
 ### Track B — Server-driven dialog windows ✅ *renderer shipped in beta.9*
 
@@ -219,8 +231,9 @@ type Genie doesn't know yet renders as a labelled placeholder rather than
 vanishing, so gaps stay visible and reportable. Where each dialog lives is
 remembered per character profile, asked once the first time it appears.
 
-#156 stays open for the bespoke remainder — the aim timer, and injuries for
-other players.
+#156 closed with 5.0.0. Another character's injuries shipped as a bespoke view
+in beta.9.6; the one piece left, the aim timer, is tracked as
+[#436](https://github.com/GenieClient/Genie5/issues/436).
 
 ### Track C — macOS / Linux self-update ✅ *done*
 
@@ -236,7 +249,9 @@ wiki.
 
 ### Track D — Player reports
 
-Burn down what players report against the current release. The current set:
+Burn down what players report against the current release. The `#config
+automapper` and Linux memory items are aimed at 5.0.1, the rest at 5.1. The
+current set:
 
 - The mapper compares a room only with its first stored description, so rooms
   with day and night descriptions can resolve to the wrong room
@@ -256,7 +271,7 @@ Burn down what players report against the current release. The current set:
 `.cmd` / `.js` syntax colouring, Ctrl+S / Ctrl+F, and prompts for unsaved and
 outside-changed files ([#243](https://github.com/GenieClient/Genie5/issues/243)).
 `#config externaleditor on` keeps a user's own editor. Breakpoints and the live
-`$variable` / script-state **debugger** stay a post-1.0 differentiator
+`$variable` / script-state **debugger** stay a later differentiator
 (Horizon 3).
 
 ---
@@ -296,7 +311,7 @@ fit (GemStone's scripting culture differs from DR's). Reference:
 
 ## Horizon 2 — Near-term wins 🔧
 
-Low-risk items that can ship during the soak. Scoped well enough to pick up
+Low-risk items that can ship in any monthly release. Scoped well enough to pick up
 without a deep architecture discussion.
 
 > The **.NET 10 runtime retarget** that sat here shipped in beta.5 — see
@@ -405,10 +420,10 @@ change.
 
 ---
 
-## Horizon 3 — Post-1.0 differentiators 🚀
+## Horizon 3 — Differentiators 🚀
 
 The features that make Genie 5 more than a faithful port. All scoped; all
-deliberately after stable. Ranked roughly by value-to-risk — items nearer the
+sequenced after the Horizon 1 hardening. Ranked roughly by value-to-risk — items nearer the
 top are cleaner wins.
 
 Every AI-driven item is constrained by [POLICY.md](POLICY.md): the AI may
@@ -437,13 +452,17 @@ rendering performance. It's bigger than a version bump: the
 `Avalonia.ReactiveUI` integration package is discontinued in 12, so the move
 carries a swap to `ReactiveUI.Avalonia` plus a major ReactiveUI upgrade (and
 retiring the Fody weaver for source generators). No deadline pressure — the
-Avalonia 11.3 line still receives patch releases in parallel with 12.x.
+Avalonia 11.3 line still receives patch releases in parallel with 12.x. A
+time-boxed spike is approved
+([#290](https://github.com/GenieClient/Genie5/issues/290)) and aimed at 5.3;
+if the spike does not pass, the migration moves to a later release rather
+than holding that one.
 
 ### Plugin marketplace + signing / trust
 
 Browse, install, and update plugins in-app, with a signed-package trust model as
-the security substrate. Reference implementation is parked and milestoned for
-v1.0. Depends on the plugin-signature work in Horizon 1 Track A.
+the security substrate. Reference implementation is parked until the plugin
+hash verification in Horizon 1 Track A lands, which is aimed at 5.1.
 
 ### Hunting / combat analytics with history
 
@@ -463,7 +482,7 @@ the ecosystem.
 ### Script debugger — breakpoints + live state inspector
 
 The in-app **editor** shipped in beta.9.7 (Horizon 1, Track E). The step
-beyond Genie 4 that stays post-1.0 is the **debugger** layered on top of it:
+beyond Genie 4 that comes later is the **debugger** layered on top of it:
 breakpoints and a live `$variable` / script-state inspector for both `.cmd` and
 `.js`. Much of the runtime introspection already exists.
 
