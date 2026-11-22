@@ -1,12 +1,12 @@
 # Genie 5
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/MtmzE2w)
-[![Releases](https://img.shields.io/github/v/release/GenieClient/Genie5?include_prereleases&label=latest%20release)](https://github.com/GenieClient/Genie5/releases)
+[![Releases](https://img.shields.io/github/v/release/GenieClient/Genie5?label=latest%20release)](https://github.com/GenieClient/Genie5/releases)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 
 **A cross-platform, modern successor to [Genie 4](https://github.com/GenieClient) — the long-running Windows client for [DragonRealms](https://www.play.net/dr), Simutronics' text-based MMO.**
 
-> ⚠️ **Beta** — Genie 5 is in active development and feature-complete for daily play. It targets feature parity with the most-used 80% of Genie 4 while running natively on Windows, macOS, and Linux. Expect rough edges. File issues; PRs welcome.
+> **Stable since 5.0.0** — Genie 5 is feature-complete for daily play and in active development. It targets feature parity with the most-used 80% of Genie 4 while running natively on Windows, macOS, and Linux. Test builds of the next release are published as pre-releases. File issues; PRs welcome.
 
 ## Screenshots
 
@@ -199,7 +199,7 @@ Each release is built from this repository's source by GitHub Actions and submit
 - **Reviewers:** [@monil2233](https://github.com/monil2233) (reviews each signing request in the SignPath UI before approval).
 - **Approvers:** [@monil2233](https://github.com/monil2233) (final approval that triggers the signing operation).
 
-For a solo-maintainer beta-stage project, all three roles consolidate on the maintainer. As the contributor base grows and a co-maintainer takes ownership, this section will be updated to reflect a separation between Reviewer and Approver per [SignPath's two-person-rule guidance](https://about.signpath.io/documentation/projects).
+At the project's current size, all three roles are held by the maintainer. As the contributor base grows and a co-maintainer takes ownership, this section will be updated to reflect a separation between Reviewer and Approver per [SignPath's two-person-rule guidance](https://about.signpath.io/documentation/projects).
 
 ## Privacy policy
 

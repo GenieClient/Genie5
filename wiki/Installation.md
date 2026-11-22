@@ -1,6 +1,6 @@
 # Installation
 
-Genie 5 is in **beta**, but you no longer have to build it yourself — **pre-built downloads ship for Windows, macOS, and Linux** on the [Releases](https://github.com/GenieClient/Genie5/releases/latest) page. Grab the one for your platform, or [build from source](#build-from-source) if you're contributing. See [Releases & Changelog](Releases) for what's in the latest build.
+**Pre-built downloads of Genie 5 ship for Windows, macOS, and Linux** on the [Releases](https://github.com/GenieClient/Genie5/releases/latest) page. Grab the one for your platform, or [build from source](#build-from-source) if you're contributing. See [Releases & Changelog](Releases) for what's in the latest build.
 
 > **Coming from Genie 4?** Install fresh first, then jump to [Importing from Genie 4](Importing-Genie4-Config) to bring your aliases, triggers, highlights, etc. across.
 

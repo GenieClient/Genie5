@@ -1,16 +1,16 @@
 # Genie 5 Roadmap
 
-This is the public roadmap — what's shipped in the current beta, what stands
-between us and a stable `5.0.0`, and what's planned for after. The goal is to
+This is the public roadmap — what shipped in `5.0.0`, what comes first after
+it, and what's planned beyond that. The goal is to
 keep contributors and testers oriented on where the project is going and where
 help is most welcome.
 
 Items are grouped into **horizons**, not hard dates:
 
-- **Horizon 1 — Road to stable 5.0.0**: the short list that actually gates a
-  stable release. This is where help moves the needle most.
-- **Horizon 2 — Beta-window wins**: low-risk parity and quality-of-life items
-  that can ship during the beta soak without an architecture debate.
+- **Horizon 1 — Hardening after 5.0.0**: the short list that comes first now
+  that 5.0.0 is out. This is where help moves the needle most.
+- **Horizon 2 — Near-term wins**: low-risk parity and quality-of-life items
+  that can ship in a point release without an architecture debate.
 - **Horizon 3 — Post-1.0 differentiators**: the features that make Genie 5 more
   than a faithful Genie 4 port. Scoped, but deliberately after stable.
 - **Horizon 4 — Expansion bets**: the longer-arc "platform" ideas.
@@ -21,11 +21,12 @@ item, the same PR that adds the first commit should move it to the shipped list.
 
 ---
 
-## Where we are — v5.0.0-beta.9.10.1 "Second Pass"
+## Where we are — v5.0.0 "True Colours"
 
-Genie 5 is a working, cross-platform DragonRealms client in **beta**. The core
-experience is feature-complete; beta is about soak, polish, and closing the
-last parity gaps. Recent releases: **beta.5** moved the whole solution to
+Genie 5 is a working, cross-platform DragonRealms client, and **5.0.0 is its
+first stable release**. The core experience is feature-complete; the work now is
+hardening, polish, and closing the last parity gaps. The beta releases that led
+here: **beta.5** moved the whole solution to
 .NET 10; beta.5.1 was built almost entirely from player reports; **beta.6**
 put every timer on the server's clock (#261), hardened the script engine
 (#242), landed the mapper-tracking batch, and brought Alteration Buddy
@@ -81,6 +82,14 @@ indexing, base-10 `log()`).
 **beta.9.8** is a fixes-only follow-up: the mapper no longer overwrites a good
 map link on a wrong room match, `#mapper reset` reloads the zone from disk,
 and a coloured `#echo >window` keeps its colour.
+**5.0.0** is the first stable release. It makes the Presets tab work as it did in
+Genie 4: presets colour typed and script commands, script output, the vitals bars, the
+map and the window chrome, and repaint at once. It adds roundtime as a countdown bar, a
+combined spell timer, two windowed-mode layouts and opt-in festival maps, draws
+column-aligned output in a monospace font on Linux with the Mono font setting restored,
+and fixes two crashes and a run of script-timing and map-boundary travel bugs found in
+Linux testing (largely contributor changes). The updater now has a real stable channel:
+stable releases and pre-releases are published separately from here on.
 **beta.9.10.1** is a small fixes release: Healing-window right-click transfers outside
 wounds and scars too, the Mobs ignore list scrolls, the mana pulse is a typed event
 instead of an unknown tag, and Find on the experimental editor renderer opens the
@@ -139,40 +148,36 @@ For the full per-release history see [RELEASE_NOTES.md](../RELEASE_NOTES.md).
 
 ---
 
-## Horizon 1 — Road to stable 5.0.0 🎯
+## Horizon 1 — Hardening after 5.0.0 🎯
 
-The honest short list. Several parallel tracks; none strictly blocks the
-others, but all should land before we cut a stable `5.0.0` off the beta channel.
+5.0.0 is out. This is the short list that comes first in the 5.0.x and 5.1
+releases. The tracks are independent.
 
-**Rough order of attack.** The tracks are independent, but if you're looking for
-where the next commit does the most good:
+**Rough order of attack.** If you're looking for where the next commit does the
+most good:
 
-1. **Track A (security)** — the actual gate, and the one with the longest
-   tail. (The P1 script-correctness bugs that used to lead this list — rule
-   layering #257 and eval composition #300 — shipped in beta.8; roundtime on
-   the server clock and script-engine thread safety shipped in beta.6.)
-2. **Track E is done** — the in-app editor shipped in beta.9.7, after the
-   script validator landed in beta.9.6 as `#scriptcheck`
-   ([#239](https://github.com/GenieClient/Genie5/issues/239)), which reports
-   every problem in a script without running it and doubles as a whole-corpus
-   regression signal for the script engine. Breakpoints and a live debugger
-   stay post-1.0.
-3. **Track B** (server-driven dialogs) — the remaining multi-week build. The
-   renderer shipped in beta.9; player `#dialogs` reports during the soak feed
-   what is left.
-4. **Track C is done** — self-update verified end-to-end on all three
-   platforms (#27).
+1. **Track A (security)** — the first priority, and the one with the longest
+   tail.
+2. **Track D (player reports)** — the Genie 4 regressions and platform bugs
+   players have reported against the current build.
+3. **Track B** (server-driven dialogs) — the renderer shipped in beta.9; player
+   `#dialogs` reports feed what is left.
+4. **Tracks C and E are done** — self-update is verified end-to-end on all three
+   platforms (#27), and the in-app script editor shipped in beta.9.7 after the
+   script validator landed as `#scriptcheck`
+   ([#239](https://github.com/GenieClient/Genie5/issues/239)). Breakpoints and a
+   live debugger are a later item.
 
 ### Track A — Security-hardening backlog 🔒
 
-The beta security review produced a set of pre-public-release items that are
-the real gate to a stable launch. Several are P2. Highlights:
+The security review run during the beta produced a hardening backlog. Login
+over TLS, the session-key logging fix and the path-traversal fixes in the
+updaters and in script includes have shipped. What is still open, several of
+them P2:
 
-- Plugin DLLs are loaded without signature/hash verification (RCE surface).
-- Zip-slip path traversal from feed-controlled filenames in the Maps/Plugin
-  updaters.
-- Update download URLs are unvalidated (SSRF / no HTTPS + host pinning).
-- Path traversal in `.cmd` include / script path resolution.
+- Plugin DLLs are loaded without signature/hash verification. A plugin runs
+  with your user's rights, so install only plugins you trust.
+- Update download URLs are not yet validated (HTTPS + host pinning).
 - Script-engine regexes can bypass the match-timeout (ReDoS).
 - Stored-password key derivation uses a non-secret machine name — harden to a
   per-user PBKDF2/Argon2 derivation.
@@ -183,8 +188,8 @@ the real gate to a stable launch. Several are P2. Highlights:
   (must land before any AI surface ships — see Horizon 3).
 
 This track is tracked privately during triage because some items are live
-attack surface; the fixes ship in the open. **This is the single most important
-thing standing between beta and a stable release.**
+attack surface; the fixes ship in the open. **It is the first priority for the
+releases after 5.0.0.**
 
 ### Track B — Server-driven dialog windows ✅ *renderer shipped in beta.9*
 
@@ -229,17 +234,21 @@ distros (#314, shipped in beta.8) and the one-cipher-suite TLS handshake on
 Linux/macOS (#316, shipped in beta.8); per-distro first-run notes live on the
 wiki.
 
-### Track D — Beta soak
+### Track D — Player reports
 
-Burn down real-user reports on the beta builds before we call it stable. The
-current set, sourced from player reports (the two P1 script-correctness bugs
-that led this list — rule layering #257 and eval composition #300 — shipped
-in beta.8):
+Burn down what players report against the current release. The current set:
 
-- Astral Plane: seven missing Map999 conduit nodes, plus a pathfinder guard so
-  the built-in walker never routes through `script X` arcs it can't execute
-  (tracked in the Maps repository as
-  [Maps #267](https://github.com/GenieClient/Maps/issues/267)).
+- The mapper compares a room only with its first stored description, so rooms
+  with day and night descriptions can resolve to the wrong room
+  ([#407](https://github.com/GenieClient/Genie5/issues/407)).
+- `#config automapper true` turns on Record mode, where Genie 4 only enabled the
+  mapper ([#401](https://github.com/GenieClient/Genie5/issues/401)).
+- The Room window ignores its font and colour settings and the `roomdesc` preset
+  ([#424](https://github.com/GenieClient/Genie5/issues/424)).
+- Linux: memory grows when a configured font is not installed
+  ([#393](https://github.com/GenieClient/Genie5/issues/393)).
+- Maps ▸ Update and Repair Maps give no notice of success or failure
+  ([#423](https://github.com/GenieClient/Genie5/issues/423)).
 
 ### Track E — In-app script editor ✅ *shipped in beta.9.7*
 
@@ -285,7 +294,7 @@ fit (GemStone's scripting culture differs from DR's). Reference:
 
 ---
 
-## Horizon 2 — Beta-window wins 🔧
+## Horizon 2 — Near-term wins 🔧
 
 Low-risk items that can ship during the soak. Scoped well enough to pick up
 without a deep architecture discussion.

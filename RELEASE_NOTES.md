@@ -1,4 +1,21 @@
-# Unreleased — staged for the next cut
+# Genie 5 — v5.0.0
+
+**"True Colours"** — the first stable release of Genie 5. After the alpha and beta series,
+Genie 5 is a DragonRealms client for Windows, macOS and Linux that runs your Genie 4
+scripts, maps and settings. From here on, finished releases are published as stable
+releases and test builds as pre-releases; see **Stable and beta channels** under Notes.
+
+This release itself is the one where the Presets tab does what it did in Genie 4.
+Presets that were saved and shown but never used now colour commands, script output,
+the vitals bars, the map and the window chrome, and repaint the moment you change one.
+Around that: roundtime as a Genie 4 countdown bar, a combined spell timer, two
+ready-made windowed layouts, opt-in festival maps, column-aligned output and a Mono
+font setting that work on Linux, and a run of script-timing and travel fixes from
+Linux testing. Most of it is contributor work — thanks @dylb0t.
+
+**Before you update,** two things look or behave differently: bracketed room titles and
+the vitals bars take Genie 4's stock colours, and `waiteval` now waits for a change.
+Both are under Notes below, with how to get the old result back.
 
 ## ✨ New
 - **Festival maps straight from the Maps repo, no root copy needed** — the community
@@ -127,6 +144,14 @@
   before. Thanks @dylb0t ([#395](https://github.com/GenieClient/Genie5/issues/395), [#422](https://github.com/GenieClient/Genie5/pull/422)).
 
 ## 💡 Notes
+- **Stable and beta channels** — until now every build was a pre-release, so Genie
+  followed the **beta** channel. From 5.0.0 there are two kinds of release. *Stable*
+  releases are numbered like `5.0.1` or `5.1.0`. *Pre-releases* are test builds of the
+  next stable release, numbered like `5.1.0-beta.1`. The **Channel** box in **Help ▸
+  Check for Updates** picks which you get: **stable** offers stable releases only,
+  **beta** offers both. **This update moves every install to the stable channel once.**
+  If you want the test builds, set **Channel** back to **beta** after updating; that
+  choice is then kept.
 - **Room titles, links and URLs now take their colours from presets** — Genie 5 no
   longer paints any game text with built-in colours of its own. Bracketed room titles
   used to be light blue; they now use the `roomname` preset, whose stock colour is

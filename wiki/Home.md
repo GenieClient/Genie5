@@ -4,7 +4,7 @@ Genie 5 is a cross-platform client for **[DragonRealms](https://www.play.net/dr)
 
 ![Genie 5 in play — dockable panels around the game text, with the Mapper floating](images/interface-default-layout.png)
 
-> ⚠️ **Beta.** Genie 5 is in active development — feature-complete for daily play, expect rough edges. Pages here describe current behavior and flag 🚧 items that are still on the roadmap.
+> **Stable since 5.0.0.** Genie 5 is feature-complete for daily play and in active development. Pages here describe current behavior and flag 🚧 items that are still on the roadmap.
 
 > ⬇️ **Pre-built downloads are here.** Native builds ship for **Windows, macOS (Apple Silicon + Intel), and Linux**, with an in-app updater on each. Grab the [latest release](https://github.com/GenieClient/Genie5/releases/latest) — see [Installation](Installation) to pick the right one, and [Releases & Changelog](Releases) for what's new.
 

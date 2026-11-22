@@ -23,7 +23,7 @@ If you're new to the codebase, read in this order: **[SGE Protocol](SGE_PROTOCOL
 | [Build & Release](build-and-release.md) | | Per-platform publish, the CI release pipeline (Velopack packaging, SignPath signing), and version stamping. |
 | [Genie 4 vs Genie 5](GENIE4_VS_GENIE5.md) | ✅ | Comprehensive feature-by-feature comparison against the original Windows client. |
 | [AutoMapper Design](AUTOMAPPER_DESIGN.md) | 🚧 | The full auto-walk design proposal: skill-weighted paths, cross-zone travel, user-editable connection database. |
-| [Roadmap](ROADMAP.md) | ✅ | The public roadmap — current beta status, the horizons to stable 5.0.0 and beyond. |
+| [Roadmap](ROADMAP.md) | ✅ | The public roadmap — where the current release stands and the horizons beyond it. |
 | [Policy](POLICY.md) | ✅ | DragonRealms policy compliance — the hard nevers and the design choices that keep automation attended. |
 | [JavaScript Scripts](javascript-scripts.md) | ✅ | The Jint-based `.js` array-script engine: the `genie.*` bridge, `include` libraries, and runtime guards. |
 | [Settings Reference](SETTINGS_REFERENCE.md) | ✅ | Every `settings.cfg` key — defaults, accepted values, and what each does — grouped by category. |

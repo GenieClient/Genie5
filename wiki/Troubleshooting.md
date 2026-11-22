@@ -8,7 +8,7 @@ Common problems and quick fixes. If none of these help, drop into [Discord](http
 Pre-built builds ship for all three platforms — see the [Installation](Installation#download-a-pre-built-build-recommended) tables. Short version: Windows → `01-Windows-Genie5-Setup.exe`; Linux → `04-Linux-Genie5.AppImage`; macOS → `02-macOS-Apple-Silicon-Genie5-Setup.pkg` (Apple Silicon, M1+) or `03-macOS-Intel-Genie5-Setup.pkg` (Intel, pre-2020). Check  → **About This Mac** if you're unsure which Mac you have.
 
 **macOS won't open the app ("developer cannot be verified" / "damaged").**
-Beta builds aren't notarized. On **macOS 15 and newer**, try to open the app once, then click **Open Anyway** in **System Settings ▸ Privacy & Security**. On **macOS 14**, right-click the app → **Open** → **Open**. Either way macOS remembers it. If it reports "damaged," clear the download quarantine: `xattr -d com.apple.quarantine /Applications/Genie5.app` (or `xattr -cr <path>`). Running from source with `dotnet run` avoids this entirely.
+macOS builds aren't notarized yet. On **macOS 15 and newer**, try to open the app once, then click **Open Anyway** in **System Settings ▸ Privacy & Security**. On **macOS 14**, right-click the app → **Open** → **Open**. Either way macOS remembers it. If it reports "damaged," clear the download quarantine: `xattr -d com.apple.quarantine /Applications/Genie5.app` (or `xattr -cr <path>`). Running from source with `dotnet run` avoids this entirely.
 
 **Windows SmartScreen blocks the exe.**
 Builds from before v5.0.0-alpha.10 are unsigned and always trigger the blue panel: **More info → Run anyway**. Since alpha.10, `Genie5.exe` is EV-signed by Shadow Realms LLC (the project's support partner); a brand-new signed build may still show the panel briefly while SmartScreen reputation accrues per file. See [Installation](Installation).
@@ -87,7 +87,7 @@ Cross-zone routing is built in — `#goto` a room in another zone (or click one 
 No network, a proxy/firewall blocking the repo host, or a badly-skewed system clock (which breaks TLS). Local maps are never corrupted by a failed update — failed files are skipped; re-run later. See [Updating Maps & Scripts](Updating-Maps-and-Scripts#troubleshooting).
 
 **The app updater didn't offer an update.**
-In-app **Core** updates work on all three platforms with any official download — Setup.exe and the Portable `.zip` alike are Velopack-aware. What *can't* self-update is a source build (`dotnet run` / a raw publish folder); the Updates dialog tells you so. Also check the **channel** selector in the Updates dialog (during the beta it should be on **beta** — the stable channel stays "up to date" until 5.0.0 ships). As a last resort, re-download from [Releases](https://github.com/GenieClient/Genie5/releases/latest). See [Keeping Up to Date](Updates#core-the-app).
+In-app **Core** updates work on all three platforms with any official download — Setup.exe and the Portable `.zip` alike are Velopack-aware. What *can't* self-update is a source build (`dotnet run` / a raw publish folder); the Updates dialog tells you so. Also check the **channel** selector in the Updates dialog (**stable** offers stable releases only; **beta** also offers pre-release test builds). As a last resort, re-download from [Releases](https://github.com/GenieClient/Genie5/releases/latest). See [Keeping Up to Date](Updates#core-the-app).
 
 ## Resetting to a clean state
 

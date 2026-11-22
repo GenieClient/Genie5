@@ -1,6 +1,6 @@
 # Contributing to Genie 5
 
-Thanks for your interest. Genie 5 is beta-stage software with a small contributor base; clear bug reports and focused PRs are the most useful things you can offer.
+Thanks for your interest. Genie 5 is a young project with a small contributor base; clear bug reports and focused PRs are the most useful things you can offer.
 
 ## Quick links
 
@@ -141,8 +141,8 @@ in, neither of which requires writing code:
   rebuilds itself daily from those counts, and you can always sort the raw list
   [by votes](https://github.com/GenieClient/Genie5/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc).
 - **Polls in [Discussions](https://github.com/GenieClient/Genie5/discussions/categories/polls).**
-  Before each beta, a poll goes up with a short list of candidates for that
-  cycle. One vote per person, and it closes when the beta is cut.
+  Before each release cycle, a poll goes up with a short list of candidates for
+  that cycle. One vote per person, and it closes when the release is cut.
 
 Votes are input, not a contract. They show where demand is and they break ties,
 but a crash affecting three people still outranks a convenience feature fifty

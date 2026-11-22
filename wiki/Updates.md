@@ -25,7 +25,7 @@ Every official download is updater-aware — including the portable forms. The W
 
 > **Signing:** **Windows** release binaries are EV code-signed (since v5.0.0-alpha.10) under **Shadow Realms LLC**, the project's support partner — see the [README's code-signing section](https://github.com/GenieClient/Genie5/blob/main/README.md#code-signing-policy). **macOS and Linux** builds are unsigned for now, so those platforms show a first-launch warning ([details](Installation#platform-first-launch-notes)).
 
-> **Release channel (while we're in beta):** the Core updater has a **stable** / **beta** channel selector in the Updates dialog. Every current build ships as a GitHub **pre-release**, so during the alpha/beta period Genie defaults to the **beta** channel — that's what lets the in-app updater see new beta builds. If you ever switch to **stable** you'll see "up to date" until the first non-prerelease (5.0.0) ships. Leave it on **beta** to ride the test releases.
+> **Release channel:** the Core updater has a **stable** / **beta** channel selector in the Updates dialog. **Stable** (the default) offers stable releases only, such as `5.0.1` or `5.1.0`. **Beta** also offers pre-releases, the test builds of the next stable release, such as `5.1.0-beta.1`; a beta-channel install still gets every stable release. Updating to 5.0.0 moved every install to **stable** once, because before 5.0.0 every build was a pre-release and beta was the only channel that offered updates. Pick **beta** again if you want the test builds; that choice is kept.
 
 ## Maps
 

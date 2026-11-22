@@ -2,13 +2,33 @@
 
 Where to get Genie 5 and what changed in each build. Downloads live on the [Releases page](https://github.com/GenieClient/Genie5/releases); the [latest release](https://github.com/GenieClient/Genie5/releases/latest) is always the one to grab. For how to install each download, see [Installation](Installation); for staying current after that, [Keeping Up to Date](Updates).
 
-> Genie 5 is now in **beta**. Versions are tagged `v5.0.0-beta.N` or `v5.0.0-beta.N.M` (earlier builds were `v5.0.0-alpha.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
+> Genie 5 is **stable** as of v5.0.0. Stable releases are tagged like `v5.0.1` or `v5.1.0`; test builds of the next stable release are published as pre-releases, tagged like `v5.1.0-beta.1` (builds before 5.0.0 were `v5.0.0-alpha.N` and `v5.0.0-beta.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Latest: v5.0.0-beta.9.10.1 — Second Pass
+## Latest: v5.0.0 — True Colours
+
+**The first stable release of Genie 5.** It is also the release where the Presets tab does what it did in Genie 4: presets that were saved but never used now colour commands, script output, the vitals bars, the map and the window chrome. Also roundtime as a countdown bar, a combined spell timer, windowed-mode layouts, opt-in festival maps, and a batch of Linux, script-timing and travel fixes.
+
+> **📡 Channels.** 5.0.0 is published as a stable release, and this update moves every install to the **stable** channel once. To keep getting test builds, set **Channel** back to **beta** in **Help → Check for Updates**. See [Keeping Up to Date](Updates#core-the-app).
+
+> **⚠ Two things change when you update.** Bracketed room titles and the vitals bars take Genie 4's stock colours (`#preset roomname #90A8F0` brings the old title colour back), and `waiteval` now waits for a change, as in Genie 4: a `waiteval` whose condition is already true no longer falls straight through. Use `if ($standing != 1) then waiteval $standing = 1` where a script relied on that.
+
+- **Presets work** — `inputuser`, `inputother`, `scriptecho` and `familiar` colour text; `health`, `mana`, `stamina`, `spirit` and `concentration` colour the vitals bars; the `automapper.*` presets colour the map; the `ui.*` presets colour the menu bar, command input and status strip; `castbar` colours the cast bar. A change on the **Presets** tab or with `#preset` repaints at once. Room titles, links and URLs use the `roomname`, `link` and `url` presets ([#406](https://github.com/GenieClient/Genie5/issues/406)).
+- **Roundtime styles** — **Layout ▸ Roundtime** picks **Badge**, **Countdown Badge** or **Countdown Bar (Genie 4)**, on the command bar or the hands strip ([#404](https://github.com/GenieClient/Genie5/issues/404)).
+- **Combined Spell Timer** — **Layout ▸ Combined Spell Timer** turns the hands strip's spell box into the cast bar, with seconds since preparing on the left and seconds until fully prepared on the right.
+- **Windowed-mode layouts** — **Layout ▸ Load Layout** has **Windowed Genie 4 Retro** and **Windowed Genie 5 Starter**, and right-click inside a window in windowed mode opens the window's menu ([#403](https://github.com/GenieClient/Genie5/issues/403), [#425](https://github.com/GenieClient/Genie5/issues/425)).
+- **Festival maps** — the Updates dialog's **Maps** tab has **Festivals** and **Quests (spoilers)** checkboxes that pull those folders of the Maps repository. Both are off by default. See [Updating Maps and Scripts](Updating-Maps-and-Scripts).
+- **Linux text alignment and the Mono font** — EXP, maps and appraisals line up on Linux; a font setting can be a list, and **Edit ▸ Display Settings** has **Mono font** and **Mono font size** ([#395](https://github.com/GenieClient/Genie5/issues/395)).
+- **Highlights** — a Regex highlight with capture groups colours only the groups, and BeginsWith colours the whole line, as in Genie 4 ([#397](https://github.com/GenieClient/Genie5/issues/397), [#400](https://github.com/GenieClient/Genie5/issues/400)).
+- **Scripts and travel** — a script resumes after the whole server read, so automapper.cmd stays in step on timed climbs ([#433](https://github.com/GenieClient/Genie5/issues/433)); crossing into the next map switches zones in the same step ([#426](https://github.com/GenieClient/Genie5/issues/426)); `#goto` to the room you are in answers `YOU HAVE ARRIVED!` ([#427](https://github.com/GenieClient/Genie5/issues/427)); the "You also see" line is no longer indented; a script's `quit` stays logged out ([#419](https://github.com/GenieClient/Genie5/issues/419)).
+- **Stability** — two crashes fixed (fast travel with the automapper on, [#398](https://github.com/GenieClient/Genie5/issues/398); a timed-out Healing check on a slow machine, [#399](https://github.com/GenieClient/Genie5/issues/399)), a stray interface error is logged instead of closing Genie, and **Edit ▸ Configuration** opens at once ([#402](https://github.com/GenieClient/Genie5/issues/402)).
+
+Thanks @dylb0t for most of the changes in this release.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0)
+
+## v5.0.0-beta.9.10.1 — Second Pass
 
 A small fixes release: right-click in the Healing window transfers outside wounds and scars too, the Mobs panel's ignore list scrolls, the game's mana pulse is no longer reported as an unknown tag, and on the experimental editor renderer Find opens the editor's own search panel.
-
-> **📡 Beta channel.** Beta builds ship as GitHub **pre-releases**, so the Core updater's **beta** channel delivers them; **Help → Check for Updates** offers **beta.9.10.1** as a delta from beta.9.10.
 
 - **Find on editor-renderer windows opens the editor's search panel** — on a game or stream window drawn by the experimental editor renderer (`#config useeditorgamewindow` / `useeditorstreamwindow`), Ctrl+F, Cmd+F on macOS and the window menu's **Find…** open the editor's own search panel (live match highlighting, match count, regex / match-case / whole-word) instead of the in-window Find bar. Standard-renderer windows keep the bar; a macro bound to Ctrl+F still wins. On Windows and Linux, Ctrl+F on an editor-renderer window now opens the panel rather than the bar. Thanks @simtel12 ([#258](https://github.com/GenieClient/Genie5/pull/258)).
 - **Right-click transfers outside wounds too** — right-click on a patient's wounded part sends the game's `transfer` for that figure's wound type (`transfer <patient> <part>`, `… internal <part> [scar]`, or `… <part> external scar`); in the Overlay that is the part's worst wound, and the wound card's **Transfer** button covers every axis. Where the game's own injuries dialog marked the part, its command still wins. See [the Healing window](The-Interface#the-healing-window).
