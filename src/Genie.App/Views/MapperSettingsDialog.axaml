@@ -11,9 +11,14 @@
 
   <StackPanel Margin="20" Spacing="14">
 
-    <CheckBox x:Name="EnableCheck"
-              Content="Enable AutoMapper"
-              ToolTip.Tip="Track your location on the map and record rooms/exits as you walk. Same as #config automapper and Window ▸ Show Mapper's engine."/>
+    <StackPanel Spacing="6">
+      <CheckBox x:Name="EnableCheck"
+                Content="Enable AutoMapper"
+                ToolTip.Tip="Track your location on the map, and allow #goto and #mapper. Off: the mapper ignores the game until you turn it back on. Same as #config automapper (Genie 4's File ▸ AutoMapper Enabled)."/>
+      <CheckBox x:Name="RecordCheck"
+                Content="Record new rooms as you walk"
+                ToolTip.Tip="Add rooms and exits the loaded map doesn't have yet. Edits the map in memory until you save it. Starts off every session. Same as the ⏺ Record button, #mapper record and #config automapperrecord."/>
+    </StackPanel>
 
     <StackPanel Spacing="4">
       <TextBlock Text="Map overlay opacity"/>

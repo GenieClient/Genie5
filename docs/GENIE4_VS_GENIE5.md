@@ -84,7 +84,7 @@ Everything V1 tagged 🔧 FIX BEFORE ALPHA is done, verified against beta.3 sour
 | Triggers Enabled (master toggle) | ✅ | ✅ File ▸ Master Toggles ▸ Triggers | ✅ | Same Enabled-flag gating; live-synced with `#config triggers off` |
 | Highlights / Substitutes / Aliases master toggles | ❌ | ✅ File ▸ Master Toggles | 🆕 | Genie 5's Master Toggles set extends beyond G4's (Highlights / Triggers / Substitutes / Gags / Aliases / Images), all backed by same-named settings.cfg keys |
 | Plugins Enabled (master toggle) | ✅ | ✅ per-plugin enable/disable (Plugins menu + `#plugin`) | 🆕 | Toggled individually; no single master switch |
-| AutoMapper Enabled (master toggle) | ✅ | ✅ "Enable AutoMapper" (`MapperSettingsDialog`) + `#config automapper` | ✅ | Caveat: off = "lookup-only" (position still tracked, no room auto-create), not a hard tracking kill |
+| AutoMapper Enabled (master toggle) | ✅ | ✅ "Enable AutoMapper" (`MapperSettingsDialog`) + `#config automapper` | ✅ | Off stops room tracking and `#goto` / `#mapper` reply "Mapper is currently disabled", as in Genie 4 (#401). Record is separate: `#config automapperrecord`, the ⏺ Record button, `#mapper record` |
 | Images Enabled (toggle) | ✅ | ✅ File ▸ Master Toggles ▸ Images | ✅ | Rides `showimages`; clears/re-fetches Portrait art live. Inline `<image>` rendering still deferred |
 | Mute Sounds (toggle) | ✅ | n/a | 🗓 | No audio yet |
 | Show Raw Data (toggle) | ✅ | ✅ Window ▸ Raw XML | ✅ | Dockable read-only live view of the raw server stream, hidden by default; tooltip notes it covers G4's Debug window |

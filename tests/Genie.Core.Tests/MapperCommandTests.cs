@@ -90,6 +90,35 @@ public class MapperCommandTests : IDisposable
         Assert.Empty(host.GameCommands);
     }
 
+    // ── #401: with the mapper off (#config automapper false), Genie 4 parity ──
+
+    [Theory]
+    [InlineData("#mapper reset")]
+    [InlineData("#mapper record on")]
+    [InlineData("#goto 42")]
+    [InlineData("#go2 bank")]
+    public void Mapper_off_answers_disabled_and_does_nothing(string input)
+    {
+        _config.SetSetting("automapper", "False");
+        var (host, engine) = Make();
+        engine.ProcessInput(input);
+
+        Assert.Equal(0, host.ResetCalls);
+        Assert.Null(host.LastMapperCommand);
+        Assert.Null(host.LastGoto);
+        Assert.Empty(host.GameCommands);
+        Assert.Contains(Genie.Core.Mapper.AutoMapperEngine.DisabledMessage, host.Echoes);
+        Assert.False(_config.AutoMapperRecord);
+    }
+
+    [Fact]
+    public void Mapper_on_by_default_goto_reaches_the_host()
+    {
+        var (host, engine) = Make();
+        engine.ProcessInput("#goto 42");
+        Assert.Equal("42", host.LastGoto);
+    }
+
     private sealed class FakeCommandHost : ICommandHost
     {
         public int     ResetCalls        { get; private set; }
@@ -104,7 +133,8 @@ public class MapperCommandTests : IDisposable
         public void SendToGame(string text, bool userInput = false, string origin = "", string? echoOverride = null)
             => GameCommands.Add(text);
 
-        public void Echo(string text) { }
+        public List<string> Echoes { get; } = new();
+        public void Echo(string text) => Echoes.Add(text);
         public void EchoTo(string text, string? window, string? color) { }
         public void EchoMain(string text, string? color, bool mono) { }
         public void EchoLink(string text, string command, string? window) { }
@@ -128,7 +158,8 @@ public class MapperCommandTests : IDisposable
         public void LayoutCommand(string args) { }
         public void PluginCommand(string args) { }
         public void ConfigCommand(string args) { }
-        public void MapperGoto(string args) { }
+        public string? LastGoto { get; private set; }
+        public void MapperGoto(string args) => LastGoto = args;
         public void PlaySound(string soundName) { }
         public void Speak(string text, bool urgent = false) { }
         public void TtsCommand(string args) { }

@@ -949,6 +949,14 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             if (field == Genie.Core.Config.ConfigFieldUpdated.MapperDebug) SyncMapperDebug();
         };
 
+        // The mapper's on/off switch (`#config automapper`, Genie 4 parity, #401).
+        AutoMapper.IsTracking = Config.AutoMapper;
+        Config.ConfigChanged += field =>
+        {
+            if (field == Genie.Core.Config.ConfigFieldUpdated.AutoMapper)
+                AutoMapper.IsTracking = Config.AutoMapper;
+        };
+
         // ── Live Audit (developer troubleshooting) ────────────────────────────
         // Off until `#audit on`. Tees raw XML + parsed events + live zone/room
         // into <LogDir>/live_audit.log so a collaborator can follow the session
