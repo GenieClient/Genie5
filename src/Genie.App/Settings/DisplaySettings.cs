@@ -80,6 +80,23 @@ public sealed class DisplaySettings : ReactiveObject
     /// <summary>Show the on-map colour legend (#157). Default on.</summary>
     [Reactive] public bool   ShowMapLegend { get; set; } = true;
 
+    // ── Compact-map options (#450) — the Mapper as a small docked minimap ──
+    /// <summary>The Mapper's Details flyout slides out when the pointer crosses
+    /// its strip. Off = it opens only when the strip is clicked. Default on.</summary>
+    [Reactive] public bool   MapDetailsOnHover { get; set; } = true;
+
+    /// <summary>Show the toolbar above the map (zone, level, zoom, edit). Default on.</summary>
+    [Reactive] public bool   ShowMapToolbar { get; set; } = true;
+
+    /// <summary>Show the status strip below the map (room title, exit buttons,
+    /// less-obvious paths). Default on.</summary>
+    [Reactive] public bool   ShowMapStatusStrip { get; set; } = true;
+
+    /// <summary>Right-click on a room starts the walk at once instead of opening
+    /// the Go Here menu. Default off: the menu guards against a mis-click
+    /// starting a long walk.</summary>
+    [Reactive] public bool   MapRightClickWalks { get; set; }
+
     /// <summary>
     /// Sort order for the Mapper's zone dropdown: <c>"name"</c> (A–Z, default),
     /// <c>"recent"</c> (file last-write time, newest first), or <c>"number"</c>

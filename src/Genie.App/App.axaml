@@ -926,7 +926,9 @@
         <!-- action (zone / level / zoom). Keeping it in the right-side    -->
         <!-- cluster put it next to "zoom in" which made it easy to click  -->
         <!-- by accident while intending a zoom action.                    -->
-        <Border Grid.Row="0" Background="{DynamicResource Theme.ToolbarBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,0,0,1" Padding="4,3">
+        <Border Grid.Row="0" Background="{DynamicResource Theme.ToolbarBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,0,0,1" Padding="4,3"
+                x:Name="MapToolbar"
+                IsVisible="{Binding ViewModel.ShowMapToolbar, FallbackValue=True}">
           <StackPanel Spacing="3">
           <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4">
             <!-- Pop out (window-level action, separated from data-level cluster) -->
@@ -1185,6 +1187,7 @@
                                     Palette="{Binding ViewModel.Palette}"
                                     AutoMapperAlpha="{Binding ViewModel.AutoMapperAlpha}"
                                     ShowLegend="{Binding ViewModel.ShowMapLegend}"
+                                    RightClickWalks="{Binding ViewModel.MapRightClickWalks}"
                                     NodeClickedCommand="{Binding ViewModel.GotoNodeCommand}"
                                     CrossZoneClickedCommand="{Binding ViewModel.OpenCrossZoneCommand}"
                                     EditExitCommand="{Binding ViewModel.EditExitCommand}"
@@ -1241,7 +1244,7 @@
                             VerticalAlignment="Stretch" HorizontalAlignment="Right"
                             HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                             AutomationProperties.Name="Open details panel"
-                            ToolTip.Tip="Hover to slide the Details panel out, or click to pin it open; the pin inside releases it.">
+                            ToolTip.Tip="Click to pin the Details panel open; the pin inside releases it. It also slides out on hover unless Maps ▸ Open Details on Hover is off.">
                 <!-- LayoutTransformControl, not RenderTransform: a render
                      transform doesn't affect layout, so the text was measured
                      against the strip's 24px WIDTH and clipped to "DETA"
@@ -1263,8 +1266,11 @@
               <Border x:Name="DetailsPanel" Width="260"
                       Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1,0,0,0">
                 <Border.IsVisible>
-                  <MultiBinding Converter="{x:Static controls:BoolOrConverter.Instance}">
+                  <!-- Open when pinned, or hovered with hover-to-open on
+                       (Maps ▸ Open Details on Hover, #450). -->
+                  <MultiBinding Converter="{x:Static controls:HoverOrPinnedConverter.Instance}">
                     <Binding Path="#DetailsFlyout.IsPointerOver"/>
+                    <Binding Path="ViewModel.MapDetailsOnHover"/>
                     <Binding Path="ViewModel.DetailsPinned"/>
                   </MultiBinding>
                 </Border.IsVisible>
@@ -1430,7 +1436,9 @@
         </Grid>
 
         <!-- ── ROW 2: compact status strip — current room + exits + diag ─ -->
-        <Border Grid.Row="2" Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0" Padding="6,3">
+        <Border Grid.Row="2" Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0" Padding="6,3"
+                x:Name="MapStatusStrip"
+                IsVisible="{Binding ViewModel.ShowMapStatusStrip, FallbackValue=True}">
           <StackPanel Spacing="2">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">

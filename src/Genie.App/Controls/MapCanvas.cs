@@ -192,6 +192,12 @@ public class MapCanvas : Control
     public static readonly StyledProperty<bool> ShowLegendProperty =
         AvaloniaProperty.Register<MapCanvas, bool>(nameof(ShowLegend), defaultValue: true);
 
+    /// <summary>Right-click on a room walks there at once instead of opening the
+    /// menu (#450). Default off. Shift+right-click and a right-click that misses
+    /// every room still open the menu, and edit mode always does.</summary>
+    public static readonly StyledProperty<bool> RightClickWalksProperty =
+        AvaloniaProperty.Register<MapCanvas, bool>(nameof(RightClickWalks));
+
     // ── Editor styled properties (Genie 4 AutoMapper edit toolbar) ─────────
 
     /// <summary>When true, left-click selects a node and drag moves it
@@ -300,6 +306,7 @@ public class MapCanvas : Control
     public MapPalette? Palette          { get => GetValue(PaletteProperty);            set => SetValue(PaletteProperty, value); }
     public int       AutoMapperAlpha    { get => GetValue(AutoMapperAlphaProperty);    set => SetValue(AutoMapperAlphaProperty, value); }
     public bool      ShowLegend         { get => GetValue(ShowLegendProperty);         set => SetValue(ShowLegendProperty, value); }
+    public bool      RightClickWalks    { get => GetValue(RightClickWalksProperty);    set => SetValue(RightClickWalksProperty, value); }
     public ICommand? EditExitCommand    { get => GetValue(EditExitCommandProperty);    set => SetValue(EditExitCommandProperty, value); }
 
     // ── Hover state (internal, drives the tooltip paint) ──────────────────
@@ -910,6 +917,12 @@ public class MapCanvas : Control
 
     // ── Input ─────────────────────────────────────────────────────────────
 
+    /// <summary>Whether a right-click walks to the room instead of opening the
+    /// menu (#450): only with the option on, on a room, outside edit mode, and
+    /// without Shift held.</summary>
+    internal static bool ShouldWalkOnRightClick(bool optionOn, bool hitRoom, bool editMode, bool shiftHeld)
+        => optionOn && hitRoom && !editMode && !shiftHeld;
+
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -931,7 +944,18 @@ public class MapCanvas : Control
             // actions (Float / Close) are always live. The dock chrome's own
             // menu is suppressed in OnContextRequested so only this one shows.
             var at = e.GetPosition(this);
-            ShowContextMenu(HitTest(at), at);
+            var hitNode = HitTest(at);
+            // Opt-in shortcut (#450): walk straight to the room. The menu stays
+            // reachable with Shift, on empty map, and throughout edit mode.
+            if (ShouldWalkOnRightClick(RightClickWalks, hitNode is not null, EditMode,
+                                       e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                && NodeClickedCommand?.CanExecute(hitNode) == true)
+            {
+                NodeClickedCommand.Execute(hitNode);
+                e.Handled = true;
+                return;
+            }
+            ShowContextMenu(hitNode, at);
             e.Handled = true;
             return;
         }

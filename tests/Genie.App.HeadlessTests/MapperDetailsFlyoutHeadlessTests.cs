@@ -216,4 +216,97 @@ public class MapperDetailsFlyoutHeadlessTests
         }
         finally { window.Close(); }
     }
+
+    /// <summary>Compact-map option (#450): with "Open Details on Hover" off the
+    /// pointer crossing the strip does nothing; a click (pin) is the way in.</summary>
+    [AvaloniaFact]
+    public void With_hover_to_open_off_the_panel_opens_only_when_pinned()
+    {
+        EnsureProductionTemplates();
+        var dir  = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "genie_headless_" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var vm = new MapperViewModel();
+        vm.AttachDisplay(new Genie.App.Settings.DisplaySettings(), System.IO.Path.Combine(dir, "display.json"));
+        vm.MapDetailsOnHover = false;
+        var tool   = new MapperTool(vm);
+        var window = new Window { Width = 1000, Height = 700, Content = new ContentControl { Content = tool } };
+        window.Show();
+        Pump(window);
+        try
+        {
+            var strip = Named<ToggleButton>(window, "DetailsStrip");
+            var panel = Named<Border>(window, "DetailsPanel");
+
+            var centre = strip.TranslatePoint(new Point(strip.Bounds.Width / 2, strip.Bounds.Height / 2), window);
+            window.MouseMove(centre!.Value);
+            Pump(window);
+            Assert.False(panel.IsVisible, "hovering the strip must not open the panel while hover-to-open is off");
+
+            strip.IsChecked = true;      // what a click on the strip does
+            Pump(window);
+            Assert.True(panel.IsVisible, "clicking the strip still opens (pins) the panel");
+
+            vm.DetailsPinned = false;
+            Pump(window);
+            Assert.False(panel.IsVisible);
+
+            // Turning the option back on restores hover-to-open without a restart.
+            vm.MapDetailsOnHover = true;
+            window.MouseMove(new Point(50, 300));
+            Pump(window);
+            window.MouseMove(centre.Value);
+            Pump(window);
+            Assert.True(panel.IsVisible, "hover should open the panel again once the option is back on");
+        }
+        finally
+        {
+            window.Close();
+            try { System.IO.Directory.Delete(dir, true); } catch { }
+        }
+    }
+
+    /// <summary>Compact-map options (#450): the toolbar and the status strip can
+    /// each be hidden, and the map row takes the room they gave up.</summary>
+    [AvaloniaFact]
+    public void Hiding_the_toolbar_and_status_strip_gives_their_room_to_the_map()
+    {
+        EnsureProductionTemplates();
+        var dir  = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "genie_headless_" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var vm = new MapperViewModel();
+        vm.AttachDisplay(new Genie.App.Settings.DisplaySettings(), System.IO.Path.Combine(dir, "display.json"));
+        var tool   = new MapperTool(vm);
+        var window = new Window { Width = 1000, Height = 700, Content = new ContentControl { Content = tool } };
+        window.Show();
+        Pump(window);
+        try
+        {
+            var toolbar = Named<Border>(window, "MapToolbar");
+            var status  = Named<Border>(window, "MapStatusStrip");
+            var flyout  = Named<Border>(window, "DetailsFlyout");
+            Assert.True(toolbar.IsVisible, "toolbar shows by default");
+            Assert.True(status.IsVisible, "status strip shows by default");
+            var before = flyout.Bounds.Height;
+
+            vm.ShowMapToolbar     = false;
+            vm.ShowMapStatusStrip = false;
+            Pump(window);
+
+            Assert.False(toolbar.IsVisible);
+            Assert.False(status.IsVisible);
+            Assert.True(flyout.Bounds.Height > before,
+                $"the map row should grow when the bars hide (was {before}, now {flyout.Bounds.Height})");
+
+            vm.ShowMapToolbar     = true;
+            vm.ShowMapStatusStrip = true;
+            Pump(window);
+            Assert.True(toolbar.IsVisible);
+            Assert.True(status.IsVisible);
+        }
+        finally
+        {
+            window.Close();
+            try { System.IO.Directory.Delete(dir, true); } catch { }
+        }
+    }
 }

@@ -894,6 +894,22 @@
                   ToggleType="CheckBox"
                   IsChecked="{Binding Mapper.ShowMapLegend, Mode=TwoWay}"
                   ToolTip.Tip="Show the on-map colour key (room / path / exit-stub colours) in the top-left of the map."/>
+        <MenuItem Header="Show Map _Toolbar"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Mapper.ShowMapToolbar, Mode=TwoWay}"
+                  ToolTip.Tip="Show the bar above the map (zone, level, zoom, edit). Hide it to give a small docked map more room."/>
+        <MenuItem Header="Show Map Status _Bar"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Mapper.ShowMapStatusStrip, Mode=TwoWay}"
+                  ToolTip.Tip="Show the strip below the map (room title, exit buttons, less-obvious paths). Hide it to give a small docked map more room."/>
+        <MenuItem Header="Open _Details on Hover"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Mapper.MapDetailsOnHover, Mode=TwoWay}"
+                  ToolTip.Tip="Slide the Details panel out when the pointer crosses its strip. When off, it opens only when you click the strip."/>
+        <MenuItem Header="_Right-Click Walks to Room"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Mapper.MapRightClickWalks, Mode=TwoWay}"
+                  ToolTip.Tip="Right-click a room to walk there at once, without the Go Here menu. Shift+right-click, or right-click on empty map, still opens the menu."/>
         <Separator/>
         <MenuItem Header="_Update from Official Repo..."
                   Command="{Binding Mapper.UpdateMapsCommand}"

@@ -247,6 +247,49 @@ public partial class MapperViewModel : ReactiveObject
         }
     }
 
+    // ── Compact-map options (#450) ────────────────────────────────────────
+    // Same shape as ShowMapLegend: two-way, stored in display.json, and the
+    // stock value until a DisplaySettings is attached.
+
+    /// <summary>The Details flyout opens when the pointer crosses its strip.
+    /// Off = it opens only on a click (which pins it). Default on.</summary>
+    public bool MapDetailsOnHover
+    {
+        get => _display?.MapDetailsOnHover ?? true;
+        set => SetDisplayFlag(d => d.MapDetailsOnHover, (d, v) => d.MapDetailsOnHover = v, value);
+    }
+
+    /// <summary>Show the toolbar above the map. Default on.</summary>
+    public bool ShowMapToolbar
+    {
+        get => _display?.ShowMapToolbar ?? true;
+        set => SetDisplayFlag(d => d.ShowMapToolbar, (d, v) => d.ShowMapToolbar = v, value);
+    }
+
+    /// <summary>Show the status strip below the map. Default on.</summary>
+    public bool ShowMapStatusStrip
+    {
+        get => _display?.ShowMapStatusStrip ?? true;
+        set => SetDisplayFlag(d => d.ShowMapStatusStrip, (d, v) => d.ShowMapStatusStrip = v, value);
+    }
+
+    /// <summary>Right-click on a room walks there at once, skipping the Go Here
+    /// menu. Default off.</summary>
+    public bool MapRightClickWalks
+    {
+        get => _display?.MapRightClickWalks ?? false;
+        set => SetDisplayFlag(d => d.MapRightClickWalks, (d, v) => d.MapRightClickWalks = v, value);
+    }
+
+    private void SetDisplayFlag(Func<DisplaySettings, bool> get, Action<DisplaySettings, bool> set, bool value,
+                                [System.Runtime.CompilerServices.CallerMemberName] string? name = null)
+    {
+        if (_display is null || get(_display) == value) return;
+        set(_display, value);
+        try { if (!string.IsNullOrEmpty(_displayPath)) _display.Save(_displayPath); } catch { /* best effort */ }
+        this.RaisePropertyChanged(name);
+    }
+
     /// <summary>
     /// Scale factor for the map canvas, bound to <c>MapCanvas.Zoom</c>.
     /// Coerced to [0.4, 4.0] inside the control; we let the user push freely
@@ -1029,6 +1072,10 @@ public partial class MapperViewModel : ReactiveObject
         _display     = display;
         _displayPath = displayPath;
         this.RaisePropertyChanged(nameof(ShowMapLegend));   // reflect the stored value (#157)
+        this.RaisePropertyChanged(nameof(MapDetailsOnHover));   // … and the compact-map options (#450)
+        this.RaisePropertyChanged(nameof(ShowMapToolbar));
+        this.RaisePropertyChanged(nameof(ShowMapStatusStrip));
+        this.RaisePropertyChanged(nameof(MapRightClickWalks));
 
         // Restore the zone-list sort order. Setting the property (when it
         // differs from the default) triggers the ctor subscription, which

@@ -132,6 +132,24 @@ floor, and only the arc kinds present. `EdgeKindFor` is shared with the
 renderer so the key cannot disagree with the map. Pinned to a clear viewport
 corner; no rows means no panel. Tests: `MapCanvasLegendTests`.
 
+### Compact map (docked minimap)
+
+Four switches in the **Maps** menu let the Mapper sit as a small always-on
+panel (#450). All are stored in `display.json`, and the stock values leave the
+panel as it always was.
+
+| Maps menu item | Setting | Stock | Effect when changed |
+|---|---|---|---|
+| Show Map Toolbar | `ShowMapToolbar` | on | Hides the bar above the map (zone, level, zoom, edit). |
+| Show Map Status Bar | `ShowMapStatusStrip` | on | Hides the strip below the map (room title, exit buttons, less-obvious paths). |
+| Open Details on Hover | `MapDetailsOnHover` | on | Off: the Details panel opens only when its strip is clicked (which pins it). |
+| Right-Click Walks to Room | `MapRightClickWalks` | off | On: right-click a room to walk there with no Go Here menu. Shift+right-click, a right-click on empty map, and edit mode still open the menu. |
+
+**Show Map Legend** is the fifth piece of the same set. The Details panel's
+open state is decided by `HoverOrPinnedConverter` (pinned, or hovered with
+hover-to-open on); the right-click rule is `MapCanvas.ShouldWalkOnRightClick`.
+Tests: `MapperCompactOptionsTests`, `MapperDetailsFlyoutHeadlessTests`.
+
 ### Labels, tags and notes
 
 Three different things carry text on a map, and only one is drawn:
