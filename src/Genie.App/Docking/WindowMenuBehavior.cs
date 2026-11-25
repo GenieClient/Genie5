@@ -120,6 +120,16 @@ public static class WindowMenuBehavior
         if (ResolveMenuTarget(menu) is { } target)
             _currentTarget = target;
         _copy.RaiseCanExecuteChanged();
+
+        // The float state has the same first-open trap. At Opening the menu has
+        // not inherited this window's DataContext yet, so the refresh there
+        // finds no host and is skipped: a window floated by a double-click on
+        // its tab (or dragged out) still offered "Float", without "Hide Title
+        // Bar", and a float dragged back into the dock still offered "Re-dock".
+        // By Opened the DataContext is the dockable. The open menu updates live
+        // through the model's change notifications.
+        if (menu.DataContext is IWindowMenuHost host)
+            host.WindowMenu?.RefreshFloatState();
     }
 
     /// <summary>The control the menu is attached to (the window's content
