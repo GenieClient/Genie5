@@ -258,7 +258,7 @@
         <StackPanel Grid.Column="0" Spacing="2">
           <TextBlock FontSize="10" Foreground="{DynamicResource Theme.SectionHeader}"
                      Text="{Binding SelectedRunning.Name, StringFormat='SELECTED — {0}'}"/>
-          <TextBlock FontSize="11" FontFamily="Consolas,Menlo,monospace"
+          <TextBlock FontSize="11" FontFamily="{DynamicResource Genie.UiMonoFont}"
                      Foreground="{DynamicResource Theme.TextSecondary}"
                      Text="{Binding SelectedRunning.DetailText}"
                      TextTrimming="CharacterEllipsis"/>
@@ -292,7 +292,7 @@
                       HorizontalScrollBarVisibility="Disabled"
                       controls:AutoScrollBehavior.ItemsSource="{Binding Output}">
           <ItemsControl ItemsSource="{Binding Output}"
-                        FontFamily="Consolas,Menlo,monospace" FontSize="11"
+                        FontFamily="{DynamicResource Genie.UiMonoFont}" FontSize="11"
                         Foreground="{DynamicResource Theme.TextSecondary}" Margin="4">
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="vm:TextLine">

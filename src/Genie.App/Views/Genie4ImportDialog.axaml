@@ -25,7 +25,7 @@
       <Grid ColumnDefinitions="*,Auto">
         <TextBox Grid.Column="0" Text="{Binding SourcePath}"
                  AutomationProperties.Name="Genie 4 config folder"
-                 FontFamily="Consolas,Courier New,monospace" FontSize="11"
+                 FontFamily="{DynamicResource Genie.EditorMonoFont}" FontSize="11"
                  Watermark="C:\Users\You\AppData\Roaming\Genie Client 4\Config"/>
         <Button Grid.Column="1" Content="Browse…" Margin="4,0,0,0"
                 Command="{Binding BrowseCommand}"/>
@@ -189,7 +189,7 @@
                 IsVisible="{Binding ResultMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <SelectableTextBlock Text="{Binding ResultMessage}"
                                Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11"
-                               FontFamily="Consolas,Courier New,monospace"/>
+                               FontFamily="{DynamicResource Genie.EditorMonoFont}"/>
         </Border>
 
       </StackPanel>

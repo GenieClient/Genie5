@@ -40,6 +40,10 @@ public class App : Application
             // to the data root that was just chosen.
             Program.RefreshCrashLogPath();
 
+            // #393: swap the UI's fixed font lists for the families that are
+            // installed before the first window measures any text.
+            Controls.EditorFonts.EnsureRegistered();
+
             var window = new MainWindow { DataContext = new MainWindowViewModel(startup) };
             desktop.MainWindow = window;
             window.Show();

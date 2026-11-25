@@ -47,7 +47,7 @@
                    VerticalAlignment="Center"
                    Padding="4,0,0,0"
                    FontSize="11"
-                   FontFamily="Verdana,Segoe UI,sans-serif"
+                   FontFamily="{DynamicResource Genie.TitleFont}"
                    Foreground="{DynamicResource Theme.TextPrimary}"
                    TextTrimming="CharacterEllipsis"
                    TextWrapping="NoWrap" />

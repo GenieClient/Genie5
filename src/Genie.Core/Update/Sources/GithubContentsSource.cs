@@ -21,8 +21,6 @@ namespace Genie.Core.Update.Sources;
 /// </summary>
 public sealed class GithubContentsSource : IFileListSource
 {
-    private const string DefaultUserAgent = "Genie5-Updater";
-
     private readonly HttpClient _http;
     private readonly string     _owner;
     private readonly string     _repo;
@@ -73,26 +71,13 @@ public sealed class GithubContentsSource : IFileListSource
                     ? $"{_owner}/{_repo}"
                     : $"{_owner}/{_repo}/{_path}");
 
-        if (http != null)
-        {
-            _http = http;
-        }
-        else
-        {
-            // Long timeout — the listing call is small but downloading every
-            // file in series can run up against the default 100s on a slow link.
-            _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-            _http.DefaultRequestHeaders.Accept.Clear();
-            _http.DefaultRequestHeaders.Accept.Add(
-                new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
-            _http.DefaultRequestHeaders.UserAgent.ParseAdd(DefaultUserAgent);
-        }
+        _http = http ?? GithubHttp.CreateClient();
     }
 
     public async Task<FileListInfo> GetFileListAsync(CancellationToken ct = default)
     {
         var url         = BuildListingUrl();
-        var listingJson = await _http.GetStringAsync(url, ct);
+        var listingJson = await GithubHttp.GetStringAsync(_http, url, ct);
         var entries     = JsonSerializer.Deserialize<List<RepoEntry>>(listingJson) ?? new();
 
         var files = entries
@@ -109,7 +94,9 @@ public sealed class GithubContentsSource : IFileListSource
 
     public async Task<byte[]> DownloadFileAsync(FileEntry file, CancellationToken ct = default)
     {
-        return await _http.GetByteArrayAsync(file.DownloadUrl, ct);
+        // download_url is the feed's to choose — GithubHttp refuses anything
+        // that is not HTTPS on a GitHub host, at every redirect hop (dev #46).
+        return await GithubHttp.GetBytesAsync(_http, file.DownloadUrl, ct);
     }
 
     /// <summary>The Contents API URL this source lists — exposed so a test can

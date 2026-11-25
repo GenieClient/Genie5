@@ -19,8 +19,9 @@ namespace Genie.Core.Update.Updaters;
 /// returns success once the file is on disk, and the GUI can offer
 /// "Reload now" or leave it for the next session.</para>
 ///
-/// <para><b>Trust model in v1.</b> HTTPS-only (the GitHub asset CDN is HTTPS;
-/// custom manifest URLs are validated up-front by the source). SHA256 of the
+/// <para><b>Trust model in v1.</b> HTTPS-only and GitHub-hosts-only: the
+/// source's <c>GithubHttp</c> refuses the asset URL, or any redirect hop, that
+/// is anything else (dev #46). SHA256 of the
 /// downloaded bytes is computed and surfaced in <see cref="UpdateApplyResult"/>;
 /// no verification against a signed manifest yet — that's Phase 4 hardening
 /// together with the <c>PluginKey</c>/<c>IsVerified</c> trust model ported

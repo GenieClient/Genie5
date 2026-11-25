@@ -99,6 +99,27 @@ public class MonoFontHeadlessTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void A_list_with_nothing_installed_becomes_the_platform_default_font()
+    {
+        // Public #393: settings synced from Windows hold a lone "Cascadia Mono".
+        // Handed that as written, Avalonia on Linux reloaded the fallback font's
+        // data on every lookup and never freed it. The renderer now gets the
+        // family it fell back to anyway, by name.
+        string? Lookup(string name) => name == "DejaVu Sans Mono" ? name : null;
+
+        Assert.Equal("Noto Sans", FontChain.RendererList("Cascadia Mono", Lookup, () => "Noto Sans"));
+        Assert.Equal("Noto Sans", FontChain.RendererList("Consolas, Menlo", Lookup, () => "Noto Sans"));
+
+        // An installed family still wins, and the default is not appended to it.
+        Assert.Equal("DejaVu Sans Mono",
+            FontChain.RendererList("Cascadia Mono, DejaVu Sans Mono", Lookup, () => "Noto Sans"));
+
+        // The default unknown (no font manager yet): the setting as written.
+        Assert.Equal("Cascadia Mono", FontChain.RendererList("Cascadia Mono", Lookup, () => null));
+        Assert.Equal("Cascadia Mono", FontChain.RendererList("Cascadia Mono", Lookup, () => ""));
+    }
+
+    [AvaloniaFact]
     public void Font_picker_converter_turns_a_name_into_a_font()
     {
         var f = FontChain.NameToFamily.Convert("DejaVu Sans Mono", typeof(FontFamily), null,

@@ -28,8 +28,6 @@ namespace Genie.Core.Update.Sources;
 /// </summary>
 public sealed class GithubTreeSource : IFileListSource
 {
-    private const string DefaultUserAgent = "Genie5-Updater";
-
     private readonly HttpClient _http;
     private readonly string     _owner;
     private readonly string     _repo;
@@ -68,20 +66,7 @@ public sealed class GithubTreeSource : IFileListSource
             ? $"{_owner}/{_repo}"
             : $"{_owner}/{_repo}/{_pathPrefix}";
 
-        if (http != null)
-        {
-            _http = http;
-        }
-        else
-        {
-            // Same shape as GithubContentsSource: long timeout because the
-            // per-file downloads run in series on the same client.
-            _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-            _http.DefaultRequestHeaders.Accept.Clear();
-            _http.DefaultRequestHeaders.Accept.Add(
-                new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
-            _http.DefaultRequestHeaders.UserAgent.ParseAdd(DefaultUserAgent);
-        }
+        _http = http ?? GithubHttp.CreateClient();
     }
 
     /// <summary>Split a <c>".cmd,.js"</c>-style filter string into normalized lowercase extensions.</summary>
@@ -94,7 +79,7 @@ public sealed class GithubTreeSource : IFileListSource
     public async Task<FileListInfo> GetFileListAsync(CancellationToken ct = default)
     {
         var url  = $"https://api.github.com/repos/{_owner}/{_repo}/git/trees/HEAD?recursive=1";
-        var json = await _http.GetStringAsync(url, ct);
+        var json = await GithubHttp.GetStringAsync(_http, url, ct);
         var tree = JsonSerializer.Deserialize<TreeResponse>(json) ?? new();
 
         var prefix = _pathPrefix.Length == 0 ? "" : _pathPrefix + "/";
@@ -121,7 +106,7 @@ public sealed class GithubTreeSource : IFileListSource
 
     public async Task<byte[]> DownloadFileAsync(FileEntry file, CancellationToken ct = default)
     {
-        return await _http.GetByteArrayAsync(file.DownloadUrl, ct);
+        return await GithubHttp.GetBytesAsync(_http, file.DownloadUrl, ct);
     }
 
     /// <summary>Escape each path segment individually so '/' separators survive.</summary>

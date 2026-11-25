@@ -1059,9 +1059,120 @@ public sealed class CommandEngine
                     _host.Echo($"Macro removed: {parts[1]}");
                 }
                 break;
+            case "save":
+                HandleSaveLoad(parts, save: true);
+                break;
+            case "load":
+                HandleSaveLoad(parts, save: false);
+                break;
             default:
                 _host.Echo($"Unknown command: {parts[0]}");
                 break;
+        }
+    }
+
+    // ── #save / #load ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Genie 4's <c>#save &lt;list&gt; [&lt;list&gt; …]</c> and <c>#load …</c>
+    /// (Command.cs <c>case "save"</c> / <c>case "load"</c>): each word names a
+    /// list and is passed to that list's own save or load — the same code
+    /// <c>#var save</c>, <c>#alias save</c> and the rest run. Before this both
+    /// verbs were unknown, so a Genie 4 script's <c>put #save vars</c> wrote
+    /// nothing (public #440).
+    ///
+    /// <para>The words are Genie 4's, plus <c>shunt</c> for the one list Genie 5
+    /// added. <c>all</c> is every list; as in Genie 4 it leaves out
+    /// <c>layout</c> and <c>profile</c>. Those two have no one-word equivalent
+    /// here (layouts are named, profiles are written when edited), so they
+    /// answer with where to go instead of doing nothing silently. Genie 4
+    /// ignores a word it does not know; this names it, since a typo otherwise
+    /// looks like a save that worked.</para>
+    /// </summary>
+    private void HandleSaveLoad(IReadOnlyList<string> parts, bool save)
+    {
+        var verb = save ? "save" : "load";
+        if (parts.Count < 2)
+        {
+            _host.Echo($"Usage: #{verb} <list> [<list> ...] — lists: vars, aliases, classes, triggers, " +
+                       "config, macros, subs, gags, highlights, names, presets, shunts, all");
+            return;
+        }
+
+        for (int i = 1; i < parts.Count; i++)
+        {
+            var word = parts[i].ToLowerInvariant();
+            if (word == "all")
+            {
+                foreach (var list in AllSaveLists) SaveOrLoadList(list, save);
+                continue;
+            }
+            if (!SaveOrLoadList(word, save))
+                _host.Echo($"#{verb}: unknown list '{parts[i]}'");
+        }
+    }
+
+    /// <summary>What <c>#save all</c> / <c>#load all</c> cover, in Genie 4's order.</summary>
+    private static readonly string[] AllSaveLists =
+    {
+        "vars", "aliases", "classes", "triggers", "config", "macros",
+        "subs", "gags", "highlights", "names", "presets", "shunts",
+    };
+
+    /// <summary>Run one list's save or load. False when the word names no list.</summary>
+    private bool SaveOrLoadList(string word, bool save)
+    {
+        switch (word)
+        {
+            case "var": case "vars": case "variable": case "setvar": case "setvariable":
+                if (save) SaveVars(); else LoadVars();
+                return true;
+            case "alias": case "aliases":
+                if (save) SaveAliases(); else LoadAliases();
+                return true;
+            case "class": case "classes":
+                if (save) SaveClasses(); else LoadClasses();
+                return true;
+            case "trigger": case "triggers": case "action": case "actions":
+                if (save) SaveTriggers(); else LoadTriggers();
+                return true;
+            case "config": case "set": case "setting": case "settings":
+                // settings.cfg belongs to the App layer, as for #config save.
+                _host.ConfigCommand(save ? "save" : "load");
+                return true;
+            case "macro": case "macros":
+                if (save) SaveMacros(); else LoadMacros();
+                return true;
+            case "sub": case "subs": case "substitute":
+                if (save) SaveSubstitutes(); else LoadSubstitutes();
+                return true;
+            case "gag": case "gags": case "squelch": case "ignore": case "ignores":
+                if (save) SaveGags(); else LoadGags();
+                return true;
+            case "highlight": case "highlights":
+                if (save) SaveHighlights(); else LoadHighlights();
+                return true;
+            case "name": case "names":
+                if (save) SaveNamesFile(); else LoadNamesFile();
+                return true;
+            case "preset": case "presets":
+                if (save) SavePresetsFile(); else LoadPresetsFile();
+                return true;
+            case "shunt": case "shunts":
+                if (save) SaveShunts(); else LoadShunts();
+                return true;
+            case "layout":
+                _host.Echo(save
+                    ? "#save layout: layouts are named in Genie 5 — use #layout save <name>."
+                    : "#load layout: layouts are named in Genie 5 — use #layout load <name> (#layout list shows them).");
+                return true;
+            case "profile":
+                _host.Echo(save
+                    ? "#save profile: nothing to do — Genie 5 writes a profile when you edit it in the Connect dialog."
+                    : "#load profile: not available — pick the profile in the Connect dialog.");
+                return true;
+            default:
+                return false;
         }
     }
 

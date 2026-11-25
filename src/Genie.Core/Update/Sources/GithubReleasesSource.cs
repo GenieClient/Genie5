@@ -18,8 +18,6 @@ namespace Genie.Core.Update.Sources;
 /// </summary>
 public sealed class GithubReleasesSource : IReleaseSource
 {
-    private const string DefaultUserAgent = "Genie5-Updater";
-
     private readonly HttpClient _http;
     private readonly string     _owner;
     private readonly string     _repo;
@@ -32,18 +30,7 @@ public sealed class GithubReleasesSource : IReleaseSource
         _repo  = repo;
         Description = $"{_owner}/{_repo}";
 
-        if (http != null)
-        {
-            _http = http;
-        }
-        else
-        {
-            _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-            _http.DefaultRequestHeaders.Accept.Clear();
-            _http.DefaultRequestHeaders.Accept.Add(
-                new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
-            _http.DefaultRequestHeaders.UserAgent.ParseAdd(DefaultUserAgent);
-        }
+        _http = http ?? GithubHttp.CreateClient();
     }
 
     public async Task<ReleaseInfo?> GetLatestReleaseAsync(
@@ -59,9 +46,10 @@ public sealed class GithubReleasesSource : IReleaseSource
 
     public async Task<byte[]> DownloadAssetAsync(ReleaseAsset asset, CancellationToken ct = default)
     {
-        // GitHub release asset download URLs return 302 to S3 — HttpClient
-        // follows by default. No special handling needed.
-        return await _http.GetByteArrayAsync(asset.DownloadUrl, ct);
+        // browser_download_url is the feed's to choose, and GitHub answers it
+        // with a 302 to its asset host. GithubHttp follows that by hand and
+        // refuses any hop that is not HTTPS on a GitHub host (dev #46).
+        return await GithubHttp.GetBytesAsync(_http, asset.DownloadUrl, ct);
     }
 
     private async Task<ReleaseInfo?> GetLatestStableAsync(CancellationToken ct)
@@ -69,7 +57,7 @@ public sealed class GithubReleasesSource : IReleaseSource
         var url = $"https://api.github.com/repos/{_owner}/{_repo}/releases/latest";
         try
         {
-            var resp = await _http.GetAsync(url, ct);
+            using var resp = await GithubHttp.GetAsync(_http, url, ct);
             if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
                 return null;     // repo has no releases (or all are drafts/prereleases)
             resp.EnsureSuccessStatusCode();
@@ -88,7 +76,7 @@ public sealed class GithubReleasesSource : IReleaseSource
     private async Task<ReleaseInfo?> GetLatestBetaAsync(CancellationToken ct)
     {
         var url     = $"https://api.github.com/repos/{_owner}/{_repo}/releases?per_page=30";
-        var json    = await _http.GetStringAsync(url, ct);
+        var json    = await GithubHttp.GetStringAsync(_http, url, ct);
         var raw     = JsonSerializer.Deserialize<List<RawRelease>>(json) ?? new();
 
         // Filter out drafts (they shouldn't be in the list per the API contract,

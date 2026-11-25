@@ -58,7 +58,7 @@
                            Foreground="{DynamicResource Theme.TextMuted}"/>
                 <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBox Grid.Column="0" Text="{Binding NewZoneName}" Watermark="Map150_Fang_Cove"
-                           FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+                           FontSize="11" FontFamily="{DynamicResource Genie.EditorMonoFont}"/>
                   <Button Grid.Column="1" Content="Add" Margin="6,0,0,0" Command="{Binding ConfirmAddZoneCommand}"/>
                   <Button Grid.Column="2" Content="Cancel" Margin="4,0,0,0" Command="{Binding CancelAddZoneCommand}"/>
                 </Grid>
@@ -71,7 +71,7 @@
               <TextBlock Grid.Column="0" Text="From zone:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <AutoCompleteBox x:Name="FromZoneBox" Grid.Column="1" ItemsSource="{Binding ZoneChoices}"
                                Text="{Binding FromZoneSel}" MinimumPrefixLength="0" FilterMode="Custom"
-                               Watermark="Type to search zones" FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+                               Watermark="Type to search zones" FontSize="11" FontFamily="{DynamicResource Genie.EditorMonoFont}"/>
               <Button x:Name="FromZoneDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
                       ToolTip.Tip="Show all zones"/>
             </Grid>
@@ -80,7 +80,7 @@
               <AutoCompleteBox x:Name="FromRoomBox" Grid.Column="1" ItemsSource="{Binding FromRooms}"
                                Text="{Binding FromRoomText}" ValueMemberBinding="{ReflectionBinding Value}"
                                MinimumPrefixLength="0" FilterMode="Custom" Watermark="Room number, or #server id"
-                               FontSize="11" FontFamily="Consolas,Courier New,monospace">
+                               FontSize="11" FontFamily="{DynamicResource Genie.EditorMonoFont}">
                 <AutoCompleteBox.ItemTemplate>
                   <DataTemplate x:DataType="vm:RoomChoice"><TextBlock Text="{Binding Display}" FontSize="11"/></DataTemplate>
                 </AutoCompleteBox.ItemTemplate>
@@ -100,7 +100,7 @@
               <TextBlock Grid.Column="0" Text="To zone:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <AutoCompleteBox x:Name="ToZoneBox" Grid.Column="1" ItemsSource="{Binding ZoneChoices}"
                                Text="{Binding ToZoneSel}" MinimumPrefixLength="0" FilterMode="Custom"
-                               Watermark="Type to search zones" FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+                               Watermark="Type to search zones" FontSize="11" FontFamily="{DynamicResource Genie.EditorMonoFont}"/>
               <Button x:Name="ToZoneDrop" Grid.Column="2" Content="▾" Margin="4,0,0,0" Padding="8,2"
                       ToolTip.Tip="Show all zones"/>
             </Grid>
@@ -109,7 +109,7 @@
               <AutoCompleteBox x:Name="ToRoomBox" Grid.Column="1" ItemsSource="{Binding ToRooms}"
                                Text="{Binding ToRoomText}" ValueMemberBinding="{ReflectionBinding Value}"
                                MinimumPrefixLength="0" FilterMode="Custom" Watermark="Room number, or #server id"
-                               FontSize="11" FontFamily="Consolas,Courier New,monospace">
+                               FontSize="11" FontFamily="{DynamicResource Genie.EditorMonoFont}">
                 <AutoCompleteBox.ItemTemplate>
                   <DataTemplate x:DataType="vm:RoomChoice"><TextBlock Text="{Binding Display}" FontSize="11"/></DataTemplate>
                 </AutoCompleteBox.ItemTemplate>
@@ -162,7 +162,7 @@
               <TextBlock Grid.Column="0" Text="Requires:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <TextBox Grid.Column="1" Text="{Binding Requires}"
                        Watermark="climbing>=50, athletics>=30"
-                       FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
+                       FontSize="11" FontFamily="{DynamicResource Genie.EditorMonoFont}"/>
             </Grid>
             <Grid ColumnDefinitions="100,*">
               <TextBlock Grid.Column="0" Text="Notes:" VerticalAlignment="Top" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="0,3,0,0"/>

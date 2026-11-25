@@ -22,8 +22,9 @@ namespace Genie.App.Controls;
 /// <c>monospace</c> counts only if what comes back is fixed-pitch. The result is
 /// the first installed font followed by the other installed fonts in the list,
 /// so characters the first one lacks still fall back along the user's list. If
-/// nothing in the list resolves, the setting is used as written, which is what
-/// Genie did before. Results are cached per setting string.</para>
+/// nothing in the list resolves, the result is the platform's default font by
+/// name (see <see cref="RendererList"/>, public #393). Results are cached per
+/// setting string.</para>
 ///
 /// <para>A family must be written the way the system names it: a localized or
 /// aliased name the font manager doesn't report is treated as not installed.</para>
@@ -73,10 +74,46 @@ public static class FontChain
         if (setting.Contains('#') || setting.Contains(':'))
             return new FontFamily(setting);
 
-        var installed = InstalledNames(setting);
-        return installed.Count > 0
-            ? new FontFamily(string.Join(", ", installed))
-            : new FontFamily(setting);
+        return new FontFamily(RendererList(
+            setting,
+            name => TryInstalled(name, out var family) ? family : null,
+            DefaultFamilyName));
+    }
+
+    /// <summary>What the renderer is handed for <paramref name="setting"/>: its
+    /// installed families, or — when none of them is installed — the platform's
+    /// default family by name (public #393). The setting is passed through as
+    /// written only when even that is unknown (no font manager yet).
+    ///
+    /// <para>The default family is the font such a setting was already drawn in,
+    /// so nothing looks different. What changes is that the renderer is given a
+    /// name it can find: handed a list with no installed family (a lone
+    /// <c>Cascadia Mono</c> in settings synced from Windows), Avalonia on Linux
+    /// loaded the fallback font's data again on every lookup and never freed it,
+    /// about 25 KB per line of game text.</para></summary>
+    internal static string RendererList(string setting, Func<string, string?> lookup, Func<string?> defaultFamily)
+    {
+        var installed = InstalledNames(setting, lookup);
+        if (installed.Count > 0) return string.Join(", ", installed);
+        return defaultFamily() is { Length: > 0 } fallback ? fallback : setting;
+    }
+
+    /// <summary>The concrete family the platform falls back to (Noto Sans on
+    /// Ubuntu), or null when it cannot be asked.</summary>
+    private static string? DefaultFamilyName()
+    {
+        try
+        {
+            var manager = FontManager.Current;
+            if (manager.TryGetGlyphTypeface(Typeface.Default, out var face) &&
+                !string.IsNullOrWhiteSpace(face?.FamilyName))
+                return face.FamilyName;
+
+            // "$Default" is Avalonia's placeholder, not a family the platform knows.
+            var name = manager.DefaultFontFamily.Name;
+            return string.IsNullOrWhiteSpace(name) || name.StartsWith('$') ? null : name;
+        }
+        catch (Exception) { return null; }   // no platform font manager (early start-up)
     }
 
     /// <summary>The installed families in <paramref name="setting"/>, in order,

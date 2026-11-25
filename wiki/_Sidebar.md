@@ -5,6 +5,7 @@
 - [Installation](Installation)
 - [Quick Start](Quick-Start)
 - [Releases & Changelog](Releases)
+- [Live Walk (test a pre-release)](Live-Walk)
 - [Importing from Genie 4](Importing-Genie4-Config)
 - [Application Folders](Application-Folders)
 

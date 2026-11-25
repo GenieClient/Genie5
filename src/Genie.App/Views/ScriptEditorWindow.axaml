@@ -69,7 +69,7 @@
                    WordWrap="False"
                    HorizontalScrollBarVisibility="Auto"
                    VerticalScrollBarVisibility="Auto"
-                   FontFamily="Cascadia Mono,Consolas,Menlo,DejaVu Sans Mono,monospace"
+                   FontFamily="{DynamicResource Genie.CodeFont}"
                    FontSize="13"
                    Padding="4,2,0,0"
                    Background="{DynamicResource Theme.PanelBg}"

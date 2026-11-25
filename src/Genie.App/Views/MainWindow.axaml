@@ -1331,7 +1331,7 @@
             Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
             Padding="6,2">
       <TextBlock Text="{Binding Mapper.LocationDisplay}"
-                 FontFamily="Consolas,Courier New,monospace" FontSize="11"
+                 FontFamily="{DynamicResource Genie.EditorMonoFont}" FontSize="11"
                  Foreground="{DynamicResource Theme.SectionHeader}" VerticalAlignment="Center"
                  ToolTip.Tip="Current mapper zone and DR server room id (#66)"/>
     </Border>
@@ -1670,7 +1670,7 @@
                    AutomationProperties.Name="Type-ahead buffer"
                    AutomationProperties.HelpText="Type-ahead buffer — commands queued ahead of the game (filled = used, hollow = free). DR caps this per account: free 1, premium 2, +1 with the LTB line. Amber means the buffer is full."
                    HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontFamily="Consolas,Courier New,monospace" FontSize="12">
+                   FontFamily="{DynamicResource Genie.EditorMonoFont}" FontSize="12">
           <TextBlock.Text>
             <MultiBinding Converter="{x:Static controls:TypeAheadPipsConverter.Instance}">
               <Binding Path="Vitals.TypeAheadInFlight"/>
@@ -1694,7 +1694,7 @@
                AutomationProperties.HelpText="Type game commands here and press Enter to send them to the game."
                Text="{Binding Command.CommandText}"
                Watermark="Enter command..."
-               FontFamily="Consolas,Courier New,monospace"
+               FontFamily="{DynamicResource Genie.EditorMonoFont}"
                KeyDown="CommandInput_KeyDown">
         <TextBox.KeyBindings>
           <KeyBinding Gesture="Return" Command="{Binding Command.SubmitCommand}"/>
@@ -1744,11 +1744,11 @@
                 <Grid IsVisible="{Binding Visible}" Classes.hot="{Binding Hot}"
                       ColumnDefinitions="84,52,52,Auto" Margin="0,1">
                   <TextBlock Grid.Column="0" Text="{Binding Name}"
-                             FontFamily="Consolas,Menlo,monospace" FontSize="11" Foreground="#FFB8C0CC"/>
+                             FontFamily="{DynamicResource Genie.UiMonoFont}" FontSize="11" Foreground="#FFB8C0CC"/>
                   <TextBlock Grid.Column="1" Text="{Binding Avg}"
-                             FontFamily="Consolas,Menlo,monospace" FontSize="11" TextAlignment="Right" Foreground="#FFB8C0CC"/>
+                             FontFamily="{DynamicResource Genie.UiMonoFont}" FontSize="11" TextAlignment="Right" Foreground="#FFB8C0CC"/>
                   <TextBlock Grid.Column="2" x:Name="PeakCell" Text="{Binding Peak}"
-                             FontFamily="Consolas,Menlo,monospace" FontSize="11" TextAlignment="Right" Foreground="#FFB8C0CC"/>
+                             FontFamily="{DynamicResource Genie.UiMonoFont}" FontSize="11" TextAlignment="Right" Foreground="#FFB8C0CC"/>
                   <TextBlock Grid.Column="3" Text="{Binding Timeouts, StringFormat='  ⏱ {0}'}"
                              IsVisible="{Binding HasTimeouts}"
                              FontSize="11" Foreground="#FFE05050" ToolTip.Tip="Regex match-timeouts caught and skipped for this component"/>
@@ -1767,11 +1767,11 @@
                 <DataTemplate x:DataType="vm:JsScriptRowViewModel">
                   <Grid ColumnDefinitions="*,Auto" Margin="0,1">
                     <TextBlock Grid.Column="0" Text="{Binding Name}"
-                               FontFamily="Consolas,Menlo,monospace" FontSize="11" Foreground="#FFB8C0CC"/>
+                               FontFamily="{DynamicResource Genie.UiMonoFont}" FontSize="11" Foreground="#FFB8C0CC"/>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                       <TextBlock Text="paused" IsVisible="{Binding Paused}"
                                  FontSize="10" Foreground="#FFE0B050"/>
-                      <TextBlock Text="{Binding Elapsed}" FontFamily="Consolas,Menlo,monospace"
+                      <TextBlock Text="{Binding Elapsed}" FontFamily="{DynamicResource Genie.UiMonoFont}"
                                  FontSize="11" TextAlignment="Right" Foreground="#FF8AC0A0"/>
                     </StackPanel>
                   </Grid>

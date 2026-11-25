@@ -185,4 +185,51 @@ public class ImportSettingsTests
         Assert.Equal(1, r.Imported);
         Assert.Equal(0, r.Skipped);
     }
+
+    // ── automapper (public #401) ─────────────────────────────────────────
+
+    [Fact]
+    public void A_Genie_4_automapper_off_turns_the_mapper_off_and_it_stays_off()
+    {
+        // Genie 4's `automapper` was the mapper's on/off switch, so an imported
+        // False is a choice the user made there. The upgrade rule in Load (a
+        // file with no `automapperrecord` line has its `automapper` ignored) is
+        // for settings an older Genie 5 saved, and does not run for an import.
+        var root = Path.Combine(Path.GetTempPath(), "genie_import_automapper_" + Guid.NewGuid().ToString("N"));
+        var lds  = new LocalDirectoryService("GenieImportSettingsTest", root);
+        lds.UseExplicitRoot(root);
+        var cfg  = new GenieConfig(lds);
+        Assert.True(cfg.AutoMapper);                      // the default
+        var path = WriteCfg("#config {automapper} {False}");
+        try
+        {
+            var r = Genie4Importer.ImportSettings(path, cfg, ImportMode.Merge);
+
+            Assert.Equal(1, r.Imported);
+            Assert.False(cfg.AutoMapper);
+            Assert.False(cfg.AutoMapperRecord);           // never Record
+
+            // Saved, the file carries both keys, so the next start honours it.
+            cfg.Save();
+            var reloaded = new GenieConfig(lds);
+            Assert.True(reloaded.Load());
+            Assert.False(reloaded.AutoMapper);
+            Assert.False(reloaded.AutoMapperRecord);
+        }
+        finally
+        {
+            File.Delete(path);
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
+    public void A_Genie_4_automapper_on_leaves_the_mapper_on_and_Record_off()
+    {
+        var (r, cfg) = Import("#config {automapper} {True}");
+
+        Assert.Equal(1, r.Imported);
+        Assert.True(cfg.AutoMapper);
+        Assert.False(cfg.AutoMapperRecord);
+    }
 }

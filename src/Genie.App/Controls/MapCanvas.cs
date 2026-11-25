@@ -817,7 +817,9 @@ public class MapCanvas : Control
         if (rows.Count == 0) return;
 
         const double pad = 8, row = 16, sw = 12, gap = 8;
-        var typeface = new Typeface("Segoe UI, Consolas, monospace");
+        // Resolved (and cached) to installed families: this runs on every
+        // redraw, and a list naming a missing family leaked on Linux (#393).
+        var typeface = new Typeface(FontChain.Resolve("Segoe UI, Consolas, monospace"));
         const double fontSize = 11;
 
         // Measure the widest label to size the panel.

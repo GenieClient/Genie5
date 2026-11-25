@@ -37,6 +37,11 @@ public sealed class ProfileStore
         LastLoadError = null;
         if (!File.Exists(path)) return;
 
+        // A file written before the owner-only rule (dev #56) may be group- or
+        // world-readable; tighten it now rather than waiting for the next Save,
+        // which only happens when the user edits a profile.
+        RestrictToOwner(path);
+
         try
         {
             var loaded = JsonSerializer.Deserialize<List<ConnectionProfile>>(
@@ -54,6 +59,7 @@ public sealed class ProfileStore
             try
             {
                 File.Copy(path, quarantine, overwrite: true);
+                RestrictToOwner(quarantine);   // it holds the same encrypted passwords
                 LastLoadError = $"{ex.Message} (unreadable copy kept at {quarantine})";
             }
             catch
@@ -69,16 +75,37 @@ public sealed class ProfileStore
     ///
     /// <para>Writes a sibling temp file and swaps it in, so an interrupted write
     /// (crash, power loss, full disk) leaves the previous good file untouched
-    /// rather than a half-serialized one. <c>File.Replace</c> also carries the
-    /// destination's permissions across, which matters for a file holding
-    /// encrypted passwords. Same idiom as the analytics rollup.</para>
+    /// rather than a half-serialized one. Same idiom as the analytics rollup.</para>
+    ///
+    /// <para>On Linux and macOS the file is owner-only (0600): it holds the
+    /// encrypted passwords, and a plain write would take the process umask and
+    /// usually come out world-readable (dev #56). The temp file is CREATED with
+    /// that mode, so the secrets are never on disk under a wider one, and the
+    /// swap is a rename, which keeps the temp file's mode. On Windows the
+    /// per-user profile ACL already does this job.</para>
     /// </summary>
     public bool Save(string path)
     {
         var tmp = path + ".tmp";
         try
         {
-            File.WriteAllText(tmp, JsonSerializer.Serialize(_profiles, _json));
+            // A temp left by a crashed run could carry a wider mode, and the
+            // create mode below only applies to a file that does not exist yet.
+            if (File.Exists(tmp)) File.Delete(tmp);
+
+            var options = new FileStreamOptions
+            {
+                Mode   = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share  = FileShare.None,
+            };
+            if (!OperatingSystem.IsWindows())
+                options.UnixCreateMode = OwnerOnly;   // throws on Windows, hence the gate
+
+            using (var stream = new FileStream(tmp, options))
+            using (var writer = new StreamWriter(stream))
+                writer.Write(JsonSerializer.Serialize(_profiles, _json));
+
             if (File.Exists(path)) File.Replace(tmp, path, null);
             else                   File.Move(tmp, path);
             return true;
@@ -89,6 +116,22 @@ public sealed class ProfileStore
             try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* best effort */ }
             return false;
         }
+    }
+
+    private const UnixFileMode OwnerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+
+    /// <summary>Best effort: make an existing secret-bearing file owner-only on
+    /// Linux/macOS. Never throws — a file we cannot chmod (not ours, read-only
+    /// mount) must not stop a load.</summary>
+    private static void RestrictToOwner(string path)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        try
+        {
+            if (File.GetUnixFileMode(path) != OwnerOnly)
+                File.SetUnixFileMode(path, OwnerOnly);
+        }
+        catch { /* best effort */ }
     }
 
     public ConnectionProfile Add(string name, string host, int port,

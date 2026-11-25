@@ -337,24 +337,28 @@ public class ChartCanvas : Control
     private static string Ellipsize(string s, int max) =>
         s.Length <= max ? s : s[..(max - 1)] + "…";
 
+    // Resolved (and cached) to installed families: these run on every redraw,
+    // and a list naming a missing family leaked on Linux (#393).
+    private static Typeface LabelTypeface => new(FontChain.Resolve("Segoe UI, Cantarell, sans-serif"));
+
     private void DrawText(DrawingContext ctx, string text, IBrush brush, Point at, double size)
     {
         var ft = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                                   new Typeface("Segoe UI, Cantarell, sans-serif"), size, brush);
+                                   LabelTypeface, size, brush);
         ctx.DrawText(ft, at);
     }
 
     private void DrawCentered(DrawingContext ctx, string text, IBrush brush, Rect bounds)
     {
         var ft = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                                   new Typeface("Segoe UI, Cantarell, sans-serif"), 12, brush);
+                                   LabelTypeface, 12, brush);
         ctx.DrawText(ft, new Point((bounds.Width - ft.Width) / 2, (bounds.Height - ft.Height) / 2));
     }
 
     private void DrawBadge(DrawingContext ctx, string text, Point at)
     {
         var ft = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                                   new Typeface("Segoe UI, Cantarell, sans-serif"), 11, Brushes.White);
+                                   LabelTypeface, 11, Brushes.White);
         var rect = new Rect(at.X, at.Y, ft.Width + 12, ft.Height + 6);
         ctx.DrawRectangle(new SolidColorBrush(Color.FromArgb(0xee, 0x22, 0x22, 0x22)),
                           new Pen(new SolidColorBrush(Color.FromRgb(0x66, 0x88, 0xaa)), 1), rect, 3, 3);

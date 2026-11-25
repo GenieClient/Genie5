@@ -1,3 +1,111 @@
+# Genie 5 — v5.0.1-beta.1
+
+**"Safe Keeping"** — the test build of 5.0.1, a fixes release. It is a pre-release:
+only installs on the **beta** channel are offered it, and it becomes 5.0.1 on
+Wednesday 2 December if testing finds nothing. That is a full week of testing and not
+the usual two days, because of the holiday and people travelling. To get it, open **Help ▸ Check for
+Updates**, set **Channel** to **beta** and update. The quickest way to help is the
+[Live Walk](https://github.com/GenieClient/Genie5/wiki/Live-Walk), about 25 minutes in
+one sitting. What to check in more detail, and where to report, is in the pinned
+"Test v5.0.1-beta.1" issue.
+
+What is in it: `#config automapper` is the mapper's on/off switch again, as in
+Genie 4, so travel scripts stop turning Record on. A script that sends a line holding
+a `$variable` inside another variable sends its value. `#save` and `#load` are back.
+On Linux, memory no longer grows when a window is set to a font that is not installed.
+On Linux and macOS, the file that holds your saved logins is readable by you only.
+Map, script and plugin updates download from GitHub over HTTPS and nowhere else.
+
+Two things behave differently for scripts, both to match Genie 4: see the first two
+fixes below. One setting changes meaning, `automapper`; nothing else here changes
+your settings.
+
+## 🐛 Fixes
+- ⚠ **Behaviour change: `#config automapper` turns the mapper on and off, as in
+  Genie 4; Record is now `#config automapperrecord`** — scripts written for Genie 4,
+  such as hunting scripts, run `#config automapper true` at startup to make sure the
+  mapper is on. In Genie 5 that line was turning on Record, which then edited the
+  loaded map as the script walked, could leave the mapper on the wrong zone and made `#goto` answer
+  DESTINATION NOT FOUND. Now `automapper` is Genie 4's switch, on by default: off,
+  the mapper stops following you (`$roomid` and the other mapper variables keep their
+  last values) and `#goto` / `#mapper` say the mapper is disabled. **Maps ▸ AutoMapper
+  Settings** has it as **Enable AutoMapper**, with a new **Record new rooms as you
+  walk** checkbox below it. Record works as before (the ⏺ Record button, `#mapper
+  record on|off`, off every session); only its `#config` name changed, to
+  `automapperrecord`. The `automapper False` line older versions saved was Record,
+  so it is ignored once and your mapper stays on. A Genie 4 `settings.cfg` is
+  different: there `automapper` was already the on/off switch, so importing one with
+  `automapper False` turns the mapper off, as you had it. Thanks @dylb0t
+  ([#401](https://github.com/GenieClient/Genie5/issues/401)).
+- **A script sends a `$variable`'s value, not its name, when the variable arrives
+  inside another one** — a script line such as `put %movement` replaced `%movement`
+  and sent the result as it stood, so a `$name` inside that value went to the game as
+  text. With automapper.cmd installed, `#goto` through the Shard Thieves' Guild door
+  (`'$shard.pw` in the community map) made your character say `$shard.pw` aloud and
+  walk into the closed door. Every line a script sends to the game now has its
+  `$variables` replaced once more just before it is sent, as in Genie 4: `put`,
+  `send`, each `;` segment, `move`, a bare command line, sends from an `action`, and
+  `genie.put` from JavaScript. A name that is not defined is still sent as written,
+  and `$1` to `$9` in such a value are not treated as the script's arguments.
+  **If a script of yours sends text that should keep a literal `$name`** and a
+  variable of that name exists, it is now replaced, as it is when you type the same
+  line. Thanks @syntaki ([#437](https://github.com/GenieClient/Genie5/issues/437)).
+- **`#save` and `#load` work, as in Genie 4** — both were unknown commands, so a
+  script's `put #save vars` or `put #save all` printed `Unknown command: save` and
+  wrote nothing. Each word after the command now saves or reloads that list:
+  `vars`, `aliases`, `classes`, `triggers`, `config`, `macros`, `subs`, `gags`,
+  `highlights`, `names`, `presets` and `shunts`, with Genie 4's other spellings
+  (`var`, `action`, `settings`, `ignores` and so on). Several can be given at once,
+  and `all` covers every one of them, so `#save all` is now the one command that
+  writes everything. A word that names no list is reported. `#save layout` and
+  `#save profile` do not save anything: layouts are named in Genie 5
+  (`#layout save <name>`) and a profile is written when you edit it, and each
+  answers with that. Thanks @syntaki
+  ([#440](https://github.com/GenieClient/Genie5/issues/440)).
+- **Linux: memory no longer grows when a font is not installed** — a window set to a
+  font the machine does not have (usually `Cascadia Mono`, `Consolas`, `Menlo` or
+  `Segoe UI`, in settings brought over from Windows or macOS) made memory grow with
+  every line of game text, by hundreds of MB a minute under heavy traffic such as a
+  container being re-sent. Genie now works out which font a setting really means
+  before anything is drawn: the first font in the list that is installed, or the
+  system's default font when none is. The dialogs, the script bar, window titles, the
+  map legend and the charts had font lists of their own and now go through the same
+  step. Your font settings are not rewritten. If you added fontconfig aliases to work
+  around this, you can remove them. Thanks @dylb0t
+  ([#393](https://github.com/GenieClient/Genie5/issues/393)).
+- **Linux and macOS: the saved-profiles file is private to your user** —
+  `profiles.json` holds your saved logins, with the passwords encrypted. It was
+  created with the system's default permissions, so on a shared machine other users
+  could read it. It is now readable and writable by you only (`600`). A file from an
+  earlier version is corrected the first time this version starts, and so is the
+  `.corrupt` copy Genie keeps when it cannot read the file. Nothing changes on
+  Windows, where the file already sits in your own user folder.
+- **The Experience window's bar follows a typed `#config`** — the strip at the top of
+  the Experience window (Density, Track gain, G4 layout, Sort, Echo, Rested) read its
+  settings once, at startup. `#config experienceconfigbar off` printed `(saved)` and
+  left the strip on screen until the next start, and a typed `experiencedensity`,
+  `experiencesort` or tickbox setting changed the rows while the controls stayed where
+  they were. The strip, its controls and the window menu's **Show Config Bar** tick now
+  follow the setting at once, as the Objects window's bar does. Thanks @syntaki
+  ([#438](https://github.com/GenieClient/Genie5/issues/438)).
+- **A floated window's menu says Re-dock the first time it opens** — a window floated
+  by a double-click on its tab, or dragged out, offered **Float** and no **Hide Title
+  Bar** the first time its right-click menu opened, and a float dragged back into the
+  dock offered **Re-dock**. Opening the menu a second time corrected it. Only the label
+  was wrong; the item always did the right thing. Thanks @syntaki
+  ([#439](https://github.com/GenieClient/Genie5/issues/439)).
+
+## 💡 Notes
+- **Updates only download from GitHub, over HTTPS** — the map, script and plugin
+  updaters now refuse any download address that is not HTTPS on a GitHub host
+  (`github.com`, `api.github.com` or `*.githubusercontent.com`), and check every
+  redirect on the way the same way. Every official source is on GitHub, so nothing
+  should look different. If an update stops with `Refused to fetch '…': update
+  downloads must be HTTPS from a GitHub host`, please report it with the address it
+  names.
+
+---
+
 # Genie 5 — v5.0.0
 
 **"True Colours"** — the first stable release of Genie 5. After the alpha and beta series,
@@ -170,20 +278,6 @@ Both are under Notes below, with how to get the old result back.
   **Script commands** and **Echoes & messages**. They edit the `inputuser`,
   `inputother` and `scriptecho` presets, so the dialog, the theme editor and the
   Presets tab all show the same colour ([#410](https://github.com/GenieClient/Genie5/pull/410)).
-- ⚠ **Behaviour change: `#config automapper` turns the mapper on and off, as in
-  Genie 4; Record is now `#config automapperrecord`** — scripts written for Genie 4,
-  such as hunting scripts, run `#config automapper true` at startup to make sure the
-  mapper is on. In Genie 5 that line was turning on Record, which then edited the
-  loaded map as the script walked, could leave the mapper on the wrong zone and made `#goto` answer
-  DESTINATION NOT FOUND. Now `automapper` is Genie 4's switch, on by default: off,
-  the mapper stops following you (`$roomid` and the other mapper variables keep their
-  last values) and `#goto` / `#mapper` say the mapper is disabled. **Maps ▸ AutoMapper
-  Settings** has it as **Enable AutoMapper**, with a new **Record new rooms as you
-  walk** checkbox below it. Record works as before (the ⏺ Record button, `#mapper
-  record on|off`, off every session); only its `#config` name changed, to
-  `automapperrecord`. The `automapper False` line older versions saved was Record,
-  so it is ignored once and your mapper stays on. Thanks @dylb0t
-  ([#401](https://github.com/GenieClient/Genie5/issues/401)).
 - ⚠ **Behaviour change: `waiteval` waits for a change, as in Genie 4** — a `waiteval`
   whose condition is already true when the script reaches it no longer continues at
   once. It waits until a variable in the condition changes and the condition is then

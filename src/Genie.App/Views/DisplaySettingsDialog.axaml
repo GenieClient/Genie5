@@ -150,7 +150,7 @@
                        AutomationProperties.Name="External editor"
                        Text="{Binding EditorPath}"
                        Watermark="Leave empty to use OS default — e.g. C:\Program Files\Notepad++\notepad++.exe"
-                       FontFamily="Consolas,Courier New,monospace"
+                       FontFamily="{DynamicResource Genie.EditorMonoFont}"
                        FontSize="11"/>
             </Grid>
 

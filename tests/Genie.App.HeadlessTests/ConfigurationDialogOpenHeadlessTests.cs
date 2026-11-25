@@ -285,6 +285,26 @@ public sealed class ConfigurationDialogOpenHeadlessTests : IDisposable
         Assert.Equal(expected, EditorFonts.Resolve(EditorFonts.Chain, installed));
 
     [AvaloniaFact]
+    public void The_other_fixed_font_lists_are_registered_as_resolved_resources()
+    {
+        // Public #393: controls take these by resource instead of each naming
+        // a list of families that may not be installed.
+        EditorFonts.EnsureRegistered();
+        var resources = Avalonia.Application.Current!.Resources;
+
+        Assert.All(EditorFonts.SharedChains, entry =>
+        {
+            var font = Assert.IsType<Avalonia.Media.FontFamily>(resources[entry.Key]);
+            Assert.Same(FontChain.Resolve(entry.Chain), font);
+        });
+
+        // A second call leaves the same instances in place.
+        var before = EditorFonts.SharedChains.Select(e => resources[e.Key]).ToList();
+        EditorFonts.EnsureRegistered();
+        Assert.Equal(before, EditorFonts.SharedChains.Select(e => resources[e.Key]).ToList());
+    }
+
+    [AvaloniaFact]
     public void The_pattern_boxes_use_the_shared_font()
     {
         var dialog = new ConfigurationDialog();

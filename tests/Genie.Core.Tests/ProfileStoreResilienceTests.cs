@@ -212,6 +212,92 @@ public class ProfileStoreResilienceTests
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
 
+    // ── owner-only permissions (dev #56) ─────────────────────────────────────
+    // Unix-only: Windows has no mode bits and relies on the per-user profile ACL.
+
+    private const UnixFileMode OwnerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+    private const UnixFileMode WorldReadable =
+        OwnerOnly | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
+
+    [Fact]
+    public void A_new_file_is_owner_only()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var dir = TempDir();
+        try
+        {
+            var path = Path.Combine(dir, "profiles.json");
+            var store = new ProfileStore();
+            store.Add("A", "h", 1, "acct", "pw");
+
+            Assert.True(store.Save(path));
+
+            Assert.Equal(OwnerOnly, File.GetUnixFileMode(path));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void Saving_over_a_world_readable_file_tightens_it()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var dir = TempDir();
+        try
+        {
+            var path = Path.Combine(dir, "profiles.json");
+            File.WriteAllText(path, "[]");
+            File.SetUnixFileMode(path, WorldReadable);
+            // A stale temp from a crashed run must not lend its mode either.
+            File.WriteAllText(path + ".tmp", "stale");
+            File.SetUnixFileMode(path + ".tmp", WorldReadable);
+
+            var store = new ProfileStore();
+            store.Add("A", "h", 1, "acct", "pw");
+            Assert.True(store.Save(path));
+
+            Assert.Equal(OwnerOnly, File.GetUnixFileMode(path));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void Loading_a_world_readable_file_tightens_it()
+    {
+        // Files written before this rule stay wide until the next Save, which
+        // only happens when a profile is edited — so Load fixes them too.
+        if (OperatingSystem.IsWindows()) return;
+        var dir = TempDir();
+        try
+        {
+            var path = Path.Combine(dir, "profiles.json");
+            File.WriteAllText(path, "[]");
+            File.SetUnixFileMode(path, WorldReadable);
+
+            new ProfileStore().Load(path);
+
+            Assert.Equal(OwnerOnly, File.GetUnixFileMode(path));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void The_quarantined_copy_of_a_damaged_file_is_owner_only()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var dir = TempDir();
+        try
+        {
+            var path = Path.Combine(dir, "profiles.json");
+            File.WriteAllText(path, "{ half a profile list");
+            File.SetUnixFileMode(path, WorldReadable);
+
+            new ProfileStore().Load(path);
+
+            Assert.Equal(OwnerOnly, File.GetUnixFileMode(path + ".corrupt"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
     [Fact]
     public void Encrypted_passwords_survive_a_save_and_reload()
     {

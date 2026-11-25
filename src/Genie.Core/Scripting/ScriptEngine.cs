@@ -2777,6 +2777,21 @@ public sealed class ScriptEngine
     {
         if (cmd.Length == 0) return cmd;
 
+        // Genie 4 expands $variables in every line a script sends, AFTER the
+        // script's own substitution (Script.SendText → Command.ParseCommand →
+        // ParseGlobalVars before SendTextToGame). The script pass leaves a `$`
+        // that arrived INSIDE a substituted value alone, so a map move such as
+        // `'$shard.pw` handed to automapper.cmd and sent with `put %movement`
+        // reached the game as the variable's name (public #437). This is the one
+        // point every game-bound script send passes through — put/send, their
+        // `;` tails, action sends, `move`, bare verbs and the JS bridge — so the
+        // second pass lives here. It is the same expander typed input uses:
+        // `$` only, an undefined name stays literal, and `$1`..`$9` are ordinary
+        // names at this level. `#` segments never reach here; they already get
+        // the pass in CommandEngine.ProcessInput.
+        cmd = ExpandGlobalVars(cmd);
+        if (cmd.Length == 0) return cmd;
+
         if (cmd[0] == '/')
         {
             if (Extensions.DispatchSlashCommand(cmd)) return null;   // built-in claimed it

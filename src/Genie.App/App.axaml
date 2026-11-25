@@ -41,6 +41,14 @@
       <!-- #402: the Configuration dialog's pattern boxes. EditorFonts replaces
            this chain with the first installed family on first open. -->
       <FontFamily x:Key="Genie.EditorMonoFont">Consolas,Courier New,monospace</FontFamily>
+      <!-- #393: every other fixed font list in the UI. Written out on each
+           control, a list naming a family that is not installed made Avalonia
+           on Linux reload fallback font data on every lookup. EditorFonts
+           replaces each with its installed families at start-up; these are the
+           defaults if that cannot run. -->
+      <FontFamily x:Key="Genie.UiMonoFont">Consolas,Menlo,monospace</FontFamily>
+      <FontFamily x:Key="Genie.CodeFont">Cascadia Mono,Consolas,Menlo,DejaVu Sans Mono,monospace</FontFamily>
+      <FontFamily x:Key="Genie.TitleFont">Verdana,Segoe UI,sans-serif</FontFamily>
     </ResourceDictionary>
   </Application.Resources>
 
@@ -1159,7 +1167,7 @@
                   <TextBlock Grid.Column="1" Margin="8,0,0,0"
                              VerticalAlignment="Center"
                              Foreground="#e0c0e8" FontSize="11"
-                             FontFamily="Consolas,Courier New,monospace"
+                             FontFamily="{DynamicResource Genie.EditorMonoFont}"
                              Text="{Binding ViewModel.AutoWalk.CurrentWaitText}"/>
                 </Grid>
               </StackPanel>
@@ -1284,7 +1292,7 @@
                         IsVisible="{Binding ViewModel.CurrentServerId, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock Grid.Column="0" Text="Server id" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <SelectableTextBlock Grid.Column="1" Text="{Binding ViewModel.CurrentServerId}"
-                                         Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" FontFamily="Consolas,monospace"
+                                         Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" FontFamily="{DynamicResource Genie.UiMonoFont}"
                                          TextWrapping="Wrap"/>
                   </Grid>
                   <TextBlock Text="Notes" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
@@ -1318,10 +1326,10 @@
                              Watermark="e.g. Bank|Teller (| separates #goto labels)"/>
                     <TextBlock Text="Color (hex)" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <TextBox Text="{Binding ViewModel.SelNodeColor}" FontSize="11"
-                             FontFamily="Consolas,monospace" Watermark="#FFAA00"/>
+                             FontFamily="{DynamicResource Genie.UiMonoFont}" Watermark="#FFAA00"/>
                     <TextBlock Text="Server id" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <TextBox Text="{Binding ViewModel.SelNodeServerId}" FontSize="11"
-                             FontFamily="Consolas,monospace"/>
+                             FontFamily="{DynamicResource Genie.UiMonoFont}"/>
                     <TextBlock Text="Tags" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <TextBox Text="{Binding ViewModel.SelNodeTags}" FontSize="11"
                              Watermark="e.g. bank|moongate — #goto @tag walks to the nearest"
@@ -1345,7 +1353,7 @@
                     <TextBox Text="{Binding ViewModel.SelLabelText}" FontSize="11"/>
                     <TextBlock Text="Position (x, y, z)" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <TextBox Text="{Binding ViewModel.SelLabelPosition}" FontSize="11"
-                             FontFamily="Consolas,monospace" Watermark="180, -36, 0"
+                             FontFamily="{DynamicResource Genie.UiMonoFont}" Watermark="180, -36, 0"
                              ToolTip.Tip="Map pixels, as Genie 4 stores them. Dragging the label on the map updates this."/>
                     <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
                       <Button Content="Remove" Padding="8,2" FontSize="11"

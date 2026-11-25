@@ -35,7 +35,7 @@
           <TextBlock Grid.Column="0" Text="Verb:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
           <TextBlock Grid.Column="1" Text="{Binding ExitVerb}"
                      Foreground="{DynamicResource Theme.Accent}" FontSize="11"
-                     FontFamily="Consolas,Courier New,monospace"/>
+                     FontFamily="{DynamicResource Genie.EditorMonoFont}"/>
         </Grid>
         <Grid ColumnDefinitions="60,*">
           <TextBlock Grid.Column="0" Text="To:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
