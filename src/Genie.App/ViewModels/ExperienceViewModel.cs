@@ -1,6 +1,8 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Reactive.Linq;
 using Genie.Core;
+using Genie.Core.Config;
 using ReactiveUI;
 
 namespace Genie.App.ViewModels;
@@ -30,6 +32,7 @@ public class ExperienceViewModel : ReactiveObject
     private int _sortIndex = 2;
     private bool _echoExp;
     private bool _showRested;
+    private IDisposable? _configSubscription;
 
     /// <summary>Sort-mode names for the config-bar dropdown, indexed by the
     /// <c>experiencesort</c> value (Genie 4 EXPTracker's SortType, public #272).</summary>
@@ -186,21 +189,24 @@ public class ExperienceViewModel : ReactiveObject
     public void Attach(GenieCore core)
     {
         _core = core;
-        // Seed from config without firing the command (level == _appliedLevel).
-        _appliedLevel = core.Config.ExperienceDensity;
-        DensityValue  = core.Config.ExperienceDensity;
-        _trackGain    = core.Config.ExperienceTrackGain;
-        this.RaisePropertyChanged(nameof(TrackGain));
-        _g4Layout     = core.Config.ExperienceG4Layout;
-        this.RaisePropertyChanged(nameof(G4Layout));
-        _showConfigBar = core.Config.ExperienceConfigBar;
-        this.RaisePropertyChanged(nameof(ShowConfigBar));
-        _sortIndex = Math.Clamp(core.Config.ExperienceSort, 0, 3);
-        this.RaisePropertyChanged(nameof(SortIndex));
-        _echoExp = core.Config.ExperienceEcho;
-        this.RaisePropertyChanged(nameof(EchoExp));
-        _showRested = core.Config.ExperienceRested;
-        this.RaisePropertyChanged(nameof(ShowRested));
+        SeedFromConfig(core);
+
+        // Follow these settings when they change somewhere other than this bar:
+        // a typed #config, or #config load. GenieCore re-renders the rows on the
+        // Trackers notice, but nothing told the bar, so
+        // `#config experienceconfigbar off` saved the value and left the strip on
+        // screen until the next start, and a typed density moved the rows while
+        // the slider and its label stayed where they were. The Objects window
+        // follows its own settings the same way. One subscription per attached
+        // session: a re-attach drops the previous session's.
+        _configSubscription?.Dispose();
+        _configSubscription = Observable
+            .FromEvent<Action<ConfigFieldUpdated>, ConfigFieldUpdated>(
+                h => core.Config.ConfigChanged += h,
+                h => core.Config.ConfigChanged -= h)
+            .Where(f => f == ConfigFieldUpdated.Trackers)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => SeedFromConfig(core));
 
         core.SetPluginWindow += (window, content) =>
         {
@@ -214,6 +220,24 @@ public class ExperienceViewModel : ReactiveObject
         // subscribes in GameTextViewModel) repaints on Apply but this panel sits
         // stale, which reads as "highlights don't work on the Experience window".
         Highlighting.UserHighlights.RulesChanged += RetokenizeLines;
+    }
+
+    /// <summary>Set every control of the bar from config without writing anything
+    /// back. Each setter writes only when its value differs from config (the
+    /// density slider compares against <see cref="_appliedLevel"/>), and here they
+    /// are equal by construction, so a control that wrote the setting itself sees
+    /// no change and nothing bounces. Raises a change only for what changed.</summary>
+    private void SeedFromConfig(GenieCore core)
+    {
+        var config = core.Config;
+        _appliedLevel = config.ExperienceDensity;
+        DensityValue  = config.ExperienceDensity;
+        this.RaiseAndSetIfChanged(ref _trackGain,     config.ExperienceTrackGain, nameof(TrackGain));
+        this.RaiseAndSetIfChanged(ref _g4Layout,      config.ExperienceG4Layout,  nameof(G4Layout));
+        this.RaiseAndSetIfChanged(ref _showConfigBar, config.ExperienceConfigBar, nameof(ShowConfigBar));
+        this.RaiseAndSetIfChanged(ref _sortIndex,     Math.Clamp(config.ExperienceSort, 0, 3), nameof(SortIndex));
+        this.RaiseAndSetIfChanged(ref _echoExp,       config.ExperienceEcho,      nameof(EchoExp));
+        this.RaiseAndSetIfChanged(ref _showRested,    config.ExperienceRested,    nameof(ShowRested));
     }
 
     /// <summary>Force each existing <see cref="TextLine"/> to re-tokenize by
