@@ -4,9 +4,9 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **stable** as of v5.0.0. Stable releases are tagged like `v5.0.1` or `v5.1.0`; test builds of the next stable release are published as pre-releases, tagged like `v5.1.0-beta.1` (builds before 5.0.0 were `v5.0.0-alpha.N` and `v5.0.0-beta.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Test build: v5.0.1-beta.1 — Safe Keeping
+## Test build: v5.0.1-beta.2 — Safe Keeping
 
-**A pre-release of 5.0.1, out for testing.** It is offered only to installs on the **beta** channel: open **Help → Check for Updates**, set **Channel** to **beta** and update. If testing finds nothing it becomes 5.0.1 on Wednesday 2 December; the test period is a full week because of the holiday and people travelling. The quickest way to help is the [Live Walk](Live-Walk), about 25 minutes in one sitting; what to check in more detail and where to report is in the pinned **Test v5.0.1-beta.1** issue on the [issue tracker](https://github.com/GenieClient/Genie5/issues).
+**A pre-release of 5.0.1, out for testing.** It is the second test build; the minimap switches and a fix to the map's wheel zoom are the only changes since beta.1. It is offered only to installs on the **beta** channel: open **Help → Check for Updates**, set **Channel** to **beta** and update. If testing finds nothing it becomes 5.0.1 on Wednesday 2 December; the test period is a full week because of the holiday and people travelling. The quickest way to help is the [Live Walk](Live-Walk), about 30 minutes in one sitting; what to check in more detail and where to report is in the pinned **Test v5.0.1-beta.2** issue on the [issue tracker](https://github.com/GenieClient/Genie5/issues).
 
 > **⚠ Two things change for scripts, both to match Genie 4.** `#config automapper` is the mapper's on/off switch again and no longer turns Record on; Record is `#config automapperrecord`, the ⏺ button or `#mapper record on|off`. And a line a script sends has its `$variables` replaced just before it goes out, so a `$name` held inside another variable is sent as its value.
 
@@ -16,11 +16,13 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 - **Linux memory** — memory no longer grows when a window is set to a font that is not installed ([#393](https://github.com/GenieClient/Genie5/issues/393)).
 - **Saved logins are private** — on Linux and macOS, `profiles.json` is readable by you only.
 - **Updates come from GitHub over HTTPS only** — map, script and plugin downloads refuse any other address.
+- **The Mapper as a small docked minimap** — four **Maps** menu switches: hide the map's toolbar and status bar, open Details by click only, and right-click a room to walk there. Nothing changes until you change one ([#450](https://github.com/GenieClient/Genie5/issues/450)).
+- **Map wheel zoom** — one notch is one zoom step on every mouse and touchpad; high-resolution wheels no longer jump several levels ([#449](https://github.com/GenieClient/Genie5/issues/449)).
 - **Two window fixes** — the Experience window's bar follows a typed `#config` ([#438](https://github.com/GenieClient/Genie5/issues/438)), and a floated window's menu says Re-dock the first time it opens ([#439](https://github.com/GenieClient/Genie5/issues/439)).
 
 Thanks @dylb0t and @syntaki for the reports and fixes in this build.
 
-[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.1-beta.1)
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.1-beta.2)
 
 ## Latest: v5.0.0 — True Colours
 
@@ -976,7 +978,7 @@ A quality-of-life batch that closes a run of community-reported issues, plus map
 
 **Interface**
 
-- **Character-Account identity** in the title bar and profile picker, e.g. `Renucci-MONIL` ([#4](https://github.com/GenieClient/Genie5/issues/4)).
+- **Character-Account identity** in the title bar and profile picker, e.g. `Mychar-MYACCOUNT` ([#4](https://github.com/GenieClient/Genie5/issues/4)).
 - **Browser-style selection** — click-drag to select across multiple lines in the Game window and copy ([#34](https://github.com/GenieClient/Genie5/issues/34)).
 - **Docking** — draggable centre splitters; a panel dragged to a new spot keeps that spot after floating or closing ([#35](https://github.com/GenieClient/Genie5/issues/35)).
 - **Windowed (MDI) document mode** with Genie 4-style window decorations ([#52](https://github.com/GenieClient/Genie5/issues/52)).

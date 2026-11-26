@@ -23,6 +23,10 @@ On first launch Genie 5 asks where to keep your data: **Portable** (next to the 
 3. Click **Fetch** to retrieve your character list. (Genie 5 talks to Simutronics' login service to get it — your password goes only to the official servers.)
 4. Pick a **character** and click **Connect**.
 
+![The Connect dialog with a saved profile loaded](images/connect-dialog.png)
+
+*The Connect dialog, here with a saved profile already loaded.*
+
 Genie 5 logs in, finds the game server, and the room you're standing in appears in the game window. The full walkthrough — including Lich and replay modes — is on [Connecting & Profiles](Connecting).
 
 ## 3. Look around the interface

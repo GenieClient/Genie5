@@ -39,7 +39,7 @@ Portable and Wine installs aren't detected automatically (nor is anything on mac
 
 ## Running the import
 
-![The Import from Genie 4 dialog — probe counts per category, the category checkboxes, Apply-To and merge-mode choices, and the post-import results](images/import-genie4-dialog.png)
+![The Import from Genie 4 dialog — probe counts per category, the category checkboxes, and the Apply-To and merge-mode choices](images/import-genie4-dialog.png)
 
 1. Launch Genie 5 and choose **File → Import from Genie 4…**.
 2. **Source folder** — click **Browse…** and select your Genie 4 `Config` directory. Genie 5 **probes** the folder and shows a count next to each category (e.g. "Triggers: 45"), so you can confirm it found the right place before committing.

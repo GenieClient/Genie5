@@ -10,6 +10,10 @@ Drop `.cmd` files into your **Scripts** folder — one shared `Scripts/` folder 
 
 If you set `#config reposcriptdir` (where **Update Scripts** pulls community script repos), Genie looks in your own Scripts folder first and the repo folder second — so a script you've edited locally always wins over the updater's copy.
 
+![Configuration → Scripts — script character, extension, timeout, GoSub depth, connect script, command separator, and the script and repo-scripts directories](images/config-scripts-tab.png)
+
+***Configuration → Scripts** — where the script and repo-scripts directories are set.*
+
 ## Hello world
 
 Create `Scripts/hello.cmd`:
@@ -101,6 +105,22 @@ Type `#var` at the command bar to see the full live list. The complete table is 
 | `#scriptcheck myscript` | Check a script for problems without running it — see below. |
 | `#edit myscript` | Open it in the script editor (creates it if new — see below). |
 
+![The Script Manager — the script library, one running script selected with its Vars, Trace, Reload and Edit buttons, and the script output pane](images/scripting-script-manager.png)
+
+*The **Script Manager** (Scripts menu) — library, running scripts and script output.*
+
+![The Script Manager with a script's right-click menu open — Run, Edit, Edit in external editor, Copy run command, Copy full path, Open containing folder, New script, Refresh and Delete](images/scripting-script-manager-menu.png)
+
+*Right-click a script for Run, Edit and the rest.*
+
+![The Script Bar under the command bar, showing a running script with pause, debug level and stop controls](images/scripting-script-bar.png)
+
+*The **Script Bar** — one chip per running script.*
+
+![The Scripts menu open](images/menu-scripts.png)
+
+*The **Scripts** menu.*
+
 ### Checking a script before you run it
 
 `#scriptcheck <name>` (synonym `#checkscript`) parses a script exactly as starting it would and lists every problem with its file and line number, without running anything: a `goto`/`gosub` or `match` to a label that doesn't exist, `if` without `then`, unbalanced parentheses or `{ }` blocks, an `action` with no `when`, a missing include, and duplicate labels. Jumps whose target is a variable (`goto %next`) are only known at run time and are skipped. It's a quick way to vet an old Genie 4 script before taking it into the game.
@@ -122,6 +142,8 @@ are rejected.
 
 `#edit`, **Edit** in the Script Manager, and the ✏ icon on the Script Bar open
 the script in Genie's built-in editor, a window of its own beside the game:
+
+![The script editor with a .cmd script open — Save, Find and Reload toolbar, line numbers, syntax colouring, and a status bar with line, column, encoding and line endings](images/scripting-script-editor.png)
 
 - **Line numbers and colours.** Syntax colouring for `.cmd` / `.inc` scripts
   (comments, labels, commands, `$` / `%` variables, strings, `#commands` inside

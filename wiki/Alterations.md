@@ -12,9 +12,13 @@ same four fields, same limits, same result line, and your existing
 Nothing here needs a connection. You can design alterations, save them, and
 browse your library without logging in at all.
 
+![The Alterations menu open — Open Designer, Saved Designs, Import from Genie 4, Export for Genie 4, Reload Library, Open Library Folder and two reference links](images/alterations-menu.png)
+
 ## Designing an alteration
 
 **Alterations ▸ Open Designer…**
+
+![The Alteration Designer — Title, Short Tap, Tap, Look, Read and Notes with their remaining-length counters, the built Result line, and the Saved Designs list on the right](images/alterations-designer.png)
 
 Fill in as many of the four fields as you need. Under each one, a counter tells
 you how much of that field's budget you have left, and turns to an "over" count

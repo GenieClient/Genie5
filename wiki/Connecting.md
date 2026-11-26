@@ -16,6 +16,10 @@ Genie 5 reaches DragonRealms three ways. The first two are chosen from **File �
 4. Click **Fetch** to pull your **character list** from Simutronics' login service.
 5. Select a **character** and click **Connect**.
 
+![The Connect dialog with a saved profile loaded — Profile, Name, Mode, Data folder, Layout, Instance, Account, Password, Character and the Secure connection (TLS) box](images/connect-dialog.png)
+
+*The Connect dialog with a saved profile loaded, so the Character row shows **Change…**; on a first connect it shows **Fetch**.*
+
 Genie authenticates, receives the game host/port for your character, connects, and starts streaming the game. When the server signals it's ready, Genie sends an initial `look` so you land with your room shown.
 
 ### How the login works (and what it never does)
@@ -57,7 +61,7 @@ A **profile** is a saved connection so you don't retype next time. Save one from
 
 - **Passwords are encrypted.** If you save a password, it's stored with **AES-256-GCM** using a machine-bound key — never plain text. That protects against casual reading of the file, but it isn't a substitute for OS account security: anyone who can run programs as you on your machine could recover it. If you'd rather not store it, save the profile without a password and type it at connect time.
 - **Per-character settings.** Each character gets its own profile directory (`Profiles/<Character>-<Account>/`) holding the rules that belong to that character alone — they **layer over** your shared `Config/` rules, which keep applying underneath. Combat triggers saved to one character don't follow you onto a shopping alt, while shared rules work everywhere. See [Application Folders](Application-Folders) for the layout.
-- **Character-Account naming.** Characters are identified as `Character-Account` (for example `Renucci-MONIL`) so two accounts with a same-named character never collide.
+- **Character-Account naming.** Characters are identified as `Character-Account` (for example `Mychar-MYACCOUNT`) so two accounts with a same-named character never collide.
 
 ## Lich proxy mode
 

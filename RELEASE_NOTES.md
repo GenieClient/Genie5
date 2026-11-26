@@ -1,13 +1,13 @@
-# Genie 5 — v5.0.1-beta.1
+# Genie 5 — v5.0.1-beta.2
 
 **"Safe Keeping"** — the test build of 5.0.1, a fixes release. It is a pre-release:
 only installs on the **beta** channel are offered it, and it becomes 5.0.1 on
 Wednesday 2 December if testing finds nothing. That is a full week of testing and not
 the usual two days, because of the holiday and people travelling. To get it, open **Help ▸ Check for
 Updates**, set **Channel** to **beta** and update. The quickest way to help is the
-[Live Walk](https://github.com/GenieClient/Genie5/wiki/Live-Walk), about 25 minutes in
+[Live Walk](https://github.com/GenieClient/Genie5/wiki/Live-Walk), about 30 minutes in
 one sitting. What to check in more detail, and where to report, is in the pinned
-"Test v5.0.1-beta.1" issue.
+"Test v5.0.1-beta.2" issue.
 
 What is in it: `#config automapper` is the mapper's on/off switch again, as in
 Genie 4, so travel scripts stop turning Record on. A script that sends a line holding
@@ -15,10 +15,25 @@ a `$variable` inside another variable sends its value. `#save` and `#load` are b
 On Linux, memory no longer grows when a window is set to a font that is not installed.
 On Linux and macOS, the file that holds your saved logins is readable by you only.
 Map, script and plugin updates download from GitHub over HTTPS and nowhere else.
+One addition came in with the fixes: four **Maps** menu switches that let the Mapper
+sit as a small docked minimap. That and a fix to the map's wheel zoom are the only
+changes since `5.0.1-beta.1`.
 
 Two things behave differently for scripts, both to match Genie 4: see the first two
 fixes below. One setting changes meaning, `automapper`; nothing else here changes
 your settings.
+
+## ✨ New
+- **The Mapper can sit as a small docked minimap** — four switches in the **Maps**
+  menu, for a map kept small and always in view. **Show Map Toolbar** and **Show Map
+  Status Bar** hide the bar above the map (zone, level, zoom, edit) and the strip
+  below it (room title, exit buttons), so a small map keeps its room. **Open Details
+  on Hover**, when unticked, stops the Details panel sliding out each time the
+  pointer crosses its strip; it then opens only when you click the strip. **Right-Click
+  Walks to Room**, when ticked, walks you to the room you right-click with no **Go
+  Here** menu in between; Shift+right-click, a right-click on empty map, and edit
+  mode still open the menu. Nothing changes until you change a switch, and each one
+  is remembered ([#450](https://github.com/GenieClient/Genie5/issues/450)).
 
 ## 🐛 Fixes
 - ⚠ **Behaviour change: `#config automapper` turns the mapper on and off, as in
@@ -94,6 +109,13 @@ your settings.
   dock offered **Re-dock**. Opening the menu a second time corrected it. Only the label
   was wrong; the item always did the right thing. Thanks @syntaki
   ([#439](https://github.com/GenieClient/Genie5/issues/439)).
+- **The map's wheel zoom moves one step per notch on every mouse and touchpad** —
+  the map zoomed one full step for every scroll event it received and looked only at
+  the direction. High-resolution wheels and touchpads send many small events for one
+  notch, so a light touch jumped several zoom levels at once. The step now follows how
+  far the wheel moved: one notch is one step on every device, and a single fast flick
+  is limited to three. A sideways scroll no longer zooms the map out
+  ([#449](https://github.com/GenieClient/Genie5/issues/449)).
 
 ## 💡 Notes
 - **Updates only download from GitHub, over HTTPS** — the map, script and plugin

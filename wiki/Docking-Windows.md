@@ -71,6 +71,14 @@ Everything on this page is remembered automatically between sessions. Beyond tha
 
 **Layout → Windowed Mode (MDI)** turns every open panel into a child window inside the main window, the way Genie 4 worked. It is also what gives windows the Genie 4 title bars: the **Genie 4 Classic** theme changes colours only, so pick windowed mode (or the built-in **Heirloom**, **Windowed Genie 4 Retro** or **Windowed Genie 5 Starter** layout, which use it) for the classic look. Turning on windowed mode by itself stacks every open window; loading one of those layouts sizes and places them for you.
 
+![The built-in Windowed Genie 5 Starter layout — child windows with their own title bars inside the main window](images/layouts-windowed-starter.png)
+
+*Windowed mode with the built-in **Windowed Genie 5 Starter** layout (window text blanked for privacy).*
+
+![The built-in Windowed Genie 4 Retro layout — Game on the left, Thoughts, Room and Log stacked down the right](images/layouts-windowed-genie4-retro.png)
+
+*The built-in **Windowed Genie 4 Retro** layout.*
+
 - **Switching keeps what you have open.** Windows that are open stay open and closed ones stay closed, in both directions. Going into windowed mode, the windows are tiled where their docked panes were, so a group of stream tabs becomes a row of stream windows. A window you had already placed in windowed mode earlier in the session goes back to that spot.
 - **Switching back restores your docked arrangement** from before you entered windowed mode, with any windows you opened or closed in the meantime added or removed. Loading a layout replaces that memory, so after a load you land on the default docked arrangement instead.
 - **Child windows stay inside the main window.** They can't be dragged or floated out of it. A panel you last had floating in docked mode opens as a child window while windowed mode is on.

@@ -4,7 +4,7 @@ The mapper knows where you are, draws the zone you're in, and can walk you to an
 
 ## The map panel
 
-![The Mapper showing all of Riverhaven — 568 rooms with guild labels, the exit-type legend, and the current room highlighted](images/mapper-panel.png)
+![The Mapper showing Throne City — 209 rooms, the zone picker with its sort control, the legend, and the current room highlighted](images/mapper-panel.png)
 
 The Mapper panel (**floating** in its own window by default; dock it by dragging, or toggle it via **Maps ▸ Show Mapper**) shows the current zone with your room highlighted. Rooms are drawn as nodes connected by their exits, color-coded by exit type (compass directions, vertical moves, and special exits like `go gate` or `climb wall`). Scroll to zoom; drag to pan.
 
@@ -15,8 +15,12 @@ As you walk, Genie matches each new room to a node and re-centers on you. When y
 - **Zone picker** — the dropdown at the top lists every zone in your Maps folder; auto-detect normally picks for you as you walk. A sort control beside it orders the list by **Name**, **Recently Changed**, or **Map Number** (special event/quest maps are badged *SPECIAL* and sort to the bottom by number).
 - **Return to Current Zone** — while you're browsing a zone your character isn't in, tracking pauses and a **⌖ Return to Current Zone** button appears; click it to jump back and resume following.
 - **Floors** — **▲ / ▼** step the map up and down a level (the `L0` readout shows which). The floors directly above and below yours draw as a faint "ghost" map under the current one (white by default), the way Genie 4 grays out other levels; see [Map colours](#map-colours). The **Map overlay opacity** slider in **Maps ▸ AutoMapper Settings…** (`#config automapperalpha`, 0–255) fades them; 0 hides them for a pure single-floor view.
-- **Legend** — **Maps ▸ Show Map Legend** (on by default) draws a colour key in the map's top-left corner. It lists only what the current floor actually draws — room colours named from the community Maps colour key, cross-zone rooms, ghost floors, and each kind of path — so an entry you see always means something on screen.
+- **Legend** — **Maps ▸ Show Map Legend** (on by default) draws a colour key in a bottom corner of the map view. It lists only what the current floor actually draws — room colours named from the community Maps colour key, cross-zone rooms, ghost floors, and each kind of path — so an entry you see always means something on screen.
 - **Labels** — the **Labels** toggle shows or hides the zone's landmark labels (the map's own text, like "East Gate").
+
+![The Mapper on Northern Trade Road with a full legend — twelve room colours, cross-zone and current-room markers, and four path kinds](images/mapper-colour-key.png)
+
+*A fuller legend: the key lists only what the current floor draws.*
 
 ### Map colours
 
@@ -123,6 +127,10 @@ DragonRealms rooms have "obvious paths," but maps also record the non-obvious co
 
 ![The room strip — compass exits plus go-buttons for temple, town hall, portal, and meeting portal](images/mapper-less-obvious-paths.png)
 
+![The Mapper on The Crossing — guild and shop labels, the legend, and two Less Obvious Paths buttons in the strip below the map](images/mapper-crossing.png)
+
+*The Crossing, with two Less Obvious Paths buttons under the map.*
+
 ## Room notes
 
 You can add a note to a room (a landmark, a warning, a shop name) in the Mapper's **Details** panel — **Save Notes** writes it into the zone XML. Notes double as `#goto` names and show when you hover the room; they aren't drawn on the canvas. To put text on the map itself, add a **label** instead (below).
@@ -138,6 +146,25 @@ The toolbar under the zone picker carries Genie 4's AutoMapper edit tools:
 - In edit mode: **Remove** deletes the selected room or label, **+ Label** adds a landmark label beside your room (or right-click ▸ **Add Label Here**), **Reset IDs** renumbers rooms 1..N, **Snap** snaps dragged rooms to Genie 4's 10px grid, **Lock** stops rooms being dragged, and **Dup** allows duplicate rooms while recording.
 
 The **Details** panel slides out from the map's right edge when you hover the **DETAILS** strip (or click it to keep it open); the **📌** pin holds it open until you release it. It shows the current room's server id and notes, an **Edit Room** form for the selected room (title, notes, colour, server id, tags — **Apply**, then **Save** the zone), an **Edit Label** form for a selected label, the zone's room count and last update, and the map's background and text colours (the `automapper.panel` preset — see [Map colours](#map-colours)).
+
+![The Mapper with the Details panel pinned open — the current room's notes with Save Notes, zone information and the Behavior switches](images/mapper-details-panel.png)
+
+*The **Details** panel pinned open (not in edit mode).*
+
+### A small docked map
+
+Four switches in the **Maps** menu are for keeping the Mapper small and always in view, as a minimap. Until you change one, the map looks and works as described above; each is remembered.
+
+- **Show Map Toolbar** — untick to hide the bar above the map (zone, level, zoom, edit).
+- **Show Map Status Bar** — untick to hide the strip below the map (room title, exit buttons, less-obvious paths).
+- **Open Details on Hover** — untick to stop the Details panel sliding out when the pointer crosses the **DETAILS** strip. It then opens only when you click the strip, and the 📌 pin closes it.
+- **Right-Click Walks to Room** — tick to walk to a room by right-clicking it, with no **Go Here** menu in between. Shift+right-click, a right-click on empty map, and edit mode still open the menu.
+
+**Maps ▸ Show Map Legend** hides the colour key, which helps on a small map too.
+
+![The Maps menu open](images/menu-maps.png)
+
+*The **Maps** menu.*
 
 ## Where maps live
 

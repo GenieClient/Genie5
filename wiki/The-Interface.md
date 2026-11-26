@@ -45,21 +45,59 @@ Out of the box you get a three-column arrangement:
 
 Toggle panels from the **Window** menu (two exceptions: the Mapper toggle lives on the **Maps** menu, the Script Manager on the **Scripts** menu). Drag a panel's tab to re-dock it; drag it out to **float** it in its own window, and drag it back to re-dock. A floated window's title-bar menu has a **Hide Title Bar** option for a leaner look. When a section holds more tabs than fit, **◀ ▶ overflow arrows** appear on the tab strip, and activating an off-screen tab scrolls it into view. For a picture-by-picture guide to the dock targets — docking **as a tab** vs. splitting off a **new section** — see [Docking Windows](Docking-Windows).
 
+![The Window menu open at full length, with a tick beside each panel and stream window that is showing](images/interface-window-menu.png)
+
+*The **Window** menu — every panel and stream window, ticked when showing.*
+
 ![The Experience panel shown five times, once per Density stop from Brief at the top to Full at the bottom](images/interface-experience-density.png)
 
 *The same Experience panel at each of the five **Density** stops — Brief (top) through Full (bottom).*
+
+![The Experience panel at the Short names density with its config bar showing — Density slider, Track gain, G4 layout, Sort, Echo and Rested](images/interface-experience.png)
+
+*The Experience panel with its config bar: **Density**, **Track gain**, **Sort**, **Echo** and **Rested**.*
+
+![The Experience panel's right-click menu — Copy, Copy All, Save As, Word Wrap, Flash on Activity, Show Config Bar, Float, Close Window](images/interface-experience-menu.png)
+
+*Right-click the panel for **Word Wrap** and **Show Config Bar**.*
 
 ![The Active Spells panel listing running spells with their remaining durations](images/interface-active-spells.png)
 
 *The Active Spells panel — each effect with its time remaining.*
 
+![The Objects panel listing seven room items one per line, with the Creatures checkbox in its header strip](images/interface-objects.png)
+
+*The Objects panel — one item per line, with the **Creatures** checkbox in the header strip.*
+
+![The Players panel listing seven players, with placeholder names](images/interface-players.png)
+
+*The Players panel (names replaced with placeholders).*
+
+![The Inventory panel listing worn items, tabbed with Experience](images/interface-inventory.png)
+
+*The Inventory panel.*
+
+![The Log stream window with timestamped, colour-coded lines written by scripts](images/interface-log-window.png)
+
+*The **Log** window — lines scripts and triggers write with `#echo >log`.*
+
 Every stream window also has an **"Also show this stream in the Main window"** toggle (Configuration → **Layout** → **Windows**, per window — or right-click the window ▸ **Show in Main Window**) that additionally echoes its lines into the main game window, Genie 4-style. The Layout → Windows tab is also where each window's font is set. Highlight rules can likewise be **scoped to specific windows** — see [Configuration & Rules](Configuration#highlights--coloring-text).
+
+![Configuration → Layout → Windows — the window list with per-window title, font, colours, redirect-if-closed, timestamp and the "Also show this stream in the Main window" box](images/config-layout-windows.png)
+
+***Configuration → Layout → Windows** — per-window font, colours and the **Also show this stream in the Main window** box.*
 
 Scripts can create their **own named windows** too — the Genie 4 menu-script commands (`#window`, `#link`, `#echo >window`) build clickable menu panels that dock like any other; **Window → Script Windows** lists them, and **Window → Plugin Windows** lists the ones plugins open. Both submenus stay empty until something opens a window. See the [Scripting Reference](Scripting-Reference#named-windows-links-and-logging).
 
+![The Window menu with the Script Windows submenu open](images/menu-window-script-windows.png)
+
+***Window → Script Windows** lists the windows scripts have opened.*
+
 ## The Analytics panel
 
-![The Analytics panel — per-skill session gain bars above a rank-over-time chart](images/interface-analytics.png)
+![The Analytics panel's History tab — one skill's gain curve over 90 days, with the range picker and the character dropdown](images/interface-analytics.png)
+
+*The **History** tab — one skill's gain over 90 days.*
 
 The **Analytics** panel (toggle it from the **Window** menu) turns the experience data Genie sees into charts. It records skill ranks locally as you play — nothing is uploaded anywhere — and reads that history back across three tabs:
 
@@ -72,6 +110,10 @@ A character dropdown switches whose history you're looking at. The store lives i
 ## The Inventory View window
 
 **Inventory View** (toggle it from the **Window** menu, or type `/iv open`) catalogs everything your characters own. Run `/iv scan` while connected and it walks your possessions — items on your person, your **vault** (if you're holding a vault book), your **deed register**, your **home**, and **Trader storage** — into a per-character tree that persists between sessions and across characters, so you can finally answer "which character has the …?" without logging everyone in.
+
+![The Inventory View window — a tree of two characters with nested containers, Wt and Size columns, and the search, scan and export toolbar](images/interface-inventory-view.png)
+
+*Inventory View with two characters scanned (names replaced with placeholders).*
 
 - **Search all characters** — type in the search box to filter the tree live; matching items highlight, their container chain stays visible, and the count shows how many matched.
 - **This character only** — tick it to hide the other characters' catalogs and list just the connected character (off by default, so the cross-character view is what you see first). The status line says so if that character has no scan yet.
@@ -118,6 +160,8 @@ Not every tool belongs in the layout. **Alterations** is its own top-level menu 
 
 **Alterations ▸ Open Designer…** gives you the four alteration fields with live length counters, builds the request line as you type, and keeps a library of designs shared across your characters. It works entirely offline, before you connect. If you used the Alteration Buddy plugin in Genie 4, your `alterations.csv` imports straight in. See [Alterations](Alterations).
 
+![The Alterations menu open — Open Designer, Saved Designs, Import from Genie 4, Export for Genie 4, Reload Library, Open Library Folder and two reference links](images/alterations-menu.png)
+
 ## SimuCoins
 
 `/sc` signs in to [store.play.net](https://store.play.net/), reports your SimuCoin balance and how long until your next subscription reward, and claims that reward if one is already waiting.
@@ -160,12 +204,20 @@ This is a port of Etherian's Genie 4 **SpellInfo** plugin, from source he provid
 - **Command bar** — where you type. A **roundtime** indicator shows here (or on the hands strip — pick via **Layout → Roundtime**) so you can see when you can act again.
 - **Status slots** — scripts can write a Genie 4-style ten-slot status row just below the vitals bar (between it and the Icon Bar) with `#statusbar [N] text` (`#statusbar clearall` empties it); it stays hidden while every slot is empty.
 
+![The bottom of the window during a hunt — Script Bar, vitals bars, a script-written status row and the Icon Bar](images/interface-status-slots.png)
+
+*A script-written **status row** between the vitals bar and the Icon Bar, with the Script Bar above.*
+
 ## Notices
 
 Two slim, dismissible strips appear just above the vitals bar — but only when there's something to tell you. Each has an **✕** to hide it.
 
 - **Updates available** — shows after the startup check finds a newer Core, map, script, or plugin. Click it to open the **Updates** dialog. See [Keeping Up to Date](Updates).
 - **Help improve the parser** — if the game ever sends Genie an element it doesn't recognize, this strip asks whether you'd like to report it. Click it and Genie opens a **pre-filled GitHub issue** in your browser, with the sample **already redacted** (other players' speech removed) and your Genie version attached. **Nothing is sent until you review it and press Submit** — no account data, no automatic posting. It's a one-click way to help Genie's parser keep pace as DragonRealms evolves. Each unknown element only asks once per session.
+
+![The "Updates available: Maps, Scripts" notice strip above the vitals bar](images/updates-notice-strip.png)
+
+*The **Updates available** notice.*
 
 ## The command bar
 
@@ -196,9 +248,15 @@ The **Window → Game Window** submenu lets you independently show or hide three
 
 Turn off script lines, for example, to keep a busy hunt script from cluttering the main window (its output still appears in the **Script Manager**).
 
+![The Window menu with the Game Window submenu open — Game Text, Echo Lines and Script Lines, all ticked](images/interface-per-tag-visibility.png)
+
 ## Layouts
 
 Rearrange the panels however you like, then keep the arrangement — the **Layout** menu manages it all:
+
+![The Layout menu with the Load Layout submenu open, listing saved and built-in layouts](images/layouts-menu.png)
+
+***Layout → Load Layout** — your saved layouts and the five built-ins.*
 
 - **Layout → Save Layout As… / Load Layout / Manage Layouts…** — keep several named layouts (a "Combat" layout vs. an "In-Character" layout) and switch between them; **Manage Layouts…** also picks the default.
 - Five layouts ship with Genie and appear in **Load Layout** marked *built-in*: **Strongbox** (the out-of-the-box three-column dock with a floating Mapper), **Shadowveil** (room and story columns around the game text, chatter and experience at right), and **Heirloom** (the Genie 4 arrangement in windowed mode — Game over Talk at the left, the Thoughts/Experience/Whispers/Familiar/Active Spells stack beside it, Arrivals floating over it, and the Mapper filling the right half). Two more are windowed-mode starting points: **Windowed Genie 4 Retro** (Genie 4's first-run layout — Game on the left at 70% of the width, Thoughts, Room and Log stacked down the right) and **Windowed Genie 5 Starter** (Item Log, Familiar, OOC and Assess across the top, Game below, Thoughts, Room and Log down the right). Saving over a built-in makes your own editable copy; deleting that copy brings the shipped one back.
@@ -223,6 +281,26 @@ Rearrange the panels however you like, then keep the arrangement — the **Layou
 - **A saved layout carries every bar**, as Genie 4's did: the hands strip, the Icon Bar, the Health bar and the Script Bar (each one's position and whether it shows) and **Magic Panels**. Loading a layout, or connecting with a character's startup layout, puts them all back. A layout saved before beta.9.6 leaves your current bars alone.
 - **Genie 4 `.layout` files import too.** **File → Import from Genie 4…** converts each saved Genie 4 layout into a windowed-mode layout named `G4 …`, keeping window positions, sizes, which windows are open, and the bars. Fonts and colours aren't part of a layout, and a window Genie 5 has no panel for is skipped and listed in the import summary.
 
+![The Manage Layouts dialog — the list of profile, global and built-in layouts with stars on the defaults, and Copy, Set as Default, Rename and Delete buttons](images/layouts-manage-dialog.png)
+
+***Manage Layouts…** — copy, rename, delete, and pick the default.*
+
+![The Layout menu with the Roundtime submenu open — Command Bar or Hands Strip, the three indicator styles, and Keep Visible](images/menu-layout-roundtime.png)
+
+***Layout → Roundtime** — where the indicator sits and how it is drawn.*
+
+![The built-in Shadowveil layout in play — room and story columns around the game text, with the hands strip at the top and the Script Bar showing](images/layouts-shadowveil.png)
+
+*The built-in **Shadowveil** layout, with a few extra windows opened on top of it.*
+
+![The built-in Heirloom layout — Game, Talk, Thoughts, Experience, Whispers, Familiar, Active Spells and a large Mapper as child windows](images/layouts-heirloom.png)
+
+*The built-in **Heirloom** layout in windowed mode (window text blanked for privacy).*
+
+![A custom hunting layout — Combat, Assess, Log and Active Spells docked around the game text, with the roundtime badge and two scripts on the Script Bar](images/interface-combat-session.png)
+
+*A layout of your own: a hunting arrangement with Combat, Assess, Log and Active Spells around the game text.*
+
 ## Themes
 
 Genie ships **seven built-in themes** under **Edit → Theme** — **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light**, and **Wrayth-style** — plus a theme editor for making your own, saved as JSON in `Config/Themes`. A theme always sets the window chrome. It sets the game text, the three echo colours and the vitals bars only when you pick it; after that they're yours to change until you pick a theme again. See [Configuration & Rules](Configuration#themes) for the full guide: what a theme contains, the echo presets, the theme editor, and the theme file format.
@@ -239,6 +317,8 @@ A few more odds and ends:
 - **File → Open Log In Editor** opens the current (or most recent) Auto Log text file in your editor — Genie 4 parity.
 - An opt-in **AvaloniaEdit-based game window renderer** is available behind `#config useeditorgamewindow on` (default off).
 - **Help → Performance → Show Performance Overlay** shows live per-stage pipeline timing (parse, scripts, triggers, highlights, substitutes, gags, plugins).
+
+![The Help menu with Performance and its Performance Overlay submenu open](images/menu-help-performance-overlay.png)
 
 ## Related
 

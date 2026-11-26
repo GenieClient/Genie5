@@ -15,7 +15,11 @@ Open it from the **Help** menu (a badge appears there when something is availabl
 
 The updater uses your system's default network settings, so OS-level proxy configuration is honored automatically.
 
-![The Updates dialog's Core tab offering a newer version, with Update and Restart enabled](images/updates-dialog-core.png)
+![The Help menu open, with a dot beside Help marking an available update](images/updates-help-menu.png)
+
+*The **Help** menu, with the update dot.*
+
+![The Updates dialog's Core tab — installed 5.0.0 on the stable channel, reporting that Core is up to date](images/updates-dialog-core.png)
 
 ## Core (the app)
 
@@ -27,9 +31,13 @@ Every official download is updater-aware — including the portable forms. The W
 
 > **Release channel:** the Core updater has a **stable** / **beta** channel selector in the Updates dialog. **Stable** (the default) offers stable releases only, such as `5.0.1` or `5.1.0`. **Beta** also offers pre-releases, the test builds of the next stable release, such as `5.1.0-beta.1`; a beta-channel install still gets every stable release. Updating to 5.0.0 moved every install to **stable** once, because before 5.0.0 every build was a pre-release and beta was the only channel that offered updates. Pick **beta** again if you want the test builds; that choice is kept.
 
+![The Core tab with the Channel dropdown open on stable and beta](images/updates-channel-selector.png)
+
+*The **Channel** selector.*
+
 ## Maps
 
-![The Maps, Plugins, and Scripts tabs — subscription rows for the official maps repo, an installed plugin, and a community script repository](images/updates-dialog-tabs.png)
+![The Maps tab — the official maps repository row with Festivals and Quests (spoilers) checkboxes, reporting one changed zone](images/updates-dialog-maps.png)
 
 The Maps tab (equivalently **Maps ▸ Update from Official Repo…**) pulls the latest zone XML from the community repository and **merges** it with your local data — upstream layout fixes come down while your stamped room ids survive. A normal update only rewrites zones whose upstream copy changed; to restore zones damaged by builds before beta.9.5 (`go` / `climb` exits showing as `none`, thinned descriptions), run **Maps ▸ Repair Maps (full re-download)…** once — it re-downloads every zone and keeps your own edits. This has its own page: [Updating Maps & Scripts](Updating-Maps-and-Scripts).
 
@@ -37,9 +45,21 @@ The Maps tab (equivalently **Maps ▸ Update from Official Repo…**) pulls the 
 
 The Plugins tab checks each installed plugin against its configured release feed and offers updates. See [Plugins](Plugins) for installing and managing them.
 
+![The Plugins tab with no plugin sources yet — the description, Add Source and the trust tip](images/updates-dialog-plugins.png)
+
+*The **Plugins** tab on a stock install: no sources until you add one.*
+
 ## Scripts
 
 The Scripts tab lets you subscribe to GitHub script repositories and pull new and changed `.cmd` / `.js` files into your Scripts folder — like a `git pull`, subfolders included. Files that exist only locally are never touched. **There is no merge, though:** a local edit to a file that also exists in the repo **is overwritten** on Update. To protect your edits, either set a separate **Repo scripts directory** (**Configuration ▸ Scripts**) — updates then land there, and your own copy in the script directory always wins — or click the row's **Files…** button and tick **Ignore** on the files you have customised. Ignored files are remembered per source and skipped by Check, Update and the start-up auto-update; **Update Selected** in the same dialog pulls only the files you tick, and **Save Ignores** keeps the list without pulling anything. The community [DR-Genie-Scripts](https://github.com/Tirost/DR-Genie-Scripts) repository ships as a ready-to-enable row; add more repositories (or a fork) as rows of your own. See [Updating Maps & Scripts](Updating-Maps-and-Scripts) for details.
+
+![The Scripts tab — two script repositories, each with Files, Check, Update and remove buttons, one reporting 14 updates](images/updates-dialog-scripts.png)
+
+*The **Scripts** tab with two subscribed repositories.*
+
+![The Choose script files dialog — the changed files with Update and Ignore checkboxes](images/updates-script-files.png)
+
+***Files…** — choose which changed files to take, and which to ignore.*
 
 ## Update Settings — what runs by itself
 
@@ -47,6 +67,18 @@ The **Help → Update Settings** submenu controls the silent check that runs at 
 
 - Auto-applied **client** updates install when you **close** Genie — never a mid-session restart.
 - A quiet notice above the status bar reports **"Updates available"** / **"Auto-updated"**; click it to open the Updates dialog.
+
+![Help → Update Settings → Check on Startup, with a box for each kind of update](images/menu-help-check-on-startup.png)
+
+***Help → Update Settings → Check on Startup**.*
+
+![Help → Update Settings → Auto-Apply, with a box for each kind of update](images/menu-help-auto-apply.png)
+
+***Help → Update Settings → Auto-Apply**.*
+
+![The "Updates available: Maps, Scripts" notice above the vitals bar](images/updates-notice-strip.png)
+
+*The notice above the status bar.*
 
 ## Under the hood
 

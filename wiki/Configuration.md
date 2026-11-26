@@ -34,6 +34,10 @@ The **File ▸ Master Toggles** submenu has a master switch for each engine — 
 
 (The Images toggle's key is `showimages`; it clears or re-fetches the room art live.) For finer-grained switching, use [classes](#classes--grouping-rules).
 
+![The File menu with the Master Toggles submenu open — a switch for each rule engine](images/menu-file-master-toggles.png)
+
+***File ▸ Master Toggles**.*
+
 ### Aliases — typing shortcuts
 
 Expand a short token into a full command:
@@ -83,11 +87,19 @@ A rule can also be **scoped to specific windows**: the Highlights tab's **Window
 
 *Substring highlights in action — six rules coloring an inventory list.*
 
+![The Highlights tab — a grid of Scope, Match, colours, Pattern, Class and Windows with each pattern drawn in its own colour, above the edit form](images/config-highlights-tab.png)
+
+*The **Highlights** tab — each rule drawn in its own colours, with the edit form below.*
+
 Genie colors game text only from what the game styles and what you configure — there are no hidden built-in color rules, as in Genie 4. Colorings you can adjust live alongside your own rules:
 
 - **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change on the **Edit → Configuration… → Presets** tab. Presets also color panels: the `creatures` preset is the creature color in both the main window and the Mobs panel. The `familiar` preset is the base color of the Familiar window's text, and the `inputuser`, `inputother` and `scriptecho` presets color typed commands, script commands, and script output / Genie messages. The `health`, `mana`, `stamina`, `spirit` and `concentration` presets color the vitals bars: the color is the bar's fill and the background its track. The seven `automapper.*` presets color the map: lines, rooms, labels and the map background (see [Mapper → Map colours](Mapper#map-colours)). The seven `ui.*` presets color the menu bar, command input, status strip and AutoMapper Settings window over the theme (see [The menu, command input and status strip](#the-menu-command-input-and-status-strip)). (Presets used to sit under Highlights, as in Genie 4; they have their own tab now, just before Highlights.)
 - **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it on the **Edit → Configuration… → Presets** tab or with `#config monsterbold on|off`.
 - **Links** — clickable links use the `link` preset (game-command links) and the `url` preset (web links), set on the same **Presets** tab. Set either to `Default` to show links in the normal text color, still underlined.
+
+![The Presets tab — the MonsterBold box, the Id, Scope, Fg and Bg grid, and the colour editor row](images/config-presets-tab.png)
+
+*The **Presets** tab.*
 
 ### Substitutes — rewriting text
 
@@ -125,6 +137,10 @@ A shunt routes game lines that match a pattern into a named window, so chatter y
 
 There's no File-menu master switch for shunts yet. To pause a set of them, give them a class and turn the class off.
 
+![The Shunts tab with no shunts defined — the Scope, Pattern, Window, Mode and Class grid and the editor with Pattern, Window, Class and the Also keep in main window box](images/config-shunts-tab.png)
+
+*The **Shunts** tab (no shunts defined yet).*
+
 ### Macros — key bindings
 
 Bind a keystroke to one or more commands:
@@ -158,6 +174,10 @@ A **class** is an on/off switch that gates a group of rules. Tag highlights, tri
 ```
 
 This is how you keep, say, a full set of combat triggers ready but inactive until you start hunting.
+
+![The Classes tab — a list of classes with active and inactive marks, and Activate All and Deactivate All buttons](images/config-classes-tab.png)
+
+*The **Classes** tab — each class with its on/off state.*
 
 ## Window logs — a file per stream
 
@@ -204,6 +224,10 @@ Rules are saved in `windowlog.json`. While you're connected, that's the characte
 
 DragonRealms describes some windows itself — the bank, stores, spell choice, feats, your profile, TDP, and more. Genie builds each one from the controls the server sends and shows it as an ordinary panel you can dock, float, or leave in its own window. The first time a dialog Genie hasn't seen arrives, Genie asks where it should go, and remembers the answer **per character profile**.
 
+![The New Server Window prompt asking where the Friends & Enemies dialog should go](images/config-server-dialog-prompt.png)
+
+*The first-time prompt for a new server dialog.*
+
 **Configuration → Layout → Server Dialogs** lists every answer you've given, with its **Where** and **Auto-open** settings. Select a dialog to change it:
 
 | Where | What it does |
@@ -221,6 +245,14 @@ DragonRealms describes some windows itself — the bank, stores, spell choice, f
 
 From the command bar, `#dialogs` (or `#dialogs list`) lists the dialogs seen this session, `#dialogs forget <id>` is the same as **Forget**, and `#dialogs report <id>` opens a pre-filled, redacted GitHub issue draft for a dialog that doesn't render right — nothing is posted until you submit it.
 
+![Configuration → Layout → Server Dialogs — the master switch, the grid of remembered dialogs with Where and Auto-open, and the editor below](images/config-server-dialogs-tab.png)
+
+***Configuration → Layout → Server Dialogs**.*
+
+![The Window menu with the Server Dialogs submenu open, listing the dialogs seen this session](images/menu-window-server-dialogs.png)
+
+***Window → Server Dialogs** reopens any dialog seen this session.*
+
 ## Themes
 
 A theme sets the colours of the whole client: the window chrome (backgrounds, borders, labels, accents) and the starting colours of the game text, your echoes and the vitals bars. Seven themes are built in: **Dark** (the default), **Light**, **Genie 4 Classic**, **High Contrast**, **Solarized Dark**, **Solarized Light** and **Wrayth-style**. You can also make your own, and share them as files.
@@ -235,6 +267,10 @@ There are two places to pick one:
 - **Edit → Display Settings… → Theme** has the same list. Picking a theme there applies it behind the dialog so you can see it. **OK** keeps it; **Cancel** (or closing the dialog) puts back the previous theme *and* the game and echo colours you had when you opened it.
 
 The active theme is shared by every character, and Genie remembers it between launches.
+
+![The Edit menu with the Theme submenu open — the seven built-in themes, custom themes, Edit Theme, Save Current As and Reset to Dark](images/menu-edit-theme.png)
+
+***Edit → Theme**.*
 
 ### What a theme contains
 
@@ -344,6 +380,10 @@ Genie 4 coloured its window chrome with seven `ui.*` presets. They do the same i
 - The vitals and game text groups start with the colours you're using now (Display Settings and Presets), not the theme file's, so you edit what you see. In the vitals group, a fully transparent colour means none: `Default` for a fill, the normal track for a track.
 - **Every change previews live** in the window behind the editor.
 - **Save** writes the theme to `Config/Themes` and makes it active, game, echo and vitals colours included. **Cancel** puts everything back the way it was when you opened the editor.
+
+![The Edit Theme dialog — theme name, base variant, and colour rows grouped under Surfaces, Text, Accents and Vitals Bars](images/themes-editor.png)
+
+*The theme editor. The list scrolls; **Game text** is below the rows shown.*
 
 Other ways to make or manage themes:
 

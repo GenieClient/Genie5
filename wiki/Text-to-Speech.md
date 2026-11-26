@@ -139,6 +139,8 @@ The same settings are also editable in the GUI — the Configuration dialog
 (**Edit → Configuration…**) has a **Text-to-Speech** tab. Connect first; the
 settings load with the session.
 
+![The Text-to-Speech tab — the master switch, the streams with their priority dropdowns, the voice picker with Test and Install voice, voice folder, rate and volume](images/tts-tab.png)
+
 - **Read game streams aloud** — the master switch (`#tts read on|off`).
   `#speak` and trigger/highlight speech work either way.
 - **Streams** — one row per stream: whether it's read, and its priority
