@@ -1539,15 +1539,31 @@ public class MapCanvas : Control
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        // Vertical wheel: +1 = up = zoom in, -1 = down = zoom out.
-        // Multiplicative step keeps the perceived speed constant across zoom
-        // levels (small steps near 1x, big steps near 4x).
-        var factor = e.Delta.Y > 0 ? ZoomStep : 1.0 / ZoomStep;
-        Zoom = Zoom * factor;
+        // Vertical wheel: up = zoom in, down = zoom out. Multiplicative step
+        // keeps the perceived speed constant across zoom levels (small steps
+        // near 1x, big steps near 4x).
+        Zoom = Zoom * WheelZoomFactor(e.Delta.Y);
         // Mark handled so the surrounding ScrollViewer doesn't also consume
         // the wheel event and try to scroll.
         e.Handled = true;
     }
+
+    /// <summary>
+    /// The zoom multiplier for one wheel event (#449). Proportional to how far
+    /// the wheel moved: a whole notch (delta 1) is one <see cref="ZoomStep"/>,
+    /// and the fractional deltas a high-resolution wheel or touchpad sends many
+    /// of per notch each zoom by their share, so one physical notch is one step
+    /// on every device. It used to be a full step per event whatever the delta,
+    /// which made those devices jump several levels at a touch. Capped at
+    /// <see cref="MaxWheelNotches"/> per event; no vertical movement is no zoom.
+    /// </summary>
+    internal static double WheelZoomFactor(double deltaY)
+    {
+        if (double.IsNaN(deltaY) || deltaY == 0) return 1.0;
+        return Math.Pow(ZoomStep, Math.Clamp(deltaY, -MaxWheelNotches, MaxWheelNotches));
+    }
+
+    private const double MaxWheelNotches = 3.0;
 
     /// <summary>
     /// Hit-test against the visible (current-level) nodes. Returns the first
