@@ -202,7 +202,9 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
     private void RebuildCoreUpdater()
     {
         var url = $"https://github.com/{_config.Core.Owner}/{_config.Core.Repo}";
-        _coreUpdater        = new CoreAppUpdater(url, _config.Core.Channel);
+        // The dialog is the one place a downgrade may be offered: the user
+        // reads what Check found and clicks Update. See ChannelDowngradePolicy.
+        _coreUpdater        = new CoreAppUpdater(url, _config.Core.Channel, allowChannelDowngrade: true);
         CoreCanUpdate       = _coreUpdater.IsInstalled;
         CorePlatformChannel = _coreUpdater.PlatformChannel;
     }
@@ -214,12 +216,21 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
         {
             var r = await _coreUpdater.CheckAsync();
             CoreUpdateAvailable = r.UpdateAvailable;
-            CoreLatestVersion   = r.UpdateAvailable
-                ? $"{r.LatestVersion} (you have {_coreUpdater.CurrentVersion})"
-                : r.LatestVersion;
-            Status = r.UpdateAvailable
-                ? $"Core update available: {r.LatestVersion}"
-                : "Core is up to date.";
+            // Leaving the beta channel: the stable release on offer is OLDER
+            // than the installed pre-release. Say so before the user clicks —
+            // "update available" would be misleading for a roll-back (#455).
+            var downgrade = r.UpdateAvailable && _coreUpdater.PendingIsDowngrade;
+            CoreLatestVersion   = downgrade
+                ? $"{r.LatestVersion} is the latest stable release. You have {_coreUpdater.CurrentVersion}, " +
+                  $"a newer pre-release. Update and Restart replaces it with {r.LatestVersion}."
+                : r.UpdateAvailable
+                    ? $"{r.LatestVersion} (you have {_coreUpdater.CurrentVersion})"
+                    : r.LatestVersion;
+            Status = downgrade
+                ? $"Core: {r.LatestVersion} (stable) can replace the installed pre-release."
+                : r.UpdateAvailable
+                    ? $"Core update available: {r.LatestVersion}"
+                    : "Core is up to date.";
         }
         catch (Exception ex) { Status = $"Core check failed: {ex.Message}"; }
         finally { CoreIsBusy = false; }

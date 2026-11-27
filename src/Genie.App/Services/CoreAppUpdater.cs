@@ -48,7 +48,7 @@ namespace Genie.App.Services;
 /// </summary>
 public sealed class CoreAppUpdater : IUpdater
 {
-    private readonly UpdateManager _mgr;
+    private readonly UpdateManager _mgr;   // assigned twice in the ctor, never after
     private readonly string        _channel;
     private readonly string?       _platformChannel;
     private          UpdateInfo?   _pendingUpdate;
@@ -89,7 +89,24 @@ public sealed class CoreAppUpdater : IUpdater
     /// </summary>
     public string PlatformChannel => _platformChannel ?? "(default / win)";
 
-    public CoreAppUpdater(string repoUrl, string channel = "stable")
+    /// <summary>
+    ///   True when the last <see cref="CheckAsync"/> found a release that is
+    ///   LOWER than the installed one — only possible when the updater was
+    ///   built with <c>allowChannelDowngrade</c> and a pre-release install is
+    ///   on the stable channel (public #455).
+    /// </summary>
+    public bool PendingIsDowngrade => _pendingUpdate?.IsDowngrade == true;
+
+    /// <param name="repoUrl">GitHub repository URL of the release feed.</param>
+    /// <param name="channel"><c>"stable"</c> or <c>"beta"</c>.</param>
+    /// <param name="allowChannelDowngrade">
+    ///   Let a pre-release install on the stable channel be offered the latest
+    ///   stable release even though it is a lower version (see
+    ///   <see cref="ChannelDowngradePolicy"/>). Pass true only where the user
+    ///   sees the offer and confirms it — the Updates dialog. The unattended
+    ///   startup check and auto-apply leave it false so nobody is rolled back
+    ///   without asking.</param>
+    public CoreAppUpdater(string repoUrl, string channel = "stable", bool allowChannelDowngrade = false)
     {
         _channel = string.IsNullOrWhiteSpace(channel) ? "stable" : channel;
         var prerelease = string.Equals(_channel, "beta", StringComparison.OrdinalIgnoreCase);
@@ -98,6 +115,19 @@ public sealed class CoreAppUpdater : IUpdater
         var source  = new GithubSource(repoUrl, accessToken: null, prerelease: prerelease);
         var options = new UpdateOptions { ExplicitChannel = _platformChannel };
         _mgr        = new UpdateManager(source, options);
+
+        // The installed version is only known once a manager exists, and the
+        // downgrade switch is fixed at construction — so decide, then rebuild.
+        if (allowChannelDowngrade
+            && ChannelDowngradePolicy.MayDowngrade(_channel, _mgr.CurrentVersion?.ToString()))
+        {
+            options = new UpdateOptions
+            {
+                ExplicitChannel       = _platformChannel,
+                AllowVersionDowngrade = true,
+            };
+            _mgr = new UpdateManager(source, options);
+        }
     }
 
     /// <summary>
@@ -155,7 +185,9 @@ public sealed class CoreAppUpdater : IUpdater
             return new UpdateCheckResult(
                 UpdateAvailable: true,
                 LatestVersion:   v,
-                Notes:           $"Update available on the {_channel} channel.");
+                Notes:           _pendingUpdate.IsDowngrade
+                    ? $"The latest {_channel} release is older than the installed build."
+                    : $"Update available on the {_channel} channel.");
         }
         catch (Exception ex)
         {
