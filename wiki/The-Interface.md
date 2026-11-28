@@ -77,6 +77,10 @@ Toggle panels from the **Window** menu (two exceptions: the Mapper toggle lives 
 
 *The Inventory panel.*
 
+![The Injuries panel — a body figure with the wounded arm, chest, abdomen and leg coloured, the nerves figure lit, and the five injuries listed underneath](images/interface-injuries.png)
+
+*The **Injuries** panel with the figure layout on.*
+
 ![The Log stream window with timestamped, colour-coded lines written by scripts](images/interface-log-window.png)
 
 *The **Log** window — lines scripts and triggers write with `#echo >log`.*
@@ -129,6 +133,14 @@ The catalog is saved to `InventoryView.xml` in your data folder in the same form
 ## The Healing window
 
 **Healing** (toggle it from the **Window** menu; hidden until you open it) is an Empath's healing console, in the spirit of Genie 4's Crutch plugin. It is fed by the text DragonRealms prints for `perceive health` and for an empath's `touch` — nothing else — and it acts only when you click one of its buttons.
+
+![The Healing window in the Four figures layout — the patient box with Perceive, Touch and Forget, one reading in the list, and four bodies with fresh wounds coloured on the Fresh External and Fresh Internal figures](images/interface-healing-figures.png)
+
+*The **Healing** window in the **Four figures** layout (patient name replaced with a placeholder).*
+
+![The Healing window in the Four figures layout after the fresh wounds are healed — the same parts now coloured steel blue on the Scar External and Scar Internal figures](images/interface-healing-figures-scars.png)
+
+*The same patient once the fresh wounds are healed: the scars that remain show in steel blue on the two scar figures.*
 
 - **Patient.** Type a name (leave it blank for yourself) and click **Touch** to diagnose a patient or **Perceive** to send `perceive health` (`perceive health <name>` for someone else). Every reading lands in the list underneath, one row per patient with its time, and stays there until a newer reading for that patient replaces it or you click **Forget**. Picking a row shows that patient and points the buttons at them.
 - **Body figures.** The reading is drawn on the same body as the **Injuries** window. Pick a layout with the switch above it; your choice is saved per character.
