@@ -1112,6 +1112,61 @@ public sealed class CommandEngine
         }
     }
 
+    // ── Typed saves and loads against the two config layers (public #446) ───
+    // A connected character has two layers: the shared Config folder and its
+    // own profile folder, and every loaded entry is tagged with the layer it
+    // came from. The typed commands (#highlight save, #save all, …) work on
+    // the profile folder only. Writing every loaded entry there gave the
+    // character a private copy of each shared rule, which then shadowed the
+    // shared file for good; clearing an engine before a typed load dropped the
+    // shared rules for the rest of the session.
+
+    /// <summary>True when the profile folder is not the shared Config folder,
+    /// so shared entries have a home of their own and must stay out of the
+    /// profile's files.</summary>
+    private bool HasSharedLayer =>
+        !ScopedRuleLoader.SameDirectory(_config.ConfigProfileDir, _config.ConfigDir);
+
+    /// <summary>The entries a typed save writes: the character's own when there
+    /// is a shared layer, everything when the one folder holds it all.</summary>
+    private IEnumerable<T> OwnEntries<T>(IEnumerable<T> entries, Func<T, RuleScope> scopeOf) =>
+        HasSharedLayer ? entries.Where(e => scopeOf(e) == RuleScope.Character) : entries;
+
+    /// <summary>Write one list's profile <c>.cfg</c>. With a shared layer, a
+    /// list holding nothing of the character's own makes no file; a file that
+    /// already exists is still rewritten, so removing the last entry sticks.</summary>
+    private void WriteProfileCfg(string fileName, string label, IEnumerable<string> lines)
+    {
+        var path = Path.Combine(_config.ConfigProfileDir, fileName);
+        var own  = lines.ToList();
+        if ((own.Count > 0 || !HasSharedLayer || File.Exists(path))
+            && !ConfigPersistence.WriteLines(path, own))
+        {
+            _host.Echo($"Failed to save {label.ToLowerInvariant()}: {path}");
+            return;
+        }
+        _host.Echo($"{label} Saved");
+    }
+
+    /// <summary>Run a clear-then-replay <paramref name="load"/> of a profile
+    /// <c>.cfg</c>, then put back each shared entry the file did not replace
+    /// (same key = the character's copy wins, as at connect).</summary>
+    private void LoadKeepingShared<T>(
+        Func<IEnumerable<T>?> entries, Func<T, RuleScope> scopeOf, Func<T, string> keyOf,
+        Action load, Action<T> restore)
+    {
+        var shared = HasSharedLayer
+            ? entries()?.Where(e => scopeOf(e) == RuleScope.Global).ToList()
+            : null;
+        load();
+        if (shared is null || shared.Count == 0) return;
+
+        var have = new HashSet<string>(
+            (entries() ?? Enumerable.Empty<T>()).Select(keyOf), StringComparer.OrdinalIgnoreCase);
+        foreach (var e in shared)
+            if (have.Add(keyOf(e))) restore(e);
+    }
+
     /// <summary>What <c>#save all</c> / <c>#load all</c> cover, in Genie 4's order.</summary>
     private static readonly string[] AllSaveLists =
     {
@@ -1530,12 +1585,8 @@ public sealed class CommandEngine
     private void SaveClasses()
     {
         if (Classes is null) return;
-        var path  = Path.Combine(_config.ConfigProfileDir, "classes.cfg");
-        var lines = CfgFormat.ClassLines(Classes.GetAll());
-        if (ConfigPersistence.WriteLines(path, lines))
-            _host.Echo("Classes Saved");
-        else
-            _host.Echo($"Failed to save classes: {path}");
+        WriteProfileCfg("classes.cfg", "Classes",
+            CfgFormat.ClassLines(OwnEntries(Classes.GetAll(), kv => Classes.ScopeOf(kv.Key))));
     }
 
     private void LoadClasses()
@@ -1642,12 +1693,8 @@ public sealed class CommandEngine
     private void SaveAliases()
     {
         if (Aliases is null) return;
-        var path  = Path.Combine(_config.ConfigProfileDir, "aliases.cfg");
-        var lines = CfgFormat.AliasLines(Aliases.Aliases);
-        if (ConfigPersistence.WriteLines(path, lines))
-            _host.Echo("Aliases Saved");
-        else
-            _host.Echo($"Failed to save aliases: {path}");
+        WriteProfileCfg("aliases.cfg", "Aliases",
+            CfgFormat.AliasLines(OwnEntries(Aliases.Aliases, r => r.Scope)));
     }
 
     private void LoadAliases()
@@ -2271,12 +2318,8 @@ public sealed class CommandEngine
     private void SaveVars()
     {
         if (Variables is null) return;
-        var path  = Path.Combine(_config.ConfigProfileDir, "variables.cfg");
-        var lines = CfgFormat.VariableLines(Variables.Store);
-        if (ConfigPersistence.WriteLines(path, lines))
-            _host.Echo("Variables Saved");
-        else
-            _host.Echo($"Failed to save variables: {path}");
+        WriteProfileCfg("variables.cfg", "Variables",
+            CfgFormat.VariableLines(OwnEntries(Variables.Store.GetAll().Values, v => v.ConfigScope)));
     }
 
     private void LoadVars()
@@ -2420,15 +2463,17 @@ public sealed class CommandEngine
     private void SaveHighlights()
     {
         if (Highlights is null) return;
-        var path  = Path.Combine(_config.ConfigProfileDir, "highlights.cfg");
-        var lines = CfgFormat.HighlightLines(Highlights.Rules);
-        if (ConfigPersistence.WriteLines(path, lines))
-            _host.Echo("Highlights Saved");
-        else
-            _host.Echo($"Failed to save highlights: {path}");
+        WriteProfileCfg("highlights.cfg", "Highlights",
+            CfgFormat.HighlightLines(OwnEntries(Highlights.Rules, r => r.Scope)));
     }
 
-    private void LoadHighlights()
+    private void LoadHighlights() =>
+        LoadKeepingShared(() => Highlights?.Rules, r => r.Scope, r => r.Pattern, LoadHighlightsFile,
+            r => Highlights!.AddRule(r.Pattern, r.ForegroundColor, r.BackgroundColor, r.MatchType,
+                                      r.CaseSensitive, r.IsEnabled, r.ClassName, r.SoundFile, r.Speak,
+                                      r.Windows).Scope = RuleScope.Global);
+
+    private void LoadHighlightsFile()
     {
         var path  = Path.Combine(_config.ConfigProfileDir, "highlights.cfg");
         var lines = ConfigPersistence.ReadLines(path);
@@ -2861,15 +2906,16 @@ public sealed class CommandEngine
     private void SaveTriggers()
     {
         if (Triggers is null) return;
-        var path  = Path.Combine(_config.ConfigProfileDir, "triggers.cfg");
-        var lines = CfgFormat.TriggerLines(Triggers.Triggers);
-        if (ConfigPersistence.WriteLines(path, lines))
-            _host.Echo("Triggers Saved");
-        else
-            _host.Echo($"Failed to save triggers: {path}");
+        WriteProfileCfg("triggers.cfg", "Triggers",
+            CfgFormat.TriggerLines(OwnEntries(Triggers.Triggers, r => r.Scope)));
     }
 
-    private void LoadTriggers()
+    private void LoadTriggers() =>
+        LoadKeepingShared(() => Triggers?.Triggers, r => r.Scope, r => r.Pattern, LoadTriggersFile,
+            r => Triggers!.AddTrigger(r.Pattern, r.Action, r.CaseSensitive, r.IsEnabled, r.ClassName,
+                                      r.SoundFile, r.Speak, r.Eval, r.MatchAll).Scope = RuleScope.Global);
+
+    private void LoadTriggersFile()
     {
         var path  = Path.Combine(_config.ConfigProfileDir, "triggers.cfg");
         var lines = ConfigPersistence.ReadLines(path);
@@ -2981,15 +3027,16 @@ public sealed class CommandEngine
     private void SaveSubstitutes()
     {
         if (Substitutes is null) return;
-        var path  = Path.Combine(_config.ConfigProfileDir, "substitutes.cfg");
-        var lines = CfgFormat.SubstituteLines(Substitutes.Rules);
-        if (ConfigPersistence.WriteLines(path, lines))
-            _host.Echo("Substitutes Saved");
-        else
-            _host.Echo($"Failed to save substitutes: {path}");
+        WriteProfileCfg("substitutes.cfg", "Substitutes",
+            CfgFormat.SubstituteLines(OwnEntries(Substitutes.Rules, r => r.Scope)));
     }
 
-    private void LoadSubstitutes()
+    private void LoadSubstitutes() =>
+        LoadKeepingShared(() => Substitutes?.Rules, r => r.Scope, r => r.Pattern, LoadSubstitutesFile,
+            r => Substitutes!.AddRule(r.Pattern, r.Replacement, r.CaseSensitive, r.IsEnabled, r.ClassName,
+                                       r.WholeWord).Scope = RuleScope.Global);
+
+    private void LoadSubstitutesFile()
     {
         var path  = Path.Combine(_config.ConfigProfileDir, "substitutes.cfg");
         var lines = ConfigPersistence.ReadLines(path);
@@ -3094,15 +3141,15 @@ public sealed class CommandEngine
     private void SaveGags()
     {
         if (Gags is null) return;
-        var path  = Path.Combine(_config.ConfigProfileDir, "gags.cfg");
-        var lines = CfgFormat.GagLines(Gags.Rules);
-        if (ConfigPersistence.WriteLines(path, lines))
-            _host.Echo("Gags Saved");
-        else
-            _host.Echo($"Failed to save gags: {path}");
+        WriteProfileCfg("gags.cfg", "Gags",
+            CfgFormat.GagLines(OwnEntries(Gags.Rules, r => r.Scope)));
     }
 
-    private void LoadGags()
+    private void LoadGags() =>
+        LoadKeepingShared(() => Gags?.Rules, r => r.Scope, r => r.Pattern, LoadGagsFile,
+            r => Gags!.AddRule(r.Pattern, r.CaseSensitive, r.IsEnabled, r.ClassName).Scope = RuleScope.Global);
+
+    private void LoadGagsFile()
     {
         var path  = Path.Combine(_config.ConfigProfileDir, "gags.cfg");
         var lines = ConfigPersistence.ReadLines(path);
@@ -3233,15 +3280,16 @@ public sealed class CommandEngine
     private void SaveShunts()
     {
         if (Shunts is null) return;
-        var path  = Path.Combine(_config.ConfigProfileDir, "shunts.cfg");
-        var lines = CfgFormat.ShuntLines(Shunts.Rules);
-        if (ConfigPersistence.WriteLines(path, lines))
-            _host.Echo("Shunts Saved");
-        else
-            _host.Echo($"Failed to save shunts: {path}");
+        WriteProfileCfg("shunts.cfg", "Shunts",
+            CfgFormat.ShuntLines(OwnEntries(Shunts.Rules, r => r.Scope)));
     }
 
-    private void LoadShunts()
+    private void LoadShunts() =>
+        LoadKeepingShared(() => Shunts?.Rules, r => r.Scope, r => r.Pattern, LoadShuntsFile,
+            r => Shunts!.AddRule(r.Pattern, r.Window, r.Copy, r.CaseSensitive, r.IsEnabled,
+                                 r.ClassName).Scope = RuleScope.Global);
+
+    private void LoadShuntsFile()
     {
         var path  = Path.Combine(_config.ConfigProfileDir, "shunts.cfg");
         var lines = ConfigPersistence.ReadLines(path);
@@ -3345,15 +3393,19 @@ public sealed class CommandEngine
     private void SaveMacros()
     {
         if (Macros is null) return;
-        var path  = Path.Combine(_config.ConfigProfileDir, "macros.cfg");
-        var lines = CfgFormat.MacroLines(Macros.Rules);
-        if (ConfigPersistence.WriteLines(path, lines))
-            _host.Echo("Macros Saved");
-        else
-            _host.Echo($"Failed to save macros: {path}");
+        WriteProfileCfg("macros.cfg", "Macros",
+            CfgFormat.MacroLines(OwnEntries(Macros.Rules, r => r.Scope)));
     }
 
-    private void LoadMacros()
+    private void LoadMacros() =>
+        LoadKeepingShared(() => Macros?.Rules, r => r.Scope, r => r.Key, LoadMacrosFile,
+            r =>
+            {
+                Macros!.Add(r.Key, r.Action, r.ClassName);
+                if (Macros.Get(r.Key) is { } added) added.Scope = RuleScope.Global;
+            });
+
+    private void LoadMacrosFile()
     {
         var path  = Path.Combine(_config.ConfigProfileDir, "macros.cfg");
         var lines = ConfigPersistence.ReadLines(path);
