@@ -220,14 +220,14 @@ public class JsEngineGuardTests
     /// stay that way: its engine re-baselines per call (Jint resets constraints at
     /// the top of every Evaluate), so repeated allocating calls do not accumulate.
     ///
-    /// <para>The work per call is deliberately string doubling rather than a filled
-    /// array. Both allocate; only the array runs 100,000 interpreted iterations to
-    /// do it. That cost is invisible on a dev box and not on a shared CI runner,
-    /// where a single call drifting past the 250 ms wall-clock budget aborts the
-    /// SCRIPT — so the final echo never runs and the test fails for a reason that
-    /// has nothing to do with allocation accumulating. Doubling gets the same
-    /// megabytes out of ~20 interpreted statements, which puts the per-call time
-    /// orders of magnitude under the budget instead of a small multiple of it.</para>
+    /// <para>Driven straight at the context with a clock that never advances, so
+    /// the 250 ms wall-clock budget cannot fire. That budget is not what this test
+    /// is about, and on a shared CI runner (macOS most of all) one call in sixty
+    /// stalling past it failed the run with nothing wrong in the allocation guard.
+    /// The wall-clock budget has its own test above.</para>
+    ///
+    /// <para>The work per call is string doubling rather than a filled array: the
+    /// same megabytes out of ~20 interpreted statements instead of 100,000.</para>
     ///
     /// <para>Sized from a measurement, not arithmetic: a single call aborts between
     /// Doubling(24) and Doubling(25), which puts one call's cumulative allocation at
@@ -238,30 +238,22 @@ public class JsEngineGuardTests
     public void JsCall_AllocationDoesNotAccumulateAcrossCalls()
     {
         var sink = new Sink();
-        var dir  = NewDir();
-        try
+        var ctx = new Genie.Core.Scripting.Js.JsLibraryContext(
+            getVar:    _ => "",
+            setVar:    (_, _) => { },
+            getGlobal: _ => "",
+            setGlobal: (_, _) => { },
+            echo:      sink.Add,
+            put:       _ => { },
+            clock:     static () => 0);
+
+        for (int i = 0; i < 60; i++)
         {
-            var cmd = new StringBuilder();
-            for (int i = 0; i < 60; i++)
-                cmd.AppendLine("jscall n " + Doubling(20));
-            cmd.AppendLine("echo T:n=%n");
-
-            File.WriteAllText(Path.Combine(dir, "t.cmd"), cmd.ToString());
-            var engine = new ScriptEngine(dir, new TypeAheadSession(),
-                                          sendCommand: _ => { }, echo: sink.Add);
-            engine.TryStart("t", new List<string>());
-            for (int i = 0; i < 400; i++) engine.Tick();
-
-            var lines = sink.Snapshot();
-            // The last call has to return a real value, not "" from a failed one.
-            Assert.Contains(lines, l => l == "T:n=1048576");
-            Assert.DoesNotContain(lines, l => l.Contains("memory limit"));
-            Assert.DoesNotContain(lines, l => l.Contains("runaway"));
-            // If this ever fires, the runner is slow enough to need a rethink —
-            // say so plainly instead of surfacing as a missing echo.
-            Assert.DoesNotContain(lines, l => l.Contains("wall-clock budget"));
+            // Every call has to return a real value, not "" from an aborted one.
+            Assert.True(ctx.Evaluate(Doubling(20)) == "1048576",
+                        $"call {i + 1} of 60 failed; echoed: " + string.Join(" | ", sink.Snapshot()));
         }
-        finally { try { Directory.Delete(dir, true); } catch { /* best effort */ } }
+        Assert.Empty(sink.Snapshot());
     }
 
     /// <summary>A self-doubling string expression: high allocation, ~<paramref

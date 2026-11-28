@@ -47,6 +47,13 @@ public sealed class ImageLineHeadlessTests : IDisposable
 
     // The decode runs on the thread pool and lands via the UI dispatcher, which
     // this test thread owns — so pump it rather than block on the task.
+    //
+    // EVERY test that adds a picture ends with this, including the ones that
+    // only look at the placeholder. The headless runner replaces
+    // Dispatcher.UIThread between tests, and the first thread to read it creates
+    // the next one. A decode left in flight finishes on a pool thread after its
+    // test has ended and reads Dispatcher.UIThread there, so it can hand the
+    // NEXT test a dispatcher nobody pumps (CI: "image decode never completed").
     private static void PumpUntil(Task task)
     {
         var sw = Stopwatch.StartNew();
@@ -70,6 +77,7 @@ public sealed class ImageLineHeadlessTests : IDisposable
         var inline = Assert.Single(line.Inlines);
         var host = Assert.IsType<InlineUIContainer>(inline);
         Assert.IsType<Image>(host.Child);
+        PumpUntil(line.Image!.Loaded);
     }
 
     [AvaloniaFact]
@@ -86,6 +94,7 @@ public sealed class ImageLineHeadlessTests : IDisposable
         Assert.Equal(2, inlines.Count);
         Assert.Equal(line.Text[..line.ImageSpan.Value.Start], Assert.IsType<Run>(inlines[0]).Text);
         Assert.IsType<InlineUIContainer>(inlines[1]);
+        PumpUntil(line.Image!.Loaded);
     }
 
     [AvaloniaFact]
@@ -93,10 +102,12 @@ public sealed class ImageLineHeadlessTests : IDisposable
     {
         var vm = new GameTextViewModel();   // default cap 2000 (no core attached)
         vm.AddImage(Request());
+        var image = vm.Lines.Single().Image!;
         for (var i = 0; i < 2000; i++) vm.AddSystemLine($"line {i}");
 
         Assert.Equal(2000, vm.Lines.Count);
         Assert.DoesNotContain(vm.Lines, l => l.Image is not null);
+        PumpUntil(image.Loaded);
     }
 
     [AvaloniaFact]
@@ -114,6 +125,7 @@ public sealed class ImageLineHeadlessTests : IDisposable
 
         var text = File.ReadAllLines(Directory.GetFiles(logs).Single());
         Assert.Equal(new[] { "before", "[image: sword.png]", "after" }, text);
+        PumpUntil(vm.Lines.Single(l => l.Image is not null).Image!.Loaded);
     }
 
     [AvaloniaFact]
@@ -171,6 +183,7 @@ public sealed class ImageLineHeadlessTests : IDisposable
         Assert.Equal("[image: sword.png]", line.Text);
         Assert.Equal("Hotbar", line.Window);
         Assert.IsType<InlineUIContainer>(Assert.Single(line.Inlines));
+        PumpUntil(line.Image!.Loaded);
     }
 
     [AvaloniaFact]
@@ -184,5 +197,6 @@ public sealed class ImageLineHeadlessTests : IDisposable
 
         Assert.Equal("[image: sword.png]", entry.Line.Text);
         Assert.Empty(entry.Links);
+        PumpUntil(entry.Line.Image!.Loaded);
     }
 }
