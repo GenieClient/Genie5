@@ -1,12 +1,12 @@
-# Live Walk — 5.0.1-beta.2
+# Live Walk — 5.0.1-beta.3
 
 A live walk is one sitting with a test build, logged in to the game, following the steps in order. Each step says what to do and what to expect. It takes about 30 minutes and is the quickest way to help test a pre-release.
 
-This page always holds the walk for the pre-release that is out for testing. This one is for **5.0.1-beta.2**, which becomes 5.0.1 on **Wednesday 2 December** if testing finds nothing. The test period is a full week because of the holiday and people travelling, so there is no rush.
+This page always holds the walk for the pre-release that is out for testing. This one is for **5.0.1-beta.3**, which becomes 5.0.1 on **Wednesday 2 December** if testing finds nothing. The test period is a full week because of the holiday and people travelling, so there is no rush.
 
-This is the second test build of 5.0.1. Part 4 is the only part new since beta.1: if you walked beta.1, do parts 1, 2 and 4 and report those.
+This is the third test build of 5.0.1. Part 11 is the only part new since beta.2, and part 4 the only one new since beta.1: if you walked beta.2, do parts 1 and 11 and report those; if you walked beta.1, do parts 1, 2, 4 and 11.
 
-> **Walk or checklist?** The walk is one pass through everything, in order. The pinned **Test v5.0.1-beta.2** issue on the [issue tracker](https://github.com/GenieClient/Genie5/issues) has the same changes as separate sections with more detail, for when you want to dig into one of them. Either helps. Report both in that issue.
+> **Walk or checklist?** The walk is one pass through everything, in order. The pinned **Test v5.0.1-beta.3** issue on the [issue tracker](https://github.com/GenieClient/Genie5/issues) has the same changes as separate sections with more detail, for when you want to dig into one of them. Either helps. Report both in that issue.
 
 **You need:** a character you can log in, and five minutes somewhere safe to stand, with a room or two you can walk to. Parts 8 and 9 are for Linux and macOS only.
 
@@ -14,8 +14,8 @@ This is the second test build of 5.0.1. Part 4 is the only part new since beta.1
 
 ## 1. Get the build (2 min)
 
-1. **Help ▸ Check for Updates**, set **Channel** to **beta**, and update. **Expect:** Genie restarts. (5.0.0 moved every install to the stable channel, so the build is not offered until you do this. On macOS and Linux you can also download it from the [release page](https://github.com/GenieClient/Genie5/releases/tag/v5.0.1-beta.2).)
-2. **Help ▸ About Genie 5**. **Expect:** `5.0.1-beta.2`.
+1. **Help ▸ Check for Updates**, set **Channel** to **beta**, and update. **Expect:** Genie restarts. (5.0.0 moved every install to the stable channel, so the build is not offered until you do this. On macOS and Linux you can also download it from the [release page](https://github.com/GenieClient/Genie5/releases/tag/v5.0.1-beta.3).)
+2. **Help ▸ About Genie 5**. **Expect:** `5.0.1-beta.3`.
 3. Look at your windows. **Expect:** your layout, profiles and settings as you left them.
 
 ## 2. Connect (2 min)
@@ -90,16 +90,28 @@ A script now sends a `$variable`'s value when it sits inside another variable.
 34. Set a game window's font to one that is not installed, such as `Cascadia Mono`. (`fc-match "Cascadia Mono"` answers with a different family when it is not installed.)
 35. Note memory with `ps -o rss= -p $(pgrep Genie5)`, play for ten minutes with heavy text, and read it again. **Expect:** it stays within about 50 MB of where it started.
 
-## 10. Clean up and report
+## 10. Clean up (1 min)
 
 36. Type `#unvar savetest`, then `#save vars`, and delete `vartest.cmd` from your Scripts folder.
 37. In the **Maps** menu, put the four switches from part 4 back (the first three ticked, **Right-Click Walks to Room** unticked), unless you prefer the map the new way.
-38. Comment on the pinned **Test v5.0.1-beta.2** issue with this filled in:
 
-        Live walk: 5.0.1-beta.2
+## 11. Back to stable, and back again (5 min, optional)
+
+New in beta.3. On earlier test builds, setting **Channel** to **stable** answered "up to date" and kept you on the test build. This part takes you off the test build, so do it last; step 41 brings you back.
+
+38. **Help ▸ Check for Updates**, **Core** tab: set **Channel** to **stable** and click **Check**. **Expect:** the Status line says `5.0.0` is the latest stable release and that you have `5.0.1-beta.3`, a newer pre-release. It does not say "up to date".
+39. Click **Update and Restart**. **Expect:** Genie restarts.
+40. **Help ▸ About Genie 5**. **Expect:** `5.0.0`, with your layout, profiles and settings as you left them. Note anything that looks different.
+41. To carry on testing: **Help ▸ Check for Updates**, set **Channel** to **beta**, click **Check** and update. **Expect:** you are back on `5.0.1-beta.3`. To stay on 5.0.0, leave **Channel** on **stable**.
+
+## 12. Report
+
+42. Comment on the pinned **Test v5.0.1-beta.3** issue with this filled in:
+
+        Live walk: 5.0.1-beta.3
         OS:
-        Parts done: 1 2 3 4 5 6 7 8 9
+        Parts done: 1 2 3 4 5 6 7 8 9 11
         Steps that did not match:
         Notes:
 
-To go back to stable builds afterwards, set **Channel** to **stable** in **Help ▸ Check for Updates**. You keep this build until 5.0.1 is out.
+To go back to stable builds for good, do part 11 and stop after step 40. If you leave **Channel** on **stable** without updating, you keep this build until 5.0.1 is out.

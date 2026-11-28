@@ -1,4 +1,4 @@
-# Genie 5 — v5.0.1-beta.2
+# Genie 5 — v5.0.1-beta.3
 
 **"Safe Keeping"** — the test build of 5.0.1, a fixes release. It is a pre-release:
 only installs on the **beta** channel are offered it, and it becomes 5.0.1 on
@@ -7,7 +7,7 @@ the usual two days, because of the holiday and people travelling. To get it, ope
 Updates**, set **Channel** to **beta** and update. The quickest way to help is the
 [Live Walk](https://github.com/GenieClient/Genie5/wiki/Live-Walk), about 30 minutes in
 one sitting. What to check in more detail, and where to report, is in the pinned
-"Test v5.0.1-beta.2" issue.
+"Test v5.0.1-beta.3" issue.
 
 What is in it: `#config automapper` is the mapper's on/off switch again, as in
 Genie 4, so travel scripts stop turning Record on. A script that sends a line holding
@@ -16,8 +16,9 @@ On Linux, memory no longer grows when a window is set to a font that is not inst
 On Linux and macOS, the file that holds your saved logins is readable by you only.
 Map, script and plugin updates download from GitHub over HTTPS and nowhere else.
 One addition came in with the fixes: four **Maps** menu switches that let the Mapper
-sit as a small docked minimap. That and a fix to the map's wheel zoom are the only
-changes since `5.0.1-beta.1`.
+sit as a small docked minimap. That and a fix to the map's wheel zoom came in
+`5.0.1-beta.2`. The only change since `beta.2` is that a test build can go back to
+the stable release from the Updates dialog.
 
 Two things behave differently for scripts, both to match Genie 4: see the first two
 fixes below. One setting changes meaning, `automapper`; nothing else here changes
@@ -116,6 +117,16 @@ your settings.
   far the wheel moved: one notch is one step on every device, and a single fast flick
   is limited to three. A sideways scroll no longer zooms the map out
   ([#449](https://github.com/GenieClient/Genie5/issues/449)).
+- **A test build can switch back to the stable channel** — on a pre-release, setting
+  **Channel** to **stable** in **Help ▸ Check for Updates** answered "Core is up to
+  date" and kept you on the test build: the newest stable release is a lower version
+  than the one installed, and the updater only moved forward. The check now offers the
+  latest stable release and says it is the older one ("5.0.0 is the latest stable
+  release. You have 5.0.1-beta.3, a newer pre-release."), and **Update and Restart**
+  installs it. Only the Updates dialog does this: the check at startup and auto-apply
+  never move you to a lower version, and a stable build is never moved down.
+  `5.0.1-beta.1` and `beta.2` do not have the fix, so update to this build first
+  ([#455](https://github.com/GenieClient/Genie5/issues/455)).
 
 ## 💡 Notes
 - **Updates only download from GitHub, over HTTPS** — the map, script and plugin
