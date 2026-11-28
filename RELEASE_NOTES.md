@@ -1,4 +1,4 @@
-# Genie 5 — v5.0.1-beta.3
+# Genie 5 — v5.0.1-beta.4
 
 **"Safe Keeping"** — the test build of 5.0.1, a fixes release. It is a pre-release:
 only installs on the **beta** channel are offered it, and it becomes 5.0.1 on
@@ -7,7 +7,7 @@ the usual two days, because of the holiday and people travelling. To get it, ope
 Updates**, set **Channel** to **beta** and update. The quickest way to help is the
 [Live Walk](https://github.com/GenieClient/Genie5/wiki/Live-Walk), about 30 minutes in
 one sitting. What to check in more detail, and where to report, is in the pinned
-"Test v5.0.1-beta.3" issue.
+"Test v5.0.1-beta.4" issue.
 
 What is in it: `#config automapper` is the mapper's on/off switch again, as in
 Genie 4, so travel scripts stop turning Record on. A script that sends a line holding
@@ -17,8 +17,10 @@ On Linux and macOS, the file that holds your saved logins is readable by you onl
 Map, script and plugin updates download from GitHub over HTTPS and nowhere else.
 One addition came in with the fixes: four **Maps** menu switches that let the Mapper
 sit as a small docked minimap. That and a fix to the map's wheel zoom came in
-`5.0.1-beta.2`. The only change since `beta.2` is that a test build can go back to
-the stable release from the Updates dialog.
+`5.0.1-beta.2`, and `beta.3` let a test build go back to the stable release from the
+Updates dialog. The only change since `beta.3` is that `#save all` leaves the rules
+you share between characters where they are. If you ran `#save all` on an earlier
+test build, see that fix below for how to undo what it did.
 
 Two things behave differently for scripts, both to match Genie 4: see the first two
 fixes below. One setting changes meaning, `automapper`; nothing else here changes
@@ -78,6 +80,26 @@ your settings.
   (`#layout save <name>`) and a profile is written when you edit it, and each
   answers with that. Thanks @syntaki
   ([#440](https://github.com/GenieClient/Genie5/issues/440)).
+- **`#save all` saves the character's own rules and leaves the shared ones alone** —
+  on the earlier test builds, a character with its own profile folder had every
+  loaded entry written into that folder by `#save all`, the rules shared by all
+  characters included. From the next login each shared rule was a private copy that
+  hid the shared one: a change or a deletion in the shared file no longer reached
+  that character, and a shared highlight limited to one window applied in every
+  window. A typed save (`#save`, and each list's own, such as `#highlight save`) now
+  writes only that character's entries for variables, aliases, classes, triggers,
+  macros, substitutes, gags, highlights and shunts, and makes no file for a list
+  that has none. `#load` keeps the shared entries the character's file does not
+  replace, so `#save all` followed by `#load all` no longer drops them for the
+  session. **If you ran `#save all` on `5.0.1-beta.1`, `beta.2` or `beta.3`,** the
+  copies it made are still in the character's folder; this build does not remove
+  them. Open **Edit ▸ Configuration…**, set a tab's scope filter to this character's
+  rules and delete the ones that are copies: the shared rule comes back at once. Or,
+  with Genie closed, delete the `.cfg` files in `Profiles/<Character>-<Account>/`
+  that hold nothing of the character's own. A character's own highlight that is
+  limited to a window still loses the window when it is saved by a typed save; that
+  is not fixed here. Thanks @syntaki
+  ([#446](https://github.com/GenieClient/Genie5/issues/446)).
 - **Linux: memory no longer grows when a font is not installed** — a window set to a
   font the machine does not have (usually `Cascadia Mono`, `Consolas`, `Menlo` or
   `Segoe UI`, in settings brought over from Windows or macOS) made memory grow with
@@ -122,7 +144,7 @@ your settings.
   date" and kept you on the test build: the newest stable release is a lower version
   than the one installed, and the updater only moved forward. The check now offers the
   latest stable release and says it is the older one ("5.0.0 is the latest stable
-  release. You have 5.0.1-beta.3, a newer pre-release."), and **Update and Restart**
+  release. You have 5.0.1-beta.4, a newer pre-release."), and **Update and Restart**
   installs it. Only the Updates dialog does this: the check at startup and auto-apply
   never move you to a lower version, and a stable build is never moved down.
   `5.0.1-beta.1` and `beta.2` do not have the fix, so update to this build first

@@ -74,6 +74,7 @@ See **[Connecting & Profiles](Connecting)** for the walkthrough.
 
 - **Discord** — [discord.gg/MtmzE2w](https://discord.gg/MtmzE2w) — the long-running Genie community server (shared with Genie 4). Beta-tester chat, scripting help, mapper questions.
 - **Issues** — [report a bug or request a feature](https://github.com/GenieClient/Genie5/issues).
+- **Wiki feedback** — found something wrong, missing, or out of date on these pages? [Tell us in the wiki feedback discussion](https://github.com/GenieClient/Genie5/discussions/457).
 - **Releases** — [download builds](https://github.com/GenieClient/Genie5/releases) as they ship.
 - **Contributing** — [CONTRIBUTING.md](https://github.com/GenieClient/Genie5/blob/main/CONTRIBUTING.md). PRs welcome.
 - **Developer docs** — the [`docs/` folder](https://github.com/GenieClient/Genie5/tree/main/docs) covers the parser, scripting engine, and mapper internals.

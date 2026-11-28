@@ -4,15 +4,16 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **stable** as of v5.0.0. Stable releases are tagged like `v5.0.1` or `v5.1.0`; test builds of the next stable release are published as pre-releases, tagged like `v5.1.0-beta.1` (builds before 5.0.0 were `v5.0.0-alpha.N` and `v5.0.0-beta.N`). **Windows** release binaries are **EV code-signed** under **Shadow Realms LLC**, the project's support partner; **macOS and Linux** builds are unsigned for now and show a first-launch warning — see [Installation](Installation#platform-first-launch-notes).
 
-## Test build: v5.0.1-beta.3 — Safe Keeping
+## Test build: v5.0.1-beta.4 — Safe Keeping
 
-**A pre-release of 5.0.1, out for testing.** It is the third test build; the only change since beta.2 is that a test build can switch back to the stable channel. It is offered only to installs on the **beta** channel: open **Help → Check for Updates**, set **Channel** to **beta** and update. If testing finds nothing it becomes 5.0.1 on Wednesday 2 December; the test period is a full week because of the holiday and people travelling. The quickest way to help is the [Live Walk](Live-Walk), about 30 minutes in one sitting; what to check in more detail and where to report is in the pinned **Test v5.0.1-beta.3** issue on the [issue tracker](https://github.com/GenieClient/Genie5/issues).
+**A pre-release of 5.0.1, out for testing.** It is the fourth test build; the only change since beta.3 is that `#save all` no longer copies the rules shared by all characters into a character's own folder. It is offered only to installs on the **beta** channel: open **Help → Check for Updates**, set **Channel** to **beta** and update. If testing finds nothing it becomes 5.0.1 on Wednesday 2 December; the test period is a full week because of the holiday and people travelling. The quickest way to help is the [Live Walk](Live-Walk), about 30 minutes in one sitting; what to check in more detail and where to report is in the pinned **Test v5.0.1-beta.4** issue on the [issue tracker](https://github.com/GenieClient/Genie5/issues).
 
 > **⚠ Two things change for scripts, both to match Genie 4.** `#config automapper` is the mapper's on/off switch again and no longer turns Record on; Record is `#config automapperrecord`, the ⏺ button or `#mapper record on|off`. And a line a script sends has its `$variables` replaced just before it goes out, so a `$name` held inside another variable is sent as its value.
 
 - **`#config automapper` is the on/off switch** — travel scripts that run `#config automapper true` no longer start editing the loaded map or get stuck on the wrong zone ([#401](https://github.com/GenieClient/Genie5/issues/401)).
 - **Scripts send a `$variable`'s value** — with automapper.cmd, `#goto` through the Shard Thieves' Guild door sends the password, not `$shard.pw` ([#437](https://github.com/GenieClient/Genie5/issues/437)).
 - **`#save` and `#load` are back** — `#save vars`, `#save all` and the rest of Genie 4's list words save and reload as they did ([#440](https://github.com/GenieClient/Genie5/issues/440)).
+- **`#save all` leaves shared rules alone** — a typed save writes only the character's own entries, so the rules in the shared `Config` folder are no longer copied into the character's folder, where the copies hid the shared ones. Copies made by an earlier test build stay until you delete them; the release notes say how ([#446](https://github.com/GenieClient/Genie5/issues/446)).
 - **Linux memory** — memory no longer grows when a window is set to a font that is not installed ([#393](https://github.com/GenieClient/Genie5/issues/393)).
 - **Saved logins are private** — on Linux and macOS, `profiles.json` is readable by you only.
 - **Updates come from GitHub over HTTPS only** — map, script and plugin downloads refuse any other address.
@@ -23,7 +24,7 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 Thanks @dylb0t and @syntaki for the reports and fixes in this build.
 
-[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.1-beta.3)
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.1-beta.4)
 
 ## Latest: v5.0.0 — True Colours
 
